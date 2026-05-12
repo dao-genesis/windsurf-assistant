@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
 # Windsurf Assistant · Devin VM Bootstrap · 道法自然
-# ═══════════════════════════════════════════════════════════════
+#   一气化三清 · I · 反代 API (本 脚本部 dao-core 本清)
+#   II · 切号 WAM           → IDE 扩展 packages/wam/
+#   III · 提示词反代 dao-proxy-min → IDE 扩展 packages/dao-proxy-min/
+# ══════════════════════════════════════════════════════════════
+#
+# Mode: SINGLE-ACCOUNT · 1 VM = 1 unit = 1 account = 1 tunnel.
+# For MULTI-ACCOUNT on a single VM (取之尽锱铢) see:
+#   scripts/devin-bootstrap-fleet.sh   (N accounts, N ports, N tunnels)
 #
 # One-line deploy on any Linux VM (Devin Cloud / VPS / EC2):
 #
@@ -154,6 +161,9 @@ if [ -n "$DAO_AUTH_KEY" ]; then
 else
   echo "  Auth Key   : (none · 公网不安全 · 请设 DAO_AUTH_KEY)"
 fi
+echo "══════════════════════════════════════════════════════════════"
+echo "  一气化三清 · 本 VM 起 [I · 反代 API]; IDE 另装 [II · 切号 WAM] / [III · 提示词反代 dao-proxy-min] 可独行可并行"
+echo "  Multi-account?  See: scripts/devin-bootstrap-fleet.sh (一 VM N 账号)"
 echo "══════════════════════════════════════════════════════════════"
 echo ""
 

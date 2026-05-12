@@ -1,5 +1,10 @@
 # 道Agent · dao-proxy-min · **v9.8.0** · 守一不离
 
+> **一气化三清 · Three Pure · 道并行而不悖**
+> [I · 反代 API · `dao-core`](../dao-core/README.md) &middot; [II · 切号 WAM · `wam`](../wam/README.md) &middot; **[III · 提示词反代 · 本](README.md)**
+>
+> dao-proxy-min 服 Cascade 提示词替换；dao-core 服任意 OpenAI 客户端；wam 服 Windsurf IDE 多账号轮转。三者正交，**道并行而不悖**。
+
 > **昔之得一者：天得一以清 · 地得一以宁 · 神得一以灵 · 侯王得一以为天下正.** —— 帛书《老子》三十九章
 >
 > **道法自然 · 无为而无不为.** —— 帛书《老子》

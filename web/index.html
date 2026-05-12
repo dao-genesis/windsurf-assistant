@@ -377,6 +377,63 @@ details > div{margin-top:8px;padding:10px;background:var(--panel2);border-radius
 
 <!-- ═════════════════════ DOCS ═════════════════════ -->
 <div class="section" id="sec-docs">
+
+  <div class="card" id="card-three-pure">
+    <h3>一气化三清 &middot; Three Pure &middot; 道并行而不悖</h3>
+    <p class="hint" style="margin-bottom:10px">
+      This project ships <b>three orthogonal pure</b>. Each runs independently;
+      any subset combines without conflict. Pick by scenario.
+    </p>
+    <div class="log" style="max-height:none;font-size:12px;line-height:1.55">
+┌──────────────────────────────────────────────────────────────────────────┐
+│ I · 反代 API · packages/dao-core/                                        │
+│   Where : your own VM (Devin Cloud / VPS / RPi / anywhere)               │
+│   What  : OpenAI-compatible /v1 reverse-proxy · SSE · 0 npm deps         │
+│   Serves: any OpenAI client (LobeChat, Cherry Studio, openai SDK, …)     │
+│                                                                          │
+│ II · 切号 WAM · packages/wam/                                            │
+│   Where : inside your Windsurf IDE                                       │
+│   What  : account-rotation extension · 60s strong-lock · quota-aware    │
+│   Serves: Windsurf IDE users with multiple accounts                     │
+│                                                                          │
+│ III · 提示词反代 dao-proxy-min · packages/dao-proxy-min/                 │
+│   Where : inside your Windsurf IDE Cascade panel                        │
+│   What  : Connect-RPC reverse-proxy · 帛书《老子》as SP · @-tool root    │
+│   Serves: Windsurf IDE users who want a custom system prompt            │
+└──────────────────────────────────────────────────────────────────────────┘
+    </div>
+    <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div style="border:1px solid var(--border);border-radius:6px;padding:10px">
+        <div style="font-size:12px;color:var(--gold);margin-bottom:4px"><b>I &middot; 反代 API</b></div>
+        <div style="font-size:11px;color:var(--dim);line-height:1.5">
+          Setup the Setup &amp; Deploy tabs on this page.<br>
+          Then plug Base URL + Key into anything OpenAI-compatible.
+        </div>
+        <div style="margin-top:6px"><a id="link-pure-1" class="btn" style="padding:4px 10px;font-size:11px" href="#" onclick="switchTab('setup');return false">Open Setup &rarr;</a></div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:6px;padding:10px">
+        <div style="font-size:12px;color:var(--gold);margin-bottom:4px"><b>II &middot; 切号 WAM</b></div>
+        <div style="font-size:11px;color:var(--dim);line-height:1.5">
+          Pure VS Code extension. <code>git clone</code> + <code>.\_dao_deploy.ps1</code>.<br>
+          Reload Windsurf window &mdash; account auto-rotates on quota exhaustion.
+        </div>
+        <div style="margin-top:6px"><a id="link-pure-2" class="btn" style="padding:4px 10px;font-size:11px" target="_blank" rel="noopener">README &rarr;</a></div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:6px;padding:10px">
+        <div style="font-size:12px;color:var(--gold);margin-bottom:4px"><b>III &middot; dao-proxy-min</b></div>
+        <div style="font-size:11px;color:var(--dim);line-height:1.5">
+          <code>windsurf --install-extension dao-proxy-min-9.8.0.vsix</code><br>
+          Cascade now uses 《老子》 as system prompt &middot; @-tools preserved.
+        </div>
+        <div style="margin-top:6px"><a id="link-pure-3" class="btn" style="padding:4px 10px;font-size:11px" target="_blank" rel="noopener">Latest VSIX &rarr;</a></div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:12px;font-size:11px">
+      Three are orthogonal: run any subset, all three together work too. Different concerns &mdash;
+      I serves any OpenAI client cloud-side; II rotates accounts IDE-side; III rewrites Cascade prompts IDE-side.
+    </p>
+  </div>
+
   <div class="card">
     <h3>Architecture &middot; Fully Decentralized</h3>
     <div class="log" style="max-height:none">
@@ -1078,15 +1135,19 @@ echo "AUTH KEY:   ${authKey}"
 // ════════════════════════════════════════════════════════════════
 // §7 · Tabs
 // ════════════════════════════════════════════════════════════════
+function switchTab(name){
+  const tab=document.querySelector(`.tab[data-tab="${name}"]`);
+  if(!tab)return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+  tab.classList.add('active');
+  const sec=$('sec-'+name); if(sec)sec.classList.add('active');
+  if(name==='api')refreshApi();
+  if(name==='deploy')genOneline();
+}
+window.switchTab=switchTab;  // expose for inline onclick (三清导航)
 document.querySelectorAll('.tab').forEach(t=>{
-  t.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    $('sec-'+t.dataset.tab).classList.add('active');
-    if(t.dataset.tab==='api')refreshApi();
-    if(t.dataset.tab==='deploy')genOneline();
-  });
+  t.addEventListener('click',()=>switchTab(t.dataset.tab));
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -1101,6 +1162,11 @@ function refreshAllDerived(){
   const repo=c.repo||detectRepo().repo;
   $('host-info').textContent=owner+'/'+repo;
   $('link-source').href=`https://github.com/${owner}/${repo}`;
+  // 三清 · Three Pure links (soft-coded · follow detectRepo)
+  const pure2=$('link-pure-2');
+  if(pure2)pure2.href=`https://github.com/${owner}/${repo}/tree/main/packages/wam`;
+  const pure3=$('link-pure-3');
+  if(pure3)pure3.href=`https://github.com/${owner}/${repo}/releases/latest`;
 }
 
 restoreConfig();
