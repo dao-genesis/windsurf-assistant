@@ -71,6 +71,18 @@ accounts*.md
 **/_capture_*.js
 **/_test_bench_*.cjs
 
+# ═══ dao-core 运行时 · 不入库 ═══
+fleet_state.json
+**/fleet_state.json
+**/_admin.out
+**/_admin.err
+**/_kernel.out
+**/_kernel.err
+**/_admin_live.*
+**/_kernel_live.*
+**/_seal*_kernel.*
+**/_lsp_bridge.json
+
 # 例外 · packages/wam/账号库.example.md (脱敏 example · 主公私产真账号由 .gitignore 屏蔽)
 !packages/wam/账号库.example.md
 
