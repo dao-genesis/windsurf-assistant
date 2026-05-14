@@ -70,6 +70,17 @@
     // 印 91 · 右栏 UI 态
     lastModel: "claude-sonnet-4-20250514", // 最近选 model (badge 用)
     useDevinIframe: false, // 右栏一笔切到 app.devin.ai iframe (配 dao-injector)
+    // 印 95 · 真本源闭环 · 云端 daemon 池
+    //   帛书·四十:「反者道之动」 · 帛书·廿五:「独立而不垓」
+    //   用户私 gist 存 token 池 · GH Actions 拉之起 daemon · 报 URL 回 gist · 本面拉之显
+    //   一 GH 账号即一切 · 主公 PC 关亦活
+    cloudPool: {
+      gistId: "", // 用户私 gist ID (dao-pool.json) · 自找或手输
+      daemons: [], // 缓存之 daemon 列 · 来自 gist /report-daemon-url 之累积
+      poolTotal: 0, // 缓存之 token 池 total
+      poolCandidates: 0, // 候选数 (W=0 · 未冻)
+      fetchedAt: 0, // 上一次拉之时
+    },
     // UI 偏好
     ui: { theme: "dark", colWidths: null, lastTab: "chat" },
   };

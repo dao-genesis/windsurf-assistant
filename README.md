@@ -3,7 +3,73 @@
 > 道生一 · 一生二 · 二生三 · 三生万物
 > 反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无
 
-A fully decentralized Windsurf assistant &mdash; **一气化五清 · 道并行而不悖** &mdash; **一账号双路** (印 88) + **柔反 alignment** (印 89) + **浏览器内 wss hook 直注** (印 90) + **三栏 engine badge + iframe app.devin.ai** (印 91) + **得鱼忘笙 · 1 ACU 换 24h VM** (印 92) + **三身一道锚定** (印 93).
+A fully decentralized Windsurf assistant &mdash; **一气化六清 · 道并行而不悖** &mdash; **一账号双路** (印 88) + **柔反 alignment** (印 89) + **浏览器内 wss hook 直注** (印 90) + **三栏 engine badge + iframe app.devin.ai** (印 91) + **得鱼忘笙 · 1 ACU 换 24h VM** (印 92) + **三身一道锚定** (印 93) + **真本源闭环 · 主公 PC 真可关机** (印 95).
+
+[![Cloud Daemon](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-cloud.yml/badge.svg)](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-cloud.yml)
+[![Keepalive](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-keepalive.yml/badge.svg)](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-keepalive.yml)
+
+---
+
+## 印 95 · 真本源闭环 · 一 GitHub 账号即一切 · 主公 PC 真可关机 (2026-05-14)
+
+> 帛书·四十:   「**反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无**」
+> 帛书·廿二:   「**圣人执一 · 以为天下牧**」
+> 帛书·二十五: 「**独立而不垓 · 可以为天地母**」
+
+承印 93/99 之三身一道 · 立印 95 之**真本源闭环** &mdash; **token 池移入主公私 Gist · GH Actions cron 5h 自起 daemon · 报 URL 回 Gist · Web UI 用 PAT 读 Gist 见 daemon · 主公 PC 真可关机**:
+
+| 件 | 道 | 量 |
+|---|---|---|
+| **packages/dao-pool/** &middot; ★ 新 | GitHub Gist token 池 (替 `~/.wam/wam-state.json`) · `gist-pool.js` (GistPool 类 · loadPool/savePool/listDaemons/findHealthy/reportDaemon/prune) · `cli.js` (init/push/pull/report/list/find/daemons/prune) | 4 件 ~30K |
+| **.github/workflows/dao-fleet-cloud.yml** &middot; ★ 新 | GH Actions 跑 daemon · pull pool → fleet_vm_unit :7862 → cloudflared → report URL 回 Gist · `workflow_dispatch` + cron 5h + push 触 | 273 行 |
+| **.github/workflows/dao-fleet-keepalive.yml** &middot; ★ 新 | 30min cron 探所有 daemon · **全死才触** dao-fleet-cloud 重起 · 不浪费 Actions 分钟 | 77 行 |
+| **web/dao_app.js pane F** &middot; ★ 新 | 用户面 · PAT 读 Gist 自动列 daemon · 一笔触 workflow · 一笔设 vmUrl 至左栏 (无须 fork) | 6 函数 +543 行 |
+| **web/dao_github_sync.js** &middot; ★ 升 | `DEFAULT_DAO_DATA.cloudPool` 字段 (poolGistId / pat / lastSync / daemons) · 与 IDB 同步 | +15 行 |
+| **tests/_seal95_smoke.cjs** &middot; ★ 新 | 44 用例全离网 · 验 GistPool 类全函数 · 集成入 run_all 套 | 206 行 |
+
+**印 95 之解** (一图尽全):
+
+```
+┌─────────────────────────────┐
+│ 主公 GitHub 账号             │
+│  Private Gist (真本源)       │  ← 替 ~/.wam/wam-state.json
+│   dao-pool.json (67KB·137号) │
+└────────────┬────────────────┘
+             │ PAT (gist scope)
+             ▼
+┌─────────────────────────────┐
+│ GH Actions runner            │
+│  ① 拉 gist → accounts.json   │
+│  ② fleet_vm_unit :7862       │
+│  ③ cf tunnel → 公网 URL      │
+│  ④ POST URL 回 gist          │
+│  ⑤ cron 5h 自起 / keepalive  │
+└─────────────────────────────┘
+             ▲
+             │ workflow_dispatch (Web UI 一笔)
+             │
+┌─────────────────────────────┐
+│ 公网用户 (任何 fork 之人)     │
+│  Pane F · PAT 读 Gist 见 URL │  ← 一笔设左栏 vmUrl
+└─────────────────────────────┘
+```
+
+**与印 99 (2026-05-13) 之别**: 印 99 daemon 仍从主公 WAM 桥拉 token (主公 PC 关 → 桥死 → 链断). 印 95 token 池入 Gist · **链中再无主公 PC** · 主公 PC 关机 daemon 永真.
+
+**一笔起 (任 Codespaces / 任 Actions runner)**:
+
+```bash
+# 一笔起 token 池 (主公本机一次)
+node packages/dao-pool/cli.js init --pat $GH_PAT --from ~/.wam/wam-state.json
+# → 出 Gist URL · 记下 Gist ID
+
+# 触 workflow (任处)
+gh workflow run dao-fleet-cloud.yml -f gist_id=<GIST_ID>
+
+# 公网用户 Pane F 输 PAT → 自动见所有活 daemon → 一笔设左栏
+```
+
+详见 [`packages/dao-pool/README.md`](packages/dao-pool/README.md) + [SEAL_yin95.md](../../05-文档_docs/SEAL_yin95.md).
 
 ---
 

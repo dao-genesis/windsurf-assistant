@@ -893,6 +893,200 @@
         ]),
       ]),
     );
+
+    // F · 印 95 · 真本源闭环 · 云端 daemon 池 (★ 主路 · 主公 PC 关亦活)
+    //   帛书·四十:   反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无
+    //   帛书·廿五:   独立而不垓 · 可以为天地母
+    //   帛书·七十三: 天网恢恢 · 疏而不失
+    //
+    //   主公诏 (2026-05-14):
+    //     "重新锚定本源 · 此核心所有均运行于云端 GitHub Actions
+    //      不依赖本地一切 · 不依赖设备 · 一 GitHub 账号即一切"
+    //
+    //   印 95 之解:
+    //     ① token 池入主公私 gist (PAT gist scope)
+    //     ② GH Actions cron 5h 自起 · 拉 gist → 立 ~/.dao/accounts.json → 起 fleet → cf tunnel → 报 URL 回 gist
+    //     ③ 此 pane 用用户 PAT (已存 localStorage) · GH API 读 gist · 显 daemon 池 · 一笔触新 run
+    //     ④ 自动设 vmUrl = 首活 daemon URL · 即可与 dao-fleet-cloud workflow 之 fleet_vm_unit 直连
+    //
+    //   主公一笔起: cd packages/dao-pool && node cli.js init --pat <PAT>
+    //   见 packages/dao-pool/README.md
+    {
+      const cp = D.cloudPool || (D.cloudPool = { gistId: "", daemons: [] });
+      const cpStatus =
+        cp.daemons && cp.daemons.length > 0
+          ? cp.daemons.filter((d) => d.ok !== false).length +
+            "/" +
+            cp.daemons.length +
+            " 活"
+          : "未拉";
+      root.appendChild(
+        el("div", { class: "pane" }, [
+          el("div", { class: "pane-hd" }, [
+            "★ 云端 daemon 池 · 印 95 ",
+            el("span", { class: "meta" }, [
+              "真本源闭环 · " + cpStatus + " · 主公 PC 关亦活",
+            ]),
+          ]),
+          el("div", { class: "pane-bd" }, [
+            el("div", { class: "hint" }, [
+              "一 GH 账号即一切 · token 池在你的私 gist · daemon 在 GH Actions cron 5h 自起 · 主公本机不必开机",
+            ]),
+            // Gist ID 配
+            el("div", { class: "row gap", style: { marginTop: "8px" } }, [
+              el(
+                "label",
+                {
+                  class: "hint",
+                  style: { fontSize: "11px", minWidth: "70px" },
+                },
+                ["dao-pool gist:"],
+              ),
+              el("input", {
+                type: "text",
+                id: "in-cloud-gist",
+                class: "inp grow",
+                placeholder: "gist id (点 🔍 自找 或手输)",
+                value: cp.gistId || "",
+              }),
+              el(
+                "button",
+                {
+                  class: "btn tiny ghost",
+                  onclick: autoFindCloudPoolGist,
+                  title: "搜你 GitHub 之 dao-pool gist (描含 dao-pool)",
+                },
+                ["🔍 自找"],
+              ),
+            ]),
+            // 操作
+            el("div", { class: "row gap", style: { marginTop: "8px" } }, [
+              el("button", { class: "btn", onclick: probeCloudFleet }, [
+                "↻ 拉 daemon 池",
+              ]),
+              el(
+                "button",
+                {
+                  class: "btn ghost",
+                  onclick: triggerCloudFleet,
+                  title:
+                    "POST /actions/workflows/dao-fleet-cloud.yml/dispatches",
+                },
+                ["▶ 触新 run"],
+              ),
+              el(
+                "button",
+                {
+                  class: "btn ghost",
+                  onclick: openCloudActions,
+                  title: "GitHub Actions · dao-fleet-cloud workflow 网页",
+                },
+                ["Actions ↗"],
+              ),
+              el(
+                "button",
+                {
+                  class: "btn tiny ghost",
+                  onclick: useFirstCloudDaemonAsVm,
+                  title: "把首活 daemon URL 设为左栏 VM URL · 一笔接客",
+                },
+                ["→ 设左栏 VM"],
+              ),
+            ]),
+            // 状态
+            el(
+              "div",
+              {
+                id: "cloud-fleet-status",
+                class: "status-line",
+                style: {
+                  marginTop: "6px",
+                  whiteSpace: "pre-wrap",
+                  fontFamily: "monospace",
+                  fontSize: "11px",
+                },
+              },
+              [
+                cp.daemons && cp.daemons.length > 0
+                  ? renderCloudDaemons(cp.daemons)
+                  : "(点 🔍 自找 → ↻ 拉 daemon 池 · 或见折叠之 主公一笔起 init)",
+              ],
+            ),
+            // 折叠 · 主公一笔起 init
+            el("details", { style: { marginTop: "8px" } }, [
+              el(
+                "summary",
+                {
+                  class: "hint",
+                  style: { cursor: "pointer", fontSize: "11px" },
+                },
+                ["▸ 主公一笔起 init (无 dao-pool gist 时)"],
+              ),
+              el(
+                "pre",
+                {
+                  class: "code",
+                  style: {
+                    fontSize: "10px",
+                    marginTop: "4px",
+                    whiteSpace: "pre-wrap",
+                  },
+                },
+                [
+                  "# 一次性 · 主公本机 · 立私 gist + 推 token 池\n" +
+                    "git clone https://github.com/" +
+                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    "/" +
+                    (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
+                    "\n" +
+                    "cd " +
+                    (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
+                    "/packages/dao-pool\n" +
+                    "node cli.js init --pat $(gh auth token)\n\n" +
+                    "# 设 repo secrets (init 输出 gist id)\n" +
+                    "gh secret set DAO_POOL_GIST_ID --body '<id>' -R " +
+                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    "/" +
+                    (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
+                    "\n" +
+                    "gh secret set DAO_POOL_PAT --body $(gh auth token) -R " +
+                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    "/" +
+                    (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
+                    "\n" +
+                    "gh secret set DAO_AUTH_KEY --body 'sk-ws-proxy-<rand>' -R " +
+                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    "/" +
+                    (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
+                    "\n\n" +
+                    "# 触新 run (或 cron 自起每 5h)\n" +
+                    "gh workflow run dao-fleet-cloud.yml -R " +
+                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    "/" +
+                    (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
+                    "\n\n" +
+                    "# (此 pane 自动 1-2 min 后拉 · 或点 ↻ 重拉)",
+                ],
+              ),
+            ]),
+          ]),
+        ]),
+      );
+      // 输 gist id 改即记
+      const inGid = $("in-cloud-gist");
+      if (inGid && !inGid.__bound) {
+        inGid.__bound = true;
+        inGid.addEventListener("input", (e) => {
+          const D2 = memo.data;
+          const v = e.target.value.trim();
+          if (!D2.cloudPool) D2.cloudPool = {};
+          if (D2.cloudPool.gistId !== v) {
+            D2.cloudPool.gistId = v;
+            markDirty();
+          }
+        });
+      }
+    }
   }
 
   // 印 94 (cascade) · 探本机五服 (unified :11440 ★ + devin :11441 + ws :8878 + 中枢 :11445 + pilot :11446)
@@ -964,6 +1158,274 @@
         toast("本机五服皆未起 · 见折叠之一键启", "warn");
       }
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  印 95 · 真本源闭环 · 云端 daemon 池 (★ 主路 · 主公 PC 关亦活)
+  //  帛书·四十:「反者道之动 · 弱者道之用」
+  //  帛书·廿五:「独立而不垓 · 可以为天地母」
+  //
+  //  pane F 之实 · 6 函数 · 全用用户已存 PAT (localStorage 'dao.pat')
+  // ═══════════════════════════════════════════════════════════════════
+
+  // 〇 · 帮: 取用户已存 PAT
+  function getCloudPat() {
+    return localStorage.getItem("dao.pat") || "";
+  }
+
+  // 一 · 自找用户 GitHub 之 dao-pool gist (描含 dao-pool · 文件 dao-pool.json)
+  async function autoFindCloudPoolGist() {
+    const stEl = $("cloud-fleet-status");
+    const pat = getCloudPat();
+    if (!pat) {
+      if (stEl) stEl.textContent = "✗ 未登录 PAT · 请先 gate 态登入";
+      return;
+    }
+    if (stEl) stEl.textContent = "↻ 找你 GitHub 之 dao-pool gist...";
+    try {
+      const r = await fetch("https://api.github.com/gists?per_page=100", {
+        headers: {
+          Authorization: "Bearer " + pat,
+          Accept: "application/vnd.github+json",
+        },
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const list = await r.json();
+      const found = (list || []).filter(
+        (g) =>
+          g.files &&
+          g.files["dao-pool.json"] &&
+          /dao-pool/i.test(g.description || ""),
+      );
+      if (found.length === 0) {
+        if (stEl)
+          stEl.textContent = "✗ 未找 dao-pool gist · 见折叠之 主公一笔起 init";
+        toast("未找 dao-pool gist · 见折叠之 init 步骤", "warn");
+        return;
+      }
+      const D = memo.data;
+      if (!D.cloudPool) D.cloudPool = {};
+      D.cloudPool.gistId = found[0].id;
+      markDirty();
+      if ($("in-cloud-gist")) $("in-cloud-gist").value = D.cloudPool.gistId;
+      if (stEl)
+        stEl.textContent = "✓ 找 " + found.length + " 个 · 用 " + found[0].id;
+      if (found.length > 1)
+        toast("有 " + found.length + " 个 dao-pool · 用首个", "info");
+      // 自动拉
+      return await probeCloudFleet();
+    } catch (e) {
+      if (stEl) stEl.textContent = "✗ 自找失: " + e.message;
+      toast("自找 gist 失: " + e.message, "err");
+    }
+  }
+
+  // 二 · 拉 gist · 解 daemon 池 · 渲染 + 自动设 vmUrl
+  async function probeCloudFleet() {
+    const D = memo.data;
+    const cp = D.cloudPool || (D.cloudPool = {});
+    const stEl = $("cloud-fleet-status");
+    // 取 input 之 ID 优 (用户可手改)
+    const inGid = $("in-cloud-gist") && $("in-cloud-gist").value.trim();
+    if (inGid && inGid !== cp.gistId) {
+      cp.gistId = inGid;
+      markDirty();
+    }
+    const pat = getCloudPat();
+    if (!pat) {
+      if (stEl) stEl.textContent = "✗ 未登录 PAT";
+      return;
+    }
+    if (!cp.gistId) {
+      if (stEl) stEl.textContent = "✗ 未设 gist · 点 🔍 自找 或手输";
+      return;
+    }
+    if (stEl) stEl.textContent = "↻ 拉 gist " + cp.gistId.slice(0, 8) + "...";
+    try {
+      const r = await fetch(
+        "https://api.github.com/gists/" + encodeURIComponent(cp.gistId),
+        {
+          headers: {
+            Authorization: "Bearer " + pat,
+            Accept: "application/vnd.github+json",
+          },
+        },
+      );
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const g = await r.json();
+      const file = g.files && g.files["dao-pool.json"];
+      if (!file) throw new Error("gist 内无 dao-pool.json");
+      const data = JSON.parse(file.content);
+      const daemons = (data.daemons || []).filter((d) => d.url);
+      // age 算 (新 · 不信 gist 之旧 ageSec)
+      const now = Date.now();
+      daemons.forEach((d) => {
+        const t = d.reportedAt ? new Date(d.reportedAt).getTime() : 0;
+        d.ageSec = Math.round((now - t) / 1000);
+        // > 15 min 标 stale
+        if (d.ageSec > 15 * 60) d.ok = false;
+      });
+      cp.daemons = daemons;
+      cp.fetchedAt = now;
+      cp.poolTotal = (data.pool && data.pool.total) || 0;
+      cp.poolCandidates = data.pool
+        ? (data.pool.accounts || []).filter(
+            (a) =>
+              !a.frozen && (typeof a.weekly !== "number" || a.weekly === 0),
+          ).length
+        : 0;
+      markDirty();
+      if (stEl) stEl.textContent = renderCloudDaemons(daemons);
+      // 重渲染 pane (更新 meta 之 N 活)
+      if (typeof renderLeft === "function") {
+        // pane F 在 left · 但避免无穷递归 · 仅更新 hd
+      }
+      if (daemons.length === 0) {
+        toast(
+          "gist pool=" + cp.poolTotal + " · 无活 daemon · 点 ▶ 触新 run",
+          "warn",
+        );
+      } else {
+        const live = daemons.filter((d) => d.ok !== false).length;
+        toast(
+          "★ pool=" +
+            cp.poolTotal +
+            " · daemon " +
+            live +
+            "/" +
+            daemons.length +
+            " 活",
+          live > 0 ? "ok" : "warn",
+        );
+      }
+    } catch (e) {
+      if (stEl) stEl.textContent = "✗ 拉失: " + e.message;
+      toast("拉 daemon 池失: " + e.message, "err");
+    }
+  }
+
+  // 三 · 渲染 daemon 表 (monospace · 紧凑)
+  function renderCloudDaemons(daemons) {
+    if (!daemons || daemons.length === 0)
+      return "(无活 daemon · 点 ▶ 触新 run · 等 1-2 min 后 ↻ 重拉)";
+    const fmtAge = (s) => {
+      if (s == null) return "?";
+      if (s < 60) return s + "s";
+      if (s < 3600) return Math.round(s / 60) + "m";
+      return Math.round(s / 3600) + "h";
+    };
+    return daemons
+      .map((d) => {
+        const ok = d.ok === false ? "⚠" : "✓";
+        const host = (d.host || "?").slice(0, 24);
+        const ver = d.version ? "v" + d.version : "v?";
+        const pool = d.poolTotal != null ? "p" + d.poolTotal : "p?";
+        const age = fmtAge(d.ageSec);
+        return (
+          ok +
+          " " +
+          host.padEnd(24) +
+          " " +
+          ver.padEnd(8) +
+          " " +
+          pool.padEnd(7) +
+          " " +
+          age.padStart(4) +
+          "\n  " +
+          d.url
+        );
+      })
+      .join("\n");
+  }
+
+  // 四 · 触 dao-fleet-cloud workflow (POST /actions/workflows/.../dispatches)
+  async function triggerCloudFleet() {
+    const owner =
+      (memo.fork && memo.fork.owner) ||
+      (memo.site && memo.site.owner) ||
+      daoSync.UPSTREAM_OWNER;
+    const repo = (memo.site && memo.site.repo) || daoSync.UPSTREAM_REPO;
+    const stEl = $("cloud-fleet-status");
+    const pat = getCloudPat();
+    if (!pat) {
+      toast("未登录 PAT", "err");
+      return;
+    }
+    if (stEl)
+      stEl.textContent =
+        "↻ 触 dao-fleet-cloud workflow on " + owner + "/" + repo + "...";
+    try {
+      const r = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/actions/workflows/dao-fleet-cloud.yml/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + pat,
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ref: "main",
+            inputs: { max_minutes: "300", auth_required: "yes" },
+          }),
+        },
+      );
+      if (r.status === 204 || r.ok) {
+        toast("✓ workflow 已触 · 等 1-2 min · 自动重拉", "ok");
+        if (stEl)
+          stEl.textContent =
+            "↻ workflow 触发成 · 等 daemon 起 (1-2 min) · 自动 90s 后重拉\n  → " +
+            `https://github.com/${owner}/${repo}/actions`;
+        setTimeout(
+          () =>
+            probeCloudFleet().catch((e) =>
+              console.warn("auto re-pull err:", e),
+            ),
+          90000,
+        );
+      } else {
+        const txt = await r.text();
+        let hint = "";
+        if (r.status === 404)
+          hint = "\n  (workflow 可能未在 fork 内 · 或 PAT 缺 workflow scope)";
+        if (r.status === 403)
+          hint =
+            "\n  (PAT 缺 actions:write 权限 · classic PAT 需勾 workflow scope)";
+        throw new Error("HTTP " + r.status + " · " + txt.slice(0, 100) + hint);
+      }
+    } catch (e) {
+      if (stEl) stEl.textContent = "✗ 触失: " + e.message;
+      toast("触 workflow 失 · " + e.message, "err");
+    }
+  }
+
+  // 五 · 开 GitHub Actions 网页
+  function openCloudActions() {
+    const owner =
+      (memo.fork && memo.fork.owner) ||
+      (memo.site && memo.site.owner) ||
+      daoSync.UPSTREAM_OWNER;
+    const repo = (memo.site && memo.site.repo) || daoSync.UPSTREAM_REPO;
+    window.open(
+      `https://github.com/${owner}/${repo}/actions/workflows/dao-fleet-cloud.yml`,
+      "_blank",
+    );
+  }
+
+  // 六 · 一笔: 把首活 daemon URL 设为左栏 VM URL · 即可与 dao-fleet-cloud 直接接客
+  function useFirstCloudDaemonAsVm() {
+    const D = memo.data;
+    const cp = D.cloudPool || {};
+    const live = (cp.daemons || []).filter((d) => d.ok !== false && d.url);
+    if (live.length === 0) {
+      toast("无活 daemon · 先 ↻ 拉 或 ▶ 触新 run", "warn");
+      return;
+    }
+    const url = live[0].url.replace(/\/+$/, "");
+    D.vmUrl = url;
+    markDirty();
+    if (typeof renderLeft === "function") renderLeft();
+    toast("★ 左栏 VM URL = " + url + " · 一笔接客", "ok");
   }
 
   function spCheckbox(id, label, checked, onChange) {
