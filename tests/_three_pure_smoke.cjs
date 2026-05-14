@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * _three_pure_smoke.cjs — 印 65 · 一气化三清 · 道并行而不悖
+ * _three_pure_smoke.cjs — 印 65→101 · 一气化三清 · 道并行而不悖
  * ════════════════════════════════════════════════════════════════════════
  *   帛书·四十二: 「道生一, 一生二, 二生三, 三生万物.」
  *   帛书·三十九: 「昔之得一者: 天得一以清 · 地得一以宁 · 神得一以灵 · 侯王得一以为天下正.」
@@ -13,7 +13,7 @@
  *         - 不含 "*Optional*" 邻近 wam/dao-proxy 的贬称
  *         - 不含 "Not required for the cloud-proxy flow"
  *         - 三清各自成段 (## I · 反代 API / ## II · 切号 WAM / ## III · 提示词反代)
- *         - 印 65 印记在尾
+ *         - 印 65 或印 101 印记在尾
  *     [B] web/index.html 三清入口
  *         - 含 #card-three-pure 卡
  *         - link-pure-1 / link-pure-2 / link-pure-3 锚存
@@ -70,7 +70,7 @@ function exists(rel) {
 }
 
 function main() {
-  console.log("═══ 三清守门 · 印 65 · 道并行而不悖 ═══\n");
+  console.log("═══ 三清守门 · 印 65→101 · 道并行而不悖 ═══\n");
 
   // ── [A] README.md 道义 ──────────────────────────────────────
   console.log("[A] README.md 道义");
@@ -78,7 +78,7 @@ function main() {
   ok(readme.includes("一气化三清"), "含 '一气化三清'");
   ok(readme.includes("Three Pure"), "含 'Three Pure'");
   ok(readme.includes("道并行而不悖"), "含 '道并行而不悖'");
-  ok(readme.includes("印 65"), "印 65 印记在");
+  ok(readme.includes("印 65") || readme.includes("印 101"), "印 65/101 印记在");
 
   // 贬称防御 (印 63 时曾把 wam/dao-proxy 标为 'Optional · Not required')
   ok(
