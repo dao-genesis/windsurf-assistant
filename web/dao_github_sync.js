@@ -71,15 +71,21 @@
     lastModel: "claude-sonnet-4-20250514", // 最近选 model (badge 用)
     useDevinIframe: false, // 右栏一笔切到 app.devin.ai iframe (配 dao-injector)
     // 印 95 · 真本源闭环 · 云端 daemon 池
-    //   帛书·四十:「反者道之动」 · 帛书·廿五:「独立而不垓」
+    // 印 100 · 太极笙万物 · 一 PAT 即一切 · 闭环自举 (民莫之令而自均)
+    //   帛书·四十:  「反者道之动」 · 帛书·廿五: 「独立而不垓」
+    //   帛书·三十二: 「侯王若能守之 · 万物将自宾 · 天地相合 · 以降甘露」
     //   用户私 gist 存 token 池 · GH Actions 拉之起 daemon · 报 URL 回 gist · 本面拉之显
-    //   一 GH 账号即一切 · 主公 PC 关亦活
+    //   一 GH 账号即一切 · 主公 PC 关亦活 · 主公自身亦可不在
     cloudPool: {
-      gistId: "", // 用户私 gist ID (dao-pool.json) · 自找或手输
+      gistId: "", // 用户私 gist ID (dao-pool.json) · 自找或手输 · 印 100 自创
+      poolUrl: "", // 印 100 · gist html_url (UI 可点)
       daemons: [], // 缓存之 daemon 列 · 来自 gist /report-daemon-url 之累积
       poolTotal: 0, // 缓存之 token 池 total
       poolCandidates: 0, // 候选数 (W=0 · 未冻)
       fetchedAt: 0, // 上一次拉之时
+      autoBootstrapped: false, // 印 100 · 是否由 oneShot 自举
+      bootstrapAt: "", // 印 100 · 自举完成时
+      yin: 0, // 印 100 标记
     },
     // UI 偏好
     ui: { theme: "dark", colWidths: null, lastTab: "chat" },

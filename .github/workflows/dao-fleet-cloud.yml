@@ -58,6 +58,18 @@ on:
         options:
           - 'yes'
           - 'no'
+      gist_id:
+        description: '印 100 · token 池 gist id (留空则用 repo secret DAO_POOL_GIST_ID)'
+        required: false
+        default: ''
+      pat:
+        description: '印 100 · gist scope PAT (留空则用 repo secret DAO_POOL_PAT · 仅当前 dispatch run 用)'
+        required: false
+        default: ''
+      auth_key:
+        description: '印 100 · sk-ws-proxy-* (留空则用 repo secret DAO_AUTH_KEY)'
+        required: false
+        default: ''
   schedule:
     # 每 5 小时一次 · 自续 (UTC · 凡 0/5/10/15/20 时)
     - cron: '0 */5 * * *'
@@ -76,7 +88,8 @@ concurrency:
 
 jobs:
   fleet:
-    if: github.repository_owner == 'zhouyoukang'
+    # 印 100 · 太极笙万物 · 任 fork 自跑自己之 daemon · 民莫之令而自均
+    # (前印 95 限 zhouyoukang · 印 100 解此锁 · 用户 fork 即可一笔自举)
     runs-on: ubuntu-latest
     timeout-minutes: 355  # 6h hard - 5min 缓
 
@@ -92,8 +105,9 @@ jobs:
       - name: 三 · 拉 token 池 · gist → ~/.dao/accounts.json
         id: pull
         env:
-          DAO_POOL_GIST_ID: ${{ secrets.DAO_POOL_GIST_ID }}
-          DAO_POOL_PAT: ${{ secrets.DAO_POOL_PAT }}
+          # 印 100: inputs 优先 (web 一笔传) · 退 repo secrets (主公自设 · cron 自续)
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
         run: |
           set -e
           echo "════════════════════════════════════════"
@@ -151,7 +165,8 @@ jobs:
       - name: 五 · 起 fleet_vm_unit · 公网 + auth 守门
         id: fleet
         env:
-          DAO_AUTH_KEY: ${{ secrets.DAO_AUTH_KEY }}
+          # 印 100: inputs 优先 · 退 repo secret · 都无则空 (无守门 · 仅调试)
+          DAO_AUTH_KEY: ${{ github.event.inputs.auth_key || secrets.DAO_AUTH_KEY }}
         run: |
           set +e
           echo ""
@@ -222,8 +237,8 @@ jobs:
 
       - name: 七 · 报 daemon URL 回 gist (web UI 即见)
         env:
-          DAO_POOL_GIST_ID: ${{ secrets.DAO_POOL_GIST_ID }}
-          DAO_POOL_PAT: ${{ secrets.DAO_POOL_PAT }}
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
           DAEMON_URL: ${{ steps.tunnel.outputs.DAEMON_URL }}
         run: |
           set +e
@@ -262,8 +277,8 @@ jobs:
 
       - name: 九 · keep alive · 350 min · 30 min 重拉 gist · 5 min 重报 URL
         env:
-          DAO_POOL_GIST_ID: ${{ secrets.DAO_POOL_GIST_ID }}
-          DAO_POOL_PAT: ${{ secrets.DAO_POOL_PAT }}
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
           DAEMON_URL: ${{ steps.tunnel.outputs.DAEMON_URL }}
           FLEET_PID: ${{ steps.fleet.outputs.FLEET_PID }}
           MAX_MIN: ${{ github.event.inputs.max_minutes || '300' }}

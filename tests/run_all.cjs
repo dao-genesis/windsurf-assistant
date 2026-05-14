@@ -36,6 +36,7 @@ const TESTS = [
   "_seal90_smoke", // 印 90 · 网页端注入器 · 反者道之动 · 弱之胜强 (印 89 TAO_HEADER 柔反)
   "_seal92_smoke", // 印 92 · 反者道之动 · 万物归焉而弗为主 · dao-vm + devin_cloud_engine 升 + ACP 真据
   "_seal95_smoke", // 印 95 · 真本源闭环 · token 池云端化 (gist) · 一 GH 账号即一切
+  "_seal100_smoke", // 印 100 · 太极笙万物 · 一 PAT 即一切 · 闭环自举 (民莫之令而自均)
 ];
 
 let allOk = true;

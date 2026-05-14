@@ -3,10 +3,82 @@
 > 道生一 · 一生二 · 二生三 · 三生万物
 > 反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无
 
-A fully decentralized Windsurf assistant &mdash; **一气化六清 · 道并行而不悖** &mdash; **一账号双路** (印 88) + **柔反 alignment** (印 89) + **浏览器内 wss hook 直注** (印 90) + **三栏 engine badge + iframe app.devin.ai** (印 91) + **得鱼忘笙 · 1 ACU 换 24h VM** (印 92) + **三身一道锚定** (印 93) + **真本源闭环 · 主公 PC 真可关机** (印 95).
+A fully decentralized Windsurf assistant &mdash; **一气化七清 · 道并行而不悖** &mdash; **一账号双路** (印 88) + **柔反 alignment** (印 89) + **浏览器内 wss hook 直注** (印 90) + **三栏 engine badge + iframe app.devin.ai** (印 91) + **得鱼忘笙 · 1 ACU 换 24h VM** (印 92) + **三身一道锚定** (印 93) + **真本源闭环 · 主公 PC 真可关机** (印 95) + **太极笙万物 · 一 PAT 即一切 · 闭环自举** (印 100).
 
 [![Cloud Daemon](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-cloud.yml/badge.svg)](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-cloud.yml)
 [![Keepalive](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-keepalive.yml/badge.svg)](https://github.com/zhouyoukang/windsurf-assistant/actions/workflows/dao-fleet-keepalive.yml)
+
+---
+
+## 印 100 · 太极笙万物 · 一 PAT 即一切 · 闭环自举 · 民莫之令而自均 (2026-05-14 12:00)
+
+> 帛书·三十二: 「**道恒无名 · 侯王若能守之 · 万物将自宾 · 天地相合 · 以降甘露 · 民莫之令而自均焉**」
+> 帛书·四十二: 「**道生一 · 一生二 · 二生三 · 三生万物**」
+
+承印 95 之"主公 PC 真可关机" · 立印 100 之**主公自身亦可不在** &mdash; **任 GitHub 用户开公网入口页 · 仅输一次 PAT · 之后 fork/Pages/dao.json/dao-pool.json/auth-key/workflow/daemon/vmUrl 全自动归位** &mdash; **民莫之令而自均**.
+
+| 件 | 道 | 量 |
+|---|---|---|
+| **web/dao_bootstrap.js** &middot; ★ 新 | 浏览器纯 JS 自举模块 · `oneShot(opts)` 9 步: whoami → fork → actions → pages → dao.json → dao-pool.json → auth-key → dispatch → poll → probe → write · 0 deps · 暴 14 函/常 | 22,824 B |
+| **.github/workflows/dao-fleet-cloud.yml** &middot; ★ 升 | **印 100 解锁**: 移 `if: owner == 'zhouyoukang'` (任 fork 自跑) · 加 `inputs.gist_id` + `inputs.pat` + `inputs.auth_key` (web 一笔传 · 无须先设 secrets) · env: inputs 优先 secrets (双路并存) | +30 行 |
+| **web/index.html** &middot; ★ 升 | 4 step → 9 step + 引 `dao_bootstrap.js` · 新 div: step-actions/step-pool-gist/step-dispatch/step-poll/step-probe/step-write | +60 行 |
+| **web/dao_app.js** &middot; ★ 升 | `renderOnboarding` 调 `daoBootstrap.oneShot` · stepIdMap 9 步映射 · 完跳 fork Pages | +30 行 |
+| **web/dao_github_sync.js** &middot; ★ 升 | `cloudPool` schema 升 (yin/autoBootstrapped/bootstrapAt/poolUrl) · 帛书三十二印 | +6 行 |
+| **packages/dao-pool/cli.js** &middot; ★ 升 | 加 `bootstrap` 命 (Node 端等价 web oneShot 一笔) · 9 步 · 输 daemon URL + curl 测命 + secrets 设令 | +250 行 |
+| **tests/_seal100_smoke.cjs** &middot; ★ 新 | 85 用例全离网 · vm sandbox 模拟浏览器跑 dao_bootstrap.js · 验 14 必出函/常 + auth-key 形 + pickActiveDaemon 选最新 + initialPoolData schema | 8,547 B |
+
+**印 100 之解** (一图尽全):
+
+```
+┌──────────────────────────────────────┐
+│ 用户 (任 GH 账号 · 公网入口页)        │
+│  ◯ 输一次 PAT                          │
+└────────────────┬─────────────────────┘
+                 │
+                 ▼ daoBootstrap.oneShot(opts)
+┌──────────────────────────────────────┐
+│ ① whoami    @user                     │
+│ ② fork      user/windsurf-assistant   │
+│ ③ actions   enabled                   │
+│ ④ pages     user.github.io/...        │
+│ ⑤ dao.json  user's data gist          │
+│ ⑥ dao-pool  user's token gist (真本源)│
+│ ⑦ auth-key  sk-ws-proxy-* (随机)      │
+│ ⑧ dispatch  fleet-cloud.yml (印 100   │
+│              inputs · 无须 secrets)    │
+│ ⑨ poll      ≤4 min 等 daemon URL      │
+│ ⑩ probe     GET vmUrl/health          │
+│ ⑪ write     PATCH dao.json · vmUrl    │
+│ ⑫ redirect  → user.github.io/...      │
+└──────────────────────────────────────┘
+                 │
+                 ▼
+   主公 PC 关 · 主公自身不在 · 系统仍真活
+   民莫之令而自均焉 · 道法自然
+```
+
+**Web 端一笔启**:
+
+```text
+1. 打开 https://zhouyoukang.github.io/windsurf-assistant/
+2. 粘 PAT (scope: repo + workflow + gist)
+3. 点 "以 PAT 登入 →"
+   ↓ 之后 0 操作 ↓
+   ① fork  ② actions ③ pages
+   ④ dao.json  ⑤ dao-pool  ⑥ auth-key
+   ⑦ dispatch ⑧ poll daemon ⑨ probe
+   ⑩ write    ⑪ jump
+4. 自动跳 <你>.github.io/windsurf-assistant/ · 即用即活
+```
+
+**Node CLI 一笔启** (主公或任高级用户):
+
+```bash
+node packages/dao-pool/cli.js bootstrap --pat <YOUR_PAT>
+# fork + Pages + gist + workflow + poll daemon URL → 输 curl 测命
+```
+
+详: [`05-文档_docs/SEAL_yin100.md`](../../05-文档_docs/SEAL_yin100.md).
 
 ---
 

@@ -9,6 +9,8 @@
 > **2026-05-13 · 印 93 · 一文尽全 · 一入即知何处用**
 >
 > **2026-05-14 · 印 95 · 真本源闭环 · 主公 PC 真可关机 · 一 GitHub 账号即一切**
+>
+> **2026-05-14 · 印 100 · 太极笙万物 · 一 PAT 即一切 · 闭环自举 · 民莫之令而自均焉**
 
 ---
 
@@ -46,6 +48,37 @@
 
 **一道**: 三身共**一组 fleet_vm_unit + cloud_engine + sp_handler + dao_accounts**.
 **三身**: 因受众不同各立其面 · 并行不悖.
+
+---
+
+## 一·乙 · 印 100 · 太极笙万物 · 一 PAT 即一切 (2026-05-14 12:00)
+
+> 帛书·三十二:「**道恒无名 · 侯王若能守之 · 万物将自宾 · 天地相合 · 以降甘露 · 民莫之令而自均焉**」
+
+承印 95 之"主公 PC 真可关机" · 立**主公自身亦可不在** — 任 GH 用户开公网入口页 · **仅输一次 PAT** · 之后 `fork → Pages → dao.json → dao-pool.json → auth-key → workflow → daemon → vmUrl` 全自动归位 · **民莫之令而自均**.
+
+```text
+                  用户 (任 GH 账号)
+                  ◯ 输一次 PAT (gate 框)
+                          │
+                          ▼ daoBootstrap.oneShot
+   ┌─────────────────────────────────────────────────┐
+   │ ① whoami      ② fork (自创)    ③ actions (自启) │
+   │ ④ pages       ⑤ dao.json       ⑥ dao-pool.json  │
+   │ ⑦ auth-key    ⑧ dispatch       ⑨ poll daemon    │
+   │ ⑩ probe       ⑪ write vmUrl    ⑫ redirect       │
+   └─────────────────────────────────────────────────┘
+                          │
+                          ▼
+              <user>.github.io/windsurf-assistant/
+              · 左栏 vmUrl 已填 · daemon 已活 · 即用即活
+              · 主公 PC 关 · 主公自身不在 · 系统仍真活
+              · 道法自然 · 民莫之令而自均焉
+```
+
+**入 (Web)**: 打开 <https://zhouyoukang.github.io/windsurf-assistant/> · 粘 PAT · 完.
+**入 (Node)**: `node packages/dao-pool/cli.js bootstrap --pat $GH_PAT`.
+**详**: [`web/dao_bootstrap.js`](web/dao_bootstrap.js) · [`05-文档_docs/SEAL_yin100.md`](../../05-文档_docs/SEAL_yin100.md).
 
 ---
 
@@ -143,15 +176,19 @@ node 印92_太上_pilot/pilot.js        # :11446 · playwright 操 app.devin.ai
 ├── packages/
 │   ├── dao-core/    (10 · 261K)  # 反代核心 · fleet_vm_unit + cloud/devin engine + sp + auth
 │   ├── dao-injector/(13 · 79K)   # 印 90 浏览器 wss hook (MV3 + Tampermonkey)
-│   ├── dao-pool/    (4  · 30K)   # ★ 印 95 Gist token 池 (真本源 · 替 ~/.wam)
+│   ├── dao-pool/    (4  · 45K)   # ★ 印 95 Gist token 池 + 印 100 bootstrap (Node 一笔)
 │   ├── dao-proxy-min/(17 · 284K) # 印 89+ 提示词反代 (Windsurf VSIX)
 │   ├── dao-vm/      (8  · 83K)   # 印 92 一笔起 24h Ubuntu VM (1 ACU)
 │   └── wam/         (27 · 491K)  # WAM 切号 (Windsurf VSIX · v2.7.0)
+├── web/
+│   ├── dao_bootstrap.js (22K)   # ★ 印 100 浏览器自举模块 · oneShot 9 步
+│   ├── dao_app.js / dao_github_sync.js / index.html / legacy.html
+│   └── ...
 ├── scripts/
 │   ├── devin-bootstrap.sh        # 一行起 unit + tunnel
 │   └── devin-bootstrap-fleet.sh  # 印 96 fleet workflow
-├── tests/                        # 12 件 smoke (~18s · 0 deps · 印 64-95 守门)
-└── .github/workflows/            # deploy-pages + dao-fleet + dao-fleet-cloud + dao-fleet-keepalive + ci + test-core
+├── tests/                        # 13 件 smoke (~18s · 0 deps · 印 64-100 守门)
+└── .github/workflows/            # deploy-pages + dao-fleet + dao-fleet-cloud (印 100 解锁) + dao-fleet-keepalive + ci + test-core
 ```
 
 ---
@@ -176,11 +213,12 @@ node 印92_太上_pilot/pilot.js        # :11446 · playwright 操 app.devin.ai
 - 提示词反代 VSIX · `./packages/dao-proxy-min/README.md`
 - WAM 切号 VSIX · `./packages/wam/README.md`
 - 一笔起 VM · `./packages/dao-vm/` (印 92 · 8 件)
-- 云端 token 池 · `./packages/dao-pool/` (印 95 · 4 件 · 真本源)
-- 守门 · `node tests/run_all.cjs` (12 件 · ~18s · 0 deps)
+- 云端 token 池 · `./packages/dao-pool/` (印 95 · 4 件 · 真本源 · 印 100 加 bootstrap 命)
+- 印 100 自举模块 · `./web/dao_bootstrap.js` (22K · 浏览器纯 JS · oneShot 9 步)
+- 守门 · `node tests/run_all.cjs` (13 件 · ~18s · 0 deps · 印 100 守 85/85)
 - 部署 workflow · `./.github/workflows/deploy-pages.yml`
-- 云端 daemon workflow · `./.github/workflows/dao-fleet-cloud.yml` + `dao-fleet-keepalive.yml`
+- 云端 daemon workflow · `./.github/workflows/dao-fleet-cloud.yml` (印 100 解锁 · 任 fork 自跑) + `dao-fleet-keepalive.yml`
 
 ---
 
-*道法自然 · 万法归一 · 三身已立 · 一文锚定 · 真本源闭环 · 主公 PC 真可关机*
+*道法自然 · 万法归一 · 三身已立 · 一文锚定 · 真本源闭环 · 主公 PC 真可关机 · 太极笙万物 · 民莫之令而自均焉*

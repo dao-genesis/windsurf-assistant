@@ -208,7 +208,11 @@
     }
   }
 
-  // ═══ Onboarding · 一气化三清 (fork → Pages → Gist → 跳) ═══════════════
+  // ═══ Onboarding · 印 100 太极笙万物 (一笔 oneShot 自举闭环) ════════════
+  //   帛书·三十二: 道恒无名 · 侯王若能守之 · 万物将自宾
+  //                天地相合 · 以降甘露 · 民莫之令而自均焉
+  //   九步: fork → actions → pages → gist → pool-gist → dispatch
+  //         → poll → probe → write → redirect (jump)
   async function renderOnboarding() {
     hide("state-gate");
     show("state-onboarding");
@@ -225,109 +229,103 @@
             ? "↻"
             : status === "err"
               ? "✗"
-              : "○";
-      const klass = "onboard-step onboard-" + status;
+              : status === "skip"
+                ? "·"
+                : "○";
+      const klass =
+        "onboard-step onboard-" + (status === "skip" ? "ok" : status);
       e.className = klass;
       e.querySelector(".icon").textContent = icon;
       if (sub != null) e.querySelector(".sub").textContent = sub;
     };
 
-    // §1 fork
-    setStep(
-      "step-fork",
-      "run",
-      "POST /repos/" +
-        daoSync.UPSTREAM_OWNER +
-        "/" +
-        daoSync.UPSTREAM_REPO +
-        "/forks",
-    );
-    let fork;
-    try {
-      fork = await daoSync.ensureFork(memo.me);
-      memo.fork = fork;
-      setStep(
-        "step-fork",
-        "ok",
-        fork.alreadyExisted
-          ? "已 fork · " + fork.htmlUrl
-          : "新建 fork · " + fork.htmlUrl,
-      );
-    } catch (e) {
-      setStep("step-fork", "err", e.message);
-      toast("fork 失败: " + e.message, "err");
+    // bootstrap step name → onboarding step id
+    const stepIdMap = {
+      whoami: null, // 不显 · 已识
+      fork: "step-fork",
+      actions: "step-actions",
+      pages: "step-pages",
+      dao_gist: "step-gist",
+      pool_gist: "step-pool-gist",
+      auth_key: null, // 内部 · 不显
+      dispatch: "step-dispatch",
+      poll: "step-poll",
+      probe: "step-probe",
+      write: "step-write",
+      done: null, // 之后做 redirect
+    };
+
+    if (!window.daoBootstrap) {
+      setStep("step-fork", "err", "daoBootstrap 未加载 · 检查 script tag");
+      toast("印 100 自举模块未加载", "err");
       return;
     }
 
-    // §2 Pages
-    setStep(
-      "step-pages",
-      "run",
-      "POST /repos/" +
-        fork.owner +
-        "/" +
-        fork.repo +
-        "/pages (source main:/web)",
-    );
+    let result;
     try {
-      const p = await daoSync.ensurePages(fork.owner, fork.repo);
-      memo.pagesUrl = p.url;
-      setStep(
-        "step-pages",
-        "ok",
-        (p.alreadyEnabled
-          ? "已启用 · "
-          : p.pending
-            ? "已下令 · build 中 · "
-            : "新启用 · ") + p.url,
-      );
+      result = await window.daoBootstrap.oneShot({
+        onProgress: (step, status, sub) => {
+          const sid = stepIdMap[step];
+          if (sid) setStep(sid, status, sub);
+        },
+        pollMaxSec: 240, // 4 min
+        pollIntervalSec: 8,
+      });
     } catch (e) {
-      setStep("step-pages", "err", e.message);
-      toast("Pages 启用失败 (可手动启): " + e.message, "warn");
-      // 容错继续 · 用推断 URL
-      memo.pagesUrl = daoSync.forkPagesUrl(fork.owner);
-    }
-
-    // §3 Gist
-    setStep("step-gist", "run", "GET /gists · 查 dao.json");
-    try {
-      const g = await daoSync.findOrCreateGist();
-      memo.gistId = g.id;
-      memo.data = g.data;
-      setStep(
-        "step-gist",
-        "ok",
-        (g.alreadyExisted ? "已存 · " : "新建 · ") + g.url,
-      );
-    } catch (e) {
-      setStep("step-gist", "err", e.message);
-      toast("Gist 失败 (检查 PAT 是否有 gist scope): " + e.message, "err");
+      console.error("[oneShot]", e);
+      toast("自举失: " + e.message + " · 1-2 min 后可重载页", "err");
       return;
     }
 
-    // §4 跳专属页
-    setStep("step-redirect", "run", "即将跳转 " + memo.pagesUrl);
+    // 写 memo
+    memo.fork = result.fork;
+    memo.pagesUrl = result.pagesUrl;
+    memo.gistId = result.daoGist && result.daoGist.id;
+    memo.data = result.daoData;
+    memo.poolGistId = result.poolGist && result.poolGist.id;
+    memo.daemonUrl = result.daemonUrl;
+    memo.vmAuthKey = result.vmAuthKey;
+
     daoSync.setState({
-      fork: fork,
+      fork: result.fork,
       gistId: memo.gistId,
-      pagesUrl: memo.pagesUrl,
-      onboardedAt: new Date().toISOString(),
+      poolGistId: memo.poolGistId,
+      pagesUrl: result.pagesUrl,
+      onboardedAt: result.startedAt,
+      bootstrappedAt: result.finishedAt,
+      yin: 100,
+      daemonUrl: result.daemonUrl || "",
+      vmAuthKey: result.vmAuthKey || "",
     });
-    // 5s 倒计时
+
+    // §9 跳专属页
+    setStep("step-redirect", "run", "即将跳转 " + result.pagesUrl);
     const linkA = $("onboard-link");
     if (linkA) {
-      linkA.href = memo.pagesUrl;
+      linkA.href = result.pagesUrl;
       linkA.style.display = "";
-      linkA.textContent = "→ 进入专属页面 (" + memo.pagesUrl + ")";
+      linkA.textContent =
+        "→ 进入专属页面 (" +
+        result.pagesUrl +
+        (result.daemonUrl ? " · daemon 活" : " · daemon 仍 build 中") +
+        ")";
     }
-    let n = 5;
-    setStep("step-redirect", "ok", "已就绪 · " + n + "s 后自动跳转");
+    let n = 6;
+    setStep(
+      "step-redirect",
+      "ok",
+      (result.success ? "✓ 全闭环 · " : "部分完 · ") + n + "s 后自动跳转",
+    );
     const timer = setInterval(() => {
       n--;
-      setStep("step-redirect", "ok", "已就绪 · " + n + "s 后自动跳转");
+      setStep(
+        "step-redirect",
+        "ok",
+        (result.success ? "✓ 全闭环 · " : "部分完 · ") + n + "s 后自动跳转",
+      );
       if (n <= 0) {
         clearInterval(timer);
-        window.location.href = memo.pagesUrl;
+        window.location.href = result.pagesUrl;
       }
     }, 1000);
   }

@@ -1050,10 +1050,12 @@
     <section id="state-onboarding">
       <div class="onboard-card">
         <div class="onboard-title">
-          一气化三清 · 正在为 <span id="onboard-login">@…</span> 落地
+          太极笙万物 · 印 100 · 自举闭环 · 为
+          <span id="onboard-login">@…</span> 落地
         </div>
         <div class="onboard-sub">
-          道生一 · 一生二 · 二生三 · 三生万物 · 每步皆 idempotent · 已存则跳
+          道生一 · 一生二 · 二生三 · 三生万物 · 民莫之令而自均焉 · 每步幂等 ·
+          已存则跳
         </div>
 
         <div class="onboard-step onboard-wait" id="step-fork">
@@ -1066,11 +1068,20 @@
             <div class="sub">…</div>
           </div>
         </div>
+        <div class="onboard-step onboard-wait" id="step-actions">
+          <span class="icon">○</span>
+          <div class="meat">
+            <div class="lbl">
+              ②a Actions &nbsp; 启用 fork 之 GitHub Actions (PUT permissions)
+            </div>
+            <div class="sub">…</div>
+          </div>
+        </div>
         <div class="onboard-step onboard-wait" id="step-pages">
           <span class="icon">○</span>
           <div class="meat">
             <div class="lbl">
-              ② Pages &nbsp; 启用 fork 上的 GitHub Pages (源 main:/web)
+              ②b Pages &nbsp; 启用 fork 上的 GitHub Pages (源 main:/web)
             </div>
             <div class="sub">…</div>
           </div>
@@ -1085,10 +1096,58 @@
             <div class="sub">…</div>
           </div>
         </div>
+        <div class="onboard-step onboard-wait" id="step-pool-gist">
+          <span class="icon">○</span>
+          <div class="meat">
+            <div class="lbl">
+              ④ Pool &nbsp; 建私有 <code>dao-pool.json</code> · token 池真本源
+              (印 95)
+            </div>
+            <div class="sub">…</div>
+          </div>
+        </div>
+        <div class="onboard-step onboard-wait" id="step-dispatch">
+          <span class="icon">○</span>
+          <div class="meat">
+            <div class="lbl">
+              ⑤ Dispatch &nbsp; 触 dao-fleet-cloud workflow on your fork (印
+              100)
+            </div>
+            <div class="sub">…</div>
+          </div>
+        </div>
+        <div class="onboard-step onboard-wait" id="step-poll">
+          <span class="icon">○</span>
+          <div class="meat">
+            <div class="lbl">
+              ⑥ Poll &nbsp; 等 daemon 上报 URL · 拉
+              <code>dao-pool.json</code> (1-4 分)
+            </div>
+            <div class="sub">…</div>
+          </div>
+        </div>
+        <div class="onboard-step onboard-wait" id="step-probe">
+          <span class="icon">○</span>
+          <div class="meat">
+            <div class="lbl">
+              ⑦ Probe &nbsp; GET <code>vmUrl/health</code> 验真活
+            </div>
+            <div class="sub">…</div>
+          </div>
+        </div>
+        <div class="onboard-step onboard-wait" id="step-write">
+          <span class="icon">○</span>
+          <div class="meat">
+            <div class="lbl">
+              ⑧ Write &nbsp; PATCH <code>dao.json</code> 写 vmUrl + cloudPool 锚
+            </div>
+            <div class="sub">…</div>
+          </div>
+        </div>
         <div class="onboard-step onboard-wait" id="step-redirect">
           <span class="icon">○</span>
           <div class="meat">
-            <div class="lbl">④ 跳 &nbsp; 自动跳转到你的专属页</div>
+            <div class="lbl">⑨ 跳 &nbsp; 自动跳转到你的专属页 · 即用即活</div>
             <div class="sub">…</div>
           </div>
         </div>
@@ -1127,17 +1186,19 @@
 
     <!-- ═══ 底道义 ═══ -->
     <footer class="dao-tail">
-      印 67/69 · 道并行而不悖 · GitHub:
+      印 100 · 太极笙万物 · 一 PAT 即一切 · 民莫之令而自均焉 · GitHub:
       <a
         href="https://github.com/zhouyoukang/windsurf-assistant"
         target="_blank"
         >zhouyoukang/windsurf-assistant</a
       >
-      · 一气化三清 (反代 API · 切号 WAM · 提示词 dao-proxy-min)
+      · 一气化三清 (反代 API · WAM 切号 · 提示词 dao-proxy-min) · 自举闭环 (fork
+      → Pages → dao.json → dao-pool.json → workflow → daemon → vmUrl)
     </footer>
 
     <!-- ═══ 主脚本 (按依赖序) ═══ -->
     <script src="dao_github_sync.js"></script>
+    <script src="dao_bootstrap.js"></script>
     <script src="dao_app.js"></script>
   </body>
 </html>
