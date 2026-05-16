@@ -159,54 +159,129 @@ async function pushGistPool(pool) {
 }
 
 // ─── spawn 1 Devin VM 通过 vm_omni.js (印 104) ───
+// 印 118 · 反者道之动 · spawn (非 spawnSync) · 真并发
+//   帛书·七十六「兵强则不胜 · 木强则恒 · 强大居下 · 柔弱微细居上」
+//   spawnSync 同步阻 promise body · N 件 Promise.all 实顺序 · 改 spawn 真并发
+//   timeout 与 vm_omni 之 TIMEOUT_MS=900s 一致 · 兜底 15min 30s · 防 child hang
 function spawnDevinVM(devinToken) {
   return new Promise((resolve) => {
     log(`  ▶ vm_omni.js spawn (token=${devinToken.slice(0, 12)}...)`);
     const env = { ...process.env };
-    const r = spawnSync(
+    const child = spawn(
       "node",
       [OMNI_JS, "--token", devinToken, "--no-keepalive"],
-      {
-        env,
-        encoding: "utf8",
-        maxBuffer: 10485760,
-        timeout: 600000,
-      },
+      { env, stdio: ["ignore", "pipe", "pipe"] },
     );
-    const out = (r.stdout || "") + (r.stderr || "");
-    // 解析 omni public URL (host pattern)
-    const m = out.match(
-      /https:\/\/(user:[a-f0-9]+@[a-z0-9-]+\.devinapps\.com)/,
-    );
-    if (!m) {
-      log(C.R(`  ✗ spawn 失 · 无 URL · tail: ${out.slice(-200)}`));
-      return resolve(null);
-    }
-    const baseUrl = "https://" + m[1];
-    log(C.G(`  ✓ VM 起 · ${m[1].split("@")[1].slice(0, 40)}`));
-    resolve(baseUrl);
+    let stdout = "";
+    let stderr = "";
+    let done = false;
+    let urlEmitted = null; // 早识 URL · 立 resolve 不等子全闭 (省时)
+    const finish = (urlOrNull) => {
+      if (done) return;
+      done = true;
+      clearTimeout(killTimer);
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      if (urlOrNull) {
+        log(C.G(`  ✓ VM 起 · ${urlOrNull.split("@")[1].slice(0, 40)}`));
+        resolve("https://" + urlOrNull);
+      } else {
+        const tail = (stdout + stderr).slice(-200);
+        log(C.R(`  ✗ spawn 失 · 无 URL · tail: ${tail}`));
+        resolve(null);
+      }
+    };
+    child.stdout.on("data", (d) => {
+      const s = d.toString();
+      stdout += s;
+      if (!urlEmitted) {
+        const m = (stdout + stderr).match(
+          /https:\/\/(user:[a-f0-9]+@[a-z0-9-]+\.devinapps\.com)/,
+        );
+        if (m) {
+          urlEmitted = m[1];
+          finish(urlEmitted);
+        }
+      }
+    });
+    child.stderr.on("data", (d) => {
+      const s = d.toString();
+      stderr += s;
+      if (!urlEmitted) {
+        const m = (stdout + stderr).match(
+          /https:\/\/(user:[a-f0-9]+@[a-z0-9-]+\.devinapps\.com)/,
+        );
+        if (m) {
+          urlEmitted = m[1];
+          finish(urlEmitted);
+        }
+      }
+    });
+    child.on("close", () => finish(urlEmitted));
+    child.on("error", (e) => {
+      log(C.R(`  ✗ spawn err: ${e.message}`));
+      finish(null);
+    });
+    const killTimer = setTimeout(() => {
+      if (!done) {
+        log(C.Y(`  ⚠ spawn timeout 930s · 杀子`));
+        finish(urlEmitted);
+      }
+    }, 930000); // 15.5 min · 略 > vm_omni TIMEOUT_MS 900s
   });
 }
 
 // ─── deploy dao_proxy 通过 vm_proxy_deploy.js (印 106) ───
+// 印 118 · 同 spawnDevinVM · spawn 真并发
 function deployDaoProxy(idx) {
   return new Promise((resolve) => {
     log(`  ▶ vm_proxy_deploy.js --idx ${idx}`);
-    const r = spawnSync("node", [DEPLOY_JS, "--idx", String(idx)], {
+    const child = spawn("node", [DEPLOY_JS, "--idx", String(idx)], {
       cwd: path.dirname(DEPLOY_JS),
-      encoding: "utf8",
-      maxBuffer: 10485760,
-      timeout: 300000,
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    const out = (r.stdout || "") + (r.stderr || "");
-    const alive = /proxy alive/.test(out);
-    const tok = out.match(/\b([a-f0-9]{64})\b/);
-    if (!alive) {
-      log(C.R(`  ✗ deploy 失 · tail: ${out.slice(-200)}`));
-      return resolve(null);
-    }
-    log(C.G(`  ✓ dao_proxy 起`));
-    resolve({ alive: true, auth: (tok && tok[1]) || null });
+    let stdout = "";
+    let stderr = "";
+    let done = false;
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      clearTimeout(killTimer);
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      if (result && result.alive) {
+        log(C.G(`  ✓ dao_proxy 起`));
+        resolve(result);
+      } else {
+        const tail = (stdout + stderr).slice(-200);
+        log(C.R(`  ✗ deploy 失 · tail: ${tail}`));
+        resolve(null);
+      }
+    };
+    child.stdout.on("data", (d) => {
+      stdout += d.toString();
+    });
+    child.stderr.on("data", (d) => {
+      stderr += d.toString();
+    });
+    child.on("close", () => {
+      const out = stdout + stderr;
+      const alive = /proxy alive/.test(out);
+      const tok = out.match(/\b([a-f0-9]{64})\b/);
+      finish(alive ? { alive: true, auth: (tok && tok[1]) || null } : null);
+    });
+    child.on("error", (e) => {
+      log(C.R(`  ✗ deploy err: ${e.message}`));
+      finish(null);
+    });
+    const killTimer = setTimeout(() => {
+      if (!done) {
+        log(C.Y(`  ⚠ deploy timeout 360s · 杀子`));
+        finish(null);
+      }
+    }, 360000); // 6 min · vm_proxy_deploy 通常 2-3 min
   });
 }
 
