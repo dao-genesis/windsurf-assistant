@@ -20,7 +20,7 @@ jobs:
           node-version: '20'
 
       - name: E2E · packages/wam
-        run: node packages/wam/_wam_e2e.js packages/wam
+        run: node packages/wam/_test_v2711_main.cjs
 
       - name: Build VSIX
         run: node scripts/build-vsix.js wam
