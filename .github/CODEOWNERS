@@ -1,0 +1,25 @@
+# CODEOWNERS — code-review responsibility assignment
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Each line is a file pattern followed by one or more owners.
+# The last matching pattern takes precedence.
+
+# Default: any change requires review from the project maintainer.
+*                              @zhouyoukang
+
+# Package-specific ownership (currently all under same maintainer · listed
+# explicitly so future contributors and reviewers can see the structure).
+/packages/dao-core/            @zhouyoukang
+/packages/dao-devin-vm/        @zhouyoukang
+/packages/wam/                 @zhouyoukang
+/packages/dao-proxy-min/       @zhouyoukang
+
+# Tests and policy documents.
+/tests/                        @zhouyoukang
+/SECURITY.md                   @zhouyoukang
+/CODE_OF_CONDUCT.md            @zhouyoukang
+/CONTRIBUTING.md               @zhouyoukang
+/ABUSE_REMEDIATION.md          @zhouyoukang
+
+# CI / workflow / dependency configuration.
+/.github/                      @zhouyoukang
