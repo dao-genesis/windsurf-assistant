@@ -729,6 +729,20 @@
     for (const k in def.sp)
       if (memo.data.sp[k] == null) memo.data.sp[k] = def.sp[k];
 
+    // ─── 印 ∞.2 · 全链路闭环导中 (本地闭环 · 主公无需粘 vmUrl) ───────────
+    //   帛书·五十七「我无为也，而民自化」
+    //   若本机起 `node scripts/dao_run_all.cjs` (web :8765 · vm :7780)
+    //   且 cache.vmUrl 为空 → 自填 http://127.0.0.1:7780 (本地直)
+    //   主公浏览器一打开即可用 · 不需粘 · 不需 cloudflared / ngrok
+    try {
+      const isLocalWeb = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+      if (isLocalWeb && !memo.data.vmUrl) {
+        memo.data.vmUrl = "http://127.0.0.1:7780";
+        daoSync.setCache(memo.data);
+        toast("★ 本地闭环 · vmUrl 自填 127.0.0.1:7780 (印 ∞.2)", "ok");
+      }
+    } catch (e) {}
+
     // 印 128 · 一气化三清 · IDE 三栏并行 (默) · 物无非彼 物无非是
     //   帛书·二: 「物无非彼 物无非是」 (按庄子·齐物论)
     //   帛书·四十八: 「为道者日损 · 损之又损 · 以至于无为」
@@ -3022,11 +3036,7 @@
         "印 ∞ · 上 iframe 真站 + 下 chat 反代 · 同问验之 · 物之两面同一道",
       ),
       makeUseTab("chat", "对话", "Cascade 风 · 走反代 vmUrl · 大屏 chat"),
-      makeUseTab(
-        "iframe",
-        "嵌真站",
-        "iframe app.devin.ai (印 91) · 大屏真站",
-      ),
+      makeUseTab("iframe", "嵌真站", "iframe app.devin.ai (印 91) · 大屏真站"),
       makeUseTab("batch", "批跑测", "题集 · A/B 路对比 · 通过率"),
     ]);
     area.appendChild(tabs);
@@ -3121,11 +3131,7 @@
       site === "windsurf"
         ? "https://chat.windsurf.ai/"
         : "https://app.devin.ai/";
-    const wrap = el(
-      "div",
-      { class: "v101-parallel", id: "v101-parallel" },
-      [],
-    );
+    const wrap = el("div", { class: "v101-parallel", id: "v101-parallel" }, []);
     // ─── 上 · iframe head (站切) ───
     const ifrHead = el(
       "div",
@@ -3136,8 +3142,7 @@
         el(
           "button",
           {
-            class:
-              "v101-btn small" + (site === "devin" ? " active" : " ghost"),
+            class: "v101-btn small" + (site === "devin" ? " active" : " ghost"),
             onclick: () => {
               D.iframeSite = "devin";
               markDirty();
@@ -3151,8 +3156,7 @@
           "button",
           {
             class:
-              "v101-btn small" +
-              (site === "windsurf" ? " active" : " ghost"),
+              "v101-btn small" + (site === "windsurf" ? " active" : " ghost"),
             onclick: () => {
               D.iframeSite = "windsurf";
               markDirty();
@@ -4251,16 +4255,20 @@
       el("div", { class: "v128-route-row", id: "v128-route-a" }, [
         el("span", { class: "v128-route-tag a" }, ["A"]),
         el("span", { class: "v128-route-path" }, ["/v1/* · Windsurf codeium"]),
-        el("span", { class: "v128-route-state idle", id: "v128-route-a-state" }, [
-          "○ 未测",
-        ]),
+        el(
+          "span",
+          { class: "v128-route-state idle", id: "v128-route-a-state" },
+          ["○ 未测"],
+        ),
       ]),
       el("div", { class: "v128-route-row", id: "v128-route-b" }, [
         el("span", { class: "v128-route-tag b" }, ["B"]),
         el("span", { class: "v128-route-path" }, ["/dc/v1/* · Devin Cloud"]),
-        el("span", { class: "v128-route-state idle", id: "v128-route-b-state" }, [
-          "○ 未测",
-        ]),
+        el(
+          "span",
+          { class: "v128-route-state idle", id: "v128-route-b-state" },
+          ["○ 未测"],
+        ),
       ]),
     ]);
     container.appendChild(routeCard);
@@ -4497,9 +4505,7 @@
     };
     setState("a", "↻ 测中", "idle");
     setState("b", "↻ 测中", "idle");
-    const hdrs = D.vmAuthKey
-      ? { Authorization: "Bearer " + D.vmAuthKey }
-      : {};
+    const hdrs = D.vmAuthKey ? { Authorization: "Bearer " + D.vmAuthKey } : {};
     // A 路 · /v1/models
     try {
       const r = await fetch(D.vmUrl + "/v1/models", {

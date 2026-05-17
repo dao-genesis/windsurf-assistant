@@ -105,3 +105,8 @@ tests/_*.err.txt
 _real_*.json
 _test_*_real.cjs
 _real_*.cjs
+
+# 印 ∞.2 · 真 keys 防泄 (帛书三十六「邦利器不可以视人」)
+_real_ws_keys.json
+_real_*_keys.json
+_test_auth*_real.cjs

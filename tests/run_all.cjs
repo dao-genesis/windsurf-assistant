@@ -53,6 +53,7 @@ const TESTS = [
   "_seal133_wam_md_real_smoke", // 印 133 · 反者道之动 · WAM 本地真本源桥 (~/.wam → /admin/wam/{local,use}) · 大曰逝逝曰远远曰反 · 帛书廿五
   "_seal_inf_parallel_smoke", // 印 ∞ · 对照 tab + A/B 双路 + WAM 无感切号 · 物无非彼 物无非是 · 庄子齐物论
   "_seal_inf2_dc_routes_smoke", // 印 ∞.2 · B 路 /dc/* 显式 devin cloud 反代 · 双反代之实 · 弱者道之用 · 帛书七十八
+  "_seal_inf_yiqi_real_impl_smoke", // 印 ∞ · 道动测真实证 (∞.3 apiKey 前缀 + ∞.4 srvUrl 优先 + 133 端点活) · 大曰逝逝曰远远曰反 · 帛书廿五
 ];
 
 let allOk = true;

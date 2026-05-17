@@ -1953,7 +1953,27 @@ function wsChat({ keyObj, messages, model, onDelta, timeoutMs = 60000 }) {
       chatMessages,
     });
 
-    // 轮 hosts (印 105 · 先 server.codeium.com)
+    // 轮 hosts (印 105 · 先 server.codeium.com · 印 ∞.4 治: keyObj.srvUrl 优)
+    // 印 ∞.4 道动测发现 (2026-05-17 12:30):
+    //   - admin/keys/add 收 srvUrl 但 wsChat 不用 keyObj.srvUrl · 是硬编码列表
+    //   - 真 windsurf register 返 api_server_url = https://server.self-serve.windsurf.com
+    //   - 但 wsChat 先试 server.codeium.com · 浪费一轮
+    //   治: 若 keyObj.srvUrl 有效 · 立其 hostname 为首试 · 再回退 WS_CHAT_HOSTS
+    //   帛书廿七: 「善行者无辙迹 · 善结者无绳约而不可解也」(顺势而为)
+    let hostList = WS_CHAT_HOSTS.slice();
+    try {
+      if (keyObj && keyObj.srvUrl) {
+        const u = new URL(keyObj.srvUrl);
+        if (u.hostname && !hostList.includes(u.hostname)) {
+          hostList = [u.hostname].concat(hostList); // 用户给定 host 先试
+        } else if (u.hostname) {
+          // 已在列表 · 移至首位
+          hostList = [u.hostname].concat(
+            hostList.filter((h) => h !== u.hostname),
+          );
+        }
+      }
+    } catch {}
     let hostIdx = 0;
     const tryHost = (host) => {
       const opts = {
@@ -2076,9 +2096,10 @@ function wsChat({ keyObj, messages, model, onDelta, timeoutMs = 60000 }) {
         });
       });
       req.on("error", (e) => {
-        if (hostIdx < WS_CHAT_HOSTS.length - 1) {
+        // 印 ∞.4 · 用动态 hostList (含 keyObj.srvUrl 首位)
+        if (hostIdx < hostList.length - 1) {
           hostIdx++;
-          tryHost(WS_CHAT_HOSTS[hostIdx]); // host 故障 · 试下一
+          tryHost(hostList[hostIdx]); // host 故障 · 试下一
         } else {
           keyObj.err++;
           resolve({ ok: false, errCode: "network", errMsg: e.message });
@@ -2092,7 +2113,8 @@ function wsChat({ keyObj, messages, model, onDelta, timeoutMs = 60000 }) {
       req.write(body);
       req.end();
     };
-    tryHost(WS_CHAT_HOSTS[0]);
+    // 印 ∞.4 · hostList 含 keyObj.srvUrl 首位 (若有效)
+    tryHost(hostList[0]);
   });
 }
 
