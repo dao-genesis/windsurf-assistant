@@ -31,7 +31,7 @@ jobs:
         run: node scripts/build-vsix.js wam
 
       - name: Upload VSIX
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wam-vsix
           path: packages/wam/*.vsix
@@ -55,7 +55,7 @@ jobs:
         run: node scripts/build-vsix.js dao-proxy-min
 
       - name: Upload VSIX
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dao-proxy-min-vsix
           path: packages/dao-proxy-min/*.vsix
