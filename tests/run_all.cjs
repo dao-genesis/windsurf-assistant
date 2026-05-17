@@ -42,6 +42,7 @@ const TESTS = [
   "_seal121_smoke", // 印 121 · auth_chain 三口同源守门 (web ↔ workflow ↔ daemon · 圣人执一)
   "_seal122_smoke", // 印 122 · yin122 全审纳入律 (3 件 git tracked + 印号统一 + silk 双源 + §0.1 软接入)
   "_seal122_watchdog_smoke", // 印 122 · vm_pool_watchdog 守门 (自启换之 · tunnel rotation · 5min poll)
+  "_yin124_root_runtime_smoke", // 印 124 · 反者道之动 · 根本底层真运 (真起 daemon · 真探 · 真切 SP · 真关 · 由静返动)
 ];
 
 let allOk = true;
