@@ -745,7 +745,7 @@ const { URL } = require("node:url");
 //   ━━━ 道 ━━━
 //   未验号本不该留 · 只是门没开 · 门一开 · 民自化 · 无为而无不为
 //
-const VERSION = "3.10.1";
+const VERSION = "3.10.2";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36";
 const WINDSURF = "https://windsurf.com";
@@ -1391,7 +1391,59 @@ function _loadDecryptKey() {
   return null;
 }
 function _saveDecryptKey(key, source) {
-  try { fs.writeFileSync(_KEY_CACHE, JSON.stringify({ key: key.toString("ascii"), hex: key.toString("hex"), source, discoveredAt: new Date().toISOString() }, null, 2)); } catch {}
+  try {
+    // v3.10.2 · 密钥池 · 积累历史密钥 (max 4 历史 + 当前 = 5 总) · 应对 Windsurf 更新换密钥
+    let existing = {};
+    try { existing = JSON.parse(fs.readFileSync(_KEY_CACHE, "utf8")); } catch {}
+    const pool = [];
+    // 收集旧 primary key 进 pool
+    if (existing.key && existing.key.length === 32) {
+      const ex = Buffer.from(existing.key, "ascii");
+      if (!key.equals(ex)) pool.push({ key: existing.key, hex: ex.toString("hex"), source: existing.source || "?", discoveredAt: existing.discoveredAt || "" });
+    }
+    // 收集旧 pool keys
+    if (Array.isArray(existing.keys)) {
+      for (const k of existing.keys) {
+        if (!k.key || k.key.length !== 32) continue;
+        const kBuf = Buffer.from(k.key, "ascii");
+        if (!key.equals(kBuf) && !pool.some(p => p.key === k.key)) pool.push(k);
+      }
+    }
+    fs.writeFileSync(_KEY_CACHE, JSON.stringify({
+      key: key.toString("ascii"),
+      hex: key.toString("hex"),
+      source, discoveredAt: new Date().toISOString(),
+      keys: pool.slice(-4),  // 保留最近4个历史密钥
+    }, null, 2));
+  } catch {}
+}
+// v3.10.2 · 加载全部已知密钥 (primary + pool) · 用于多密钥兜底解密
+function _loadAllDecryptKeys() {
+  try {
+    const c = JSON.parse(fs.readFileSync(_KEY_CACHE, "utf8"));
+    const keys = [];
+    if (c.key && c.key.length === 32) keys.push(Buffer.from(c.key, "ascii"));
+    if (Array.isArray(c.keys)) {
+      for (const k of c.keys) {
+        if (!k.key || k.key.length !== 32) continue;
+        const b = Buffer.from(k.key, "ascii");
+        if (!keys.some(x => x.equals(b))) keys.push(b);
+      }
+    }
+    return keys;
+  } catch { return []; }
+}
+// v3.10.2 · 多密钥兜底解密 · primary → pool 依次试 · 返回 {pt,key}|null
+// 应用场景: Windsurf 版本升级换密钥 · 跨机器 PB 备份 · 旧批次 PB 用旧密钥
+function _decryptPbWithFallback(ct) {
+  const primary = _loadDecryptKey();
+  if (primary) { const pt = _tryDecryptPb(ct, primary); if (pt) return { pt, key: primary }; }
+  for (const k of _loadAllDecryptKeys()) {
+    if (primary && k.equals(primary)) continue;
+    const pt = _tryDecryptPb(ct, k);
+    if (pt) return { pt, key: k };
+  }
+  return null;
 }
 function _decryptPb(ciphertext, key) {
   const nonce = ciphertext.slice(0, 12);
@@ -1728,12 +1780,23 @@ function _parsePbConversation(pt) {
 }
 // PB 文件 → MD 内容字符串 (meta 含 title/backedUpAt)
 function _pbToMdContent(pbPath, meta) {
-  const key = _loadDecryptKey();
-  if (!key) return null;
+  if (!_loadDecryptKey() && _loadAllDecryptKeys().length === 0) return null;
   try {
     const ct = fs.readFileSync(pbPath);
     if (ct.length < 29) return null;
-    const pt = _decryptPb(ct, key);
+    // v3.10.2 · 多密钥兜底: primary→pool · 全失败则写 stub MD (不再丢弃)
+    const decResult = _decryptPbWithFallback(ct);
+    if (!decResult) {
+      const uuid = path.basename(pbPath, ".pb");
+      const ts = (meta && meta.backedUpAt) || new Date().toISOString();
+      let stub = "# " + uuid.substring(0, 8) + "\n\n";
+      stub += "> **UUID**: `" + uuid + "`  \n";
+      stub += "> **大小**: " + Math.round(ct.length / 1024) + " KB  \n";
+      stub += "> **时间**: " + ts.substring(0, 19).replace("T", " ") + "  \n\n---\n\n";
+      stub += "_（密钥不匹配 · 无法解密此备份 — 可能由不同 Windsurf 版本或机器生成 · 后续密钥更新后将自动重建）_\n";
+      return stub;
+    }
+    const pt = decResult.pt;
     const conv = _parsePbConversation(pt);
     const uuid = path.basename(pbPath, ".pb");
     // v3.8.6 · 大道至简 · 三级兜底:
@@ -1848,15 +1911,23 @@ function _retroactiveMdGeneration() {
           for (const pb of pbFiles) {
             const pbPath = path.join(batchDir, pb);
             const mdPath = pbPath.replace(/\.pb$/, ".md");
-            // v3.9.1: 旧版 MD 质量低 (fn=20 遗漏) → 强制重生成
-            // 判定: MD 大小 < PB 大小的 2% = 旧版解析器生成 · 需重建
+            // v3.10.2 三重判定: MD需重建的条件
+            //   ① MD 不存在 → 直接补
+            //   ② MD/PB比 < 2% (pbSz>10KB) → 旧版解析器 (fn=20遗漏) · 需重建
+            //   ③ MD 含「密钥不匹配」stub → 之前密钥未就绪 · 现在重试
             if (fs.existsSync(mdPath)) {
               try {
                 const pbSz = fs.statSync(pbPath).size;
                 const mdSz = fs.statSync(mdPath).size;
                 if (pbSz > 10000 && mdSz / pbSz < 0.02) {
-                  // 旧版 MD 质量不达标 · 重生成
-                } else { skip++; continue; }
+                  // ② 旧版 MD 质量不达标 · 重生成
+                } else {
+                  // ③ 检查是否为「密钥不匹配」stub
+                  const mdHead = fs.readFileSync(mdPath, "utf8").substring(0, 400);
+                  if (mdHead.includes("密钥不匹配") || mdHead.includes("未提取到对话内容")) {
+                    // stub → 有新密钥后重试
+                  } else { skip++; continue; }
+                }
               } catch { skip++; continue; }
             }
             try { if (_writePbMd(pbPath, mdPath, {})) gen++; else fail++; } catch { fail++; }
