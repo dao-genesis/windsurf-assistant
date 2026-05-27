@@ -7756,39 +7756,29 @@ const _VSCDB_PATH = path.join(
 const _EXT_TITLE_FILE = path.join(os.homedir(), ".wam", "_conv_titles.json");
 let _lastVscdbTitleRefresh = 0;
 
-function _tryExtractSessionsFromBuf(buf) {
-  const needle = Buffer.from('{"sessions":[');
-  let pos = 0,
-    best = null;
-  while (pos < buf.length) {
-    const idx = buf.indexOf(needle, pos);
-    if (idx < 0) break;
-    let depth = 0,
-      i = idx;
-    const limit = Math.min(idx + 8 * 1024 * 1024, buf.length);
-    while (i < limit) {
-      const c = buf[i];
-      if (c === 0x7b) depth++;
-      else if (c === 0x7d) {
-        depth--;
-        if (depth === 0) {
-          i++;
-          break;
-        }
+// v3.11.4: 裸扫已废弃 — JSON 跨 SQLite overflow 页无法扫描 · 改用 Python sqlite3
+function _tryExtractSessionsFromBuf(_buf) {
+  return null; // 保留函数签名以防调用 · 逻辑已移至 _refreshTitlesFromVscdbRaw
+}
+// Python 可执行文件缓存
+let _pyExeExt = undefined;
+function _findPythonExt() {
+  if (_pyExeExt !== undefined) return _pyExeExt;
+  for (const cmd of ["python", "python3"]) {
+    try {
+      const r = require("child_process").spawnSync(cmd, ["--version"], {
+        timeout: 2000,
+        windowsHide: true,
+        encoding: "utf8",
+      });
+      if (r.status === 0) {
+        _pyExeExt = cmd;
+        return cmd;
       }
-      i++;
-    }
-    if (depth === 0 && i > idx + needle.length) {
-      try {
-        const obj = JSON.parse(buf.slice(idx, i).toString("utf8"));
-        if (obj.sessions && Array.isArray(obj.sessions)) {
-          if (!best || obj.sessions.length >= best.length) best = obj.sessions;
-        }
-      } catch {}
-    }
-    pos = idx + 1;
+    } catch {}
   }
-  return best;
+  _pyExeExt = null;
+  return null;
 }
 
 function _refreshTitlesFromVscdbRaw() {
