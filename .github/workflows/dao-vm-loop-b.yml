@@ -1,41 +1,10 @@
+# dao-vm-loop-b.yml - DISABLED (回退印273 · 已移至01-VM本地实践)
 name: dao-vm-loop-b
-# ═══════════════════════════════════════════════════════════════
-# 印273 · 万源VM · slot-B · 永续Loop · schedule +2h offset
-# 「无为而无不为」── 自动触发 · 永续在线
-# ═══════════════════════════════════════════════════════════════
 on:
   workflow_dispatch:
-    inputs:
-      duration_min:
-        description: 'Keep-alive minutes (max 330)'
-        default: '300'
-  schedule:
-    - cron: '0 2,6,10,14,18,22 * * *'
-  push:
-    paths:
-      - 'trigger-b.txt'
-
-permissions:
-  contents: write
-  actions: write
-
-concurrency:
-  group: dao-vm-loop-b-${{ github.run_id }}
-  cancel-in-progress: false
-
 jobs:
   vm:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 340
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: dao-vm slot-b
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/dao_vm_gha_bootstrap.sh b ${{ github.event.inputs.duration_min || '300' }}
+      - run: echo "disabled"
