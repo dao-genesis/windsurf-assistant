@@ -1,68 +1,10 @@
+# dao-vm-orchestrator.yml - DISABLED (回退印273 · 已移至01-VM本地实践)
 name: dao-vm-orchestrator
-# ═══════════════════════════════════════════════════════════════
-# 印273 · 万源VM主控器 · 每15min扫描所有slot · 自动重启死亡slot
-# 「治人事天，莫若啬」── 以最小代价维持最大稳定
-# ═══════════════════════════════════════════════════════════════
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
-  actions: write
-
 jobs:
   orchestrate:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Scan fleet and restart dead slots
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          NOW=$(date +%s)
-          STALE=3900  # 65 minutes
-          RESTARTED=0
-
-          check_slot() {
-            local SLOT=$1
-            local SF=$2
-            local WF=$3
-            if [ -f "$SF" ]; then
-              TS=$(python3 -c "import json,sys; d=json.load(open('$SF')); print(d.get('ts',0))" 2>/dev/null || echo "0")
-              AGE=$((NOW - TS))
-              URL=$(python3 -c "import json,sys; d=json.load(open('$SF')); print(d.get('url','null'))" 2>/dev/null || echo "null")
-              if [ "$AGE" -gt "$STALE" ]; then
-                echo "[orc] slot=$SLOT STALE age=${AGE}s → restarting $WF"
-                curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" \
-                  -H "Accept: application/vnd.github.v3+json" \
-                  "https://api.github.com/repos/$REPO/actions/workflows/$WF/dispatches" \
-                  -d '{"ref":"main"}' && echo "  ✓ $SLOT restarted" || echo "  ✗ $SLOT restart failed"
-                RESTARTED=$((RESTARTED+1))
-              else
-                echo "[orc] slot=$SLOT OK age=$((AGE/60))min url=$URL"
-              fi
-            else
-              echo "[orc] slot=$SLOT no status → triggering first run"
-              curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" \
-                -H "Accept: application/vnd.github.v3+json" \
-                "https://api.github.com/repos/$REPO/actions/workflows/$WF/dispatches" \
-                -d '{"ref":"main"}' && echo "  ✓ $SLOT first-run triggered" || true
-            fi
-          }
-
-          check_slot main vm-status.json        dao-vm-free-loop.yml
-          check_slot a    vm-status-a.json      dao-vm-loop-a.yml
-          check_slot b    vm-status-b.json      dao-vm-loop-b.yml
-          check_slot c    vm-status-c.json      dao-vm-loop-c.yml
-          check_slot d    vm-status-d.json      dao-vm-loop-d.yml
-
-          echo ""
-          echo "[orc] Scan complete. Restarted: $RESTARTED slots"
-          echo "[orc] 无为而无不为 · 道法自然"
+      - run: echo "disabled"
