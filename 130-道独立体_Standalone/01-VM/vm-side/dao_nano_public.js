@@ -8,7 +8,7 @@
 const http=require("http"),os=require("os"),fs=require("fs"),{exec,spawn}=require("child_process"),crypto=require("crypto");
 const PORT=8181;
 const TOKEN=crypto.randomBytes(16).toString("hex");
-try{fs.writeFileSync("/tmp/.dao_token",TOKEN);}catch{}
+try{fs.writeFileSync("/tmp/.dao_token",TOKEN,{mode:0o600});}catch{}
 console.log("[nano] PORT="+PORT+" TOKEN="+TOKEN);
 
 function run(cmd,t){return new Promise(r=>{exec(cmd,{timeout:t||60000,maxBuffer:4*1024*1024,shell:"/bin/bash"},(e,o,s)=>r({stdout:String(o||""),stderr:String(s||""),exit:e?e.code||1:0}));});}
