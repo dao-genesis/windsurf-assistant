@@ -1,0 +1,443 @@
+{
+	"name": "rt-flow",
+	"displayName": "Runtime Flow",
+	"description": "Runtime flow management · adaptive scheduling",
+	"version": "3.16.0",
+	"publisher": "devaid",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/zhouyoukang1234-spec/windsurf-assistant.git",
+		"directory": "plugins/rt-flow"
+	},
+	"homepage": "https://github.com/zhouyoukang/windsurf-assistant",
+	"bugs": {
+		"url": "https://github.com/zhouyoukang/windsurf-assistant/issues"
+	},
+	"keywords": [
+		"runtime",
+		"flow",
+		"scheduling",
+		"adaptive",
+		"management"
+	],
+	"license": "MIT",
+	"icon": "media/icon.png",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"AI",
+		"Other"
+	],
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"main": "./extension.js",
+	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "wam-container",
+					"title": "RT Flow",
+					"icon": "media/icon.svg"
+				}
+			]
+		},
+		"views": {
+			"wam-container": [
+				{
+					"id": "wam.panel",
+					"name": "Manager",
+					"type": "webview"
+				}
+			]
+		},
+		"commands": [
+			{
+				"command": "wam.openEditor",
+				"title": "Open Panel",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.status",
+				"title": "Status",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.switchAccount",
+				"title": "Switch Account",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.panicSwitch",
+				"title": "Emergency Switch",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.refreshAll",
+				"title": "Refresh All",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.addAccount",
+				"title": "Add Account",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.injectToken",
+				"title": "Inject Token (v2.7.1: auth1/session/JWT/email-pair · loginViaToken 全栈)",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.addToken",
+				"title": "Add Token (v2.7.1 万法归一·任意 token/凭据·入完整管理流)",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.verifyAll",
+				"title": "Verify & Clean",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.scanExpiry",
+				"title": "Scan Expiry",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.healthCheck",
+				"title": "Health Check",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.clearBlacklist",
+				"title": "Clear Blacklist",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.clearAllInUse",
+				"title": "Clear All In-Use Locks (v2.3.0)",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.clearAllHealth",
+				"title": "Clear All Health Data (v2.4.0)",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.endpointHealth",
+				"title": "Show Quota Endpoint Health (v2.4.0)",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.toggleAutoRotate",
+				"title": "Toggle Auto-Rotate",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.show",
+				"title": "Show Output Log",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.setModeWam",
+				"title": "WAM Mode",
+				"category": "RT Flow"
+			},
+			{
+				"command": "wam.setModeOfficial",
+				"title": "Official Login Mode",
+				"category": "RT Flow"
+			}
+		],
+		"configuration": {
+			"title": "RT Flow",
+			"properties": {
+				"wam.accountsFile": {
+					"type": "string",
+					"default": "",
+					"description": "Account pool file path (empty = auto-detect)"
+				},
+				"wam.autoRotate": {
+					"type": "boolean",
+					"default": true,
+					"description": "Auto-switch when quota drops below threshold"
+				},
+				"wam.autoSwitchThreshold": {
+					"type": "number",
+					"default": 5,
+					"description": "Auto-switch threshold (%)"
+				},
+				"wam.scanIntervalMs": {
+					"type": "number",
+					"default": 10000,
+					"description": "v2.6.11 道恒无名·民自均 · W%轮询周期 (ms·min 5000) · 作为 user send 真本源信号查询周期 · 10s 使 W%增量在 1 轮内足以体现"
+				},
+				"wam.preferYi": {
+					"type": "boolean",
+					"default": false,
+					"description": "Force clipboard injection path"
+				},
+				"wam.notifyLevel": {
+					"type": "string",
+					"enum": [
+						"silent",
+						"notify",
+						"verbose"
+					],
+					"default": "notify",
+					"description": "Notification level"
+				},
+				"wam.startupDelayMs": {
+					"type": "number",
+					"default": 3500,
+					"description": "Startup delay before first auto-login (ms)"
+				},
+				"wam.invisible": {
+					"type": "boolean",
+					"default": false,
+					"description": "Invisible mode — minimal UI + zero toast"
+				},
+				"wam.rotatePeriodMs": {
+					"type": "number",
+					"default": 0,
+					"description": "Time rotation period (ms, 0=off)"
+				},
+				"wam.verify.parallel": {
+					"type": "number",
+					"default": 3,
+					"description": "Batch verify parallelism (1-8)"
+				},
+				"wam.verify.gapMs": {
+					"type": "number",
+					"default": 250,
+					"description": "Verify gap between completions (ms)"
+				},
+				"wam.verify.staleMin": {
+					"type": "number",
+					"default": 30,
+					"description": "Skip recently verified accounts (min)"
+				},
+				"wam.autoVerifyOnStartupMs": {
+					"type": "number",
+					"default": 30000,
+					"description": "Auto verify stale accounts after startup (ms, 0=off)"
+				},
+				"wam.autoVerifyPeriodMs": {
+					"type": "number",
+					"default": 1800000,
+					"description": "Periodic verify interval (ms, 0=off)"
+				},
+				"wam.predictiveThreshold": {
+					"type": "number",
+					"default": 25,
+					"description": "Pre-select candidate threshold (%)"
+				},
+				"wam.switchCooldownMs": {
+					"type": "number",
+					"default": 15000,
+					"description": "Min interval between auto-switches (ms)"
+				},
+				"wam.waitResetHours": {
+					"type": "number",
+					"default": 3,
+					"description": "Wait for reset when within N hours"
+				},
+				"wam.rotateOnEveryMessage": {
+					"type": "boolean",
+					"default": true,
+					"description": "v2.3.0 直觉切号: 用户每发一条 Cascade 消息即切下一号 (反者道之动 · 默认开 · 与使用中🔒合带·极限分散使用)"
+				},
+				"wam.inUseLockMs": {
+					"type": "number",
+					"default": 120000,
+					"description": "v2.3.0 使用中🔒: 切号成功后该号锁定 N ms · 锁期内自动切号不入选 · 手动切号不受影响 · 0=关 · 默认 120s"
+				},
+				"wam.quotaPulseMinDelta": {
+					"type": "number",
+					"default": 0.3,
+					"description": "v2.6.11 道恒无名 · W%脉动信号阈值 — 两轮轮询间 weekly%增量 ≥ 此值 即为一次 user send 完成 · 触发切号 (默认 0.3% · 一次 Sonnet send 约增 0.3-1% · 流式 single token 只增 0.001%) · v2.6.12 加同账号判 (跨账号变化屏蔽)"
+				},
+				"wam.quotaPulsePriorityMs": {
+					"type": "number",
+					"default": 60000,
+					"description": "v2.6.12 守一 · W%脉动主信号窗口 — 一次 ⚡W%脉动 触发后 N ms 内 WAL/pb 备用信号让位 (skip) · 解决三路抢跑 1.75 倍切号 · 默认 60s · 0=关守一·复 v2.6.11 三路并发"
+				},
+				"wam.walDetect": {
+					"type": "boolean",
+					"default": true,
+					"description": "v2.6.3 WAL 直达触发 — 监听 state.vscdb-wal 作为 Send 按钪最底层信号源 (click Send 后 SQLite 同步写入·早于 AI 响应)"
+				},
+				"wam.walEdgeMinBytes": {
+					"type": "number",
+					"default": 512,
+					"description": "v2.6.9 边沿首发 · WAL 单次增量下限 — delta ≥ 此值即 fire (1 SQLite 帧 ≈4120B · 部分写 ≥512B 即可捕捉)"
+				},
+				"wam.walPollMs": {
+					"type": "number",
+					"default": 300,
+					"description": "v2.6.9 WAL 轮询间隔 — stat() state.vscdb-wal 轮询频率 (默认 300ms · 低延迟高应)"
+				},
+				"wam.quotaDeltaEnable": {
+					"type": "boolean",
+					"default": true,
+					"description": "v2.6.13 阴阳结合 · ⚖额度变动信号 — 监测 daily%/promptCredits/flowCredits 任一下降 ≥ 阈值即触发切号 (与 W%脉动互补·主信号窗内自动让位·反者道之动)"
+				},
+				"wam.quotaDeltaCreditsMin": {
+					"type": "number",
+					"default": 1,
+					"description": "v2.6.13 ⚖ promptCredits/flowCredits 下降阈值 (默 1 · 任何整数减少即触发 · 微观额度池绝对数·与 quota% 解耦)"
+				},
+				"wam.quotaDeltaDailyMin": {
+					"type": "number",
+					"default": 0.3,
+					"description": "v2.6.13 ⚖ daily% 下降阈值 (默 0.3% · 与 W%脉动 quotaPulseMinDelta 同量级 · Pro plan daily 维度专用)"
+				},
+				"wam.perMessageMinIntervalMs": {
+					"type": "number",
+					"default": 60000,
+					"description": "v2.6.14 守一·全 reason 强锁 — _maybeTrigger 入口全栏 · 适 ⚡W%脉动/📡WAL/📃pb·new/⚖额度变动 万源 · 1 user send ≤ 1 切号 · 复 v2.6.9 之全栏治 v2.6.13 W% 自火与 WAL 抢跑雪崩 · 默 60s · 0=关复 v2.6.11 无栏行为"
+				},
+				"wam.walEdgeCooldownMs": {
+					"type": "number",
+					"default": 2000,
+					"description": "v2.6.14 守二·WAL 同源最小间隔 — _fireWalEdge 两次间 ≥ 此值才 fire · 避连续 4KB SQLite 帧连火 · 削 log 噪 · 默 2000ms · 0=关"
+				},
+				"wam.walWarmupMs": {
+					"type": "number",
+					"default": 5000,
+					"description": "v2.6.14 守三·WAL 启动暖启窗 — _installWalWatcher 后首 N ms 内 WAL fire 全跳 · 防 activate 首 stat 累积差引启动雪崩 (实证 reload 0.5s 即火) · 默 5000ms · 0=关"
+				},
+				"wam.preferOverageFirst": {
+					"type": "boolean",
+					"default": true,
+					"description": "v3.3.0 💎 额度绝对优先 — true=有 Extra Usage 余额($)的账号永远先于百分比账号(无论W%/D%多高) · 内部按$多寡排 · overage耗尽才轮到百分比 · 解构本源: overage=存量(不用即损) 百分比=流量(重置可循环) · false=回退v3.2.1统一打分(兼容)"
+				},
+				"wam.expiryFirst": {
+					"type": "boolean",
+					"default": true,
+					"description": "v3.3.1 临期优先 — true=剩余有效期<60天的账号得到 expBonus加分(临期越近加分越高) · 临期维度主导额度次排 · false=关闭临期优先回退v3.3.0"
+				},
+				"wam.creditsThreshold": {
+					"type": "number",
+					"default": 1000,
+					"description": "v3.7.0 余额门控 — promptCredits+flowCredits 总量达到此阈值才视为「余额可用」(默 1000) · 影响: _isValidAutoTarget放行 + _tick耗尽保护 + _scoreOf加分起点 · 0=关闭credits维度"
+				},
+				"wam.creditsInScore": {
+					"type": "boolean",
+					"default": true,
+					"description": "v3.7.0 余额纳入评分 — true=promptCredits+flowCredits计入_scoreOf评分 (per 200 credits=+1分·上限+500) · false=credits静默不参与排序 · 不影响_isValidAutoTarget/切号触发逻辑"
+				},
+				"wam.hubNotifyCooldownMs": {
+					"type": "number",
+					"default": 300000,
+					"description": "v13.2 兼容旧配置 · 当前同一异常生命周期只提示一次，不再按冷却重复弹"
+				},
+				"wam.hubNotifyGlobalCdMs": {
+					"type": "number",
+					"default": 5000,
+					"description": "v3.7.1 对话卡住全局冷却 — 两次任意通知间最小间隔 (默 5000=5s · 允许多对话快速连续通知)"
+				},
+				"wam.hubRenotifyIntervalMs": {
+					"type": "number",
+					"default": 300000,
+					"description": "v13.2 兼容旧配置 · 已停止周期再推；恢复后下一轮新异常才会再次提示"
+				},
+				"wam.hubDataStaleMs": {
+					"type": "number",
+					"default": 60000,
+					"description": "v3.7.1 Hub数据过期阈值 — 引擎嵌入Hub数据连续 N ms 未更新则认为引擎已停·不处理岡死途知 (默 60000=1min)"
+				},
+				"wam.autoBackupStartDelayMs": {
+					"type": "number",
+					"default": 8000,
+					"description": "v3.7.1 备份岕动延迟 — 插件激活后 N ms 再执行初始全量备份·等待所有组件初始化完母 (默 8000=8s)"
+				},
+				"wam.incrementalBackupDebounceMs": {
+					"type": "number",
+					"default": 3000,
+					"description": "v3.7.1 增量备份防抖 — .pb文件发生变化后延迟 N ms 再备份·合并高频小批写防颠繁 (默 3000=3s)"
+				},
+				"wam.stuckNotify": {
+					"type": "boolean",
+					"default": true,
+					"description": "v3.4.0 对话追踪通知 — 当 Cascade 对话卡住/死亡/恢复时在 Windsurf 左下角弹通知 (true=开 false=关 · 不走 Windows Toast)"
+				},
+				"wam.conversationBackupDir": {
+					"type": "string",
+					"default": "",
+					"description": "v3.4.0 对话备份目录 — Cascade .pb 对话文件备份存储位置 (空=默认 ~/.wam/conversation_backups)"
+				},
+				"wam.autoSwitchDailyMin": {
+					"type": "number",
+					"default": 5,
+					"description": "v3.8.4 日额度最低门槛 — 低于此值 (%) 的账号不进入自动切号候选池 · 即 D<5% 不切入 (默认 5 · 0=关闭日额度守门)"
+				},
+				"wam.autoSwitchWeeklyMin": {
+					"type": "number",
+					"default": 3,
+					"description": "v3.8.4 周额度最低门槛 — 低于等于此值 (%) 且非干旱模式时不进入候选池 · 即 W≤3% 不切入 (默认 3 · 0=关闭周额度守门)"
+				},
+				"wam.zeroQuotaRetickMs": {
+					"type": "number",
+					"default": 300,
+					"description": "v15.0(3.11.6) 零额度紧急重触延迟 — 切号后发现新账号 D=0/W=0 时 N ms 后立即重触 _tick 换号 · 减少「Trial - Quota Exhausted」停留时间 (默认 300ms · 旧值 2000 · 0=禁用紧急重触)"
+				},
+				"wam.creditsBypassQuotaGate": {
+					"type": "boolean",
+					"default": false,
+					"description": "v15.0(3.11.6) credits 旁路 quota 守门 — false (默认安全) · Cascade premium model (Claude/GPT-4) 模式 · W=0% 时即视硬耗尽必切号 (credits 仅作辅助加分) · true · 老逻辑兼容 (适纯 Devin agent 场景) · credits 充裕时不视耗尽 · 实证: Cascade 后端只看 weekly% · credits 不能代替 quota%"
+				},
+				"wam.hardExhaustWatchdogMs": {
+					"type": "number",
+					"default": 2000,
+					"description": "v15.0(3.11.6) 硬耗尽看门狗周期 — 独立于 _tick 10s · 高频 (默 2s) 检测当前活跃号是否硬耗尽 (W=0/D=0) · 触发即调 _tick 救场 · 用户感觉切到 W=0 号 1-2s 内自愈 (而非等 10s) · 0=禁用看门狗"
+				},
+				"wam.streamStaleMaxSec": {
+					"type": "number",
+					"default": 1800,
+					"description": "v15.0(3.11.7) 对话识别真死透阈值 — streamingList 最长保留窗口秒 · 默 1800s=30min (旧 v14.0 硬限 5min 致 stale>5min 对话失明) · 30min 内 state=streaming 全保留 · UI 通过 _isStale 字段区分新鲜(绿)/陈旧(黄·停滞) · 0=永不剔除"
+				},
+				"wam.notifyOnStaleStream": {
+					"type": "boolean",
+					"default": true,
+					"description": "v15.1(3.11.8) 陈旧 streaming 对话也发 toast — true (默认) · streamingList 中 _isStale=true (>60s 停滞) 也弹左下角通知 · 与 stuck 同闸门一次性 · 10min 自动消退 · 用户可 X 关闭 · 治 AI 中断/_awaitingUser 静默漏报 · false=只对 stuckList (warning/stuck/dead) 通知"
+				},
+				"wam.notifyOnAwaitingUser": {
+					"type": "boolean",
+					"default": false,
+					"description": "v15.1(3.11.8) 等待用户的对话也发 toast — false (默认) · AI 完成 _turnGrowth>4KB+_awaitingUser=true 时不通知 (v12.9 设计·避免骚扰) · true=即便 _awaitingUser 也通知 (用于无法区分 AI 中断 vs 完成的极端场景)"
+				},
+				"wam.broadcastDebounceMs": {
+					"type": "number",
+					"default": 200,
+					"description": "v3.11.3 UI广播防抖 — broadcastUI 合并高频调用的延迟 (ms) · 200ms 覆盖用户多选手速·避免中途DOM重建 · min 30"
+				},
+				"wam.engineSingletonAgeMs": {
+					"type": "number",
+					"default": 90000,
+					"description": "v3.11.3 引擎单例闸门PID年龄 — PID文件 mtimeMs 距今超过此值则视为僵死·新进程接替 (默认 90s · min 30s)"
+				},
+				"wam.engineHeartbeatMs": {
+					"type": "number",
+					"default": 30000,
+					"description": "v3.11.3 引擎心跳间隔 — dao_stuck 每 N ms 更新PID文件时间戳 (默认 30s · min 5s)"
+				},
+				"wam.recentConvWindowMs": {
+					"type": "number",
+					"default": 300000,
+					"description": "v3.11.3 近期对话窗口 — lastGrowth 距今小于此值的对话算「活跃」(默认 5min · min 60s)"
+				},
+				"wam.streamingFreshMs": {
+					"type": "number",
+					"default": 60000,
+					"description": "v3.11.3 流式对话新鲜度 — 当前对话 lastGrowth 距今小于此值才进 streamingList (默认 60s · min 10s)"
+				},
+				"wam.pythonPath": {
+					"type": "string",
+					"default": "",
+					"description": "v15.2(3.11.9) 显式 Python 路径 — 用于 vscdb 直读拿真实对话标题 (空=自动从 PATH/py launcher/常见安装路径探测·适配 Python.org/Microsoft Store/Anaconda) · 仅当自动探测失败 (面板显示「对话 #UUID」) 时才需配置"
+				}
+			}
+		}
+	}
+}

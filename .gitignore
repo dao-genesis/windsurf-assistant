@@ -1,21 +1,6 @@
-# ── 构建产物 ──────────────────────────────────────
-*.vsix
 node_modules/
-out/
 dist/
-
-# ── 遗留镜像 (已 git rm --cached · 仅 FS 残留) ──
-wam-bundle/
-Windsurf万法归宗/
-packages/wam-proxy/
-packages/wam/_vsix_archive/
-
-# ── 本地配置 ─────────────────────────────────────
-.env
-*.local
-*.psd1
-
-# ── OS / IDE ─────────────────────────────────────
+*.vsix
 .DS_Store
-Thumbs.db
-.vscode/settings.json
+*.log
+.vscode-test/
