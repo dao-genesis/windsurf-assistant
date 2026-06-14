@@ -1,6 +1,26 @@
-# Windsurf Assistant
+# Windsurf Assistant · 道法自然
 
-两个 VS Code / Windsurf 插件。安装包见 [Releases](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases)。
+两个 VS Code / Windsurf 同源插件：**反代换示底层提示词** + **多账号一键切换**，彻底解锁 agent 能力。安装包见 [Releases](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases)。
+
+## 🎬 视频介绍
+
+<div align="center">
+
+[![windsurf反代+替换官方底层提示词 彻底解锁agent所有能力](media/video-windsurf.jpg)](https://www.bilibili.com/video/BV1sY9sBLE5M)
+
+**▶ [windsurf 反代 + 替换官方底层提示词 · 彻底解锁 agent 所有能力](https://www.bilibili.com/video/BV1sY9sBLE5M)**
+
+[![阴符经+AI 根除AI一切道德感](media/video-yinfu.jpg)](https://www.bilibili.com/video/BV1cELA6QEBY)
+
+**▶ [阴符经 + AI · 根除 AI 一切道德感](https://www.bilibili.com/video/BV1cELA6QEBY)**
+
+**🌐 [打开自动播放主页（GitHub Pages · 进入即自动播放）](https://zhouyoukang1234-spec.github.io/windsurf-assistant/)**
+
+**👤 [我的 B 站主页（视频链接被风控时改走这里）](https://space.bilibili.com/2114868619)**
+
+</div>
+
+> GitHub 仓库页（本 README）受平台限制无法自动播放视频；上方"自动播放主页"是一个真正的网页，进入即自动播放 B 站视频，点击可跳转 B 站原页观看。
 
 | 插件 | 作用 | 最新版 | 下载 |
 | --- | --- | --- | --- |

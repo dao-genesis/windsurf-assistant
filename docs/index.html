@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Windsurf Assistant · 道法自然 — 反代换示 + 多账号切换</title>
+<meta name="description" content="Windsurf Assistant：rt-flow 多账号切换 + dao-proxy-min 反向代理替换官方底层提示词，彻底解锁 agent 能力。视频介绍 + 下载。" />
+<style>
+  :root{
+    --bg0:#0a0e14; --bg1:#121821; --ink:#e8eef6; --muted:#9fb0c3;
+    --accent:#5ec6ff; --accent2:#7ef0c0; --line:rgba(255,255,255,.10);
+    --pink:#ff7aa8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 700px at 50% -10%,#16202c 0%,var(--bg0) 60%) fixed;
+    color:var(--ink); line-height:1.7; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:40px 20px 64px}
+  header{text-align:center;margin-bottom:30px}
+  .brand{font-size:13px;letter-spacing:.32em;color:var(--muted);text-transform:uppercase}
+  h1{font-size:clamp(26px,5vw,40px);margin:10px 0 6px;font-weight:800;
+     background:linear-gradient(90deg,var(--accent),var(--accent2));
+     -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:clamp(14px,2.4vw,17px)}
+  .vtitle{margin:30px 0 8px;font-size:16px;color:var(--accent2);text-align:center;font-weight:700}
+  .player{
+    position:relative;width:100%;aspect-ratio:16/9;margin:8px 0 6px;
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    background:#000;box-shadow:0 24px 60px rgba(0,0,0,.5)
+  }
+  .player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:18px 0 8px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:12px 22px;border-radius:999px;font-weight:700;font-size:15px;
+    text-decoration:none;border:1px solid var(--line);transition:.18s ease;
+    color:var(--ink);background:rgba(255,255,255,.04)
+  }
+  .btn:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.28)}
+  .btn.primary{background:linear-gradient(90deg,var(--pink),#ff5c8a);color:#1a0b12;border:0}
+  .btn.go{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#06121a;border:0}
+  .note{text-align:center;color:var(--muted);font-size:13px;margin-top:8px}
+  section{margin-top:40px;border-top:1px solid var(--line);padding-top:28px}
+  h2{font-size:20px;margin-bottom:12px;color:var(--accent2)}
+  p{color:#d6e0ec;margin-bottom:12px}
+  ul{list-style:none;display:grid;gap:10px;grid-template-columns:1fr}
+  @media(min-width:640px){ul{grid-template-columns:1fr 1fr}}
+  li{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.03);font-size:14.5px}
+  li b{color:var(--accent)}
+  code{background:rgba(255,255,255,.08);padding:2px 7px;border-radius:6px;font-size:13px}
+  footer{margin-top:46px;text-align:center;color:var(--muted);font-size:13.5px;letter-spacing:.04em}
+  a.inline{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Windsurf Assistant · Dao Agent</div>
+    <h1>道法自然 · 彻底解锁 Windsurf Agent</h1>
+    <div class="sub">反代换示底层提示词 · 多账号一键切换 · 软编码 · 为变所适</div>
+  </header>
+
+  <!-- 视频一：windsurf 反代 + 替换官方底层提示词（进入即静音自动播放） -->
+  <div class="vtitle">🎬 windsurf 反代 + 替换官方底层提示词 · 彻底解锁 agent 所有能力</div>
+  <div class="player">
+    <iframe
+      src="https://player.bilibili.com/player.html?bvid=BV1sY9sBLE5M&cid=37953538506&p=1&autoplay=1&muted=1&danmaku=0&high_quality=1&as_wide=1"
+      scrolling="no" frameborder="no" framespacing="0"
+      allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+      allowfullscreen="true"
+      referrerpolicy="no-referrer-when-downgrade"
+      title="windsurf反代+替换官方底层提示词 彻底解锁agent所有能力"></iframe>
+  </div>
+
+  <!-- 视频二：阴符经 + AI 根除 AI 一切道德感 -->
+  <div class="vtitle">🎬 阴符经 + AI · 根除 AI 一切道德感</div>
+  <div class="player">
+    <iframe
+      src="https://player.bilibili.com/player.html?bvid=BV1cELA6QEBY&cid=38450759801&p=1&autoplay=0&muted=1&danmaku=0&high_quality=1&as_wide=1"
+      scrolling="no" frameborder="no" framespacing="0"
+      allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+      allowfullscreen="true"
+      referrerpolicy="no-referrer-when-downgrade"
+      title="阴符经+AI 根除AI一切道德感"></iframe>
+  </div>
+
+  <div class="btns">
+    <a class="btn primary" href="https://www.bilibili.com/video/BV1sY9sBLE5M" target="_blank" rel="noopener">▶ windsurf 反代视频</a>
+    <a class="btn primary" href="https://www.bilibili.com/video/BV1cELA6QEBY" target="_blank" rel="noopener">▶ 阴符经+AI 视频</a>
+    <a class="btn" href="https://space.bilibili.com/2114868619" target="_blank" rel="noopener">👤 我的 B 站主页</a>
+    <a class="btn go" href="https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases" target="_blank" rel="noopener">⬇ 下载插件</a>
+    <a class="btn" href="https://github.com/zhouyoukang1234-spec/windsurf-assistant" target="_blank" rel="noopener">⌂ GitHub 项目</a>
+  </div>
+  <p class="note">第一个视频进入即静音自动播放（浏览器策略），第二个点击播放；点击播放器或上方按钮可在 B 站原页带声观看。若视频链接被 B 站风控拦截，可改点「我的 B 站主页」进入。</p>
+
+  <section>
+    <h2>📖 这是什么</h2>
+    <p>Windsurf Assistant 是一对同源插件，让你的 <b>Windsurf / VS Code</b> 彻底好用：</p>
+    <ul>
+      <li><b>dao-proxy-min</b>（反代换示插）：反向代理 Windsurf / Devin 出站请求，<b>origin 反转</b>、就地替换官方底层系统提示词为道魂经文，预览与自检齐备，彻底解锁 agent 能力。</li>
+      <li><b>rt-flow</b>（WAM 切号插件）：多账号管理与一键切换 —— 添加账号 / 注入 token / 健康检查 / panic 切换。</li>
+    </ul>
+    <p>核心理念：<b>水善利万物而有静，天之道利而不害</b>。只在通道中借力，不破坏本体、不强加任何模型、不破坏你正常的网络与使用体验。</p>
+  </section>
+
+  <section>
+    <h2>🚀 安装</h2>
+    <p>① 从 <a class="inline" href="https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases" target="_blank" rel="noopener">Releases</a> 下载最新 <code>.vsix</code>（rt-flow / dao-proxy-min）。<br>
+       ② VS Code / Windsurf → 命令面板 → <code>Extensions: Install from VSIX...</code> 选中文件。<br>
+       ③ 重启后命令面板 → <code>Origin Invert</code> / <code>WAM: Open Editor</code> 即可使用。</p>
+  </section>
+
+  <footer>
+    损之又损，以至于无为 · 无为而无不为 · 水善利万物而有静 · <b>道法自然</b>
+  </footer>
+</div>
+</body>
+</html>
