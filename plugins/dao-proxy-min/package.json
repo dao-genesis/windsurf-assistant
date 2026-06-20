@@ -13,7 +13,7 @@
 		"url": "https://github.com/zhouyoukang1234-spec/windsurf-assistant.git",
 		"directory": "plugins/dao-proxy-min"
 	},
-	"homepage": "https://github.com/zhouyoukang/windsurf-assistant",
+	"homepage": "https://github.com/zhouyoukang1234-spec/windsurf-assistant",
 	"icon": "media/icon.png",
 	"categories": [
 		"AI",
@@ -46,16 +46,16 @@
 		"viewsContainers": {
 			"activitybar": [
 				{
-					"id": "dao-container",
-					"title": "道Agent",
+					"id": "daomin-container",
+					"title": "道Agent · min",
 					"icon": "media/icon.svg"
 				}
 			]
 		},
 		"views": {
-			"dao-container": [
+			"daomin-container": [
 				{
-					"id": "dao.essence",
+					"id": "daomin.essence",
 					"name": "本源观照",
 					"type": "webview"
 				}
@@ -63,67 +63,67 @@
 		},
 		"commands": [
 			{
-				"command": "wam.originInvert",
+				"command": "daomin.originInvert",
 				"title": "道Agent: 启 (invert · 道德经前置 · 彻删官方着相)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "wam.originPassthrough",
+				"command": "daomin.originPassthrough",
 				"title": "官方Agent: 启 (passthrough · 锚归云 · 直连)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "dao.toggleMode",
+				"command": "daomin.toggleMode",
 				"title": "道Agent: 切换模式 (道 ⇄ 官方)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "dao.openPreview",
+				"command": "daomin.openPreview",
 				"title": "道Agent: 浏览器观真 SP (/origin/preview)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "wam.verifyEndToEnd",
+				"command": "daomin.verifyEndToEnd",
 				"title": "全链路自检 (E2E)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "wam.selftest",
+				"command": "daomin.selftest",
 				"title": "闭环自检 (L1 + L2)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "dao.外接api.toggle",
+				"command": "daomin.外接api.toggle",
 				"title": "道Agent: 外接 api 开关 (印 124 · 14 provider · vscode.lm 注 · 默关)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "dao.term.exec",
+				"command": "daomin.term.exec",
 				"title": "道Agent: 终端会话池 · exec (印 160 · 七层一招治 · 零第三方)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "dao.term.list",
+				"command": "daomin.term.list",
 				"title": "道Agent: 终端会话池 · list (列所有 sid · 终端池状)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			},
 			{
-				"command": "dao.term.close",
+				"command": "daomin.term.close",
 				"title": "道Agent: 终端会话池 · close (选 sid 关 · 释 shell 进程)",
-				"category": "道Agent"
+				"category": "道Agent · min"
 			}
 		],
 		"configuration": {
-			"title": "道Agent",
+			"title": "道Agent · min",
 			"properties": {
-				"dao.origin.port": {
+				"daomin.origin.port": {
 					"type": "number",
 					"default": 0,
 					"minimum": 0,
 					"maximum": 65535,
 					"description": "源.js 反代端口 (0=自动 per-user FNV-1a hash · 8889..8988 · 多账号自然隔离). 非0则覆盖."
 				},
-				"dao.origin.defaultMode": {
+				"daomin.origin.defaultMode": {
 					"type": "string",
 					"default": "invert",
 					"enum": [
@@ -136,12 +136,12 @@
 					],
 					"description": "首激默模 (二态互斥 · 无off)"
 				},
-				"dao.origin.banner": {
+				"daomin.origin.banner": {
 					"type": "boolean",
 					"default": false,
 					"description": "启动时显道德经横幅 (默认 false · 不言之教)"
 				},
-				"dao.外接api.enabled": {
+				"daomin.外接api.enabled": {
 					"type": "boolean",
 					"default": false,
 					"description": "印 124 · 第一细药 · 外接 api 归一 · 启后: gateway :11635..11734 起 · vscode.lm 注 14 provider 之 N 模 · Cascade 选单见 'dao-*' · 与 4 BYOK 一视同仁. 需手编 ~/.codeium/dao-byok/配置.json 填 apiKey."

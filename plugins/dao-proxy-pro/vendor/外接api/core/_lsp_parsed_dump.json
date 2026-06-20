@@ -1,0 +1,466 @@
+{
+  "_ts": "2026-06-03T14:11:49.736Z",
+  "_modelUid": "MODEL_SIM_TEST",
+  "_sysLen": 16,
+  "_sysPreview": "You are helpful.",
+  "_sysFull": "You are helpful.",
+  "_msgCount": 3,
+  "_toolsFromLSP": [
+    {
+      "name": "Read",
+      "description": "Read file",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path"
+        ]
+      }
+    },
+    {
+      "name": "Edit",
+      "description": "Edit file",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file_path": {
+            "type": "string"
+          },
+          "old_string": {
+            "type": "string"
+          },
+          "new_string": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path",
+          "old_string",
+          "new_string"
+        ]
+      }
+    },
+    {
+      "name": "multi_edit",
+      "description": "Multi edit",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file_path": {
+            "type": "string"
+          },
+          "edits": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "file_path",
+          "edits"
+        ]
+      }
+    },
+    {
+      "name": "Write",
+      "description": "Write file",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "TargetFile": {
+            "type": "string"
+          },
+          "CodeContent": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "TargetFile",
+          "CodeContent"
+        ]
+      }
+    },
+    {
+      "name": "bash",
+      "description": "Run command",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "CommandLine": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "CommandLine"
+        ]
+      }
+    },
+    {
+      "name": "Grep",
+      "description": "Grep search",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "SearchPath": {
+            "type": "string"
+          },
+          "Query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "SearchPath",
+          "Query"
+        ]
+      }
+    },
+    {
+      "name": "FindByName",
+      "description": "Find by name",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "SearchDirectory": {
+            "type": "string"
+          },
+          "Pattern": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "SearchDirectory",
+          "Pattern"
+        ]
+      }
+    },
+    {
+      "name": "ListDir",
+      "description": "List dir",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "DirectoryPath": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "DirectoryPath"
+        ]
+      }
+    },
+    {
+      "name": "CodeSearch",
+      "description": "Code search",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "search_folder_absolute_uri": {
+            "type": "string"
+          },
+          "search_term": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "search_folder_absolute_uri",
+          "search_term"
+        ]
+      }
+    },
+    {
+      "name": "command_status",
+      "description": "Command status",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "CommandId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "CommandId"
+        ]
+      }
+    },
+    {
+      "name": "browser_preview",
+      "description": "Browser preview",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "Url": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Url",
+          "Name"
+        ]
+      }
+    },
+    {
+      "name": "todo_list",
+      "description": "Todo list",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "todos": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "todos"
+        ]
+      }
+    },
+    {
+      "name": "ask_user_question",
+      "description": "Ask user",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array"
+          },
+          "allowMultiple": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "question",
+          "options",
+          "allowMultiple"
+        ]
+      }
+    },
+    {
+      "name": "deploy_web_app",
+      "description": "Deploy",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "project_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_path"
+        ]
+      }
+    },
+    {
+      "name": "read_deployment_config",
+      "description": "Read deploy config",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "project_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_path"
+        ]
+      }
+    },
+    {
+      "name": "check_deploy_status",
+      "description": "Deploy status",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "windsurf_deployment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "windsurf_deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "create_memory",
+      "description": "Create memory",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Title": {
+            "type": "string"
+          },
+          "Content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Id",
+          "Title",
+          "Content"
+        ]
+      }
+    },
+    {
+      "name": "search_web",
+      "description": "Search web",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "read_url_content",
+      "description": "Read URL",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "Url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Url"
+        ]
+      }
+    },
+    {
+      "name": "view_content_chunk",
+      "description": "View chunk",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "document_id",
+          "position"
+        ]
+      }
+    },
+    {
+      "name": "trajectory_search",
+      "description": "Search trajectory",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "id_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "query",
+          "id_type"
+        ]
+      }
+    },
+    {
+      "name": "edit_notebook",
+      "description": "Edit notebook",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "absolute_path": {
+            "type": "string"
+          },
+          "new_source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "absolute_path",
+          "new_source"
+        ]
+      }
+    },
+    {
+      "name": "read_notebook",
+      "description": "Read notebook",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "AbsolutePath": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "AbsolutePath"
+        ]
+      }
+    },
+    {
+      "name": "read_resource",
+      "description": "Read resource",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ServerName": {
+            "type": "string"
+          },
+          "Uri": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ServerName",
+          "Uri"
+        ]
+      }
+    }
+  ],
+  "_toolNames": [
+    "Read",
+    "Edit",
+    "multi_edit",
+    "Write",
+    "bash",
+    "Grep",
+    "FindByName",
+    "ListDir",
+    "CodeSearch",
+    "command_status",
+    "browser_preview",
+    "todo_list",
+    "ask_user_question",
+    "deploy_web_app",
+    "read_deployment_config",
+    "check_deploy_status",
+    "create_memory",
+    "search_web",
+    "read_url_content",
+    "view_content_chunk",
+    "trajectory_search",
+    "edit_notebook",
+    "read_notebook",
+    "read_resource"
+  ],
+  "_toolChoice": "auto",
+  "_disableParallel": false
+}

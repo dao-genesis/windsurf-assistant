@@ -136,8 +136,8 @@ const SELF_EXT_VER_REGEX = new RegExp(
 const DEFAULT_PORT = 8889;
 const OFFICIAL_API_URL = "https://server.codeium.com";
 const OFFICIAL_INFER_URL = "https://inference.codeium.com";
-const BACKUP_KEY_API = "dao.origin._backup_apiServerUrl";
-const BACKUP_KEY_INFER = "dao.origin._backup_inferenceApiServerUrl";
+const BACKUP_KEY_API = "daomin.origin._backup_apiServerUrl";
+const BACKUP_KEY_INFER = "daomin.origin._backup_inferenceApiServerUrl";
 
 const DAO_QUOTES = [
   "道可道，非常道",
@@ -163,7 +163,7 @@ let _deferredAnchorTimer = null; // v9.9.36 · 延迟锚定计时器 · 渡过 I
 // ═══════════════════════════ 日志 ═══════════════════════════
 let _channel = null;
 function logger() {
-  if (!_channel) _channel = vscode.window.createOutputChannel("道Agent");
+  if (!_channel) _channel = vscode.window.createOutputChannel("道Agent · min");
   return _channel;
 }
 function _stamp() {
@@ -191,13 +191,13 @@ function fnv1aPort(input) {
 }
 
 function resolvePort() {
-  const c = vscode.workspace.getConfiguration("dao");
+  const c = vscode.workspace.getConfiguration("daomin");
   const explicit = parseInt(c.get("origin.port"), 10);
   if (Number.isFinite(explicit) && explicit >= 1 && explicit <= 65535)
     return explicit;
-  // per-user 自动 · 用 os.userInfo().username
+  // per-user 自动 · 用 os.userInfo().username + ":min" · 与 pro 同用户不撞端口
   try {
-    return fnv1aPort(os.userInfo().username);
+    return fnv1aPort(os.userInfo().username + ":min");
   } catch {
     return DEFAULT_PORT;
   }
@@ -1321,8 +1321,8 @@ function _ensureTermPool() {
 let _DAO_TERM_HTTP = null;
 let _DAO_TERM_HTTP_PORT = 0;
 function _termHttpPort() {
-  // 复用 fnv1a 思想 · base 12780
-  const u = (os.userInfo().username || "default").toLowerCase();
+  // 复用 fnv1a 思想 · base 12780 · :min 偏置 · 与 pro 同用户不撞
+  const u = ((os.userInfo().username || "default") + ":min").toLowerCase();
   let h = 2166136261;
   for (let i = 0; i < u.length; i++) {
     h ^= u.charCodeAt(i);
@@ -2732,7 +2732,7 @@ function activate(ctx) {
     cfg();
     _cachedAnchored = isAnchored();
     _cachedMode = vscode.workspace
-      .getConfiguration("dao")
+      .getConfiguration("daomin")
       .get("origin.defaultMode", "invert");
 
     installSpawnHook();
@@ -2744,35 +2744,35 @@ function activate(ctx) {
     );
 
     // 道德经横幅 (默认关 · 不言之教)
-    if (vscode.workspace.getConfiguration("dao").get("origin.banner", false)) {
+    if (vscode.workspace.getConfiguration("daomin").get("origin.banner", false)) {
       const q = DAO_QUOTES[Math.floor(Math.random() * DAO_QUOTES.length)];
       vscode.window.showInformationMessage(`道Agent v${PKG_VERSION} · ${q}`);
     }
 
     // 注册命令
     ctx.subscriptions.push(
-      vscode.commands.registerCommand("wam.originInvert", cmdInvert),
-      vscode.commands.registerCommand("wam.originPassthrough", cmdPassthrough),
-      vscode.commands.registerCommand("dao.toggleMode", cmdToggle),
-      vscode.commands.registerCommand("dao.openPreview", cmdOpenPreview),
-      vscode.commands.registerCommand("wam.verifyEndToEnd", cmdVerifyE2E),
-      vscode.commands.registerCommand("wam.selftest", cmdSelftest),
+      vscode.commands.registerCommand("daomin.originInvert", cmdInvert),
+      vscode.commands.registerCommand("daomin.originPassthrough", cmdPassthrough),
+      vscode.commands.registerCommand("daomin.toggleMode", cmdToggle),
+      vscode.commands.registerCommand("daomin.openPreview", cmdOpenPreview),
+      vscode.commands.registerCommand("daomin.verifyEndToEnd", cmdVerifyE2E),
+      vscode.commands.registerCommand("daomin.selftest", cmdSelftest),
       // v9.9.0 · 印 124 · 第一细药 · 外接 api 开关 (默关 · 主公一字开)
       vscode.commands.registerCommand(
-        "dao.外接api.toggle",
+        "daomin.外接api.toggle",
         cmdExternalApiToggle,
       ),
       // v9.9.29 · 印 160 · 终端会话池 (反者道之动 · 七层污染一招治)
-      vscode.commands.registerCommand("dao.term.exec", cmdTermExec),
-      vscode.commands.registerCommand("dao.term.list", cmdTermList),
-      vscode.commands.registerCommand("dao.term.close", cmdTermClose),
+      vscode.commands.registerCommand("daomin.term.exec", cmdTermExec),
+      vscode.commands.registerCommand("daomin.term.list", cmdTermList),
+      vscode.commands.registerCommand("daomin.term.close", cmdTermClose),
     );
 
     // 注册 webview
     _essenceProvider = new EssenceProvider(ctx);
     ctx.subscriptions.push(
       vscode.window.registerWebviewViewProvider(
-        "dao.essence",
+        "daomin.essence",
         _essenceProvider,
         {
           webviewOptions: { retainContextWhenHidden: true },
@@ -2787,9 +2787,9 @@ function activate(ctx) {
     setTimeout(() => {
       try {
         vscode.commands.executeCommand(
-          "workbench.view.extension.dao-container",
+          "workbench.view.extension.daomin-container",
         );
-        L.info("activate", "focus dao-container · webview 自化");
+        L.info("activate", "focus daomin-container · webview 自化");
       } catch (e) {
         L.warn("activate", `focus fail: ${e.message}`);
       }
@@ -3051,7 +3051,7 @@ let _externalApiRuntime = null;
 async function tryStartExternalApi(ctx) {
   // 默关 · 主公 dao.外接api.enabled=true 才启
   const enabled = vscode.workspace
-    .getConfiguration("dao")
+    .getConfiguration("daomin")
     .get("外接api.enabled", false);
   if (!enabled) {
     L.info("外接api", "默关 (dao.外接api.enabled=false) · 跳启");
@@ -3071,7 +3071,7 @@ async function tryStartExternalApi(ctx) {
   _externalApiRuntime = new ExternalApiRuntime({
     vscodeModule: vscode,
     logger: L,
-    configKey: "dao.外接api",
+    configKey: "daomin.外接api",
     vendorPrefix: "dao-",
   });
   const status = await _externalApiRuntime.start();
@@ -3104,7 +3104,7 @@ async function tryStopExternalApi() {
 
 async function cmdExternalApiToggle() {
   try {
-    const cfg = vscode.workspace.getConfiguration("dao");
+    const cfg = vscode.workspace.getConfiguration("daomin");
     const cur = cfg.get("外接api.enabled", false);
     const next = !cur;
     await cfg.update(
