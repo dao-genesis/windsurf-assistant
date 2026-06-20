@@ -2,7 +2,7 @@
   "name": "dao-proxy-pro",
   "displayName": "道Agent Pro · 外接API · 反者道之动",
   "description": "在 dao-proxy-min 反代/提示词隔离之上，新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、配置原子写+备份轮转、三面板（本源观照/渠道配置/模型路由）、只填 API Key 自动识别模型。完整版本历史见 CHANGELOG。",
-  "version": "9.9.301",
+  "version": "9.9.302",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "engines": {

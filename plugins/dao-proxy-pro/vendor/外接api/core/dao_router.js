@@ -1285,7 +1285,33 @@ function init({ log, configPath }) {
     //   道义: 二十八章「复归于朴」· 去其华饰 复其本根 · 名实相符方能通。
     for (const _pn of Object.keys(_providers)) {
       const _pc = _providers[_pn];
-      if (_pc && _pc.baseUrl) {
+      if (!_pc) continue;
+      // ★ 道法自然 · 先修「按字母 s 拆碎」的历史脏配置 (复原 baseUrl/endpoints)
+      //   实证根因: 旧版「添加渠道」分隔符正则退化 /[\s,]+/ → /[s,]+/ ·
+      //     把 URL 按字母 s 切碎 "https://api.deepseek.com/v1"
+      //     → endpoints=["http","://api.deep","eek.com/v1"], baseUrl="http" · 整渠道不可用。
+      //   归一: s 为唯一被吃分隔符(URL 无逗号空白) · 顺序碎片以 "s" 重接即复原。
+      if (_reassembleSplitUrl(_pc)) {
+        _log(
+          `[dao-router] [载] provider ${_pn}: 拆碎URL自愈 → baseUrl=${_pc.baseUrl} (修历史 /[s,]+/ 误拆)`,
+        );
+        // 复原后按含/不含 /vN 重判 completionPath · 清旧的错值(防双重 /v1)
+        if (
+          !_pc.completionPath ||
+          /^\/v\d+\/(?:chat\/completions|messages)$/i.test(_pc.completionPath)
+        ) {
+          const _hasVer = /\/v\d+\/?$/i.test(_pc.baseUrl);
+          _pc.completionPath =
+            _pc.type === "anthropic"
+              ? _hasVer
+                ? "/messages"
+                : "/v1/messages"
+              : _hasVer
+                ? "/chat/completions"
+                : "/v1/chat/completions";
+        }
+      }
+      if (_pc.baseUrl) {
         const _nb = _stripCompletionSuffix(_pc.baseUrl);
         if (_nb && _nb !== String(_pc.baseUrl).replace(/\/+$/, "")) {
           _log(
@@ -4202,7 +4228,49 @@ function _joinCompletionUrl(base, completionPath) {
   const root = _stripCompletionSuffix(base);
   let p = completionPath || "/v1/chat/completions";
   if (!p.startsWith("/")) p = "/" + p;
+  // ★ 防双重版本段: root 已以 /vN 结尾且 path 又以 /vM/ 开头 → 去 path 的版本段
+  //   (如 deepseek root=.../v1 + path=/v1/chat/completions → .../v1/chat/completions)
+  if (/\/v\d+$/i.test(root) && /^\/v\d+\//i.test(p)) {
+    p = p.replace(/^\/v\d+/i, "");
+  }
   return root + p;
+}
+
+// ★ 道法自然 · 复原被「按字母 s 拆碎」的 URL (修历史 /[s,]+/ 误拆 bug)
+//   s 为唯一被吃分隔符(URL 无逗号/空白) → 顺序碎片以 "s" 重接即原样复原:
+//     ["http","://api.deep","eek.com/v1"].join("s") = "https://api.deepseek.com/v1"
+//   守常: 仅当 baseUrl 是裸协议碎片(^https?$)或 endpoints 首段为裸协议碎片,
+//     且重接后为合法 http(s) URL(含点分主机)方施治 · 不误伤正常的多端点配置。
+function _looksLikeBareScheme(s) {
+  return /^https?$/i.test(String(s == null ? "" : s).trim());
+}
+function _reassembleSplitUrl(provCfg) {
+  if (!provCfg) return false;
+  const eps = Array.isArray(provCfg.endpoints) ? provCfg.endpoints : [];
+  const frags = eps
+    .map((e) => (typeof e === "string" ? e : e && (e.url || e.baseUrl)) || "")
+    .filter((x) => x !== "");
+  const baseBare = _looksLikeBareScheme(provCfg.baseUrl);
+  const epsFragmented = frags.length >= 2 && _looksLikeBareScheme(frags[0]);
+  if (!baseBare && !epsFragmented) return false;
+  const joined = (frags.length ? frags : [String(provCfg.baseUrl || "")]).join(
+    "s",
+  );
+  let ok = false;
+  try {
+    const u = new URL(joined);
+    ok =
+      /^https?:$/.test(u.protocol) &&
+      !!u.hostname &&
+      u.hostname.indexOf(".") > 0;
+  } catch {
+    ok = false;
+  }
+  if (!ok) return false;
+  provCfg.baseUrl = joined.replace(/\/+$/, "");
+  // 复原后 endpoints 收敛为单端点 · 去碎片 · 防负载均衡再打碎片主机
+  provCfg.endpoints = [{ url: provCfg.baseUrl, weight: 1 }];
+  return true;
 }
 
 // ★ cc-switch build_models_url_candidates 移植 · 多候选顺序探测 /models
