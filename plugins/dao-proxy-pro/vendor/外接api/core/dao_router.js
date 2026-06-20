@@ -4603,6 +4603,19 @@ function hotAddProvider(name, cfg) {
     return { ok: false, error: "name required" };
   if (!cfg || typeof cfg !== "object")
     return { ok: false, error: "cfg required" };
+  // ★★ 根治「首次添加即探活失败·重启窗口后才生效」(v9.9.306)
+  //   根因(实证·设备实时抓包): 历史脏数据 / 旧前端把含 s 的 URL 按字母 s 切碎 →
+  //     "https://open.bigmodel.cn/api/paas/v4" 存成 baseUrl="http" + endpoints=["http","://...paa","/v4"]
+  //   旧逻辑只在 _loadConfig (重载/重启) 时调 _reassembleSplitUrl 自愈 →
+  //     热添加入口不自愈 → 紧接的探活拿碎 URL 必 404/连接失败 → "探活失败·检查URL/apiKey" →
+  //     用户重启窗口触发重载自愈 → 才变绿。此即「我点(直写真URL)绿·你点(走前端切碎)红」之真相。
+  //   修正: 在添加入口立即归一碎 URL · 使热添加与重载同效 · 首次添加即通 · 无须重启。
+  //   必须在 type/completionPath 推断之前 (二者依赖正确 baseUrl)。
+  if (_reassembleSplitUrl(cfg)) {
+    _log(
+      `[dao-router] [热] provider ${name}: URL 碎片即时归一 → ${cfg.baseUrl} (添加入口自愈·免重启·v9.9.306)`,
+    );
+  }
   // ★ cc-switch 风 · baseUrl 归一: 剥去误含的补全后缀(/chat/completions 等) · 防双重路径 404
   //   实证: 小米渠道用户把完整端点贴进 baseUrl → 拼 completionPath 双重 → 完全不可用 · 此处根治
   if (cfg.baseUrl) {
