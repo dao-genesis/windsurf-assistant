@@ -344,7 +344,7 @@ function _routeDiag(msg) {
   } catch {}
 }
 let _substituteEnabled = false; // 全局开关: substitute模式默认关闭(需用户有目标模型权限)
-let _familyTierExtend = false; // ★ 同族档位延伸: 连一档是否覆盖全族 · 默认关(可显式 familyTierExtend:true 开) · 关时 slow 等未显式连线之档保持官方原生直通(默认走官方·免费不路由) · 开时全族档位归一其渠道
+let _familyTierExtend = false; // ★ 兄弟档→兄弟档延伸闸控 (仅 3.6): 默认关 · 关时仅连兄弟档(如 fast)不波及其它档(slow 守官方原生直通) · 开时同族任一档被显式连线即归一全族档位 · 注: 3.5「连族基名即覆盖全档」恒开, 不受此闸控
 let _wire = null; // cascade_wire.js (lazy load)
 
 // ════════════════════════════════════════════════════════════════
@@ -1565,9 +1565,10 @@ function _normalizeModelUid(uid) {
   //   关键: 自动播种(_seeded)的 MODEL_SWE_1_6 测试桩不得吞并兄弟档位 →
   //         swe-1-6-slow 等未显式连线者保持官方透传(免费原生·用户旨意)
   //   仅当精确/形态匹配皆未命中, 且族基名被用户"显式"(非_seeded)连线时方触发
-  //   ★ 受 daoRoutes.familyTierExtend 闸控 · 默认开(可显式置 false 关) · 守「连族即覆盖全档」之本
-  //     (slow 等档 catalog 无独立项·无法单独连线 → 必经此延伸方能命中用户所连渠道)
-  if (_familyTierExtend) {
+  //   ★ 3.5「连族基名即覆盖全档」恒开 · 不受 familyTierExtend 闸控 (守「连族即覆盖全档」之本)
+  //     (slow/thinking 等档 catalog 无独立项·无法单独连线 → 必经此延伸方能命中用户所连渠道)
+  //     守常: 仅延伸"族基名本身被显式(非_seeded)连线"之族 → 仅连兄弟档(如 fast)时
+  //     base(swe-1-6) 非真路由, 此处不命中, slow 仍守官方直通 (兄弟→兄弟延伸见下方 3.6, 受闸控)
   const base = _stripVariantSuffix(uid);
   if (base && base !== uid) {
     // ★ v9.9.284 · 真实可路由判定: 非播种 + 非桩/替身 + 未禁用
@@ -1600,6 +1601,9 @@ function _normalizeModelUid(uid) {
   //   治: 只要同族任一档位被用户"显式"(非_seeded)连线 · 则全族档位归一其渠道
   //   守常: 仅延伸"用户已连"之族 · 纯播种桩族(无真路由)仍保官方原生直通
   //   道义: 二十八章「朴散为器·大制无割」· 四十八章「损之又损·以至无为而无不为」
+  //   ★ 仅 3.6(兄弟档→兄弟档延伸)受 familyTierExtend 闸控 · 默认关 ·
+  //     守「仅连 fast 时 slow 仍守官方原生直通」(用户旨意·免费档不被吞)
+  if (_familyTierExtend) {
   const _qFam = _familyCanon(uid);
   if (_qFam) {
     const _sibs = Object.keys(_routes)
@@ -1625,7 +1629,7 @@ function _normalizeModelUid(uid) {
       return (_realSib.length ? _realSib : _sibs)[0];
     }
   }
-  } // end if(_familyTierExtend) · 同族档位延伸
+  } // end if(_familyTierExtend) · 3.6 兄弟档→兄弟档延伸 (闸控)
   // 4) ★ v9.9.59 · 通配符兜底: * → 任何未知模型自动路由
   if (_routes["*"]) return "*";
   return uid; // 无法规范化则原样返回
