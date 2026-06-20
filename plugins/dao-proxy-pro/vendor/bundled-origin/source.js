@@ -3106,15 +3106,28 @@ function handleControl(req, res) {
   // v9.7.0 · 为道日损 · /origin/preview · 简返 before/after + 计数 (无 dissect)
   // 致虚守静 · 观复知常 · 二十六章 重为轻根
   if (u.pathname === "/origin/preview" && req.method === "GET") {
-    const hasBefore = !!(_lastInject && _lastInject.before);
-    const before = hasBefore ? _lastInject.before : null;
+    // ★ v9.9.302 · 本源观照取槽归一 · 优先主 Cascade「chat」槽 · 变换用 invertAnySP
+    //   痛根(zhoumac 实证): preview 旧取单槽 _lastInject —— 被 summary 子代理 RPC 覆盖后,
+    //     且旧 after=invertSP(before)·invertSP 仅识主 chat → invertSP(summary)=null →
+    //     after 回退 before(英文子代理总结词)。面板遂「一直显示子代理提示词」,
+    //     且切单经/经藏「看似无效」(显示恒为那条英文)。三诉同此一源。
+    //   归一: 取槽优先 _injectsByKind.chat(主体真注入) · 缺则回退 _lastInject;
+    //     变换用 invertAnySP(识 chat/summary/memory/ephemeral·即 LLM 实收), 退 invertSP, 再退 before。
+    const _previewSlot =
+      _injectsByKind && _injectsByKind.chat && _injectsByKind.chat.before
+        ? _injectsByKind.chat
+        : _lastInject;
+    const hasBefore = !!(_previewSlot && _previewSlot.before);
+    const before = hasBefore ? _previewSlot.before : null;
     const age_s =
-      _lastInject && _lastInject.at
-        ? Math.round((Date.now() - _lastInject.at) / 1000)
+      _previewSlot && _previewSlot.at
+        ? Math.round((Date.now() - _previewSlot.at) / 1000)
         : null;
     let after = null;
     if (SP_MODE === "invert") {
-      after = hasBefore ? invertSP(before) || before : null;
+      after = hasBefore
+        ? invertAnySP(before) || invertSP(before) || before
+        : null;
     } else {
       after = before;
     }
