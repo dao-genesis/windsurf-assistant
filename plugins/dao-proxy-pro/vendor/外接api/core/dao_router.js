@@ -4689,6 +4689,29 @@ function hotAddProvider(name, cfg) {
       );
     }
   }
+  // ★ v9.9.307 · 渠道配置回归至简(吸收 devin-remote v9.9.302 成果): 净化历史「多端点/多Key」残留。
+  //   前端已回归单 baseUrl+单 apiKey; baseUrl 经上方自愈/归一为完整单值。
+  //   故丢弃任何残留 endpoints[](防旧碎片端点盖过好 baseUrl)→ _lbCandidates 自动回落 baseUrl 单发(行 864)。
+  //   merged.apiKey 充足(非空非脱敏)时一并清 apiKeys[]。重存任一渠道即净化其旧「乱七八糟」配置。
+  if (typeof merged.baseUrl === "string" && merged.baseUrl.indexOf("://") > 0) {
+    if (merged.endpoints !== undefined) {
+      delete merged.endpoints;
+      _log(
+        `[dao-router] [热] provider ${name}: 清理残留 endpoints[] · 回归单 baseUrl=${merged.baseUrl} (v9.9.307)`,
+      );
+    }
+    if (
+      Array.isArray(merged.apiKeys) &&
+      typeof merged.apiKey === "string" &&
+      merged.apiKey.trim() &&
+      !/\*{2,}/.test(merged.apiKey)
+    ) {
+      delete merged.apiKeys;
+      _log(
+        `[dao-router] [热] provider ${name}: 清理残留 apiKeys[] · 回归单 apiKey (v9.9.307)`,
+      );
+    }
+  }
   _providers[name] = merged;
   _log(
     `[dao-router] [热] 添加provider: ${name} type=${cfg.type} url=${cfg.baseUrl || "?"}`,
