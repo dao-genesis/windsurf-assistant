@@ -3131,6 +3131,34 @@ function handleControl(req, res) {
     } else {
       after = before;
     }
+    // ★ v9.9.303 · 本源观照实时全文 · 重建 chat 槽 all_fields · 随经藏热变
+    //   痛根(zhoumac 实证): webview pull() 取 /origin/tape 最近条 —— 外接API接通后
+    //     最近条恒为 summary 子代理(英文), 且其 after 为捕获时定格(不随经藏变),
+    //     遂面板「只显经文/英文·切经无效」。今 preview 直供主 chat 槽 all_fields,
+    //     SP 类字段以 invertAnySP(原文) 当场重算 → 切单道德经/单阴符经/合一即时反映,
+    //     且 raw_text/user_msg/tool_def 等全字段皆显 = LLM 实收之一切文本。
+    let all_fields = null;
+    try {
+      const _af =
+        _previewSlot && Array.isArray(_previewSlot.all_fields)
+          ? _previewSlot.all_fields
+          : null;
+      if (_af && _af.length) {
+        const _isSP = (k) =>
+          k === "chat" || k === "summary" || k === "memory" || k === "ephemeral";
+        all_fields = _af.map((f) => {
+          const raw = f.text_before != null ? f.text_before : f.text || "";
+          let t;
+          if (SP_MODE === "invert") {
+            t = _isSP(f.kind) ? invertAnySP(raw) || f.text || raw : f.text || raw;
+          } else {
+            t = raw;
+          }
+          t = t || "";
+          return { kind: f.kind, path: f.path, chars: t.length, text: t };
+        });
+      }
+    } catch {}
     res.end(
       JSON.stringify({
         ok: true,
@@ -3141,6 +3169,8 @@ function handleControl(req, res) {
         before: before,
         before_chars: before ? before.length : 0,
         has_captured_before: hasBefore,
+        all_fields: all_fields,
+        all_fields_count: all_fields ? all_fields.length : 0,
         age_s: age_s,
         // v9.9.19 · 损之又损 · 去 injects_by_kind 全体 (934KB) · preview瘦身 872KB→~52KB
         // 全量数据仍由 /origin/allinjects 专供 · preview 只返 webview 所需精华

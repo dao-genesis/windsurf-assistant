@@ -3005,10 +3005,17 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
 
   function pull() {
     if (!_PORT) return;
-    // v9.9.19 · 损之又损 · fields=0 去除all_fields全文(432项·767KB) · 仅保after/before元数据(~52KB)
-    fJson('/origin/tape?limit=1&fields=0').then(function(resp) {
-      if (resp && resp.ok && resp.tape && resp.tape.length > 0) {
-        renderTapeEntry(resp.tape[0], new Date().toLocaleTimeString());
+    // v9.9.303 · 本源观照取数归一 · 直取 /origin/preview 主 chat 槽 (含实时重算 all_fields)
+    //   旧取 /origin/tape 最近条 —— 外接API接通后最近条恒为 summary 子代理(英文)、
+    //   且其 after 捕获时定格不随经藏变, 故「只显经文/英文·切经无效」。
+    //   今取 preview: after 与 all_fields 皆随经藏 invertAnySP 当场重算 → 切经即变 + 全字段实时显。
+    fJson('/origin/preview').then(function(resp) {
+      if (resp && resp.ok && resp.has_captured_before) {
+        renderTapeEntry({
+          after: resp.after,
+          before: resp.before,
+          all_fields: resp.all_fields || []
+        }, new Date().toLocaleTimeString());
       } else {
         if (!editMode) {
           $sp.classList.add('quiet');
@@ -3048,19 +3055,10 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       if (_d.ping && _d.ping.canon && $canonSelect.value !== _d.ping.canon) $canonSelect.value = _d.ping.canon;
       // 3. \u81ea\u5b9a\u4e49 badge
       if (_d.ping && _d.ping.custom_sp != null) updateCustomBadge(_d.ping.custom_sp, _d.ping.custom_sp_chars);
-      // 4. \u663e\u793a SP \u5185\u5bb9 (\u4f18\u5148 proxy.after · \u5df2\u8fd0\u884c\u624d\u6709)
+      // 4. SP \u5185\u5bb9 (v9.9.303 · \u5185\u5bb9\u4ea4 pull() \u4e3b chat \u69fd all_fields \u5168\u6587\u72ec\u4e3b
+      //    \u00b7 data \u8def\u4ec5\u540c\u6b65 lastSP(\u4f9b\u7f16\u8f91\u521d\u503c) \u4e0e\u672a\u542f\u52a8\u65f6\u7f6e\u7a7a \u00b7 \u514d\u4e0e all_fields \u95ea\u70c1)
       if (_d.proxy && _d.proxy.after) {
         lastSP = _d.proxy.after;
-        if (!editMode) {
-          $sp.classList.remove('quiet');
-          $sp.textContent = _d.proxy.after;
-        }
-        var _ageS = (_d.proxy.age_s != null) ? Math.round(_d.proxy.age_s) : null;
-        var _pill = _d.proxy.after.length + '\u5b57';
-        if (_ageS != null) _pill += ' \u00b7 ' + _ageS + 's\u524d';
-        if (_d.ping && _d.ping.canon_name) _pill += ' \u00b7 ' + _d.ping.canon_name;
-        $stat.innerHTML = '<span class="pill">' + _pill + '</span>';
-        $stat.classList.add('show');
       } else if (_d.proxyUp === false) {
         // v9.9.19 对标v9.9.16本源: 只有代理真正宿机才重置显示
         // 去掉!_d.proxy分支: preview超时/gatherEssence失败导致proxy=null时不覆盖pull()展示内容
@@ -3096,6 +3094,8 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       if (_cc.default_source_name) _ccPill += ' \u00B7 ' + _cc.default_source_name;
       $stat.innerHTML = '<span class="pill">' + _ccPill + '</span>';
       $stat.classList.add('show');
+      // v9.9.303 · 切经即拉主 chat 槽全文 (all_fields 随新经藏重算) · 名变即随实显
+      pull();
       return;
     }
     if (e.data.type === 'customSP') {

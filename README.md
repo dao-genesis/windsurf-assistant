@@ -24,9 +24,9 @@
 
 | 插件 | 作用 | 最新版 | 下载 |
 | --- | --- | --- | --- |
-| **rt-flow**（WAM 切号插件） | 多账号管理与一键切换：添加账号 / 注入 token / 健康检查 / panic 切换 | `3.16.0` | [rt-flow-3.16.0.vsix](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/v9.9.301/rt-flow-3.16.0.vsix) |
-| **dao-proxy-min**（反代替换提示词 · 精简示范版） | 反向代理 Windsurf / Devin，origin 反转与系统提示词替换、预览与自检。命令 / 视图 / 端口 / 配置均独立命名空间（`daomin.*` · 端口 8889..8988 per-user FNV `+:min`），与 Pro 同装零干扰 | `9.9.64` | [dao-proxy-min-9.9.64.vsix](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/v9.9.301/dao-proxy-min-9.9.64.vsix) |
-| **dao-proxy-pro**（反代替换提示词 · 全功能版） | 在 min 反代/提示词隔离之上，新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、配置原子写+备份轮转、三面板（本源观照 / 渠道配置 / 模型路由）、只填 API Key 自动全量识别模型。命令 / 视图保持规范 `dao.*` / `wam.*`，后端默认端口 8937 | `9.9.301` | [dao-proxy-pro-9.9.301.vsix](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/v9.9.301/dao-proxy-pro-9.9.301.vsix) |
+| **rt-flow**（WAM 切号插件） | 多账号管理与一键切换：添加账号 / 注入 token / 健康检查 / panic 切换 | `3.16.0` | [rt-flow-3.16.0.vsix](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/v9.9.303/rt-flow-3.16.0.vsix) |
+| **dao-proxy-min**（反代替换提示词 · 精简示范版） | 反向代理 Windsurf / Devin，origin 反转与系统提示词替换、预览与自检。命令 / 视图 / 端口 / 配置均独立命名空间（`daomin.*` · 端口 8889..8988 per-user FNV `+:min`），与 Pro 同装零干扰 | `9.9.64` | [dao-proxy-min-9.9.64.vsix](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/v9.9.303/dao-proxy-min-9.9.64.vsix) |
+| **dao-proxy-pro**（反代替换提示词 · 全功能版） | 在 min 反代/提示词隔离之上，新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、配置原子写+备份轮转、三面板（本源观照 / 渠道配置 / 模型路由）、只填 API Key 自动全量识别模型。命令 / 视图保持规范 `dao.*` / `wam.*`，后端默认端口 8937 | `9.9.303` | [dao-proxy-pro-9.9.303.vsix](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/v9.9.303/dao-proxy-pro-9.9.303.vsix) |
 
 ## 仓库结构
 
