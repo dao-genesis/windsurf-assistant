@@ -1,4 +1,7 @@
-// extension.js · dao-proxy-pro v9.9.269 · 道法自然 · ACP适配 · 反者道之动 · 印222
+// extension.js · dao-proxy-pro v9.9.314 · 道法自然 · ACP适配 · 反者道之动 · 印226
+// v9.9.314 · 卸载归零 · 复归于无物: 真卸载侦测(读 .obsolete) → 越 30s 智能保锚门限无条件清锚 +
+//            系统级残留归零(_dao_ls_port.txt/dao-certs/MITM 证书/CODEIUM_LANGUAGE_SERVER_BIN 环变)
+//            + 独立 reset 脚本(scripts/dao-reset.ps1|.sh · 不依赖扩展存活). 卸载即彻底还官方直连.
 // v9.9.260 · 同步Min v9.9.60提示词策略 · 繁体化 · 损之又损(去嘱留经) · 经文自足
 // v9.9.267 · ③模型路由 模板字面量内正则反斜杠折叠修复(字符类替代 \/ \s)
 // v9.9.268 · 三模块面板 window.confirm/alert 被 webview 屏蔽 → 自带 _daoConfirm/_daoToast 弹层
@@ -1038,12 +1041,153 @@ function _restoreOfficialDirect(opts) {
   return total;
 }
 
+// ═══════════════════════════ 卸载归零 (v9.9.314) ═══════════════════════════
+// 印 226 · 复归于无物 · 第十四章「复归于无物 · 是谓无状之状」· 道法自然
+// 真因(用户实证): 卸载+重启 IDE 仍跳「connection to server is erroring · Unable to connect」.
+//   两源: ① deactivate 智能保锚 30s 门限是为「重载」防写风暴而设, 但「卸载」后扩展永逝 ·
+//          无下一个 ext-host 来 auto-restore → codeium.apiServerUrl=http://127.0.0.1:<死端口>
+//          被永留 → 重启后 Cascade 连死端口 → 卡死. deactivate 须能区分「重载」与「卸载」.
+//       ② settings.json 之外的系统级残留卸载根本不碰: ~/.codeium/_dao_ls_port.txt(死端口) ·
+//          dao-certs/ + 信任区自签 MITM 证书 · CODEIUM_LANGUAGE_SERVER_BIN 持久化环变.
+// 治: 真卸载侦测(读 .obsolete) → 无条件清锚 + 系统级残留归零 · 还官方语言服务器自连.
+
+// ★ 真卸载侦测 · 区分「卸载」与「重载/禁用」:
+//   VS Code/Windsurf/Devin 卸载流程: 先写 <extensions-root>/.obsolete[本目录]=true → 再 deactivate
+//   → 下次启动物理删目录. 故 deactivate 时 .obsolete 已含本目录 ⇒ 可靠判定为卸载.
+//   多信号兜底: .obsolete 命中 本目录 / 本族任一版本目录, 或本扩展已不在注册表中.
+function _isSelfUninstalling() {
+  try {
+    const extPath =
+      _extContext && _extContext.extensionPath ? _extContext.extensionPath : null;
+    if (extPath) {
+      const selfDir = path.basename(extPath);
+      const obs = path.join(path.dirname(extPath), ".obsolete");
+      if (fs.existsSync(obs)) {
+        let j = null;
+        try {
+          j = JSON.parse(fs.readFileSync(obs, "utf8") || "{}");
+        } catch {}
+        if (j && typeof j === "object") {
+          if (j[selfDir] === true) return true;
+          for (const k of Object.keys(j)) {
+            if (j[k] === true && SELF_EXT_DIR_REGEX.test(k)) return true;
+          }
+        }
+      }
+    }
+  } catch {}
+  // 兜底信号: deactivate 时本扩展已从注册表移除 ⇒ 卸载 (重载/禁用时仍在)
+  try {
+    if (!vscode.extensions.getExtension(SELF_EXT_ID)) return true;
+  } catch {}
+  return false;
+}
+
+// ~/.codeium 根 · dao 系统级状态所在
+function _codeiumHome() {
+  return path.join(os.homedir(), ".codeium");
+}
+
+// ★ 系统级残留归零 · 不依赖任何 settings.json · 卸载/手动复原时还官方语言服务器自连.
+//   清: ① _dao_ls_port.txt(还原 .dao_backup 之官方原值, 无则删) ② dao-certs/ 目录
+//       ③ 信任区自签 MITM 证书 (server/inference.codeium.com·localhost) ④ CODEIUM_LANGUAGE_SERVER_BIN
+//          / VSCODE_DEV 持久化用户环变 ⑤ _dao_csrf_token.txt
+//   不动: dao-byok(主公 key) · dao/(Cascade 记忆/上下文) · 已装扩展. 返回所清项计数.
+function _purgeDaoLsResidue() {
+  let n = 0;
+  const home = _codeiumHome();
+  // ① _dao_ls_port.txt · 还原 .dao_backup(被 dao 覆盖前的原值) 或直接删 · 还官方 LS 自寻端口
+  try {
+    const portFile = path.join(home, "_dao_ls_port.txt");
+    const bak = portFile + ".dao_backup";
+    if (fs.existsSync(bak)) {
+      const orig = fs.readFileSync(bak, "utf8");
+      fs.writeFileSync(portFile, orig, "utf8");
+      fs.unlinkSync(bak);
+      n++;
+      L.info("purge", `_dao_ls_port.txt 还原 .dao_backup → ${orig.trim()}`);
+    } else if (fs.existsSync(portFile)) {
+      fs.unlinkSync(portFile);
+      n++;
+      L.info("purge", "_dao_ls_port.txt 删除 (无 backup)");
+    }
+  } catch (e) {
+    L.warn("purge", `_dao_ls_port 处理失败: ${e && e.message}`);
+  }
+  // ② dao-certs/ 目录 (自签 MITM 证书材料)
+  try {
+    const certDir = path.join(home, "dao-certs");
+    if (fs.existsSync(certDir)) {
+      fs.rmSync(certDir, { recursive: true, force: true });
+      n++;
+      L.info("purge", "dao-certs/ 删除");
+    }
+  } catch (e) {
+    L.warn("purge", `dao-certs 删除失败: ${e && e.message}`);
+  }
+  // ③ _dao_csrf_token.txt (孤儿令牌文件)
+  try {
+    const csrf = path.join(home, "_dao_csrf_token.txt");
+    if (fs.existsSync(csrf)) {
+      fs.unlinkSync(csrf);
+      n++;
+    }
+  } catch {}
+  // ④ 信任区自签 MITM 证书 + 持久化 LS 环变 · 需外部工具 · detached 子进程 (卸载后独立跑完)
+  try {
+    _untrustDaoCertsAndClearEnvAsync();
+  } catch (e) {
+    L.warn("purge", `cert/env 异步清理调度失败: ${e && e.message}`);
+  }
+  return n;
+}
+
+// 平台相关 · 解信任自签 MITM 证书 + 清持久化 LS 环变 · detached 子进程脱离 ext-host 生命周期
+//   (卸载致 ext-host 被杀亦能跑完). 仅删「自签且域名匹配 codeium/localhost」者, 不碰公信 CA.
+function _untrustDaoCertsAndClearEnvAsync() {
+  const plat = process.platform;
+  const spawnDetached = (file, args) => {
+    try {
+      const ch = cp.spawn(file, args, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      ch.unref();
+    } catch (e) {
+      L.warn("purge", `spawn ${file} 失败: ${e && e.message}`);
+    }
+  };
+  if (plat === "win32") {
+    const ps = [
+      "$ErrorActionPreference='SilentlyContinue';",
+      "Get-ChildItem Cert:\\CurrentUser\\Root | Where-Object { $_.Subject -eq $_.Issuer -and $_.Subject -match 'CN=(server\\.codeium\\.com|inference\\.codeium\\.com|\\*\\.codeium\\.com|localhost|127\\.0\\.0\\.1)$' } | Remove-Item -Force;",
+      "foreach($v in @('CODEIUM_LANGUAGE_SERVER_BIN','VSCODE_DEV')){ if(Get-ItemProperty -Path 'HKCU:\\Environment' -Name $v -EA SilentlyContinue){ Remove-ItemProperty -Path 'HKCU:\\Environment' -Name $v -Force -EA SilentlyContinue } }",
+    ].join(" ");
+    spawnDetached("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      ps,
+    ]);
+  } else if (plat === "darwin") {
+    const sh =
+      "for n in server.codeium.com inference.codeium.com; do security delete-certificate -c \"$n\" ~/Library/Keychains/login.keychain-db >/dev/null 2>&1; done; true";
+    spawnDetached("/bin/sh", ["-c", sh]);
+  }
+  // linux: dao 证书多由扩展自管 · 无系统信任注入 · 跳过
+}
+
 // ★ 手动复原官方直连 (卸载善后/解锚) · 命令面板可调 · 已卡死亦可一键自救:
-//   完全清除重定向(含 apiServerUrl 与 LS 外置) → 停本地代理 → 提示 Reload Window.
+//   完全清除重定向(含 apiServerUrl 与 LS 外置) + 系统级残留归零 → 停本地代理 → 提示 Reload Window.
 async function cmdRestoreOfficial() {
   let n = 0;
+  let m = 0;
   try {
     n = _restoreOfficialDirect({ includeAnchor: true });
+  } catch {}
+  try {
+    m = _purgeDaoLsResidue();
   } catch {}
   try {
     removeSpawnHook();
@@ -1053,9 +1197,9 @@ async function cmdRestoreOfficial() {
   } catch {}
   const tail = "请 Reload Window · 官方语言服务器将自连 (无需本插件)";
   vscode.window.showInformationMessage(
-    n > 0
-      ? `道Agent · 已复原官方直连 · 清除 ${n} 处重定向 · ${tail}`
-      : `道Agent · 未发现重定向项 · 已是官方直连 · ${tail}`,
+    n > 0 || m > 0
+      ? `道Agent · 已复原官方直连 · 清除 ${n} 处重定向 + ${m} 项系统级残留 · ${tail}`
+      : `道Agent · 未发现残留 · 已是官方直连 · ${tail}`,
   );
 }
 
@@ -3986,7 +4130,30 @@ async function deactivate() {
     L.warn("deactivate", `复原官方直连失败: ${e && e.message}`);
   }
 
-  if (isLocal && lifetime > 30000) {
+  // ★ v9.9.314 · 真卸载须无条件归零 · 越过智能保锚 30s 门限 (无下一个 ext-host 来 auto-restore)
+  //   根因(用户实证): 卸载+重启 → apiServerUrl 仍指 http://127.0.0.1:<死端口> → Cascade 卡死.
+  //   智能保锚门限仅为「重载」防写风暴而设 · 卸载场景必须越之 · 否则锚永留 → 「unable to connect」.
+  const uninstalling = _isSelfUninstalling();
+  if (uninstalling) {
+    try {
+      const n = _restoreOfficialDirect({ includeAnchor: true });
+      L.info(
+        "deactivate",
+        `卸载侦测 → 无条件清锚 + 复原官方直连 · 清 ${n} 处 settings 键`,
+      );
+    } catch (e) {
+      L.warn("deactivate", `卸载清锚失败: ${e && e.message}`);
+    }
+    try {
+      const m = _purgeDaoLsResidue();
+      L.info(
+        "deactivate",
+        `卸载侦测 → 系统级残留归零 · 清 ${m} 项 (端口文件/证书/环变)`,
+      );
+    } catch (e) {
+      L.warn("deactivate", `系统级残留归零失败: ${e && e.message}`);
+    }
+  } else if (isLocal && lifetime > 30000) {
     _clearAnchorFileSync();
     L.info(
       "deactivate",
