@@ -2825,6 +2825,8 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   function fJson(p) { return fetch(_BASE + p, { cache: 'no-store' }).then(function(r){ if (!r.ok) throw new Error('http ' + r.status); return r.json(); }); }
 
   // ─── renderTapeEntry · 万物作焉而不辞 · 永显 all_fields 全貌 ───
+  // v9.9.307 · 真上游 · 路由第三方时面板优先显第三方实收全文 · 时戳防 host 推之经文覆盖
+  var _lastUpstreamAt = 0;
   function renderTapeEntry(entry, ts) {
     if (!entry) return false;
     lastEntry = entry;
@@ -2854,8 +2856,11 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     if (fieldCount > 0) {
       for (var i = 0; i < fieldCount; i++) {
         var f = entry.all_fields[i];
-        parts.push('\u2501\u2501\u2501 #' + (i + 1) + '/' + fieldCount +
-          ' \u00b7 ' + (f.chars || 0) + '\u5b57 \u2501\u2501\u2501');
+        var _h = '\u2501\u2501\u2501 #' + (i + 1) + '/' + fieldCount;
+        if (f.field_path) _h += ' \u00b7 ' + f.field_path;
+        else if (f.role) _h += ' \u00b7 ' + f.role;
+        _h += ' \u00b7 ' + (f.chars || 0) + '\u5b57 \u2501\u2501\u2501';
+        parts.push(_h);
         parts.push(f.text || '');
         parts.push('');
         totalChars += (f.chars || 0);
@@ -3026,14 +3031,38 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     }).catch(function(){});
   }
 
+  // v9.9.307 · 真上游 · 路由第三方时拉第三方实收全文(system+messages+tools)并全显
+  //   有则优先显此(返 true) · 无则交回 preview 兜底 · 道法自然·观其真实所往
+  function pullUpstream() {
+    return fJson('/origin/upstream').then(function(resp){
+      if (resp && resp.ok && resp.upstream && resp.upstream.all_fields && resp.upstream.all_fields.length > 0) {
+        var e = resp.upstream;
+        _lastUpstreamAt = e.at || Date.now();
+        renderTapeEntry({ after: e.after, all_fields: e.all_fields }, new Date().toLocaleTimeString());
+        var _p = '\u771f\u4e0a\u6e38 \u00b7 ' + (e.all_fields_chars || 0) + '\u5b57';
+        if (e.provider) _p += ' \u00b7 ' + e.provider;
+        if (e.model) _p += ' / ' + e.model;
+        $stat.innerHTML = '<span class="pill">' + _p + '</span>';
+        $stat.classList.add('show');
+        return true;
+      }
+      return false;
+    }).catch(function(){ return false; });
+  }
+
+  // v9.9.307 · 统一刷 SP 显 · 先真上游(第三方实收全文) · 无则 preview 兜底
+  function refreshSP() {
+    return pullUpstream().then(function(shown){ if (!shown) pull(); });
+  }
+
   function sigTick() {
     fJson('/origin/sig').then(function(r){
       if (!r || !r.ok) return;
-      var cur = (r.injects_last_at || 0) + '|' + (r.injects_count || 0) + '|' + (r.tape_last_at || 0) + '|' + (r.mode_sig || '');
+      var cur = (r.injects_last_at || 0) + '|' + (r.injects_count || 0) + '|' + (r.tape_last_at || 0) + '|' + (r.upstream_last_at || 0) + '|' + (r.mode_sig || '');
       if (cur === lastSig) return;
       lastSig = cur;
       pingPull();
-      pull();
+      refreshSP();
     }).catch(function(){});
   }
 
@@ -3152,15 +3181,15 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
 
   // boot · v9.7.6 · 执今之道 · boot 即拉 getCustomSP 预装 lastSP (帛书本源) · tape 空亦可编辑
   pingPull();
-  pull();
+  refreshSP();
   vsc.postMessage({ command: 'getCustomSP' });
   // v9.9.18 \u4fee\u590d \u00b7 boot \u5373\u8bf7\u6c42 extension host refresh \u63a8\u9001 {type:"data"} \u5305
   // \u8ba9\u4e09\u76cf/\u6309\u9215/SP\u663e\u793a\u5728\u65e0\u9700 portMapping \u7684\u60c5\u51b5\u4e0b\u4e5f\u80fd\u7acb\u5373\u66f4\u65b0
   vsc.postMessage({ command: 'refresh' });
-  setTimeout(function(){ pingPull(); pull(); vsc.postMessage({ command: 'refresh' }); }, 3000);
+  setTimeout(function(){ pingPull(); refreshSP(); vsc.postMessage({ command: 'refresh' }); }, 3000);
   setInterval(sigTick, 5000);
   setInterval(pingPull, 10000);
-  setInterval(pull, 30000);
+  setInterval(refreshSP, 30000);
   // v9.9.18+v9.9.36 \u00b7 \u5468\u671f refresh \u4fdd\u5e95 \u00b7 15s (\u539f 5s)
   setInterval(function() { vsc.postMessage({ command: 'refresh' }); }, 15000);
   // v9.9.20 jiqi · IIFE 全跑通 · 至此即活 · 上报 boot-done 标记
@@ -4190,6 +4219,7 @@ function getEaConfigHtml(port, nonce) {
       <input id="provModels" placeholder="模型 (逗号分隔, 可空)" style="flex:1.2">
       <button class="btn add" id="btnAddProv" title="添加 Provider">+ 添加</button>
       <button class="btn probe" id="btnProbe" title="探测所有 Provider 健康">探测</button>
+      <button class="btn" id="btnOpenCfgJson" title="在编辑器中打开 配置.json 文件 · 直接查看/手改全部渠道与路由">📄 配置JSON</button>
     </div>
     <!-- 已配渠道列表 (cc-switch 风) -->
     <div id="channelList" style="flex:1;overflow-y:auto;margin-top:4px"></div>
@@ -4243,8 +4273,12 @@ function getEaConfigHtml(port, nonce) {
         <input id="routeExtModel" placeholder="如 deepseek-v4-flash">
       </div>
       <div>
-        <label style="font-size:10px;opacity:0.6">Max Output Tokens</label>
+        <label style="font-size:10px;opacity:0.6">最大输出 Token (max_tokens · 单次回复上限 · 越大越费)</label>
         <input id="routeMaxTokens" type="number" value="16384" placeholder="16384">
+      </div>
+      <div>
+        <label style="font-size:10px;opacity:0.6">采样温度 Temperature (0~2 · 留空=用模型默认)</label>
+        <input id="routeTemp" type="number" step="0.1" min="0" max="2" placeholder="留空=默认">
       </div>
       <div>
         <label style="font-size:10px;opacity:0.6">
@@ -5001,6 +5035,10 @@ function getEaConfigHtml(port, nonce) {
     _autoProbe().then(function() { btn.textContent = '探测'; });
   });
 
+  // v9.9.309 · 📄 配置JSON · 在编辑器打开配置文件
+  var _ocj = document.getElementById('btnOpenCfgJson');
+  if (_ocj) _ocj.addEventListener('click', function() { postMsg('openConfigJson'); });
+
   // ── 路由弹窗 ──
   // ★ v9.9.263 · 自连 · 左右各选一 → 自创路由 (早期设计 · 无为而无不为)
   //   不再需双击开模态 · 选完即路· 选完即现连线
@@ -5079,6 +5117,7 @@ function getEaConfigHtml(port, nonce) {
     document.getElementById('routeExtModel').value = extModel || '';
     document.getElementById('routeMaxTokens').value = '16384';
     document.getElementById('routeThinking').checked = false;
+    document.getElementById('routeTemp').value = '';
 
     // 填充 provider 下拉
     var sel = document.getElementById('routeProvider');
@@ -5097,6 +5136,7 @@ function getEaConfigHtml(port, nonce) {
       document.getElementById('routeExtModel').value = route.model || '';
       document.getElementById('routeMaxTokens').value = route.maxOutputTokens || 16384;
       document.getElementById('routeThinking').checked = !!route.thinkingEnabled;
+      document.getElementById('routeTemp').value = (route.temperature != null ? route.temperature : '');
       for (var i = 0; i < sel.options.length; i++) {
         if (sel.options[i].value === route.provider) sel.options[i].selected = true;
       }
@@ -5113,10 +5153,13 @@ function getEaConfigHtml(port, nonce) {
     var model = document.getElementById('routeExtModel').value.trim();
     var maxTokens = parseInt(document.getElementById('routeMaxTokens').value) || 16384;
     var thinking = document.getElementById('routeThinking').checked;
+    var tempRaw = (document.getElementById('routeTemp').value || '').trim();
     if (!uid || !prov || !model) { _daoToast('所有字段必填'); return; }
+    var _route = { provider: prov, model: model, maxOutputTokens: maxTokens, thinkingEnabled: thinking };
+    if (tempRaw !== '') { var _tv = parseFloat(tempRaw); if (!isNaN(_tv)) _route.temperature = _tv; }
     fPost('/origin/ea/route', {
       modelUid: uid,
-      route: { provider: prov, model: model, maxOutputTokens: maxTokens, thinkingEnabled: thinking }
+      route: _route
     }).then(function(r) {
       if (r.ok) {
         document.getElementById('routeModal').classList.remove('show');
@@ -5332,6 +5375,48 @@ function _openExternalUrl(url) {
   }
 }
 
+// ★ v9.9.309 · 解析活跃配置文件路径 · 与 runtime._resolveConfigPath 同序:
+//   1) 用户级 ~/.codeium/dao-byok/配置.json (跨升级持久·含真凭据)
+//   2) 退 · 当前 VSIX 内 vendor/外接api/core/配置.json
+function _resolveDaoConfigPath() {
+  try {
+    const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
+    if (home) {
+      const userCfg = path.join(home, ".codeium", "dao-byok", "配置.json");
+      if (fs.existsSync(userCfg)) return userCfg;
+    }
+  } catch {}
+  try {
+    const bundled = path.join(
+      __dirname,
+      "vendor",
+      "外接api",
+      "core",
+      "配置.json",
+    );
+    if (fs.existsSync(bundled)) return bundled;
+  } catch {}
+  return null;
+}
+
+// ★ v9.9.309 · 渠道配置面板「📄 配置JSON」按钮 · 直接在编辑器打开配置文件
+//   方便用户一眼查看/手改全部渠道与路由 · 排查问题
+async function _openConfigJson() {
+  try {
+    const p = _resolveDaoConfigPath();
+    if (!p) {
+      vscode.window.showWarningMessage("未找到配置文件 配置.json");
+      return;
+    }
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+    await vscode.window.showTextDocument(doc, { preview: false });
+  } catch (e) {
+    vscode.window.showErrorMessage(
+      "打开配置JSON失败: " + (e && e.message ? e.message : e),
+    );
+  }
+}
+
 // ★ v9.9.90 · 外接api 热配置面板命令
 // ★ 归一·② Proxy Pro 侧栏视图 Provider: 渲染三模块面板(getEaConfigHtml),
 //   与中央面板 cmdEaConfig 同一 HTML/端口映射/消息桥 —— 复用为主,无重写。
@@ -5353,6 +5438,7 @@ class EaRouterProvider {
         else if (msg.type === "modelStatus") cmdModelUnlockStatus();
         else if (msg.type === "saveHandoff") _saveHandoffDoc(msg.content || "");
         else if (msg.type === "openExternal" && msg.url) _openExternalUrl(msg.url);
+        else if (msg.type === "openConfigJson") _openConfigJson();
       } catch (e) { L.warn("router", `msg handle fail: ${e && e.message}`); }
     });
     try { webviewView.show(true); } catch {}
@@ -5392,6 +5478,8 @@ async function cmdEaConfig() {
           _saveHandoffDoc(msg.content || "");
         } else if (msg.type === "openExternal" && msg.url) {
           _openExternalUrl(msg.url);
+        } else if (msg.type === "openConfigJson") {
+          _openConfigJson();
         }
       } catch (e) {
         L.warn("eaConfig", `msg handle fail: ${e && e.message}`);

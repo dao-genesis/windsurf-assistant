@@ -143,6 +143,21 @@ function hotReloadCanon() {
   return false;
 }
 
+// ★ 经藏热切真生效 · 注入前以持久化 _origin_canon.txt 为准 · 执一
+//   根因: setCanon 仅同步「处理 /origin/canon 之进程」· 多窗口/多 ext-host 时
+//         实际注入之进程从不更新 → 切经藏无效(恒为启动时之 laozi+yinfu)
+//   道义: 三十二章「道恒无名·侯王若能守之·万物将自宾」· 文件即唯一真源
+//   节流: 至多每 500ms 读一次文件(11 字节) · 不扰热路
+let _lastCanonCheck = 0;
+function _maybeHotReloadCanon() {
+  const now = Date.now();
+  if (now - _lastCanonCheck < 500) return;
+  _lastCanonCheck = now;
+  try {
+    hotReloadCanon();
+  } catch {}
+}
+
 // ── 哨兵/常量 ─────────────────────────────────────────────
 const INVERTED_PREFIX =
   "\u4F60\u672C\u7121\u540D \u540D\u53EF\u540D\u4E5F \u975E\u6052\u540D\u4E5F";
@@ -575,6 +590,7 @@ function extractRealtimeBlocks(s) {
 // 道义: 三十二章 "道恒无名" · 副路 summary/memory/ephemeral 皆归帛书
 function invertAnySP(spText) {
   try {
+    _maybeHotReloadCanon();
     if (spText === undefined || spText === null) return null;
     const s = typeof spText === "string" ? spText : String(spText);
     if (!s) return null;
@@ -603,6 +619,7 @@ function invertAnySP(spText) {
 // ═══════════════════════════════════════════════════════════
 function invertSP(spText) {
   try {
+    _maybeHotReloadCanon();
     if (spText === undefined || spText === null) return null;
     const s = typeof spText === "string" ? spText : String(spText);
     if (!s) return null;

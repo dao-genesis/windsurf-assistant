@@ -243,6 +243,12 @@ function _deOfficialDescDeep(obj) {
 function _getDaoEnhanceText() {
   try {
     if (!_spInvert) return null;
+    // ★ 经藏热切真生效 · 以持久化 _origin_canon.txt 为准 · 不滞启动值
+    if (typeof _spInvert.hotReloadCanon === "function") {
+      try {
+        _spInvert.hotReloadCanon();
+      } catch {}
+    }
     // 从 sp_invert.js 获取经藏文本
     const canonText = _spInvert.getActiveCanonText
       ? _spInvert.getActiveCanonText()
@@ -2974,6 +2980,20 @@ async function _callProvider(
       }
     }
 
+    // ★ v9.9.307 · 本源观照·真上游 · 回传第三方实发之全文(system+messages+tools)给面板
+    //   道义: 十四章「执今之道·以御今之有」· 观其真实所往 · 不滞 devin 侧经文
+    //   仅观察 · 不改 body · 失败静默 · 不扰路由
+    try {
+      if (typeof global.__DAO_RECORD_UPSTREAM === "function") {
+        global.__DAO_RECORD_UPSTREAM({
+          provider: providerName,
+          model: model,
+          messages: messages,
+          tools: toolsField,
+        });
+      }
+    } catch {}
+
     const bodyObj = { messages, stream: provCfg.streamMode !== "unary" };
     if (toolsField) {
       bodyObj.tools = toolsField;
@@ -2988,6 +3008,15 @@ async function _callProvider(
       }
     }
     if (maxOutputTokens) bodyObj.max_tokens = maxOutputTokens;
+
+    // ★ v9.9.309 · 采样温度 · 路由可配 · 留空则不发(用模型默认) · 参照通用 OpenAI 兼容配置
+    if (
+      target &&
+      typeof target.temperature === "number" &&
+      !Number.isNaN(target.temperature)
+    ) {
+      bodyObj.temperature = target.temperature;
+    }
 
     // ★ v9.9.80 · 思考模式: DeepSeek V3.2 支持 thinking + tools
     //   配置中 thinkingEnabled=true → 请求体加 thinking:{type:"enabled"}
@@ -4416,7 +4445,7 @@ function _modelsUrlFor(cfg) {
 // ★ 非对话模型名特征 (语音/向量/重排/图像/审核) · 自动发现时剔除
 //   道义: 二十七章「善行无辙迹」· 自动回填只取可对话之模 · 不把 tts/asr/embedding 当对话模型路由 (必失败)
 const _NON_CHAT_RE =
-  /(^|[-_/.])(tts|asr|stt|whisper|voice|voiceclone|voicedesign|audio|speech|realtime|embed|embedding|embeddings|rerank|reranker|image|images|dall-?e|vision-ocr|ocr|moderation|guard|guardrail)([-_/.]|$)/i;
+  /(^|[-_/.])(tts|asr|stt|whisper|voice|voiceclone|voicedesign|audio|speech|realtime|embed|embedding|embeddings|rerank|reranker|image|images|dall-?e|vision-ocr|ocr|moderation|guard|guardrail|t2v|i2v|t2i|i2i|t2a|seedance|seedream|seededit|seedance-?lite|video|sora|cogvideo|cogview|wanx|kolors|flux|midjourney|mj)([-_/.]|$)/i;
 function _isChatModel(id) {
   if (!id || typeof id !== "string") return false;
   return !_NON_CHAT_RE.test(id);
@@ -4474,22 +4503,66 @@ const _CHANNEL_ERR_PATTERNS = [
   /violation of the terms/i,
 ];
 
+// ★ v9.9.308 · 渠道失败之「可读中文提因」· 名实相符 · 让用户一眼知该如何处置
+//   实证(火山方舟): key 有效但账号未开通模型 → 404 ModelNotOpen → 原仅显笼统 "HTTP 404"
+//   道义: 七十一章「知不知 尚矣」· 不止报不通 · 更明言因何不通、当往何处治
+const _CHANNEL_HINTS = [
+  {
+    re: /ModelNotOpen|has not activated the model|model service is not (?:open|activated)|未开通|请开通|activate the model/i,
+    hint: "模型未开通 · 请去服务商控制台开通(激活)该模型后重试(如火山方舟:开通管理)",
+  },
+  {
+    re: /InvalidEndpointOrModel\.NotFound|does not exist or you do not have|model_not_found|no such model|model not found|unknown model|未找到模型|模型不存在/i,
+    hint: "模型名/接入点不存在 · 请核对模型名(火山方舟需用模型名或接入点 ep-xxx)",
+  },
+  {
+    re: /invalid api key|incorrect api key|authentication[^.]{0,20}fail|invalid[^.]{0,12}(?:token|credential)|api key not valid|unauthorized/i,
+    hint: "Key 无效或鉴权失败 · 请核对 API Key(及是否选对协议/请求头)",
+  },
+  {
+    re: /insufficient (?:quota|balance|credit|funds)|quota[^.]{0,20}exceed|balance|余额不足|额度不足|欠费/i,
+    hint: "余额/配额不足 · 请充值或检查配额",
+  },
+  {
+    re: /access denied|official[^.]{0,40}client only|restricted to authorized|unauthorized (?:client|tooling)/i,
+    hint: "渠道拒绝(HTTP 200 伪成功) · 该中转仅限官方客户端/已授权访问",
+  },
+  {
+    re: /rate limit|too many requests|requests per|限流|频率/i,
+    hint: "触发限流 · 稍后重试或降低并发",
+  },
+  {
+    re: /service (?:temporarily )?unavailable|temporarily unavailable|upstream|bad gateway|gateway time|暂不可用|服务不可用/i,
+    hint: "中转/上游暂不可用(常为 503/502) · 多为该中转后端临时故障 · 稍后重试或换渠道",
+  },
+];
+function _channelHint(text) {
+  const raw = typeof text === "string" ? text : "";
+  for (const h of _CHANNEL_HINTS) {
+    if (h.re.test(raw)) return h.hint;
+  }
+  return "";
+}
+
 /**
  * 渠道响应分类 · 实证渠道是否真通 (不止看 HTTP 码 · 还看响应体伪成功/拒绝文案)
  *   返回 { ok, reason } · ok=false 时 reason 简述不通之因 (供前端展示给用户)
  *   道义: 七十一章「知不知 尚矣」· 知其不通方能明言其不通
  */
 function classifyChannelResponse(status, text) {
-  const snippet = (typeof text === "string" ? text : "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 160);
+  const raw = typeof text === "string" ? text : "";
+  const snippet = raw.replace(/\s+/g, " ").trim().slice(0, 160);
+  const hint = _channelHint(raw);
   if (typeof status === "number" && status >= 400) {
-    return { ok: false, reason: `HTTP ${status}` + (snippet ? ` · ${snippet}` : "") };
+    const base = `HTTP ${status}` + (snippet ? ` · ${snippet}` : "");
+    return { ok: false, reason: hint ? `${hint} · ${base}` : base };
   }
   for (const p of _CHANNEL_ERR_PATTERNS) {
-    if (p.test(text || "")) {
-      return { ok: false, reason: `渠道拒绝/伪成功 · ${snippet}` };
+    if (p.test(raw)) {
+      return {
+        ok: false,
+        reason: (hint ? hint + " · " : "") + `渠道拒绝/伪成功 · ${snippet}`,
+      };
     }
   }
   return { ok: true, reason: "" };
@@ -4686,6 +4759,8 @@ function hotAddProvider(name, cfg) {
   // ★ cc-switch 风 · baseUrl 归一: 剥去误含的补全后缀(/chat/completions 等) · 防双重路径 404
   //   实证: 小米渠道用户把完整端点贴进 baseUrl → 拼 completionPath 双重 → 完全不可用 · 此处根治
   if (cfg.baseUrl) {
+    // ★ baseUrl 去内部空白 · 根治「http s://…」被切成 "http" 的渠道不可用 (URL 不含空格)
+    cfg.baseUrl = String(cfg.baseUrl).trim().replace(/\s+/g, "");
     const _normBase = _stripCompletionSuffix(cfg.baseUrl);
     if (_normBase && _normBase !== String(cfg.baseUrl).replace(/\/+$/, "")) {
       _log(
