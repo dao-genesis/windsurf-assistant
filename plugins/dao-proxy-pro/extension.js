@@ -947,6 +947,118 @@ function _writeSettingsJson(fp, json) {
   }
 }
 
+// ★ LS 外置重定向键 · 把官方语言服务器(Cascade LSP)指向本地外置端点 ·
+//   一旦代理/扩展不在(卸载·停用), 这些键仍指向死端口 → 官方语言服务器连不上 → 卡死中间态.
+//   本扩展从不写这些键(它走 Connect-RPC 层 apiServerUrl), 但旧世代/同族残留会留之.
+//   故卸载/停用/手动复原时须无条件清除 · 还官方自连 (清之无写风暴: 本扩展永不再写).
+const LS_REDIRECT_KEYS = [
+  "codeiumDev.externalLanguageServerAddress",
+  "codeiumDev.externalLanguageServerLspPort",
+];
+
+// 候选 settings.json: 本实例(ctx 上溯) + 各 IDE User 目录 · 去重 · 仅返回存在者
+function _allSettingsJsonPaths() {
+  const out = [];
+  const push = (p) => {
+    if (p && !out.includes(p)) out.push(p);
+  };
+  push(_settingsJsonFromCtx());
+  let base;
+  const plat = process.platform;
+  if (plat === "win32") base = process.env.APPDATA;
+  else if (plat === "darwin")
+    base = path.join(os.homedir(), "Library", "Application Support");
+  else base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  if (base) {
+    for (const ide of ["devin", "Windsurf", "Code", "VSCodium"]) {
+      push(path.join(base, ide, "User", "settings.json"));
+    }
+  }
+  return out.filter((p) => {
+    try {
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
+  });
+}
+
+// 复原前留痕: <dir>/.dao-settings-backups/<name>.<ts>.bak · 轮转保留最近 5 份
+function _backupSettingsFile(sp) {
+  try {
+    const dir = path.join(path.dirname(sp), ".dao-settings-backups");
+    fs.mkdirSync(dir, { recursive: true });
+    const base = path.basename(sp);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    fs.copyFileSync(sp, path.join(dir, `${base}.${stamp}.bak`));
+    const baks = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith(base + ".") && f.endsWith(".bak"))
+      .sort();
+    while (baks.length > 5) {
+      try {
+        fs.unlinkSync(path.join(dir, baks.shift()));
+      } catch {}
+    }
+  } catch {}
+}
+
+// ★ 复原官方直连: 跨所有候选 settings.json 清除「重定向键」· 还官方自连.
+//   includeAnchor=true: 连 codeium.apiServerUrl 系一并清 (完全复原 · 卸载/手动复原).
+//   includeAnchor=false: 仅清 LS 外置重定向 (每次停用兜底 · 本扩展从不写之 · 无写风暴).
+function _restoreOfficialDirect(opts) {
+  const includeAnchor = !!(opts && opts.includeAnchor);
+  const keys = includeAnchor
+    ? [
+        ...LS_REDIRECT_KEYS,
+        "codeium.apiServerUrl",
+        "codeium.inferenceApiServerUrl",
+        BACKUP_KEY_API,
+        BACKUP_KEY_INFER,
+      ]
+    : [...LS_REDIRECT_KEYS];
+  let total = 0;
+  for (const sp of _allSettingsJsonPaths()) {
+    try {
+      const json = _readSettingsJson(sp);
+      if (!json) continue;
+      const hit = keys.filter((k) => k in json);
+      if (hit.length === 0) continue;
+      _backupSettingsFile(sp);
+      for (const k of hit) delete json[k];
+      if (_writeSettingsJson(sp, json)) {
+        total += hit.length;
+        L.info("restore", `${sp} 清 ${hit.length} 键: ${hit.join(",")}`);
+      }
+    } catch (e) {
+      L.warn("restore", `${sp} 复原失败: ${e.message}`);
+    }
+  }
+  _cachedAnchored = false;
+  return total;
+}
+
+// ★ 手动复原官方直连 (卸载善后/解锚) · 命令面板可调 · 已卡死亦可一键自救:
+//   完全清除重定向(含 apiServerUrl 与 LS 外置) → 停本地代理 → 提示 Reload Window.
+async function cmdRestoreOfficial() {
+  let n = 0;
+  try {
+    n = _restoreOfficialDirect({ includeAnchor: true });
+  } catch {}
+  try {
+    removeSpawnHook();
+  } catch {}
+  try {
+    await proxyStop();
+  } catch {}
+  const tail = "请 Reload Window · 官方语言服务器将自连 (无需本插件)";
+  vscode.window.showInformationMessage(
+    n > 0
+      ? `道Agent · 已复原官方直连 · 清除 ${n} 处重定向 · ${tail}`
+      : `道Agent · 未发现重定向项 · 已是官方直连 · ${tail}`,
+  );
+}
+
 async function setAnchor(port) {
   // ★ v9.9.272 · 失败安全 · 仅当反代确认健康时才锚定 · 否则清锚(还官方直通)
   if (!_proxyHealthy) {
@@ -3432,6 +3544,8 @@ function activate(ctx) {
       ),
       // ★ v9.9.90 · 外接api 热配置面板 · 五十七章「我无为也 而民自化」
       vscode.commands.registerCommand("dao.eaConfig", cmdEaConfig),
+      // ★ 复原官方直连 (卸载善后/解锚) · 卡死中间态一键自救
+      vscode.commands.registerCommand("dao.restoreOfficial", cmdRestoreOfficial),
       // v9.9.29 · 印 160 · 终端会话池 (反者道之动 · 七层污染一招治)
       vscode.commands.registerCommand("dao.term.exec", cmdTermExec),
       vscode.commands.registerCommand("dao.term.list", cmdTermList),
@@ -3861,6 +3975,17 @@ async function deactivate() {
   // 道义: 七十六「兵强则不胜 · 木强则折」· 强清反害 · 柔保则安
   //       二十二「曲则金 · 枉则定」· 不争 · 故莫能与之争
   // ════════════════════════════════════════════════════════════
+  // ★ LS 外置重定向键无条件清除 · 跨所有 IDE settings.json · 还官方语言服务器自连.
+  //   根因(用户实证): 原生卸载后 codeiumDev.externalLanguageServerAddress 仍指向死端口
+  //   → 官方 LSP 连不上 → 卡死中间态. 本扩展从不写此键 · 清之无写风暴 · 故不受 30s 门限约束.
+  try {
+    const n = _restoreOfficialDirect({ includeAnchor: false });
+    if (n > 0)
+      L.info("deactivate", `复原官方直连 · 清除 ${n} 处 LS 外置重定向`);
+  } catch (e) {
+    L.warn("deactivate", `复原官方直连失败: ${e && e.message}`);
+  }
+
   if (isLocal && lifetime > 30000) {
     _clearAnchorFileSync();
     L.info(

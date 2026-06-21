@@ -2,6 +2,8 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.313 · 根治「原生卸载后官方服务器连不上·卡死中间态」+ 复原官方直连命令(用户旨意): 真因实证——卸载后 `settings.json` 残留 `codeiumDev.externalLanguageServerAddress: 127.0.0.1:19999`(把官方 Cascade 语言服务器重定向到本地外置端点), 代理/插件一去该端口即死, 官方 LSP 连不上 → 卡死中间态; 而原解锚仅清 `codeium.apiServerUrl` 系、从不碰这条 LS 外置重定向(此键由同族旧世代/残留写入, 本扩展走 Connect-RPC 层不写它)。本版: ①新增 `_restoreOfficialDirect()` 跨所有候选 IDE 的 `User/settings.json`(devin/Windsurf/Code/VSCodium + ctx 上溯本实例) 清除重定向键, 写前带轮转备份; ②`deactivate`(卸载/停用必经) **无条件**清除 `codeiumDev.externalLanguageServerAddress`/`externalLanguageServerLspPort`(本扩展从不写之 → 清之无写风暴 → 不受原 30s 门限约束), `codeium.apiServerUrl` 系仍按原防写风暴逻辑; ③新增命令「道Agent Pro: 复原官方直连 (卸载善后/解锚 · 卡死自救)」(`dao.restoreOfficial`): 完全清除重定向(含 apiServerUrl 与 LS 外置)+停本地代理+提示 Reload Window, 即便已卡死也能在命令面板一键自救。卸载后官方语言服务器自连, 不再卡中间态。
+
 v9.9.312 · 根治「首次添加渠道探活失败·须重启+手点探测」+ 交接文档一键复制(用户旨意): 两处真因合治——①**自写抑制根除热重载竞态**: 每次热保存(加渠道/解模型)改写 `配置.json` 会触发 `fs.watch` → `init()` 全量重载 → `_providers` 被替换为新对象, 与正进行的「解模型→落 `cfg.models`→探活」内存改写打架, 致解出的模型不落、探活退化; 新增 `_lastSelfWriteData` 记录本进程写盘内容, 监听回调比对磁盘内容一致即判「自写·跳过热重载」, 仅外部手改方重载。②**探活前先解模型·绝不用渠道名当模型**: `probeAllProviders` 在 `_verifyProviderChat` 前若 `cfg.models` 空则先 `hotListProviderModels({refresh})` 拿真实模型再验; `_verifyProviderChat` 去掉 `|| name` 退化(旧法无模型时把渠道名当模型发 → 上游 400「you passed <渠道名>」误判失败), 无真实模型则明确返回「需先拉取模型」。合治后首次添加即解即探即绿、启动自动探活无需手点。③交接文档面板加「📋 复制最新状态」按钮: 一键取 `/origin/ea/handoff.md` 最新全文写入剪贴板(浏览器剪贴板不可用则经宿主 `vscode.env.clipboard` 兜底), 直接粘给本地任意 Agent 即可接管热配置一切。
 
 v9.9.311 · 预设不重置已有体验、添加后自动识别道部模型(用户旨意): 预设 `_PRESETS` 去掉硬编码候选模型 m 字段，只给「显示名/协议/BaseURL/注册页」，选设后模型输入框留空(占位提示自动识别)，填 Key 添加后即按 `/v1/models` 全量拉取该渠道真实可用模型——既不覆盖已配渠道的现有体验，又对新建渠道做到只填 Key 即全识别，各家通治。
