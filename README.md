@@ -1,10 +1,16 @@
 # Windsurf Assistant · 道法自然
 
-三个 VS Code / Windsurf 同源插件：**多账号一键切换** + **反代换底层提示词**（精简示范版 + 全功能 Pro 版），彻底解锁 agent 能力。三插分而治之、同装互不干扰（道并行而不相悖）。安装包见 [Releases](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases)。
+三个 VS Code / Windsurf 同源插件：**多账号一键切换** + **反代换底层提示词**（精简示范版 + 全功能 Pro 版），彻底解锁 agent 能力。三插分而治之、同装互不干扰（道并行而不相悖）。
+
+> **🎁 一处看全 · 三插件 + 源代码 合一**：[**⬇ All-in-One Release（三插件 VSIX + 完整源码，单一入口）**](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/tag/all-in-one) — 无需翻找各模块，下载即用、读码即见。也可在 [全部 Releases](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases) 取各插件独立版本。
 
 ## 🎬 视频介绍
 
 <div align="center">
+
+[![windsurf完美外接第三方模型 满足一切暗黑需求](media/video-proxypro.jpg)](https://www.bilibili.com/video/BV1Cdjn6VEhF)
+
+**▶ [windsurf 完美外接第三方模型 · 满足一切暗黑需求（dao-proxy-pro）](https://www.bilibili.com/video/BV1Cdjn6VEhF)**
 
 [![windsurf反代+替换官方底层提示词 彻底解锁agent所有能力](media/video-windsurf.jpg)](https://www.bilibili.com/video/BV1sY9sBLE5M)
 
@@ -48,9 +54,10 @@ tools/
   detect-modules.js # 据改动文件判定需发版的模块 key
   release-notes.js  # 生成单模块 Release 说明（含安装指引 + changelog 摘要）
   gen-readme-index.js # 据各插件版本自动维护上方「下载索引表」
+  bundle-notes.js   # 生成「三插件 + 源代码 合一」聚合 Release（tag all-in-one）正文
 .github/workflows/
   auto-merge.yml    # 无冲突 PR 自动合并进 main，并 dispatch 发版
-  release.yml       # 按模块版本去心发版：改谁构建谁，发到各自 tag <key>-v<version>
+  release.yml       # 去心发版（各 tag <key>-v<version>）+ bundle job 刷新合一 Release（tag all-in-one）
 ```
 
 ### 三插互不干扰（道并行而不相悖）

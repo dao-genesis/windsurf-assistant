@@ -17,6 +17,7 @@ on:
       - "tools/detect-modules.js"
       - "tools/release-notes.js"
       - "tools/gen-readme-index.js"
+      - "tools/bundle-notes.js"
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
@@ -106,6 +107,42 @@ jobs:
           else
             gh release create "$TAG" "$VSIX" --title "$TITLE" --notes-file notes.md --target "$GITHUB_SHA"
           fi
+          echo "released $TAG"
+
+  # 三插件 + 源代码 合一：单一聚合 Release（rolling tag all-in-one），
+  # 每次主线发版随之刷新，作为门面「主 Release」。独立于 detect 门限：
+  # 工作流一旦运行（push 命中 paths 或 dispatch）即重建，确保门面恒为最新。
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build all VSIX
+        run: node scripts/build-vsix.mjs
+      - name: Pack source snapshot
+        run: |
+          set -e
+          git archive --format=zip --prefix=windsurf-assistant/ -o dist/windsurf-assistant-source.zip HEAD
+          ls -lh dist/
+      - name: Create/refresh all-in-one Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          node tools/bundle-notes.js > bundle-notes.md
+          TAG="all-in-one"
+          TITLE="三插件 + 源代码 合一 · Windsurf Assistant"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --cleanup-tag --yes
+          fi
+          gh release create "$TAG" dist/*.vsix dist/windsurf-assistant-source.zip \
+            --title "$TITLE" --notes-file bundle-notes.md --target "$GITHUB_SHA" --latest
           echo "released $TAG"
 
   index:
