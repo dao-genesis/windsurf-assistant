@@ -1413,6 +1413,16 @@ function init({ log, configPath }) {
             }
           }, 500);
         });
+        // ★ v9.9.305 · FSWatcher 'error' 必接 · 否则 Windows 上配置目录的
+        //   EPERM/重命名/删除会冒出未处理 'error' 事件 → 整个扩展宿主崩溃
+        //   (「错误堆积·面板加载不进」症之一)。今: 吞错 + 释放句柄 · 不殃及主流程。
+        _cfgWatcher.on("error", (e) => {
+          _log("[dao-router] 配置监听错误(已隔离·不影响运行): " + e.message);
+          try {
+            _cfgWatcher.close();
+          } catch (_) {}
+          _cfgWatcher = null;
+        });
         _log("[dao-router] 配置监听已启动 · " + configPath);
       } catch (e) {
         _log("[dao-router] 配置监听启动失败 (不影响运行): " + e.message);
@@ -1565,9 +1575,11 @@ function _normalizeModelUid(uid) {
   //   关键: 自动播种(_seeded)的 MODEL_SWE_1_6 测试桩不得吞并兄弟档位 →
   //         swe-1-6-slow 等未显式连线者保持官方透传(免费原生·用户旨意)
   //   仅当精确/形态匹配皆未命中, 且族基名被用户"显式"(非_seeded)连线时方触发
-  //   ★ 受 daoRoutes.familyTierExtend 闸控 · 默认开(可显式置 false 关) · 守「连族即覆盖全档」之本
-  //     (slow 等档 catalog 无独立项·无法单独连线 → 必经此延伸方能命中用户所连渠道)
-  if (_familyTierExtend) {
+  //   ★ v9.9.305 · 基族延伸(本块)恒开: 用户连"族基名"(MODEL_SWE_1_6)即覆盖其全部
+  //     档位变体(slow/fast/thinking…) · 此乃「连族即覆盖全档」之本, 不受闸控
+  //     —— 用户旨意: 连了模型族, 切任何档位都应路由到所连渠道, 不退回官方
+  //   ★ 仅"兄弟档互延"(3.6)受 familyTierExtend 闸控(默认关) · 守 L2.6 之常:
+  //     仅连 fast 而未连族基名时, slow 仍保官方透传(免费原生·不被兄弟吞)
   const base = _stripVariantSuffix(uid);
   if (base && base !== uid) {
     // ★ v9.9.284 · 真实可路由判定: 非播种 + 非桩/替身 + 未禁用
@@ -1599,7 +1611,10 @@ function _normalizeModelUid(uid) {
   //   旧逻辑(3.5)仅认"族基名本身"被连线 · 不认"兄弟档位"被连线 → 漏判
   //   治: 只要同族任一档位被用户"显式"(非_seeded)连线 · 则全族档位归一其渠道
   //   守常: 仅延伸"用户已连"之族 · 纯播种桩族(无真路由)仍保官方原生直通
+  //   ★ v9.9.305 · 此"兄弟互延"受 familyTierExtend 闸控(默认关) · 与 3.5 基族延伸解耦:
+  //     默认仅"连族基名"覆盖全档; 显式开 familyTierExtend:true 方令"连任一兄弟"亦覆盖全族
   //   道义: 二十八章「朴散为器·大制无割」· 四十八章「损之又损·以至无为而无不为」
+  if (_familyTierExtend) {
   const _qFam = _familyCanon(uid);
   if (_qFam) {
     const _sibs = Object.keys(_routes)
@@ -2035,6 +2050,47 @@ async function route(req, res, rawBody, isJSON, modelUid) {
   return false;
 }
 
+// ★ v9.9.305 · 首字节守望窗 (TTFB · Time-To-First-Byte)
+//   实证(zhoumac/179 笔记本): 冷启/空闲后「第一条消息常发送失败、第二条才成功」——
+//     上游(网关/外接 API)首次连接虽回 200 头, 但 body 久无首字节(冷连/半开 socket),
+//     下游 Cascade 头已发出却收不到帧 → LSP 超时判失败; 用户重发(第二条)走热连接遂成。
+//   治: 上游 200 后、下发下游头前, 守望首字节; 窗内未达且尚未重试则透明重试一次(新连接)。
+//   默 18s(实测正常首字 1.6~5.5s · 留足余量不误伤慢思模型) · env DAO_TTFB_MS 可调 · 0 关闭。
+const _TTFB_FIRSTBYTE_MS = (() => {
+  const v = parseInt(process.env.DAO_TTFB_MS || "", 10);
+  return Number.isFinite(v) && v >= 0 ? v : 18000;
+})();
+
+// ★ v9.9.305 · 探首字节而不消费: readable 可能在无数据时先触发(read() 返 null),
+//   故 read() 取到首块后立即 unshift 还回缓冲, 交由 _streamOaToCascade 的 'data' 监听原样消费。
+//   返回 "data"(有首字) | "end"(空体正常结束) | "error"(流错) | "timeout"(窗内无首字)。
+function _awaitFirstByte(stream, ms) {
+  return new Promise((resolve) => {
+    let done = false;
+    const fin = (v) => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      stream.removeListener("readable", onR);
+      stream.removeListener("end", onE);
+      stream.removeListener("error", onErr);
+      resolve(v);
+    };
+    const onR = () => {
+      const chunk = stream.read();
+      if (chunk === null) return; // readable 误触(尚无真数据) · 继续守望
+      stream.unshift(chunk); // 首块还回 · 不吞字节
+      fin("data");
+    };
+    const onE = () => fin("end");
+    const onErr = () => fin("error");
+    const t = setTimeout(() => fin("timeout"), ms);
+    stream.on("readable", onR);
+    stream.once("end", onE);
+    stream.once("error", onErr);
+  });
+}
+
 /** 尝试单条路由 */
 async function _tryRoute({
   target,
@@ -2110,6 +2166,12 @@ async function _tryRoute({
     const _cands = _lbCandidates(target.provider, provCfg);
     let agRes = null;
     let _activeCfg = provCfg;
+    // ★ v9.9.305 · 首字节守望仅主路 + 流式生效 (unary 自有超时 · 备路不重试)
+    const _ttfbStream = isPrimary && provCfg.streamMode !== "unary";
+    let _ttfbRetried = 0;
+    const _TTFB_MAX_RETRY = 1;
+    while (true) {
+    agRes = null;
     for (let _ci = 0; _ci < _cands.length; _ci++) {
       const _c = _cands[_ci];
       const _pc =
@@ -2178,6 +2240,28 @@ async function _tryRoute({
     if (!agRes) {
       return false;
     }
+    // ★ v9.9.305 · 首字节守望 · 仅在下游头未发出前 · 窗内无首字则透明重试一次(新连接)
+    if (_ttfbStream && !res.headersSent && _TTFB_FIRSTBYTE_MS > 0) {
+      const _fb = await _awaitFirstByte(agRes, _TTFB_FIRSTBYTE_MS);
+      if (_fb === "timeout" && _ttfbRetried < _TTFB_MAX_RETRY) {
+        _ttfbRetried++;
+        _log(
+          `[dao-router] ${tag}[↻TTFB] ${target.provider} 首字 ${_TTFB_FIRSTBYTE_MS}ms 未达 → 透明重试#${_ttfbRetried} (冷连/半开)`,
+        );
+        _routeDiag(
+          `_tryRoute ${tag} TTFB stall → retry#${_ttfbRetried} model=${sendModel}`,
+        );
+        try {
+          agRes.destroy();
+        } catch (_) {}
+        continue; // 重跑候选选择 · 取新连接
+      }
+      _routeDiag(
+        `_tryRoute ${tag} first-byte signal=${_fb} ttfbRetried=${_ttfbRetried} model=${sendModel}`,
+      );
+    }
+    break;
+    } // end while · 首字节守望重试
 
     if (!res.headersSent) {
       // ★ v9.9.73e · 与官方 API 响应头完全对齐
@@ -5346,4 +5430,7 @@ module.exports = {
   hotSetResilienceParam,
   hotDetectRefusal,
   hotCompactSchema,
+  // ★ v9.9.305 · 首字节守望(TTFB)测试钩子 · 供 dao-test.js 验证冷连重试机制
+  _awaitFirstByte,
+  _TTFB_FIRSTBYTE_MS,
 };

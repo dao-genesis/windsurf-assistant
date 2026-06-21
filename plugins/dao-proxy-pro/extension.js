@@ -4972,6 +4972,14 @@ function getEaConfigHtml(port, nonce) {
             var hh = _health[name];
             if (hh && hh.alive === true) _daoToast('渠道 ' + name + ' 已连通 · 绿');
             else if (hh && hh.alive === false) _daoToast('渠道 ' + name + ' 探活失败 · 检查 apiKey/URL');
+            else _daoToast('渠道 ' + name + ' 已添加 · 探活待定');
+          }).catch(function(e) {
+            // ★ v9.9.305 · 渠道已落库(后端 ok), 探活/解模型/刷新任一异常皆不得卡死按钮:
+            //   旧逻辑此内层链无 catch → loadConfig/render 抛错时按钮永停"解模型…"·
+            //   用户误判"添加失败"(实已成功)。今: 必复位按钮 + 明示已添加。
+            btnAdd.textContent = '+ 添加';
+            try { loadConfig(); } catch (_) {}
+            _daoToast('渠道 ' + name + ' 已添加 · 探活/解模型未完成: ' + (e && e.message ? e.message : e));
           });
         } else {
           btnAdd.textContent = '+ 添加';

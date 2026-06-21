@@ -554,6 +554,86 @@ async function runSeededBaseCheck() {
   } catch {}
 }
 
+async function runFirstByteCheck() {
+  console.log(header("\n═══════════════════════════════════════════"));
+  console.log(header("  L2.7 · 首字节守望(TTFB) · 冷连首条消息不丢"));
+  console.log(header("═══════════════════════════════════════════\n"));
+
+  const { PassThrough } = require("stream");
+  const routerPath = path.join(__dirname, "dao_router.js");
+  let router;
+  try {
+    delete require.cache[require.resolve(routerPath)];
+    router = require(routerPath);
+  } catch (e) {
+    console.log(fail(`dao_router.js 加载失败: ${e.message}`));
+    totalFail++;
+    return;
+  }
+
+  const _awaitFirstByte = router._awaitFirstByte;
+  if (typeof _awaitFirstByte !== "function") {
+    console.log(fail("_awaitFirstByte 未导出 · 无法验证 TTFB 守望"));
+    totalFail++;
+    return;
+  }
+  const expect = (cond, desc) => {
+    if (cond) {
+      console.log(ok(desc));
+      totalPass++;
+    } else {
+      console.log(fail(desc));
+      totalFail++;
+    }
+  };
+
+  // 默认窗为正有限值 (env DAO_TTFB_MS 未设 → 18000)
+  expect(
+    Number.isFinite(router._TTFB_FIRSTBYTE_MS) &&
+      router._TTFB_FIRSTBYTE_MS > 0,
+    `_TTFB_FIRSTBYTE_MS 默认有效 = ${router._TTFB_FIRSTBYTE_MS}ms`,
+  );
+
+  // A) 有首字 → signal=data 且 unshift 不吞字节 (下游收完整 body)
+  {
+    const r = new PassThrough();
+    const p = _awaitFirstByte(r, 5000);
+    r.write("data: hi\n\n");
+    const sig = await p;
+    let body = "";
+    r.on("data", (c) => (body += c));
+    r.end();
+    await new Promise((res) => r.once("end", res));
+    expect(sig === "data", `首字到达 → signal=data (实得 ${sig})`);
+    expect(
+      body === "data: hi\n\n",
+      `unshift 还原首块 · 下游收完整 body=${JSON.stringify(body)}`,
+    );
+  }
+
+  // B) 久无首字 → signal=timeout (触发透明重试的判据)
+  {
+    const r = new PassThrough();
+    const t0 = Date.now();
+    const sig = await _awaitFirstByte(r, 120);
+    const dt = Date.now() - t0;
+    r.destroy();
+    expect(
+      sig === "timeout" && dt >= 100 && dt < 2000,
+      `冷连无首字 → signal=timeout (实得 ${sig} · ${dt}ms)`,
+    );
+  }
+
+  // C) 空体正常结束 → signal=end (不误判为 timeout · 不重试)
+  {
+    const r = new PassThrough();
+    const p = _awaitFirstByte(r, 5000);
+    r.end();
+    const sig = await p;
+    expect(sig === "end", `空体结束 → signal=end (实得 ${sig})`);
+  }
+}
+
 // ─── 主入口 ──
 async function main() {
   const start = Date.now();
@@ -573,6 +653,9 @@ async function main() {
 
     // L2.6: 播种桩不吞兄弟档位 · slow 守官方 (秒级 · 始终运行)
     await runSeededBaseCheck();
+
+    // L2.7: 首字节守望(TTFB) · 冷连首条消息不丢 (秒级 · 始终运行)
+    await runFirstByteCheck();
 
     // 协议验证 (非quick模式)
     if (!optQuick) {
