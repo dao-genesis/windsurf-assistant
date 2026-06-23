@@ -145,15 +145,16 @@ const ORIGIN_VERSION = ORIGIN_VERSION_BASE + "-dao-fa-zi-ran";
 let _actualPort = PORT; // listening / start.onListen 时更新为 server.address().port
 const UPSTREAM_MGMT = "server.self-serve.windsurf.com";
 const UPSTREAM_INFER = "inference.codeium.com";
-// v9.3.2 · 道恒无名 · 名随实变
-// 路由之 upstream 回归默认分流 (chat 走 inference via INFERENCE_SERVICES 匹)
-// v9.3.1 "chat 单分流至 server.codeium.com" 之推断基于无 JWT 合成测,
-// 合成测之 grpc-status=12 UNIMPLEMENTED 不足据 (auth 缺亦致同响应).
-// 实捕 v9.2.1 之 67 reqs 证默认分流通. 故回归.
-// CHAT_UPSTREAM env 保留 · 主公可 opt-in 显式覆盖:
-//   "" (默认/空): 走 INFERENCE_SERVICES 默认分流 → UPSTREAM_INFER
-//   "server.codeium.com" / "inference.codeium.com" / "auto": 覆盖至指端
-const UPSTREAM_CHAT = process.env.CHAT_UPSTREAM || "";
+// v9.9.65 · 道法自然 · 实证反正前判 (反者道之动)
+// 官方 chat (GetChatMessage{,V2}/RawGetChatMessage) 须走 api_server =
+//   server.codeium.com, 与不装插件时 LS 原生 --api_server_url 一致。
+// v9.3.2 曾据 v9.2.1 捕获的 67 reqs「默认分流(chat→inference)通」而回归默认,
+//   但实证(直连 replay·同一请求同字节)推翻该判断: 本账号
+//   GetChatMessage → server.codeium.com 得 HTTP 200 真实聊天流; 同一请求
+//   → inference.codeium.com 得「third-party model provider unavailable」。
+//   故默认把 chat 覆盖至 api_server (server.codeium.com)。
+// CHAT_UPSTREAM env 保留 · 可显式覆盖至 "inference.codeium.com" / "auto" 等。
+const UPSTREAM_CHAT = process.env.CHAT_UPSTREAM || "server.codeium.com";
 const CLOUD_PORT = 443;
 
 // inference 服务名集 (Connect-RPC 路径的 package.Service 部分)
@@ -2174,8 +2175,8 @@ function routeUpstream(reqUrl) {
     return { host: UPSTREAM_INFER, path: rawPath.slice(2) + query };
   if (rawPath.startsWith("/r/"))
     return { host: UPSTREAM_MGMT, path: rawPath.slice(2) + query };
-  // v9.3.2 · 道恒无名 · chat RPC opt-in 覆盖 (主公设 CHAT_UPSTREAM env 方激活)
-  // 默认 (CHAT_UPSTREAM="") 时不特判, 随 INFERENCE_SERVICES 分流 → UPSTREAM_INFER
+  // v9.9.65 · 官方 chat RPC 钉到 api_server (UPSTREAM_CHAT 默认 server.codeium.com)
+  //   CHAT_UPSTREAM env 可显式覆盖; 仅在 UPSTREAM_CHAT 非空时特判 chat 方法名。
   if (UPSTREAM_CHAT) {
     const methodM = rawPath.match(/\/([A-Za-z0-9_]+)$/);
     const method = methodM ? methodM[1] : "";

@@ -2,7 +2,7 @@
 	"name": "dao-proxy-min",
 	"displayName": "道Agent · 反者道之动 · 弱者道之用",
 	"description": "v9.9.64 道法自然·從Pro版吸取底層修復·DevService/ApiServerService退出INFERENCE_SERVICES·管理RPC歸位MGMT·繁體經文·帛書老子+道藏陰符經·適配Windsurf+Devin Desktop雙環境·無為而無以為. 承v9.9.63.",
-	"version": "9.9.64",
+	"version": "9.9.65",
 	"publisher": "dao-agi",
 	"license": "Apache-2.0",
 	"engines": {

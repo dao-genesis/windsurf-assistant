@@ -2976,7 +2976,13 @@ function routeUpstream(reqUrl) {
       method === "GetChatMessageV2" ||
       method === "RawGetChatMessage"
     ) {
-      return { host: UPSTREAM_INFER, path: rawPath + query };
+      // FIX (2026-06-23 empirical replay): same GetChatMessage request returns
+      //   200 + real chat response on server.codeium.com (UPSTREAM_API),
+      //   but "third-party model provider unavailable" on inference.codeium.com.
+      //   Official chat (ApiServerService) must go to api_server host, matching
+      //   the LS native --api_server_url. Routed (BYOK) models are intercepted
+      //   earlier at _eaRouter.route() (kind-gated), so they bypass this host.
+      return { host: UPSTREAM_API, path: rawPath + query };
     }
   }
   // 服务名自动分流
