@@ -789,6 +789,68 @@ async function main() {
     }
   }
 
+  // ── 5.5b · ask_user_question 同轮打包隔离验证 (v10.1 · 修法⑰) ──
+  //   外接模型把 ask_user_question 与 multi_edit/read_file 同轮打包发出 →
+  //   代理应将其隔离为终止性独占交互 (只发 ask_user_question, 丢弃兄弟工具),
+  //   对齐官方"单发即停"路径 → IDE 渲染阻塞式弹窗.
+  console.log("\n── 5.5b ask_user_question 独占一轮隔离 ──");
+  {
+    const reqBody = buildReq({
+      modelUid: MODEL_UID,
+      system: "You are helpful.",
+      messages: [
+        {
+          role: "user",
+          content: "batched: ask which framework and also edit & read files",
+        },
+      ],
+      tools: TOOLS,
+      toolChoice: "auto",
+    });
+    const res = mockRes();
+    try {
+      const routed = await Router.route(
+        { on: () => {} },
+        res,
+        reqBody,
+        false,
+        MODEL_UID,
+      );
+      ok("ask隔离: 路由", routed, "route() returned false");
+      if (routed) {
+        const parsed = parseResp(res.getBody());
+        const names = parsed.toolCalls.map((t) => t.name);
+        ok(
+          "ask隔离: 仅发1个工具调用",
+          parsed.toolCalls.length === 1,
+          `got ${parsed.toolCalls.length}: ${names.join(",")}`,
+        );
+        ok(
+          "ask隔离: 唯一工具=ask_user_question",
+          names.length === 1 && names[0] === "ask_user_question",
+          `got: ${names.join(",")}`,
+        );
+        ok(
+          "ask隔离: 同轮 multi_edit 已丢弃",
+          !names.includes("multi_edit"),
+          "multi_edit 未被隔离丢弃",
+        );
+        ok(
+          "ask隔离: 同轮 read_file 已丢弃",
+          !names.includes("read_file"),
+          "read_file 未被隔离丢弃",
+        );
+        ok(
+          "ask隔离: stopReason=TOOL_CALLS",
+          parsed.stopReason === W.STOP_TOOL_CALLS,
+          `got: ${parsed.stopReason}`,
+        );
+      }
+    } catch (e) {
+      ok("ask隔离: 异常", false, e.message);
+    }
+  }
+
   // ── 5.6 多工具并行调用验证 ──
   console.log("\n── 5.6 多工具并行调用验证 ──");
   {

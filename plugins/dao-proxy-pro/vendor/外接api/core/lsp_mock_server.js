@@ -65,6 +65,9 @@ class MockLLM {
   }
   _m(msg, tools) {
     const sc = this.sc;
+    // ★ v10.1 · 修法⑰ 实证: ask_user_question 同轮打包场景 (须先于通用 ask 匹配)
+    if (/batched|isolate/i.test(msg) && sc.has("ask_user_question_batched"))
+      return sc.get("ask_user_question_batched");
     // ★ 匹配优先级: 更具体的模式在前 · 通用模式在后
     //   1. trajectory → 在 search 之前
     //   2. code_search → 在 search 之前

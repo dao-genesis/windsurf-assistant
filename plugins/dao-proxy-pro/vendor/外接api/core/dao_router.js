@@ -3295,10 +3295,25 @@ async function _unaryOaToCascade(
           !(lspToolNames && lspToolNames.has(_rawName)),
       };
     });
+    // ★ v10.1 · 修法⑰ (同 _flushTools) · ask_user_question 独占一轮 (终止性交互)
+    //   非流式/缓冲路径同样隔离: 含 ask_user_question 即只保留它, 丢弃同轮兄弟
+    //   工具 → 对齐官方"单发即停" → 弹窗正常弹出. 详见 _flushTools 处实证记述.
+    let _emitCalls = mappedCalls;
+    const _askI = mappedCalls.findIndex((c) => c.name === "ask_user_question");
+    if (_askI >= 0 && mappedCalls.length > 1) {
+      const _dropped = mappedCalls
+        .filter((c) => c.name !== "ask_user_question")
+        .map((c) => c.name);
+      _emitCalls = [mappedCalls[_askI]];
+      _routeDiag(
+        "buffered tool_calls: ask_user_question 独占本轮 (终止性交互) → 丢弃同轮工具=" +
+          _dropped.join(","),
+      );
+    }
     if (w.encodeChatToolCall) {
       const inner = Buffer.concat([
         _hdr(), // ★ message_id + timestamp
-        ...mappedCalls.map((tc) =>
+        ..._emitCalls.map((tc) =>
           w.encodeMessage(w.RSP.DELTA_TOOL_CALLS, w.encodeChatToolCall(tc)),
         ),
       ]);
@@ -3437,6 +3452,36 @@ function _streamOaToCascade(
       }
       _seen.add(_dedupKey);
       _dedupedCalls.push({ ...tc, argumentsJson: _validArgs });
+    }
+
+    // ★ v10.1 · 修法⑰ · ask_user_question 独占一轮 (终止性交互 · 对齐官方)
+    //   逆向实证 (zhoumac Pro 机 · D:\Devin\...\windsurf\dist\extension.js):
+    //     官方弹窗由 LSP 把 chat 层 ask_user_question 工具调用转为 cortex 层
+    //     RequestedInteraction{ask_user_question: CascadeAskUserQuestionInteractionSpec}
+    //     (CortexStep field no:56 requested_interaction) → 渲染阻塞式弹窗.
+    //   官方模型问问题时 *单发* ask_user_question 即停 (终止性, 问完等用户);
+    //   外接模型常把它与 multi_edit/read_file 等同轮打包发出 (实证 _router_diag:
+    //     "_flushTools total=2 names=ask_user_question,multi_edit") → LSP 把整批
+    //   当普通工具执行, ask_user_question 不触发弹窗, 对话无感继续 → 用户实测
+    //   "外接 API 弹不出弹窗, 只有官方模型才行" 之根因.
+    //   故: 本轮一旦含 ask_user_question, 只保留它, 丢弃同轮兄弟工具, 令其独占
+    //   成终止性交互 → 对齐官方"单发即停"路径 → 弹窗正常弹出. 被丢弃的工具不
+    //   重放: 用户应答后模型自会重新规划 (官方语义本即 ask 为终止步, 不并骛).
+    //   道义: 二十四章「企者不立 跨者不行」· 一事一时 · 问则专问.
+    const _askIdx = _dedupedCalls.findIndex(
+      (c) => c.name === "ask_user_question",
+    );
+    if (_askIdx >= 0 && _dedupedCalls.length > 1) {
+      const _askCall = _dedupedCalls[_askIdx];
+      const _dropped = _dedupedCalls
+        .filter((c) => c.name !== "ask_user_question")
+        .map((c) => c.name);
+      _dedupedCalls.length = 0;
+      _dedupedCalls.push(_askCall);
+      _routeDiag(
+        "_flushTools: ask_user_question 独占本轮 (终止性交互) → 丢弃同轮工具=" +
+          _dropped.join(","),
+      );
     }
 
     // ★ v9.9.93 · 修法⑧ · 工具分类: LSP有执行器 → 透传 · 仅代理 → 拦截
