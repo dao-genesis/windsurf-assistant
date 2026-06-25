@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | **rt-flow** | `3.16.0` | `devaid.rt-flow` | 多账号管理与一键切换：添加账号 / 注入 token / 健康检查 / panic 切换。命令/视图独立命名空间 `wam.*`。 | [Release](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/tag/rt-flow-v3.16.0) · [⬇ VSIX](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/rt-flow-v3.16.0/rt-flow-3.16.0.vsix) |
 | **dao-proxy-min** | `9.9.65` | `dao-agi.dao-proxy-min` | 反向代理 Windsurf / Devin，origin 反转与系统提示词替换、预览与自检。独立命名空间 `daomin.*`，与 Pro 同装零干扰。 | [Release](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/tag/dao-proxy-min-v9.9.65) · [⬇ VSIX](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/dao-proxy-min-v9.9.65/dao-proxy-min-9.9.65.vsix) |
-| **dao-proxy-pro** | `9.9.318` | `dao-agi.dao-proxy-pro` | 在 min 反代/提示词隔离之上新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、三面板（本源观照 / 渠道配置 / 模型路由）、只填 API Key 自动全量识别模型。 | [Release](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/tag/dao-proxy-pro-v9.9.318) · [⬇ VSIX](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/dao-proxy-pro-v9.9.318/dao-proxy-pro-9.9.318.vsix) |
+| **dao-proxy-pro** | `9.9.319` | `dao-agi.dao-proxy-pro` | 在 min 反代/提示词隔离之上新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、三面板（本源观照 / 渠道配置 / 模型路由）、只填 API Key 自动全量识别模型。 | [Release](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/tag/dao-proxy-pro-v9.9.319) · [⬇ VSIX](https://github.com/zhouyoukang1234-spec/windsurf-assistant/releases/download/dao-proxy-pro-v9.9.319/dao-proxy-pro-9.9.319.vsix) |
 <!-- DAO-MODULE-INDEX:END -->
 
 ## 仓库结构
