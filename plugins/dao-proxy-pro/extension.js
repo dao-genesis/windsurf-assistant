@@ -592,13 +592,41 @@ function findSourceJs() {
 }
 
 // v9.9.21 · 唯变所适 · 让位机制
-// _isRemoteStale: 远端 self_file 是否非最新版 dao-proxy-min-* 之 source.js
+// 从 self_file 路径中提取 dao-proxy-{pro,min}-X.Y.Z 之 [X,Y,Z]
+function _verFromPath(p) {
+  try {
+    const m = String(p).match(/dao-proxy-[a-z]+-(\d+)\.(\d+)\.(\d+)/i);
+    return m ? [+m[1], +m[2], +m[3]] : null;
+  } catch {
+    return null;
+  }
+}
+function _cmpVer(a, b) {
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) - (b[i] || 0);
+  }
+  return 0;
+}
+
+// v9.9.320 · 治本 · 不杀同道 · 七十六章「兵强则不胜·强大居下·柔弱微细居上」
+// _isRemoteStale: 远端 self_file 是否「严格旧于」本地最新版
+//   病(本源·间歇断连): 旧逻辑按 source.js 路径全等判定旧否 · 多实例并发下
+//       不同安装目录(pro vs min · 不同根 · ephemeral 绑定)即便「同版」亦路径不等
+//       → 误判旧 → 启动期与 watchdog 每周期反复 POST /_quit 杀「正在服务活动 LS
+//       的健康反代」→ 那一刻 LS 报「connection to server is erroring · Shutting
+//       down server」→ ~30s 后 watchdog 重起自愈 → 表现为反复掉线
+//   药: 路径全等→必不旧(快路径); 否则比对从路径抽取之 semver ·
+//       远端版本 >= 本地最新 → 不旧(同版/更新不杀·不与争); 仅远端严格更旧才让位升级
 function _isRemoteStale(remoteSelfFile) {
   if (!remoteSelfFile || typeof remoteSelfFile !== "string") return false;
   const best = _scanLatestVendorDir();
   if (!best) return false;
   const expected = path.join(best.path, "source.js").toLowerCase();
-  return remoteSelfFile.toLowerCase() !== expected;
+  if (remoteSelfFile.toLowerCase() === expected) return false; // 同一文件 · 必不旧
+  const rv = _verFromPath(remoteSelfFile);
+  if (rv) return _cmpVer(rv, best.version) < 0; // 仅远端严格更旧才判旧 · 同版/更新不杀
+  // 无法解析远端版本 → 保守退回严格路径比较 (旧行为)
+  return true;
 }
 
 // ═══════════════════════════ v9.9.272 · 软编码端口 · 失败安全 ═══════════════════════════
@@ -644,15 +672,20 @@ async function _ephemeralBind(srcPath, mode) {
 //   无 /origin/ea/* → pro 若将就复用 min → 面板 /origin/ea/overview 一律 404「加载失败」
 //   真治: 不只看 self_file · 直接探 ea 能力 · 不兼容则不复用 · 自绑全功能后端 (柔弱胜刚强)
 async function _remoteServesEa(port) {
-  try {
-    const r = await httpGetJson(
-      `http://127.0.0.1:${port}/origin/ea/status`,
-      1500,
-    );
-    return !!(r && (r.ok === true || r.routes !== undefined));
-  } catch {
-    return false;
+  // v9.9.320 · 治本 · 探针容错 · 防高负载下 ea/status 瞬时超时被误判「无 ea」
+  //   误判「无 ea」→ _remoteIncompatible=true → 启动期 POST /_quit 杀健康反代
+  //   (与 _isRemoteStale 同为「反复让位」之本源) · 故提高超时 + 重试一次
+  for (let i = 0; i < 2; i++) {
+    try {
+      const r = await httpGetJson(
+        `http://127.0.0.1:${port}/origin/ea/status`,
+        i === 0 ? 2500 : 4000,
+      );
+      if (r && (r.ok === true || r.routes !== undefined)) return true;
+    } catch {}
+    if (i === 0) await new Promise((res) => setTimeout(res, 400));
   }
+  return false;
 }
 
 // 远端是否「不兼容」: 非最新 source.js (stale) 或 不提供 ea 能力 (旧/极简变体)
