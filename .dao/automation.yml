@@ -1,0 +1,29 @@
+# 道自动化体系 · 中央配置（本体侧读取，手套侧参考）
+# 任何 Devin/AI 启动时读本文件即可知道：往哪推、以什么身份、按什么策略合并。
+
+version: 1
+
+# 数据本体：真正持有数据的账号或组织。手套只把成果 PR 回这里。
+body:
+  owner: dao-devin              # 数据本体已升级为 Org
+  is_org: true
+
+# 可信手套账号 allowlist：只有这些账号开的、且带 label 的 PR 才会被自动合并。
+# 新增一只手套 = 往这里加一行（用当前 Devin 的 GitHub 登录名）。
+gloves:
+  - hooperjustin78
+  - devin-ai-integration[bot]
+  # - <下一个 Devin 实例的 GitHub 账号>
+
+# 自动合并策略（本体侧 dao-automerge.yml 执行）
+automerge:
+  label: dao-auto               # PR 必须带此标签才纳入自动合并
+  merge_method: squash          # squash | merge | rebase
+  require_ci_pass: true         # 必须等 PR 的 CI 全绿
+  delete_branch_after: true
+  # 限速闸门：避免本体侧短时间涌入过多合并而被风控
+  rate_limit:
+    max_merges_per_hour: 12
+    min_seconds_between_merges: 90
+
+# 高频活动全部发生在手套 fork 上，本体只做低频合并。
