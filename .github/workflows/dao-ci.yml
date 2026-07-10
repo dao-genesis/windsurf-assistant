@@ -1,0 +1,55 @@
+# 道自动化 · 通用安全 CI（每仓必备的最低门禁）
+#
+# 目的：让每个 PR 都至少有一个 check run（automerge 要求 CI 全绿且至少 1 个 check），
+#       同时把住两条底线：不带冲突标记、不泄露令牌/密钥。
+# 各仓可另加自己的构建/测试工作流，automerge 会一并等它们全绿。
+
+name: dao-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 冲突标记检查（仅本 PR 改动的文件）
+        run: |
+          set -e
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          git fetch --no-tags origin "$BASE_SHA" >/dev/null 2>&1 || true
+          FILES=$(git diff --name-only --diff-filter=ACM "$BASE_SHA"...HEAD || true)
+          [ -z "$FILES" ] && { echo "无改动文件"; exit 0; }
+          BAD=0
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            if grep -nE '^(<<<<<<< |=======$|>>>>>>> )' "$f" >/dev/null 2>&1; then
+              echo "::error file=$f::发现未解决的合并冲突标记"; BAD=1
+            fi
+          done <<< "$FILES"
+          exit $BAD
+
+      - name: 令牌/密钥泄露检查（仅本 PR 新增内容）
+        run: |
+          set -e
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          # 只查本 PR 新增的行，避免误伤历史
+          ADDED=$(git diff "$BASE_SHA"...HEAD | grep '^+' | grep -v '^+++' || true)
+          PATTERNS='ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|ghs_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|dao-vsix-[a-f0-9]{32}|-----BEGIN (RSA|EC|OPENSSH|DSA|PGP) PRIVATE KEY-----|AKIA[0-9A-Z]{16}'
+          HITS=$(echo "$ADDED" | grep -nE "$PATTERNS" | grep -v 'REDACTED' || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::PR 新增内容疑似包含令牌/私钥，拒绝合并："
+            echo "$HITS" | sed -E 's/[A-Za-z0-9_\-]{20,}/<REDACTED>/g' | head -20
+            exit 1
+          fi
+          echo "未发现泄露"
