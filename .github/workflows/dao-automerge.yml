@@ -1,0 +1,114 @@
+# 道自动化 · 本体侧自动合并工作流
+#
+# 部署到「数据本体」的每个仓库里（scripts/install-automerge.sh 可批量安装）。
+# 作用：当可信手套账号开来带 `dao-auto` 标签的 PR 且 CI 全绿时，
+#       用仓库自带 GITHUB_TOKEN（无需 PAT）限速合并，并删除来源分支。
+#
+# 高频活动全在手套 fork 上发生；本体这里只做低频、合规的合并。
+
+name: dao-automerge
+
+on:
+  pull_request_target:
+    types: [opened, labeled, synchronize, reopened]
+  check_suite:
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: dao-automerge
+  cancel-in-progress: false
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout body repo (for .dao/automation.yml)
+        uses: actions/checkout@v4
+
+      - name: Evaluate & merge eligible glove PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let cfg = { gloves: [], automerge: {} };
+            try {
+              const yaml = fs.readFileSync('.dao/automation.yml', 'utf8');
+              // 极简 YAML 提取（避免额外依赖）：抓 gloves 列表 + automerge 标量
+              const gl = [];
+              let inGloves = false;
+              for (const raw of yaml.split('\n')) {
+                const line = raw.replace(/#.*$/, '');
+                if (/^gloves:\s*$/.test(line)) { inGloves = true; continue; }
+                if (inGloves) {
+                  const m = line.match(/^\s*-\s*(.+?)\s*$/);
+                  if (m) { gl.push(m[1]); continue; }
+                  if (/^\S/.test(line)) inGloves = false;
+                }
+              }
+              cfg.gloves = gl;
+              const label = (yaml.match(/label:\s*(\S+)/) || [])[1] || 'dao-auto';
+              const method = (yaml.match(/merge_method:\s*(\S+)/) || [])[1] || 'squash';
+              const reqCI = /require_ci_pass:\s*true/.test(yaml);
+              const maxPerHour = parseInt((yaml.match(/max_merges_per_hour:\s*(\d+)/) || [])[1] || '12', 10);
+              const minGap = parseInt((yaml.match(/min_seconds_between_merges:\s*(\d+)/) || [])[1] || '90', 10);
+              const delBranch = /delete_branch_after:\s*true/.test(yaml);
+              cfg.automerge = { label, method, reqCI, maxPerHour, minGap, delBranch };
+            } catch (e) {
+              core.setFailed('无法读取 .dao/automation.yml: ' + e.message);
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const A = cfg.automerge;
+            const gloves = new Set(cfg.gloves.map(s => s.toLowerCase()));
+
+            // 收集候选 PR
+            let prs = [];
+            if (context.payload.pull_request) {
+              prs = [context.payload.pull_request];
+            } else {
+              const { data } = await github.rest.pulls.list({ owner, repo, state: 'open', per_page: 100 });
+              prs = data;
+            }
+
+            // 限速：看最近一小时已合并数量 + 最近一次合并时间
+            const since = new Date(Date.now() - 3600 * 1000).toISOString();
+            const recent = await github.rest.pulls.list({ owner, repo, state: 'closed', per_page: 100, sort: 'updated', direction: 'desc' });
+            const mergedRecent = recent.data.filter(p => p.merged_at && p.merged_at > since);
+            let budget = A.maxPerHour - mergedRecent.length;
+            const lastMerge = mergedRecent.map(p => new Date(p.merged_at).getTime()).sort((a,b)=>b-a)[0];
+            if (lastMerge && (Date.now() - lastMerge) < A.minGap * 1000) {
+              core.info('冷却窗口内，跳过本轮（min_seconds_between_merges）'); return;
+            }
+
+            for (const pr of prs) {
+              if (budget <= 0) { core.info('本小时合并额度已用尽，限速中'); break; }
+              const author = (pr.user && pr.user.login || '').toLowerCase();
+              const labels = (pr.labels || []).map(l => (l.name || l).toLowerCase());
+              if (!labels.includes(A.label.toLowerCase())) continue;
+              if (!gloves.has(author)) { core.info(`PR #${pr.number} 作者 ${author} 不在 allowlist，跳过`); continue; }
+
+              if (A.reqCI) {
+                const sha = pr.head.sha;
+                const cr = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
+                const runs = cr.data.check_runs || [];
+                const notGreen = runs.filter(c => c.status !== 'completed' || !['success','neutral','skipped'].includes(c.conclusion));
+                if (runs.length === 0 || notGreen.length > 0) { core.info(`PR #${pr.number} CI 未全绿，等待`); continue; }
+              }
+
+              try {
+                await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: A.method });
+                core.info(`已合并 PR #${pr.number}（作者 ${author}）`);
+                budget--;
+                if (A.delBranch && pr.head.repo && pr.head.repo.full_name === `${owner}/${repo}`) {
+                  await github.rest.git.deleteRef({ owner, repo, ref: `heads/${pr.head.ref}` }).catch(()=>{});
+                }
+              } catch (e) {
+                core.warning(`PR #${pr.number} 合并失败: ${e.message}`);
+              }
+            }
