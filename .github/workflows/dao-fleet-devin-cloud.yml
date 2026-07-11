@@ -1,0 +1,223 @@
+name: dao-fleet-devin-cloud
+
+# ════════════════════════════════════════════════════════════════════
+# 印 113 · 反者道之动 · GH 面板综合管 · Devin VM 反代核心
+#
+#   帛书·四十三:「天下莫柔弱于水 · 而攻坚强者莫之能胜也 · 弱之胜强 · 柔之胜刚」
+#   帛书·八十:  「邻邦相望 · 鸡狗之声相闻 · 民至老死不相往来」
+#
+# 主公诏 (2026-05-16 00:45):
+#   「重新锚定本源底层 · 彻底改造反代底层 · 均运行于 Devin cloud 虚拟机反代
+#    GitHub 做用户端面板综合管理一切 · 反代VM于GitHub VM鸡犬相闻 · 民至老死不相往来」
+#
+# 反者之核 (vs 印 95-100 dao-fleet-cloud.yml):
+#   旧: GH Actions runner 跑 fleet_vm_unit.js + cf tunnel
+#   新: GH Actions runner 仅 deployer · spawn N Devin VM + deploy dao_proxy · 退
+#
+# 链路:
+#   gist (Devin token 池) → GH Actions deployer → spawn N Devin VM
+#   → omni router 自带公网 → deploy dao_proxy v0.4.0 → 报 N URL 回 gist
+#   → GH Actions 退 · daemon 在 Devin VM 自管 (印 112 已证)
+#
+# 触发:
+#   ① workflow_dispatch (主公手动/Web UI 一键)
+#   ② schedule cron · 每 5h · 自续 (主公关机时仍真活)
+#
+# 必设 GitHub repo secrets:
+#   - DAO_POOL_GIST_ID  (印 95 一次 cli.js init 输出)
+#   - DAO_POOL_PAT      (PAT · scope: gist)
+#
+# 道义守 (帛书·八十 · 鸡犬相闻):
+#   1. GH Actions 不跑 LLM proxy daemon · 仅做 deployer
+#   2. Devin VM dao_proxy 不知 GH 存在 · 自管自家 token 池
+#   3. 用户面板直调 Devin VM URL · 不通过 GH 中转
+#   4. 两 VM 通 Gist 间接交流 · 不互调 (民至老死不相往来)
+# ════════════════════════════════════════════════════════════════════
+
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: '起 N Devin VM (默 4 · max 8 · 防 ACU 浪)'
+        required: false
+        default: '4'
+      gist_id:
+        description: '印 100 · token 池 gist id (留空用 secret)'
+        required: false
+        default: ''
+      pat:
+        description: '印 100 · gist PAT (留空用 secret)'
+        required: false
+        default: ''
+      auth_key:
+        description: '印 121 · sk-ws-proxy-* · web oneShot 生 · 与 daemon X-Dao-Auth 同源'
+        required: false
+        default: ''
+      auth_required:
+        description: '印 121 · 是否守门 (默 yes · 与 dao-fleet-cloud.yml 同口)'
+        required: false
+        default: 'yes'
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+      max_minutes:
+        description: '印 121 · 最大跑时长 (max 350 · 默 350 · 供 oneShot maxMinutes)'
+        required: false
+        default: '350'
+  # 印 ∞.7 · 软化触因 · 暂停 cron · 帛书三十「兵者不祥之器也 · 不得已而用之」
+  # 帛书四十「反者道之动也 · 弱者道之用也」── 退一步 · 让 GitHub 反 abuse 自察
+  # 解冻后建议恢复为 '0 */12 * * *' (每 12h · 主公 PC 关机仍真活但温和)
+  # schedule:
+  #   # 每 5 小时一次 · cron 接续 · daemon 真永活 · 印 ∞.7 暂停
+  #   - cron: '0 */5 * * *'
+  # 印 116 损: 删 push trigger
+  # 根: push 触发无 inputs · secrets fallback 即 secrets 缺则必失
+  # 治: 仅 workflow_dispatch (用户主动) + schedule (cron 自续)
+  # 帛书·四十八「闻道者日损 · 损之又损 · 以至于无为」
+
+permissions:
+  contents: read
+
+# 同时仅一 run · 旧 run 退 · 防 ACU 浪
+concurrency:
+  group: dao-fleet-devin-cloud
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+
+    steps:
+      - name: 一 · checkout
+        uses: actions/checkout@v4
+
+      - name: 二 · setup Node 22 (built-in WebSocket · vm_omni 需)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 三 · 拉 Devin token 池 · gist + 锡 auth_key (印 121)
+        id: pull
+        env:
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
+          DAO_AUTH_KEY: ${{ github.event.inputs.auth_key || secrets.DAO_AUTH_KEY }}
+        run: |
+          set -e
+          echo "════════════════════════════════════════"
+          echo "§ 印 121 · dao-fleet-devin-cloud · 起跑"
+          echo "  runner  : $(hostname)"
+          echo "  trigger : ${{ github.event_name }}"
+          echo "  run id  : ${{ github.run_id }}"
+          echo "  gist    : ${DAO_POOL_GIST_ID:0:8}..."
+          echo "════════════════════════════════════════"
+
+          if [ -z "$DAO_POOL_GIST_ID" ] || [ -z "$DAO_POOL_PAT" ]; then
+            echo ""
+            echo "  ✗ 缺 secrets · 主公请:"
+            echo "    1. 本机: cd packages/dao-pool && node cli.js init --pat <PAT>"
+            echo "    2. 设 repo secrets DAO_POOL_GIST_ID + DAO_POOL_PAT"
+            echo "    3. 重 dispatch"
+            exit 1
+          fi
+          echo "  ✓ secrets 备"
+
+          # 印 121 · 锡 auth_key · 写 .dao_auth_token · 同源 web ↔ daemon
+          # 帛书·廿二「圣人执一·以为天下牧」+ 六十四「治之于其未乱也」
+          if [ -n "$DAO_AUTH_KEY" ]; then
+            mkdir -p packages/dao-devin-vm
+            printf '%s' "$DAO_AUTH_KEY" > packages/dao-devin-vm/.dao_auth_token
+            chmod 600 packages/dao-devin-vm/.dao_auth_token
+            echo "  ✓ auth_key 写盘 · prefix=${DAO_AUTH_KEY:0:12}... · 长=${#DAO_AUTH_KEY}"
+          else
+            echo "  ◦ 无 auth_key (未传 inputs.auth_key 且无 secrets.DAO_AUTH_KEY)"
+            echo "    vm_proxy_deploy 将自生 · web 端调 daemon 时 401"
+          fi
+
+      - name: 四 · ★ deploy N Devin VM + dao_proxy v0.4.0
+        id: deploy
+        env:
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
+          N_VMS: ${{ github.event.inputs.n || '4' }}
+        run: |
+          set -e
+          echo ""
+          echo "═══ § 4 · 反者道之动 · deploy $N_VMS 件 Devin VM ═══"
+          cd packages/dao-devin-vm
+          node deployer.js \
+            --gist-id "$DAO_POOL_GIST_ID" \
+            --pat "$DAO_POOL_PAT" \
+            --n "$N_VMS"
+
+      - name: 五 · keep alive · ★ inputs.max_minutes (默 350) · 5 min poll · VM 死即起新
+        env:
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
+          N_VMS: ${{ github.event.inputs.n || '4' }}
+          MAX_MIN_INPUT: ${{ github.event.inputs.max_minutes || '350' }}
+        run: |
+          set +e
+          echo ""
+          # 印 121 · max_minutes 守 0..350 · 防 oneShot 传非数 / 超 350 撕 ACU
+          MAX_MIN=$(echo "$MAX_MIN_INPUT" | grep -E '^[0-9]+$' | head -1)
+          if [ -z "$MAX_MIN" ] || [ "$MAX_MIN" -gt 350 ] || [ "$MAX_MIN" -lt 1 ]; then
+            MAX_MIN=350
+          fi
+          echo "═══ § 5 · keep alive · 最 ${MAX_MIN} min (input=$MAX_MIN_INPUT) ═══"
+          START=$(date +%s)
+          MAX_SEC=$((MAX_MIN * 60))
+          TICK=0
+          while true; do
+            NOW=$(date +%s)
+            EL=$((NOW - START))
+            if [ $EL -ge $MAX_SEC ]; then
+              echo "[$(date -u +%H:%M:%S)] ★ 达 ${MAX_MIN}m · 退"
+              break
+            fi
+            sleep 300  # 5 min poll
+            TICK=$((TICK + 1))
+            EL_MIN=$((EL / 60))
+            echo "[$(date -u +%H:%M:%S)] tick=$TICK el=${EL_MIN}m · 重 deploy 替死者"
+
+            cd packages/dao-devin-vm
+            timeout 200 node deployer.js \
+              --gist-id "$DAO_POOL_GIST_ID" \
+              --pat "$DAO_POOL_PAT" \
+              --n "$N_VMS" 2>&1 | tail -30 || echo "  ⚠ tick=$TICK deploy 失"
+            cd "$GITHUB_WORKSPACE"
+          done
+
+      - name: 末 · 清死 daemon URL (gist)
+        if: always()
+        env:
+          DAO_POOL_GIST_ID: ${{ github.event.inputs.gist_id || secrets.DAO_POOL_GIST_ID }}
+          DAO_POOL_PAT: ${{ github.event.inputs.pat || secrets.DAO_POOL_PAT }}
+        run: |
+          echo ""
+          echo "═══ 末 · 清死 daemon ═══"
+          if [ -n "$DAO_POOL_GIST_ID" ] && [ -n "$DAO_POOL_PAT" ]; then
+            cd packages/dao-devin-vm 2>/dev/null && \
+            node -e "
+              const https = require('https');
+              function g(m,p,b){return new Promise((rs,rj)=>{const d=b?JSON.stringify(b):null;
+                const r=https.request({hostname:'api.github.com',port:443,path:p,method:m,
+                headers:{Authorization:'token $DAO_POOL_PAT','User-Agent':'cl','Accept':'application/vnd.github+json','Content-Type':'application/json',
+                ...(d?{'Content-Length':Buffer.byteLength(d)}:{})}},x=>{let bd='';x.on('data',c=>bd+=c).on('end',()=>{try{rs(JSON.parse(bd))}catch{rs(bd)}})});
+                r.on('error',rj);if(d)r.write(d);r.end();});}
+              (async()=>{
+                try {
+                  const gg=await g('GET','/gists/$DAO_POOL_GIST_ID');
+                  const pool=JSON.parse(gg.files['dao-pool.json'].content);
+                  if(!pool.daemons) return console.log('  ◦ 无 daemons');
+                  const old=pool.daemons.length;
+                  pool.daemons = pool.daemons.filter(d => d.source !== '印 113 · deployer · GH Actions');
+                  pool.last_cleaned_113 = new Date().toISOString();
+                  await g('PATCH','/gists/$DAO_POOL_GIST_ID',{files:{'dao-pool.json':{content:JSON.stringify(pool,null,2)}}});
+                  console.log('  ✓ 清 印 113 daemon · ' + old + ' → ' + pool.daemons.length);
+                } catch(e){console.error('  ⚠',e.message)}
+              })();
+            " || echo "  ⚠ 清失"
+          fi

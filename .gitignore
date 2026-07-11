@@ -1,6 +1,123 @@
+# windsurf-assistant monorepo · 道法自然
+
+# ═══ 账号池数据 · 绝不入库 ═══
+*.auth_blob
+accounts.json
+keypool.json
+oneshot_token.json
+inject_result.json
+quota_snapshots.json
+inuse_marks.json
+instance_claims.json
+
+# ═══ 机密 ═══
+.env
+.env.local
+secrets.env
+*.pem
+*.key
+
+# ═══ 构建产物 ═══
+*.vsix
 node_modules/
 dist/
-*.vsix
-.DS_Store
+
+# ═══ 临时与日志 ═══
 *.log
-.vscode-test/
+*.bak
+*.tmp
+_r*.tmp
+__pycache__/
+.vsixmanifest
+
+# ═══ 运行时持态 · 不入库 ═══
+**/_lastinject.json
+**/_origin_mode.txt
+
+# ═══ 本地内部工具链 · 绝不入公开 repo ═══
+# 账号批量注册 · 逆向补丁 · 限流绕过 · 内部管理面板
+# 包含敏感脚本 · 仅本地开发使用
+cloud-pool/
+engine/
+pipeline/
+tools/
+monitor/
+pool-admin/
+diagnostics/
+research/
+bundled-origin/
+
+# 例外 · packages/dao-proxy-min/vendor/bundled-origin/ 内之 essence (source.js + 帛书二篇) 必入库
+!packages/dao-proxy-min/vendor/bundled-origin/
+!packages/dao-proxy-min/vendor/bundled-origin/source.js
+!packages/dao-proxy-min/vendor/bundled-origin/_silk_de.txt
+!packages/dao-proxy-min/vendor/bundled-origin/_silk_dao.txt
+
+# scripts/ 细规则: 保留合法构建脚本 (build-vsix.js / deploy.js)
+# 屏蔽敏感一键批处理 (→ 开头 · 中文 .cmd/.ps1/.py)
+scripts/→*
+scripts/一键*
+scripts/*.cmd
+scripts/*.ps1
+scripts/*.py
+
+# ═══ 账号库 (Markdown) · 绝不入库 ═══
+账号库*.md
+accounts*.md
+**/账号库*.md
+
+# ═══ 本地备份 ═══
+*.王弼版.bak
+*.bak.*
+**/_probe_*.cjs
+**/_capture_*.js
+**/_test_bench_*.cjs
+
+# ═══ dao-core 运行时 · 不入库 ═══
+fleet_state.json
+**/fleet_state.json
+**/_admin.out
+**/_admin.err
+**/_kernel.out
+**/_kernel.err
+**/_admin_live.*
+**/_kernel_live.*
+**/_seal*_kernel.*
+**/_lsp_bridge.json
+
+# 印 64 · 测试运行时产物 (子进程 stdout/stderr 重定向)
+packages/dao-core/_*.out
+packages/dao-core/_*.err
+tests/_*.out
+tests/_*.err
+tests/_*.out.txt
+tests/_*.err.txt
+**/_*_unit.out
+**/_*_unit.err
+
+# 印 134 · 根级一键脚本临时重定向件 (dao_run_all.cjs 等 stdout/stderr)
+# 帛书六十四「为之于其未有 · 治之于其未乱」
+/_runall.out
+/_runall.err
+/_runall.*.out
+/_runall.*.err
+
+# cleanup-2026-05-16 · 损之件不再立 · 防再误入
+05-文档_docs/
+**/SEAL_yin*.md
+
+# 例外 · packages/wam/账号库.example.md (脱敏 example · 主公私产真账号由 .gitignore 屏蔽)
+!packages/wam/账号库.example.md
+
+_real_*.json
+_test_*_real.cjs
+_real_*.cjs
+
+# 印 ∞.2 · 真 keys 防泄 (帛书三十六「邦利器不可以视人」)
+_real_ws_keys.json
+_real_*_keys.json
+_test_auth*_real.cjs
+
+# dao-desktop 构建产物 (官方本体折入 + 占位图标)
+plugins/dao-desktop/engines/
+plugins/dao-desktop/media/icon.png

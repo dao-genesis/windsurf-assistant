@@ -1,0 +1,115 @@
+name: CI · E2E
+
+on:
+  push:
+    branches: [main, 'backup/pre-dao-sync-20260626-200008']
+    paths:
+      - 'packages/**'
+      - 'plugins/**'
+  pull_request:
+    branches: [main, 'backup/pre-dao-sync-20260626-200008']
+
+jobs:
+  dao-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: dao-desktop 构建 (语法自检 + 共生模式 VSIX)
+        run: |
+          cd plugins/dao-desktop
+          node build.js
+
+      - name: dao-ai-base 再 vendor 回环自检
+        run: |
+          mkdir -p /tmp/synctest
+          node plugins/dao-ai-base/sync.js /tmp/synctest
+          diff -r --exclude=VENDOR.md /tmp/synctest/dao-ai-base/dao-cascade plugins/dao-desktop/dao-cascade
+          diff /tmp/synctest/dao-ai-base/windsurf-shim.js plugins/dao-desktop/windsurf-shim.js
+          diff /tmp/synctest/dao-ai-base/index.js plugins/dao-ai-base/index.js
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao-desktop-vsix
+          path: plugins/dao-desktop/*.vsix
+          retention-days: 30
+
+  e2e-wam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 单测 · packages/wam (rt-flow v4.x 零依赖回归护栏)
+        run: |
+          cd packages/wam
+          node test/unit.test.js
+
+      - name: Build VSIX
+        run: node scripts/build-vsix.js wam
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: wam-vsix
+          path: packages/wam/*.vsix
+          retention-days: 30
+
+  e2e-dao-proxy-min:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Strip test · v9.8.0 守一不离
+        run: node packages/dao-proxy-min/_审视/_v980_strip_test.js
+        # 验: stripSideChannelBlocks 保留 <additional_metadata> · hasSideChannels lastIndex 重置
+
+      - name: Build VSIX
+        run: node scripts/build-vsix.js dao-proxy-min
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao-proxy-min-vsix
+          path: packages/dao-proxy-min/*.vsix
+          retention-days: 30
+
+  e2e-dao-proxy-pro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test · dao-proxy-pro 路由自检 (--quick)
+        run: |
+          cd packages/dao-proxy-pro
+          node vendor/外接api/core/dao-test.js --quick
+
+      - name: Build VSIX
+        run: node scripts/build-vsix.js dao-proxy-pro
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao-proxy-pro-vsix
+          path: packages/dao-proxy-pro/*.vsix
+          retention-days: 30
