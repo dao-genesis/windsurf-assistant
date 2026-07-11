@@ -1404,7 +1404,7 @@
                 [
                   "# 一次性 · 主公本机 · 立私 gist + 推 token 池\n" +
                     "git clone https://github.com/" +
-                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    (daoSync.UPSTREAM_OWNER || "dao-genesis") +
                     "/" +
                     (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
                     "\n" +
@@ -1414,23 +1414,23 @@
                     "node cli.js init --pat $(gh auth token)\n\n" +
                     "# 设 repo secrets (init 输出 gist id)\n" +
                     "gh secret set DAO_POOL_GIST_ID --body '<id>' -R " +
-                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    (daoSync.UPSTREAM_OWNER || "dao-genesis") +
                     "/" +
                     (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
                     "\n" +
                     "gh secret set DAO_POOL_PAT --body $(gh auth token) -R " +
-                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    (daoSync.UPSTREAM_OWNER || "dao-genesis") +
                     "/" +
                     (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
                     "\n" +
                     "gh secret set DAO_AUTH_KEY --body 'sk-ws-proxy-<rand>' -R " +
-                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    (daoSync.UPSTREAM_OWNER || "dao-genesis") +
                     "/" +
                     (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
                     "\n\n" +
                     "# 触新 run (或 cron 自起每 5h)\n" +
                     "gh workflow run dao-fleet-cloud.yml -R " +
-                    (daoSync.UPSTREAM_OWNER || "zhouyoukang") +
+                    (daoSync.UPSTREAM_OWNER || "dao-genesis") +
                     "/" +
                     (daoSync.UPSTREAM_REPO || "windsurf-assistant") +
                     "\n\n" +
@@ -1963,7 +1963,7 @@
             el("button", { class: "btn", onclick: addAccount }, ["加"]),
           ]),
           el("div", { class: "hint" }, [
-            "email + key 落用户私有 Gist · zhouyoukang 不见 · 各账号自属自己 Devin VM",
+            "email + key 落用户私有 Gist · dao-genesis 不见 · 各账号自属自己 Devin VM",
           ]),
         ]),
       ]),

@@ -10,10 +10,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dao-devin/windsurf-assistant.git",
+    "url": "https://github.com/dao-genesis/windsurf-assistant.git",
     "directory": "packages/dao-proxy-min"
   },
-  "homepage": "https://github.com/dao-devin/windsurf-assistant",
+  "homepage": "https://github.com/dao-genesis/windsurf-assistant",
   "icon": "media/icon.png",
   "categories": [
     "AI",

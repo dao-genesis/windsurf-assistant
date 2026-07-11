@@ -12,7 +12,7 @@
 #
 # One-line deploy on any Linux VM (Devin Cloud / VPS / EC2):
 #
-#   curl -sL https://raw.githubusercontent.com/zhouyoukang/windsurf-assistant/main/scripts/devin-bootstrap.sh | \
+#   curl -sL https://raw.githubusercontent.com/dao-genesis/windsurf-assistant/main/scripts/devin-bootstrap.sh | \
 #     DAO_API_KEY="sk-ws-01-..." DAO_PORT=7862 bash
 #
 # Environment variables:
@@ -29,7 +29,7 @@
 #
 set -e
 
-REPO="${DAO_REPO:-https://github.com/zhouyoukang/windsurf-assistant.git}"
+REPO="${DAO_REPO:-https://github.com/dao-genesis/windsurf-assistant.git}"
 PORT="${DAO_PORT:-7862}"
 ACCOUNT="${DAO_ACCOUNT:-auto@fleet.local}"
 WORK="$HOME/windsurf-assistant"

@@ -7,9 +7,9 @@
 // 帛书·二十四:   炊者不立 · 自视不章 · 自见者不明 · 自伐者无功
 //
 // 用户视角:
-//   公网入口页 (zhouyoukang.github.io/windsurf-assistant/) 仅一个 PAT 登入按钮.
+//   公网入口页 (dao-genesis.github.io/windsurf-assistant/) 仅一个 PAT 登入按钮.
 //   登入后自动 fork → 启 Pages → 建私有 Gist → 跳专属页 (<user>.github.io/...).
-//   所有数据 (VM URL · accounts · SP) 均落用户自有 GitHub 资源, zhouyoukang 不持任何字节.
+//   所有数据 (VM URL · accounts · SP) 均落用户自有 GitHub 资源, dao-genesis 不持任何字节.
 //
 // 道义:
 //   一次"为" (粘 PAT), 之后皆"无为" — 这就是"最小化无为之感为锚".
@@ -22,7 +22,7 @@
   "use strict";
 
   const API_BASE = "https://api.github.com";
-  const UPSTREAM_OWNER = "zhouyoukang";
+  const UPSTREAM_OWNER = "dao-genesis";
   const UPSTREAM_REPO = "windsurf-assistant";
   const GIST_DESC =
     "道独立体 · Windsurf Assistant · user data (private · do not edit by hand)";

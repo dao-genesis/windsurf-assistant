@@ -132,8 +132,8 @@ jobs:
             echo "       node cli.js init --pat <PAT-gist-scope>"
             echo ""
             echo "    2. 设 repo secrets (init 输出 gist id):"
-            echo "       gh secret set DAO_POOL_GIST_ID --body '<id>' -R zhouyoukang/windsurf-assistant"
-            echo "       gh secret set DAO_POOL_PAT --body '<PAT>' -R zhouyoukang/windsurf-assistant"
+            echo "       gh secret set DAO_POOL_GIST_ID --body '<id>' -R dao-genesis/windsurf-assistant"
+            echo "       gh secret set DAO_POOL_PAT --body '<PAT>' -R dao-genesis/windsurf-assistant"
             echo ""
             echo "    3. 重 dispatch 此 workflow"
             exit 1

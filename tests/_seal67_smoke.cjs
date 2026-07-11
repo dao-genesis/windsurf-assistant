@@ -24,8 +24,8 @@
 //       · 必备方法: setPat/getPat/hasPat/clearPat/whoami/ensureFork/
 //                  ensurePages/findOrCreateGist/readGist/writeGist/
 //                  detectSite/forkPagesUrl/defaultData
-//       · 常量: UPSTREAM_OWNER='zhouyoukang' / UPSTREAM_REPO='windsurf-assistant'
-//       · 不外发任何字节到 zhouyoukang (除 fork/Pages 元操作)
+//       · 常量: UPSTREAM_OWNER='dao-genesis' / UPSTREAM_REPO='windsurf-assistant'
+//       · 不外发任何字节到 dao-genesis (除 fork/Pages 元操作)
 //       · Node syntax check pass
 //
 //   [C] web/dao_app.js 交互层
@@ -189,8 +189,8 @@ for (const m of reqMethods) {
 
 // 常量
 ok(
-  /UPSTREAM_OWNER\s*=\s*['"]zhouyoukang['"]/.test(sync),
-  "UPSTREAM_OWNER='zhouyoukang'",
+  /UPSTREAM_OWNER\s*=\s*['"]dao-genesis['"]/.test(sync),
+  "UPSTREAM_OWNER='dao-genesis'",
 );
 ok(
   /UPSTREAM_REPO\s*=\s*['"]windsurf-assistant['"]/.test(sync),

@@ -183,7 +183,7 @@
   function initialPoolData() {
     return {
       _hint: "道独立体 · 真本源 token 池 · 印 95/100 · 勿手编",
-      _doc: "https://github.com/zhouyoukang/windsurf-assistant/blob/main/packages/dao-pool/",
+      _doc: "https://github.com/dao-genesis/windsurf-assistant/blob/main/packages/dao-pool/",
       schemaVersion: 2,
       yin: 100,
       createdAt: nowIso(),

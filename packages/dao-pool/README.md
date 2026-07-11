@@ -34,11 +34,11 @@ cd packages/dao-pool
 node cli.js init --pat $(gh auth token)
 
 # (输出): gist id 之 → 设为 repo secret
-gh secret set DAO_POOL_GIST_ID --body '<gist-id>' -R zhouyoukang/windsurf-assistant
-gh secret set DAO_POOL_PAT --body $(gh auth token) -R zhouyoukang/windsurf-assistant
+gh secret set DAO_POOL_GIST_ID --body '<gist-id>' -R dao-genesis/windsurf-assistant
+gh secret set DAO_POOL_PAT --body $(gh auth token) -R dao-genesis/windsurf-assistant
 
 # ② 触发 dao-fleet-cloud workflow (主公手动一次或 cron 自起)
-gh workflow run dao-fleet-cloud.yml -R zhouyoukang/windsurf-assistant
+gh workflow run dao-fleet-cloud.yml -R dao-genesis/windsurf-assistant
 
 # ③ 用 (Web UI 自动显 · 或手动 curl)
 node cli.js daemons --gist $DAO_POOL_GIST_ID --pat $(gh auth token)
