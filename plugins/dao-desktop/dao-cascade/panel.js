@@ -1695,8 +1695,11 @@ class CascadePanelProvider {
     if (!name || !name.trim()) return;
     try {
       const ls = require("./ls-bridge");
+      // rule/workflow 是 markdown 文件, LS 不自动补扩展名, 无 .md 会不被扫描收录
+      let fn = name.trim();
+      if (kind !== "skill" && !/\.md$/i.test(fn)) fn += ".md";
       const r = await ls.call("CreateCustomizationFile", {
-        fileName: name.trim(), fileType: ft, workspaceConfigDir: ".windsurf" });
+        fileName: fn, fileType: ft, workspaceConfigDir: ".windsurf" });
       const p = ((r && r.filePath) || "").replace(/^file:\/\//, "");
       if (p) await this._handleOpenFile(p);
       this._handleCustomizationsList();
