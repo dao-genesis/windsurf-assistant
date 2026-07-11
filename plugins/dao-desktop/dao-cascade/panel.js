@@ -3311,27 +3311,31 @@ function register(context, log, opts) {
   // 官方式底部状态栏(账号/引擎/模型态与面板同源同步)
   try { provider._sb = require("./status-bar").createStatusBar(context, viewId); } catch (_) {}
   // 官方把 Cascade 面板默认放右侧辅助栏 —— 首次安装对齐官方布局(仅一次, 此后尊重用户拖动)。
-  // Devin Desktop 工作台无 moveViewToSecondarySideBar 命令, 但内建 vscode.moveViews 可把视图
-  // 迁入官方原生 Cascade 容器(windsurf.cascadeViewContainerId, 常驻辅助栏); 标准 VS Code 走后者兜底。
-  const MOVED_KEY = viewId + ".movedToAuxBar";
+  // Devin Desktop/Windsurf: 内建 vscode.moveViews 迁入官方原生 Cascade 容器(windsurf.cascadeViewContainerId, 常驻辅助栏)。
+  // 标准 VS Code 无该容器(moveViews 对不存在容器静默无效), 迁入辅助栏常驻的 chat 容器(workbench.panel.chat)。
+  // 先迁移后聚焦: moveViews 只需视图描述符(无需先创建 webview); 若先 focus 再迁移,
+  // webview 会在主侧栏解析到一半被重挂到新容器, 首装呈空白面板直至 Reload Window。
+  const MOVED_KEY = viewId + ".movedToAuxBar.v4";
   if (!context.globalState.get(MOVED_KEY)) {
     context.globalState.update(MOVED_KEY, true);
-    vscode.commands.executeCommand(viewId + ".focus").then(async () => {
-      try {
-        await vscode.commands.executeCommand("vscode.moveViews", {
-          viewIds: [viewId], destinationId: "windsurf.cascadeViewContainerId",
-        });
-      } catch (_) {
-        try { await vscode.commands.executeCommand("workbench.action.moveViewToSecondarySideBar"); } catch (_) {}
-      }
-    }, () => {});
+    const isWindsurfHost = /windsurf|devin/i.test(String(vscode.env.appName || ""));
+    const destinationId = isWindsurfHost ? "windsurf.cascadeViewContainerId" : "workbench.panel.chat";
+    vscode.commands.executeCommand("vscode.moveViews", { viewIds: [viewId], destinationId }).then(
+      () => vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {}),
+      () => vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {})
+    );
   }
+  // 视图 id 为 <ns>.cascade 时, 工作台自动生成 "<ns>.cascade.focus"; 新版 VS Code 还会
+  // 自动生成 "<ns>.cascade.open"(语义同 focus) —— 已存在时不可重复注册。
+  vscode.commands.getCommands(true).then((cmds) => {
+    if (!cmds.includes(viewId + ".open"))
+      context.subscriptions.push(
+        vscode.commands.registerCommand(viewId + ".open", () =>
+          vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {})
+        )
+      );
+  }, () => {});
   context.subscriptions.push(
-    // 注意: 视图 id 为 <ns>.cascade 时, 工作台自动生成 "<ns>.cascade.focus" —— 不可自注册同名命令
-    // (会遮蔽内建并自递归)。这里用 <ns>.cascade.open 转发内建 focus。
-    vscode.commands.registerCommand(viewId + ".open", () =>
-      vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {})
-    ),
     vscode.commands.registerCommand(viewId + ".newSession", () => provider._handleSessionNew()),
     vscode.commands.registerCommand(viewId + ".history", () => provider.showHistory()),
     vscode.commands.registerCommand(viewId + ".deepwiki", () => provider.deepwikiFromEditor()),
