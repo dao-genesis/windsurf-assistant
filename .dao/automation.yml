@@ -14,6 +14,9 @@ body:
 gloves:
   - hooperjustin78
   - devin-ai-integration[bot]
+  - jakolor
+  - oumanushinilla
+  - shapetersonv1
   # - <下一个 Devin 实例的 GitHub 账号>
 
 # 自动合并策略（本体侧 dao-automerge.yml 执行）
