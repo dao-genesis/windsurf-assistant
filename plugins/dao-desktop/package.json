@@ -72,6 +72,14 @@
         "command": "dao.cascade.genCommit",
         "title": "Devin Desktop: ✨ 生成提交信息 (GenerateCommitMessage)",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "dao.cascade.sendProblems",
+        "title": "Devin Desktop: 把问题发送到 Cascade (Send problems)"
+      },
+      {
+        "command": "dao.cascade.explainFix",
+        "title": "Devin Desktop: 解释并修复 (Explain and Fix)"
       }
     ],
     "menus": {
@@ -86,11 +94,19 @@
           "when": "view == dao.cascade",
           "group": "navigation@2"
         }
+      ],
+      "editor/context": [
+        {
+          "command": "dao.cascade.explainFix",
+          "when": "editorTextFocus",
+          "group": "1_modification@9"
+        }
       ]
     }
   },
   "scripts": {
     "build": "node build.js",
+    "sync-official": "node scripts/sync-official.js",
     "package": "npx --yes @vscode/vsce package -o dao-desktop.vsix --allow-missing-repository --skip-license --allow-star-activation"
   },
   "repository": {

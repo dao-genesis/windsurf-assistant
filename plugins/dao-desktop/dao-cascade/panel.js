@@ -3307,6 +3307,34 @@ function register(context, log, opts) {
     vscode.commands.registerCommand(viewId + ".newSession", () => provider._handleSessionNew()),
     vscode.commands.registerCommand(viewId + ".history", () => provider.showHistory()),
     vscode.commands.registerCommand(viewId + ".deepwiki", () => provider.deepwikiFromEditor()),
+    // 官方式 Send problems to Cascade: 汇集诊断(当前文件优先, 无则全工作区) → @mention 式塗入 composer
+    vscode.commands.registerCommand(viewId + ".sendProblems", async () => {
+      const fmt = (uri, ds) => ds.map((d) => {
+        const sev = ["错误", "警告", "信息", "提示"][d.severity] || "问题";
+        return "- @" + vscode.workspace.asRelativePath(uri) + ":" + (d.range.start.line + 1) +
+          " [" + sev + (d.source ? "·" + d.source : "") + "] " + d.message.split("\n")[0];
+      });
+      const ed = vscode.window.activeTextEditor;
+      let lines = [];
+      if (ed) lines = fmt(ed.document.uri, vscode.languages.getDiagnostics(ed.document.uri));
+      if (!lines.length) for (const [uri, ds] of vscode.languages.getDiagnostics()) { lines.push(...fmt(uri, ds)); if (lines.length >= 30) break; }
+      if (!lines.length) return void vscode.window.showInformationMessage("问题面板当前没有诊断");
+      await vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {});
+      provider._post({ type: "insert-input", text: "请分析并修复以下问题:\n" + lines.slice(0, 30).join("\n") });
+    }),
+    // 官方式 Explain and Fix: 选中出错代码 → 带文件@定位与该处诊断塗入 composer
+    vscode.commands.registerCommand(viewId + ".explainFix", async () => {
+      const ed = vscode.window.activeTextEditor;
+      if (!ed) return void vscode.window.showInformationMessage("先在编辑器中选中出错的代码");
+      const sel = ed.selection.isEmpty ? (ed.document.getWordRangeAtPosition(ed.selection.active) || ed.selection) : ed.selection;
+      const ds = vscode.languages.getDiagnostics(ed.document.uri).filter((d) => d.range.intersection(sel) || d.range.contains(sel.start));
+      const rel = vscode.workspace.asRelativePath(ed.document.uri);
+      const code = ed.document.getText(sel).slice(0, 2000);
+      let text = "解释并修复 @" + rel + ":" + (sel.start.line + 1) + " 处的问题:\n```\n" + code + "\n```";
+      if (ds.length) text += "\n诊断:\n" + ds.slice(0, 5).map((d) => "- " + d.message.split("\n")[0]).join("\n");
+      await vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {});
+      provider._post({ type: "insert-input", text });
+    }),
     // 官方式提交信息生成: GenerateCommitMessage{repoRootUri} → 写入 SCM 输入框(官方 SCM ✨ 同款)
     vscode.commands.registerCommand(viewId + ".genCommit", async () => {
       try {
