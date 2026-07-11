@@ -65,7 +65,8 @@ if (!fs.existsSync(icon)) {
 // ③ 语法自检 + 打包。
 for (const f of ["extension.js", "windsurf-shim.js",
   "dao-cascade/panel.js", "dao-cascade/acp-client.js", "dao-cascade/acp-wss.js",
-  "dao-cascade/devin-provision.js", "dao-cascade/host-discover.js", "dao-cascade/ls-bridge.js"]) {
+  "dao-cascade/devin-provision.js", "dao-cascade/host-discover.js", "dao-cascade/ls-bridge.js",
+  "dao-cascade/host-state.js"]) {
   execSync(`node --check ${JSON.stringify(path.join(here, f))}`);
 }
 console.log("✓ 语法自检通过");

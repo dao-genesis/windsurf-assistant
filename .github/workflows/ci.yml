@@ -25,6 +25,11 @@ jobs:
           cd plugins/dao-desktop
           node build.js
 
+      - name: 通用底层 headless 契约 (无 vscode 环境载入 RPC 核)
+        run: |
+          cd plugins/dao-desktop
+          node --test test/*.test.js
+
       - name: dao-ai-base 再 vendor 回环自检
         run: |
           mkdir -p /tmp/synctest

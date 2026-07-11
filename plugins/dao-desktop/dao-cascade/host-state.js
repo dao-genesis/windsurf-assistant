@@ -1,0 +1,76 @@
+// 道 · 宿主态中枢(通用底层 · 零 IDE 依赖) —— LS 端口/CSRF/登录态的单一事实来源
+// ─────────────────────────────────────────────────────────────────────────────
+// 反者道之动: 此前 hostState 定义在 windsurf-shim.js 里, 而 shim 顶层 `require("vscode")`
+//   —— 于是 ls-bridge/host-discover 只要碰 hostState 就被拖入 vscode 依赖, 纯 Node(无 IDE)
+//   环境下 shim 载入即抛、hostState 恒空, RPC 核无法脱离 IDE 独立运行。
+// 知止不殆: 把这族「与 IDE 无关」的宿主态(端口/CSRF/登录)下沉到本模块 —— 只用 fs/os/path,
+//   任何宿主(VS Code 扩展 / CLI / 独立进程 / 他 IDE)皆可消费, 即所谓「通用底层」。
+//   - 进程内(与官方扩展共生): globalThis 单例, shim 经 setPort/setCsrfToken 灌入。
+//   - 跨进程(headless): 落盘 ~/.dao/windsurf-host.json(shim 每次变更即写), 后来者读回。
+//   - 无宿主写入: 交由 host-discover 就地 /proc 扫描发现 —— 三路兜底, 道并行而不悖。
+"use strict";
+const os = require("os");
+const path = require("path");
+const fs = require("fs");
+
+// 落盘路径可经环境变量重定向(便于测试 / 非默认家目录的宿主)。
+function hostFilePath() {
+  return process.env.DAO_WINDSURF_HOST_FILE
+    || path.join(os.homedir(), ".dao", "windsurf-host.json");
+}
+
+// 全进程单例(与官方扩展、面板、桥同引用)。
+function hostState() {
+  const g = globalThis;
+  if (!g.__daoWindsurfHost) {
+    g.__daoWindsurfHost = { lsPort: 0, csrfToken: "", auth: null, profileUrl: "", listeners: new Set() };
+  }
+  return g.__daoWindsurfHost;
+}
+
+// 变更广播 + 落盘(0600 本机私有): 供 dao 生态(脚本/诊断/headless 核)读取会话信息。
+function hostFire() {
+  const h = hostState();
+  for (const fn of h.listeners) { try { fn(h); } catch (_) {} }
+  try {
+    const p = hostFilePath();
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify({
+      lsPort: h.lsPort, csrfToken: h.csrfToken, profileUrl: h.profileUrl,
+      auth: h.auth, updatedAt: new Date().toISOString(),
+    }), { mode: 0o600 });
+  } catch (_) {}
+}
+
+// 从落盘文件回补单例(仅当进程内尚无端口/CSRF): 跨进程(headless)复用官方扩展捕获的会话。
+function loadPersisted() {
+  const h = hostState();
+  if (h.lsPort && h.csrfToken) return h;
+  try {
+    const j = JSON.parse(fs.readFileSync(hostFilePath(), "utf8"));
+    if (j && j.lsPort && j.csrfToken) {
+      h.lsPort = Number(j.lsPort) || 0;
+      h.csrfToken = String(j.csrfToken || "");
+      if (j.profileUrl && !h.profileUrl) h.profileUrl = j.profileUrl;
+      if (j.auth && !h.auth) h.auth = j.auth;
+    }
+  } catch (_) {}
+  return h;
+}
+
+// 解析可用宿主态: 进程内单例优先, 否则回落落盘文件; 二者皆无返回 null(未就绪)。
+function resolveHost() {
+  const h = hostState();
+  if (h.lsPort && h.csrfToken) return h;
+  const p = loadPersisted();
+  return (p.lsPort && p.csrfToken) ? p : null;
+}
+
+// 订阅宿主态变更(返回 disposable)。
+function subscribe(fn) {
+  const h = hostState();
+  h.listeners.add(fn);
+  return { dispose() { h.listeners.delete(fn); } };
+}
+
+module.exports = { hostState, hostFire, loadPersisted, resolveHost, subscribe, hostFilePath };
