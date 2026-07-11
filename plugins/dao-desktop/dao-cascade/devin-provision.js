@@ -91,7 +91,13 @@ function startLogin(bin, opts = {}) {
   const scan = (s) => {
     out += s;
     if (!urlSent) {
-      const m = out.match(/https:\/\/\S+/);
+      // PTY 输出常裹 OSC-8 超链接(ESC]8;;url ST text ESC]8;;ST)与 CSI 色码,
+      // 先剥离终端转义再取 URL,否则 ESC 字节与重复 URL 会混入匹配结果。
+      const plain = out
+        .replace(/\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+        .replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, "")
+        .replace(/\x1b[\]PX^_][^\x07\x1b]*(?:\x07|\x1b\\)?/g, "");
+      const m = plain.match(/https:\/\/[^\s\x00-\x1f"'\\]+/);
       if (m) { urlSent = true; try { onUrl(m[0]); } catch (_) {} }
     }
     if (/Login successful/i.test(out)) finish({ ok: true, message: "Login successful" });
@@ -104,7 +110,8 @@ function startLogin(bin, opts = {}) {
   });
   child.on("error", (e) => finish({ ok: false, message: String(e && e.message || e) }));
   return {
-    submitCode: (code) => { try { child.stdin.write(String(code).trim() + "\n"); } catch (_) {} },
+    // raw-mode TUI 只认 CR(回车键)为提交,LF 不触发。
+    submitCode: (code) => { try { child.stdin.write(String(code).trim() + "\r"); } catch (_) {} },
     cancel: () => { try { child.kill(); } catch (_) {} },
   };
 }
