@@ -238,7 +238,7 @@ VM 一览 (节选 · 详见 `vm_spec.md`):
   │ ① 真本源逆向态: Windsurf万法归宗 + Devin云原生/PC端/本源     │
   │ ② 开发集成态:   130-道独立体_Standalone/_kernel/             │
   │ ③ 服务核心态:   Devin云原生/虚拟机反代/ daemon :11441         │
-  │ ④ 公网分发态:   github.com/zhouyoukang/windsurf-assistant    │
+  │ ④ 公网分发态:   github.com/dao-genesis/windsurf-assistant    │
   │ ⑤ 用户运行态:   用户·forks/Pages/Gist + Devin VM (本目录)    │
   │                                                                │
   │ 互通: ACP / Connect-RPC / wss / SSE / OpenAI 兼容              │

@@ -104,7 +104,7 @@ node _test_harness.cjs --devin   # live pipeline (needs accounts)
 
 ## Origin
 
-This is the deployment bundle of [windsurf-assistant](https://github.com/zhouyoukang/windsurf-assistant).
+This is the deployment bundle of [windsurf-assistant](https://github.com/dao-genesis/windsurf-assistant).
 
 Full edition with advanced features (message anchoring, token pool, proxy scanning, Firebase auth, auto-update, ExtHost sentinel) lives at `packages/wam/`.
 

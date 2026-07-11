@@ -34,7 +34,7 @@ curl http://localhost:7862/v1/chat/completions \
 ## One-Line VM Deploy
 
 ```bash
-curl -sL https://raw.githubusercontent.com/zhouyoukang/windsurf-assistant/main/scripts/devin-bootstrap.sh | \
+curl -sL https://raw.githubusercontent.com/dao-genesis/windsurf-assistant/main/scripts/devin-bootstrap.sh | \
   DAO_API_KEY="sk-ws-01-..." \
   DAO_AUTH_KEY="sk-ws-proxy-..." \
   DAO_TUNNEL=yes \

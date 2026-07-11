@@ -168,7 +168,7 @@ async function cmdInit() {
   const gist = await create({
     pat: PAT,
     description:
-      "dao-pool · 印 95 真本源闭环 · 一 GH 账号即一切 (zhouyoukang/windsurf-assistant)",
+      "dao-pool · 印 95 真本源闭环 · 一 GH 账号即一切 (dao-genesis/windsurf-assistant)",
     public: !!opts.public, // 默 私 gist
     fileName: FILE_NAME,
     data: pool.data,
@@ -186,15 +186,15 @@ async function cmdInit() {
   console.log("  下一步 (设 GitHub repo secret · 让 Actions 用):");
   console.log("");
   console.log(
-    `    gh secret set DAO_POOL_GIST_ID --body '${gist.id}' -R zhouyoukang/windsurf-assistant`,
+    `    gh secret set DAO_POOL_GIST_ID --body '${gist.id}' -R dao-genesis/windsurf-assistant`,
   );
   console.log(
-    `    gh secret set DAO_POOL_PAT --body '${masked(PAT)}' -R zhouyoukang/windsurf-assistant   # 全 PAT 不显`,
+    `    gh secret set DAO_POOL_PAT --body '${masked(PAT)}' -R dao-genesis/windsurf-assistant   # 全 PAT 不显`,
   );
   console.log("");
   console.log("  或网页 (推荐):");
   console.log(
-    "    https://github.com/zhouyoukang/windsurf-assistant/settings/secrets/actions",
+    "    https://github.com/dao-genesis/windsurf-assistant/settings/secrets/actions",
   );
   console.log("");
   console.log(
@@ -393,7 +393,7 @@ async function cmdDaemons() {
 //
 //   等价 web/dao_bootstrap.js · oneShot · 但用 Node CLI + 现有 cli 工具:
 //     ① whoami       (GET /user)
-//     ② ensureFork   (POST /repos/zhouyoukang/windsurf-assistant/forks)
+//     ② ensureFork   (POST /repos/dao-genesis/windsurf-assistant/forks)
 //     ③ ensureActions(PUT /repos/<me>/.../actions/permissions)
 //     ④ ensurePages  (POST /repos/<me>/.../pages · main:/web)
 //     ⑤ ensurePool   (find/create dao-pool gist · 等 cli init)
@@ -403,7 +403,7 @@ async function cmdDaemons() {
 //     ⑨ output       (vmUrl + curl 测命)
 async function cmdBootstrap() {
   need(PAT, "pat");
-  const UPSTREAM_OWNER = "zhouyoukang";
+  const UPSTREAM_OWNER = "dao-genesis";
   const UPSTREAM_REPO = "windsurf-assistant";
   const ghApi = async (p, opts = {}) => {
     const r = await fetch("https://api.github.com" + p, {

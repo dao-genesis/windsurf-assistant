@@ -10,7 +10,7 @@
 #
 # One-line deploy on any Linux VM (Devin Cloud / VPS / EC2):
 #
-#   curl -sL https://raw.githubusercontent.com/zhouyoukang/windsurf-assistant/main/scripts/devin-bootstrap-fleet.sh | \
+#   curl -sL https://raw.githubusercontent.com/dao-genesis/windsurf-assistant/main/scripts/devin-bootstrap-fleet.sh | \
 #     DAO_ACCOUNTS="a@b.com:sk-ws-01-A,c@d.com:sk-ws-01-B" \
 #     DAO_AUTH_KEY="sk-ws-proxy-SHARED" \
 #     bash
@@ -38,7 +38,7 @@
 
 set -e
 
-REPO="${DAO_REPO:-https://github.com/zhouyoukang/windsurf-assistant.git}"
+REPO="${DAO_REPO:-https://github.com/dao-genesis/windsurf-assistant.git}"
 BASE_PORT="${DAO_BASE_PORT:-7862}"
 BIND="${DAO_BIND:-127.0.0.1}"
 WORK="$HOME/windsurf-assistant"

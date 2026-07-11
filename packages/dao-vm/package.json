@@ -34,7 +34,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhouyoukang/windsurf-assistant.git",
+    "url": "https://github.com/dao-genesis/windsurf-assistant.git",
     "directory": "packages/dao-vm"
   },
   "_dao": {

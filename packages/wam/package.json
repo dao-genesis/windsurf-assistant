@@ -6,12 +6,12 @@
 	"publisher": "devaid",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/dao-devin/windsurf-assistant.git",
+		"url": "https://github.com/dao-genesis/windsurf-assistant.git",
 		"directory": "packages/wam"
 	},
-	"homepage": "https://github.com/dao-devin/windsurf-assistant",
+	"homepage": "https://github.com/dao-genesis/windsurf-assistant",
 	"bugs": {
-		"url": "https://github.com/dao-devin/windsurf-assistant/issues"
+		"url": "https://github.com/dao-genesis/windsurf-assistant/issues"
 	},
 	"keywords": [
 		"runtime",

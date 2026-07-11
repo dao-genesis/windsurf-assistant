@@ -67,6 +67,11 @@
       {
         "command": "dao.cascade.deepwiki",
         "title": "Devin Desktop: DeepWiki 解释选中符号"
+      },
+      {
+        "command": "dao.cascade.genCommit",
+        "title": "Devin Desktop: ✨ 生成提交信息 (GenerateCommitMessage)",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {
@@ -90,7 +95,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dao-devin/windsurf-assistant.git",
+    "url": "https://github.com/dao-genesis/windsurf-assistant.git",
     "directory": "plugins/dao-desktop"
   }
 }

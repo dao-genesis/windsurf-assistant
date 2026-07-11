@@ -68,6 +68,7 @@ class CascadePanelProvider {
           this._pushEnv();
           // 官方式面板初始化: 面板就绪即告知 LS 初始化面板状态通道(官方 UI 启动序列同款)
           try { const ls = require("./ls-bridge"); if (ls.ready()) ls.call("InitializeCascadePanelState", {}).catch(() => {}); } catch (_) {}
+          this._startHeartbeat();
           // 宿主 LS 发现约需数秒(端口/CSRF), 轮询重试直至全量模型灌入首屏选择器。
           let tries = 0;
           const tick = async () => {
@@ -192,6 +193,17 @@ class CascadePanelProvider {
     } catch (_) { this._cascadeModel = "swe-1-6-slow"; }
   }
 
+  // 官方式 LS 保活: Heartbeat 每 60s 一次(官方扩展同款, LS 以此判定扩展存活)。
+  _startHeartbeat() {
+    if (this._hbTimer) return;
+    const beat = () => {
+      try { const ls = require("./ls-bridge"); if (ls.ready()) ls.call("Heartbeat", {}).catch(() => {}); } catch (_) {}
+    };
+    beat();
+    this._hbTimer = setInterval(beat, 60000);
+    if (this._view) this._view.onDidDispose(() => { clearInterval(this._hbTimer); this._hbTimer = null; });
+  }
+
   // 与官方 composer 对齐: 全量模型灌入 webview 模型选择器(config-options 同渠)。
   // 官方首屏(New session)即列全模型, 故此处提前推送, 不再懒到首条消息发送时。
   // 1:1 复刻官方: 列全部模型(含 Pro 门控禁用项), 标注倍率(Nx)与禁用原因(灰置+title)。
@@ -201,6 +213,9 @@ class CascadePanelProvider {
       if (!ls.ready() || !ls.apiKey()) return false;
       const models = await ls.listModels();
       if (!models.length) return false;
+      // 官方式模型健康位: GetModelStatuses → {statuses:{uid:{status,message}}}(当前多为空, 防御式合入)
+      let mStatus = {};
+      try { const st = await ls.call("GetModelStatuses", {}); mStatus = (st && st.statuses) || {}; } catch (_) {}
       this._cxImageModels = new Set(models.filter((m) => m.images).map((m) => m.uid));
       if (!this._cascadeModel) {
         const usable = models.filter((m) => !m.disabled);
@@ -214,6 +229,7 @@ class CascadePanelProvider {
           name: m.label + (m.credit != null ? "  ·  " + m.credit + "x" : ""),
           disabled: !!m.disabled,
           description: [
+            (mStatus[m.uid] && (mStatus[m.uid].message || mStatus[m.uid].status)) || "",
             m.disabled ? (m.reason ? m.reason + " · " + (m.reasonLink || "") : "需升级方案") : "",
             m.dims && m.dims.length ? m.dims.join(" · ") : "",
             m.pricing || "",
@@ -825,6 +841,12 @@ class CascadePanelProvider {
     try {
       const ls = require("./ls-bridge");
       const r = await ls.call("GetCascadeMemories", {});
+      // 官方双源: 账号级 GetUserMemories 与工作区级 GetCascadeMemories 合并(按 id 去重)
+      try {
+        const um = await ls.call("GetUserMemories", {});
+        const seen = new Set(((r && r.memories) || []).map((m) => m.id));
+        for (const m of (um && um.memories) || []) if (!seen.has(m.id)) (r.memories = r.memories || []).push(m);
+      } catch (_) {}
       const ms = ((r && r.memories) || []).map((m) => ({
         id: m.memoryId, title: m.title || "",
         content: ((m.textMemory || {}).content) || "",
@@ -1357,7 +1379,15 @@ class CascadePanelProvider {
         flowCredits: pi.monthlyFlowCredits || 0, maxInputTokens: pi.maxNumChatInputTokens || "",
         dailyQuotaPct: num(ps.dailyQuotaRemainingPercent), weeklyQuotaPct: num(ps.weeklyQuotaRemainingPercent),
         flexCredits: num(ps.availableFlexCredits),
-        dailyResetUnix: num(ps.dailyQuotaResetAtUnix), weeklyResetUnix: num(ps.weeklyQuotaResetAtUnix) });
+        dailyResetUnix: num(ps.dailyQuotaResetAtUnix), weeklyResetUnix: num(ps.weeklyQuotaResetAtUnix),
+        teamModelLabels: this._teamModelLabels || [] });
+      // 官方式团队管控: GetTeamOrganizationalControls → 组织级可用模型标签(一次性拉取缓存)
+      if (this._teamModelLabels === undefined) {
+        try {
+          const tc = await ls.call("GetTeamOrganizationalControls", {});
+          this._teamModelLabels = ((tc && tc.controls) || {}).extensionModelLabels || [];
+        } catch (_) { this._teamModelLabels = []; }
+      }
       this._watchPanelState();
     } catch (e) { this._post({ type: "error", text: "读取账户状态失败: " + e.message }); }
   }
@@ -3276,7 +3306,25 @@ function register(context, log, opts) {
     ),
     vscode.commands.registerCommand(viewId + ".newSession", () => provider._handleSessionNew()),
     vscode.commands.registerCommand(viewId + ".history", () => provider.showHistory()),
-    vscode.commands.registerCommand(viewId + ".deepwiki", () => provider.deepwikiFromEditor())
+    vscode.commands.registerCommand(viewId + ".deepwiki", () => provider.deepwikiFromEditor()),
+    // 官方式提交信息生成: GenerateCommitMessage{repoRootUri} → 写入 SCM 输入框(官方 SCM ✨ 同款)
+    vscode.commands.registerCommand(viewId + ".genCommit", async () => {
+      try {
+        const ls = require("./ls-bridge");
+        if (!ls.ready()) throw new Error("官方 language_server 未就绪");
+        const ws = (vscode.workspace.workspaceFolders || [])[0];
+        if (!ws) throw new Error("无工作区");
+        const r = await ls.call("GenerateCommitMessage", { repoRootUri: ws.uri.toString() });
+        const text = (r && (r.commitMessage || r.message)) || "";
+        if (!text) throw new Error("未生成内容");
+        const gitExt = vscode.extensions.getExtension("vscode.git");
+        const api = gitExt && gitExt.exports && gitExt.exports.getAPI(1);
+        const repo = api && api.repositories && api.repositories[0];
+        if (repo) repo.inputBox.value = text;
+        else await vscode.env.clipboard.writeText(text);
+        vscode.window.setStatusBarMessage("✨ 提交信息已生成" + (repo ? "" : "(已复制到剪贴板)"), 4000);
+      } catch (e) { vscode.window.showWarningMessage("生成提交信息失败: " + e.message); }
+    })
   );
   return provider;
 }
