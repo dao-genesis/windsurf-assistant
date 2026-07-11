@@ -1623,6 +1623,7 @@ async function handleAdminWamLocal(req, res) {
       return sendJson(res, 200, {
         ok: true,
         available: false,
+        items: [],
         pathHint: "~/.wam/accounts.md",
         hint: "~/.wam/accounts.md 不存 · 非主公本机起 dao_proxy · 或 WAM 扩展未装",
       });
