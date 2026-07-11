@@ -66,6 +66,8 @@ class CascadePanelProvider {
       try {
         if (msg.type === "ready") {
           this._pushEnv();
+          // 官方式面板初始化: 面板就绪即告知 LS 初始化面板状态通道(官方 UI 启动序列同款)
+          try { const ls = require("./ls-bridge"); if (ls.ready()) ls.call("InitializeCascadePanelState", {}).catch(() => {}); } catch (_) {}
           // 宿主 LS 发现约需数秒(端口/CSRF), 轮询重试直至全量模型灌入首屏选择器。
           let tries = 0;
           const tick = async () => {
@@ -1858,10 +1860,17 @@ class CascadePanelProvider {
         const imgs = this._cxImages(msg.images);
         // 官方式发送前配额闸: CheckUserMessageRateLimit → !hasCapacity 即拦(免费额度耗尽时与官方同款提示)
         try {
-          const cap = await ls.call("CheckUserMessageRateLimit", {});
+          // 官方双闸: CheckUserMessageRateLimit(消息频次) + CheckChatCapacity(后端总容量), 任一无容即拦
+          const [cap, chat] = await Promise.all([
+            ls.call("CheckUserMessageRateLimit", {}),
+            ls.call("CheckChatCapacity", {}).catch(() => null),
+          ]);
           if (cap && cap.hasCapacity === false) {
             const left = (cap.messagesRemaining >= 0 && cap.maxMessages >= 0) ? "（" + cap.messagesRemaining + "/" + cap.maxMessages + "）" : "";
             return this._post({ type: "assistant-done", id: msg.id, text: "⚠ 已达消息用量上限" + left + "，请稍后再试或升级套餐" });
+          }
+          if (chat && chat.hasCapacity === false) {
+            return this._post({ type: "assistant-done", id: msg.id, text: "⚠ 后端聊天容量已满，请稍后再试" });
           }
         } catch (_) {}
         // 官方式消息队列: 运行中再发 → QueueCascadeMessage(带 cascadeConfig, 轮次结束 LS 自动续驱)

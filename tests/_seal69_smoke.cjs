@@ -109,14 +109,14 @@ ok(
   "cancel-in-progress: false (生产 deploy 不中止)",
 );
 ok(
-  /repository_owner\s*==\s*'zhouyoukang'/.test(wf),
-  "if owner == zhouyoukang (fork 跑空守护)",
+  /repository_owner\s*==\s*'dao-genesis'/.test(wf),
+  "if owner == dao-genesis (fork 跑空守护)",
 );
 ok(/印 69/.test(wf), "印 69 印记在 workflow");
-// 道氾印 (官方 starter 假定 Pages 已启 · zhouyoukang 一次性 setup)
+// 道氾印 (官方 starter 假定 Pages 已启 · dao-genesis 一次性 setup)
 ok(
-  /zhouyoukang\/windsurf-assistant\/settings\/pages/.test(wf),
-  "workflow 注释含 setup URL (zhouyoukang 一次启 30s)",
+  /dao-genesis\/windsurf-assistant\/settings\/pages/.test(wf),
+  "workflow 注释含 setup URL (dao-genesis 一次启 30s)",
 );
 
 // ── [B] dao_app.js · el() helper 修[1] ────────────────────────────

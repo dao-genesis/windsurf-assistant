@@ -3,21 +3,19 @@
 来源: `tools/extract-official.js` 反提官方前端 bundle。
 
 - 官方 LanguageServerService 方法总数: **169**
-- 插件已接入: **73**
-- 未接入: **96**
+- 插件已接入: **75**
+- 未接入: **94**
 
 ## 未接入方法（按域分类）
 
-### 面板状态通道 (3)
-- InitializeCascadePanelState
+### 面板状态通道 (2)
 - UpdatePanelStateWithUserStatus
 - StreamCascadePanelReactiveUpdates
 
-### 模型/状态 (4)
+### 模型/状态 (3)
 - GetCascadeModelConfigs
 - GetModelStatuses
 - GetExternalModel
-- CheckChatCapacity
 
 ### 会话协作/分享 (4)
 - CreateTrajectoryShare
@@ -129,5 +127,5 @@
 - GetGithubPullRequestSearchInfo
 - ReplayGroundTruthTrajectory
 
-## 已接入 (73)
-AcknowledgeCascadeCodeEdit, ArchiveCascadeTrajectory, BranchCascade, CancelCascadeInvocation, CancelCascadeInvocationAndWait, CancelCascadeSteps, CheckUserMessageRateLimit, ConvergeArenaCascades, CopyBuiltinWorkflowToWorkspace, CreateCustomizationFile, CreateWorktree, DeleteCascadeMemory, DeleteCascadeTrajectory, GenerateCodeMap, GetAllAcpRegistries, GetAllCascadeTrajectories, GetAllPlans, GetAllRules, GetAllSkills, GetAllWorkflows, GetAvailableCascadePlugins, GetCascadeMemories, GetCascadeTrajectory, GetCascadeTrajectoryGeneratorMetadata, GetCascadeTrajectorySteps, GetCascadeTranscriptForTrajectoryId, GetClassInfos, GetCodeMapSuggestions, GetCodeMapsForRepos, GetCommandModelConfigs, GetDebugDiagnostics, GetDeepWiki, GetDefaultWebOrigins, GetFunctions, GetLifeguardConfig, GetMatchingContextScopeItems, GetMcpPrompt, GetMcpRegistryServers, GetMcpServerStates, GetMessageTokenCount, GetProcesses, GetRepoInfos, GetRevertPreview, GetUserSettings, GetUserStatus, GetUserTrajectory, GetUserTrajectoryDescriptions, GetWebDocsOptions, GetWorkspaceEditState, GetWorkspaceInfos, HandleCascadeUserInteraction, ImportFromCursor, InterruptWithQueuedMessage, MoveQueuedMessage, QueueCascadeMessage, RefreshCustomization, RefreshMcpServers, RemoveFromQueue, RenameCascadeTrajectory, ResolveWorktreeChanges, RevertToCascadeStep, SaveMcpServerToConfigFile, SendUserCascadeMessage, SetUserSettings, SpawnArenaModeMidConversation, StartCascade, StreamCascadeReactiveUpdates, StreamCascadeSummariesReactiveUpdates, StreamUserTrajectoryReactiveUpdates, ToggleMcpTool, UndoWorktreeMerge, UpdateCascadeMemory, UpdateMcpServerInConfigFile
+## 已接入 (75)
+AcknowledgeCascadeCodeEdit, ArchiveCascadeTrajectory, BranchCascade, CancelCascadeInvocation, CancelCascadeInvocationAndWait, CancelCascadeSteps, CheckChatCapacity, CheckUserMessageRateLimit, ConvergeArenaCascades, CopyBuiltinWorkflowToWorkspace, CreateCustomizationFile, CreateWorktree, DeleteCascadeMemory, DeleteCascadeTrajectory, GenerateCodeMap, GetAllAcpRegistries, GetAllCascadeTrajectories, GetAllPlans, GetAllRules, GetAllSkills, GetAllWorkflows, GetAvailableCascadePlugins, GetCascadeMemories, GetCascadeTrajectory, GetCascadeTrajectoryGeneratorMetadata, GetCascadeTrajectorySteps, GetCascadeTranscriptForTrajectoryId, GetClassInfos, GetCodeMapSuggestions, GetCodeMapsForRepos, GetCommandModelConfigs, GetDebugDiagnostics, GetDeepWiki, GetDefaultWebOrigins, GetFunctions, GetLifeguardConfig, GetMatchingContextScopeItems, GetMcpPrompt, GetMcpRegistryServers, GetMcpServerStates, GetMessageTokenCount, GetProcesses, GetRepoInfos, GetRevertPreview, GetUserSettings, GetUserStatus, GetUserTrajectory, GetUserTrajectoryDescriptions, GetWebDocsOptions, GetWorkspaceEditState, GetWorkspaceInfos, HandleCascadeUserInteraction, ImportFromCursor, InitializeCascadePanelState, InterruptWithQueuedMessage, MoveQueuedMessage, QueueCascadeMessage, RefreshCustomization, RefreshMcpServers, RemoveFromQueue, RenameCascadeTrajectory, ResolveWorktreeChanges, RevertToCascadeStep, SaveMcpServerToConfigFile, SendUserCascadeMessage, SetUserSettings, SpawnArenaModeMidConversation, StartCascade, StreamCascadeReactiveUpdates, StreamCascadeSummariesReactiveUpdates, StreamUserTrajectoryReactiveUpdates, ToggleMcpTool, UndoWorktreeMerge, UpdateCascadeMemory, UpdateMcpServerInConfigFile

@@ -254,22 +254,46 @@ let _spawnHooked = false;
 // 道义: 四十章「反也者 道之动也」· 旧HTTP MITM死 → 新stdio中间人生
 // 返回 { cmd, args, options } 或 null · 由 spawn hook 修改 arguments
 function _rewriteAcpSpawn(command, args) {
-  if (
-    typeof command !== "string" ||
-    !/devin\.exe$|\/devin$/.test(command) ||
-    !Array.isArray(args)
-  )
-    return null;
+  if (typeof command !== "string" || !Array.isArray(args)) return null;
   // 仅在 ACP 模式下拦截
   if (!_acpMode || !_acpProxyPath) return null;
-  // 替换 command: node dao-acp-stdio-proxy.js <原devin.exe> <原args>
   const nodeExe = process.execPath || "node";
-  const newArgs = [_acpProxyPath, command, ...args];
-  L.info(
-    "spawn-hook-acp",
-    `devin.exe → stdio proxy: ${command} → node ${_acpProxyPath}`,
-  );
-  return { cmd: nodeExe, args: newArgs };
+  // 直接 spawn devin.exe
+  if (/devin\.exe$|\/devin$/.test(command)) {
+    const newArgs = [_acpProxyPath, command, ...args];
+    L.info(
+      "spawn-hook-acp",
+      `devin.exe → stdio proxy: ${command} → node ${_acpProxyPath}`,
+    );
+    return { cmd: nodeExe, args: newArgs };
+  }
+  // ★ v9.9.349 · bash 包裹型 spawn (bash.exe --login -c "'/e/.../devin.exe' 'acp' ...")
+  //   实证(DESKTOP-MASTER reload 后): IDE 经 Git bash login shell 间接拉起 devin.exe
+  //   旧 regex 只认 devin.exe 直呼 → 包裹型全部漏网 → 鉴权锚定失效
+  if (/bash(\.exe)?$/i.test(command)) {
+    const ci = args.indexOf("-c");
+    if (ci < 0 || ci + 1 >= args.length) return null;
+    const script = args[ci + 1];
+    if (typeof script !== "string" || !/devin(\.exe)?'?\s+'?acp/.test(script))
+      return null;
+    // 解析单引号 token: '/e/Windsurf/.../devin.exe' 'acp' '--agent-type' 'summarizer'
+    const toks = [];
+    const re = /'([^']*)'|(\S+)/g;
+    let m;
+    while ((m = re.exec(script)) !== null) toks.push(m[1] !== undefined ? m[1] : m[2]);
+    if (!toks.length || !/devin(\.exe)?$/.test(toks[0])) return null;
+    // msys 路径 → Windows 路径: /e/Windsurf/... → e:\Windsurf\...
+    let devinPath = toks[0];
+    const mm = devinPath.match(/^\/([a-zA-Z])\/(.*)$/);
+    if (mm) devinPath = mm[1] + ":\\" + mm[2].replace(/\//g, "\\");
+    const newArgs = [_acpProxyPath, devinPath, ...toks.slice(1)];
+    L.info(
+      "spawn-hook-acp",
+      `bash包裹 devin.exe → stdio proxy: ${devinPath} → node ${_acpProxyPath}`,
+    );
+    return { cmd: nodeExe, args: newArgs };
+  }
+  return null;
 }
 
 function maybeRewriteLsArgs(command, args) {
@@ -344,6 +368,35 @@ function _readSystemProxy() {
   }
 }
 
+// ★ v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)api_server 本地锚定 · 根治「Connecting to server」
+//   病(根因·实证于 DESKTOP-MASTER 日志): LS 侧 --api_server_url 早已反代至 8937, 但捆绑的
+//     ACP 代理 devin.exe 自持 windsurf_api_client(chisel), 绕开反代直连
+//     WINDSURF_API_SERVER_URL(默认 server.codeium.com)取 GetCliTeamSettings 做鉴权;
+//     官方经系统 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" →
+//     "Failed to authenticate bundled agent" → 前端永卡「Connecting to server」(唯此漏网).
+//   解: 反代健康时把 devin.exe 的 api_server 指向本地 8937 → GetCliTeamSettings 即刻本地
+//     gRPC OK(实测 ~75ms) · 无 3s 超时 · 鉴权必过 · 与官方可达性彻底解耦.
+//   本地反代走明文 h2c · 须把 127.0.0.1 纳入 NO_PROXY(否则被系统 VPN 代理兜转致连不上).
+//   fail-safe: 仅反代健康时改写(与 maybeRewriteLsArgs 同源) · 否则原样直连官方.
+//   道义: 五十二章「天下有始 以为天下母 · 既得其母 以知其子」· 母=本地兜底 · 子=鉴权态.
+function _acpEnvAnchorApi(env) {
+  if (!env || !_proxyHealthy || !_cachedProxyUrl) return;
+  if (env.WINDSURF_API_SERVER_URL) return;
+  env.WINDSURF_API_SERVER_URL = _cachedProxyUrl;
+  const _np = env.NO_PROXY || env.no_proxy || "";
+  if (!/127\.0\.0\.1/.test(_np)) {
+    const _merged = _np
+      ? _np + ",127.0.0.1,localhost,::1"
+      : "127.0.0.1,localhost,::1";
+    env.NO_PROXY = _merged;
+    env.no_proxy = _merged;
+  }
+  L.info(
+    "spawn-hook-acp",
+    `WINDSURF_API_SERVER_URL → ${_cachedProxyUrl} (鉴权本地兜底·根治 Connecting to server)`,
+  );
+}
+
 function installSpawnHook() {
   if (_spawnHooked) return;
   _spawnHooked = true;
@@ -361,6 +414,7 @@ function installSpawnHook() {
         if (!arguments[2].env) arguments[2].env = { ...process.env };
         if (!arguments[2].env.ACP_BACKEND)
           arguments[2].env.ACP_BACKEND = "windsurf";
+        _acpEnvAnchorApi(arguments[2].env);
         if (
           _sysProxy &&
           !arguments[2].env.HTTP_PROXY &&
@@ -389,6 +443,7 @@ function installSpawnHook() {
         if (!arguments[2].env) arguments[2].env = { ...process.env };
         if (!arguments[2].env.ACP_BACKEND)
           arguments[2].env.ACP_BACKEND = "windsurf";
+        _acpEnvAnchorApi(arguments[2].env);
         if (
           _sysProxy &&
           !arguments[2].env.HTTP_PROXY &&
@@ -417,6 +472,7 @@ function installSpawnHook() {
           if (!arguments[2].env) arguments[2].env = { ...process.env };
           if (!arguments[2].env.ACP_BACKEND)
             arguments[2].env.ACP_BACKEND = "windsurf";
+          _acpEnvAnchorApi(arguments[2].env);
           if (
             _sysProxy &&
             !arguments[2].env.HTTP_PROXY &&
@@ -5107,6 +5163,18 @@ function getEaConfigHtml(port, nonce, opts) {
       </div>
       <pre id="rpTestOut" style="display:none;max-height:200px;overflow:auto;margin:6px 0 0;padding:8px;font-size:11px;line-height:1.45;white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,rgba(0,0,0,0.18));border-radius:4px"></pre>
     </div>
+
+    <!-- ★ v9.9.347 · 模型反代专属 Agent 交接文档 (实时生成 · 面向公网直调链路接管) -->
+    <div style="border-top:1px solid rgba(128,128,128,0.2);margin-top:6px;padding-top:6px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-weight:600;font-size:11px">📄 Agent 交接文档 · 模型反代→公网直调</span>
+        <span style="font-size:10px;opacity:0.55">实时含公网URL/Key/自愈要点 · 交给本地或云端 Agent 即可接管「反代→内网穿透→公网无感调用」整条链路</span>
+        <button class="btn add" id="btnCopyRpHandoff" style="margin-left:auto" title="一键复制最新模型反代交接文档到剪贴板">📋 复制最新状态</button>
+        <button class="btn" id="btnDownloadRpHandoff" title="下载 dao-proxy-pro-revproxy-handoff.md">⬇ 下载 MD</button>
+        <button class="btn" id="btnPreviewRpHandoff" title="预览/刷新文档">预览</button>
+      </div>
+      <pre id="rpHandoffPreview" style="display:none;max-height:200px;overflow:auto;margin:6px 0 0;padding:8px;font-size:10px;line-height:1.45;white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,rgba(0,0,0,0.18));border-radius:4px"></pre>
+    </div>
   </div>
 
   <!-- ⑤ 内网穿透 · DAO Bridge (反者道之动 · 把反代端点直暴公网 · 零账号去中心化 · 公网直调反带模型) -->
@@ -5122,7 +5190,9 @@ function getEaConfigHtml(port, nonce, opts) {
     <div style="font-size:11px;line-height:1.6;padding:6px 2px;opacity:0.85">
       把「④ 模型反代」的本地端点经 <b>cloudflared 快速隧道</b>(零账号·去中心化)暴露到<b>公网</b>，
       任意常用 AI 工具在公网环境把 Base URL 换成下方<b>公网URL</b>、Header 仍带同一 API Key，
-      即可直调反带出来的免费/付费模型。<span style="opacity:0.6">反者道之动 · 无名之樸。</span>
+      即可直调反带出来的免费/付费模型。<b>插件激活即自动连接</b>(零配置·断线自愈)；
+      手动「停止」后自动连接挂起，点「启动/重启」即恢复常驻。
+      <b>v9.9.348</b>: 指数退避(限流不盲冲)·45s宽限(注册中不误杀)·25s冷却(防密集重启)。<span style="opacity:0.6">反者道之动 · 损之又损以至于无为。</span>
     </div>
 
     <!-- 隧道状态 + 启停 -->
@@ -6449,7 +6519,11 @@ function getEaConfigHtml(port, nonce, opts) {
       else { state.textContent = '○ 未连接'; state.style.color = ''; }
     }
     _brgSet('brgMode', running ? (d.shared ? '复用归一🌐板块共享隧道' : (d.named ? '命名隧道·固定域名' : '快速隧道·零账号')) : '');
-    _brgSet('brgStat', running ? (url ? '● 公网已暴露' : '◌ 隧道启动中') : '○ 未启动');
+    // v9.9.348: 退避/宽限状态细化展示
+    var statText = running ? (url ? '● 公网已暴露' : '◌ 隧道启动中') : '○ 未启动';
+    if (d.backoff > 0) statText = '⏸ 退避中(' + d.backoff + 's·连续失败' + (d.spawnFails||0) + '次)';
+    else if (d.graceRemaining > 0) statText = '◌ 注册中(宽限' + d.graceRemaining + 's)';
+    _brgSet('brgStat', statText);
     _brgSet('brgUrl', url || '—');
     _brgSet('brgBound', '本地反代端口: ' + (d.boundPort || d.localPort || '—') + (d.bin ? ' · cloudflared: 已就绪' : ' · cloudflared: 未安装(启动时自动拉取)'));
     _brgSet('brgPubBase', d.publicBase || '—');
@@ -6701,6 +6775,44 @@ function getEaConfigHtml(port, nonce, opts) {
       .catch(function(e) { if (pre) { pre.textContent = '预览失败: ' + e.message; pre.style.display = 'block'; } });
   });
 
+  // ═══ ④ 模型反代专属 Agent 交接文档 · 实时生成 · 复制 / 下载 / 预览 (v9.9.347) ═══
+  function _fetchRpHandoff() {
+    return fetch(_BASE + '/origin/revproxy/handoff.md', { cache: 'no-store' })
+      .then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.text(); });
+  }
+  var _rch = _e1El('btnCopyRpHandoff');
+  if (_rch) _rch.addEventListener('click', function() {
+    var self = this; var _orig = self.textContent; self.textContent = '取最新…';
+    _fetchRpHandoff().then(function(md) {
+      function _viaHost() { if (_vscode) _vscode.postMessage({ type: 'copyHandoff', content: md }); }
+      var done = function() { self.textContent = '✓ 已复制'; setTimeout(function() { self.textContent = _orig; }, 1800); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(md).then(done, function() { _viaHost(); done(); });
+        } else { _viaHost(); done(); }
+      } catch (_e) { _viaHost(); done(); }
+    }).catch(function(e) { self.textContent = _orig; try { _daoToast('复制失败: ' + e.message); } catch (_) {} });
+  });
+  var _rdh = _e1El('btnDownloadRpHandoff'), _rph = _e1El('btnPreviewRpHandoff');
+  if (_rdh) _rdh.addEventListener('click', function() {
+    _fetchRpHandoff().then(function(md) {
+      if (_vscode) { _vscode.postMessage({ type: 'saveHandoff', content: md, filename: 'dao-proxy-pro-revproxy-handoff.md' }); return; }
+      try {
+        var blob = new Blob([md], { type: 'text/markdown' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'dao-proxy-pro-revproxy-handoff.md';
+        document.body.appendChild(a); a.click();
+        setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      } catch (e2) {}
+    }).catch(function(e) { try { _daoToast('下载失败: ' + e.message); } catch (_) {} });
+  });
+  if (_rph) _rph.addEventListener('click', function() {
+    var pre = _e1El('rpHandoffPreview');
+    _fetchRpHandoff().then(function(md) { if (pre) { pre.textContent = md; pre.style.display = 'block'; } })
+      .catch(function(e) { if (pre) { pre.textContent = '预览失败: ' + e.message; pre.style.display = 'block'; } });
+  });
+
   // ── 初始加载 ──
   loadConfig();
   // 首次探测健康 (统一走 _autoProbe)
@@ -6712,12 +6824,12 @@ function getEaConfigHtml(port, nonce, opts) {
 }
 
 // ★ v9.9.270 · 保存 Agent 交接指挥文档 (webview 下载按钮 → 宿主存盘)
-async function _saveHandoffDoc(content) {
+async function _saveHandoffDoc(content, filename) {
   try {
     const def = vscode.Uri.file(
       require("path").join(
         require("os").homedir(),
-        "dao-proxy-pro-handoff.md",
+        filename || "dao-proxy-pro-handoff.md",
       ),
     );
     const uri = await vscode.window.showSaveDialog({
@@ -6827,7 +6939,7 @@ class EaRouterProvider {
           vscode.commands.executeCommand("workbench.view.extension.dao-container");
         else if (msg.type === "openPreview") cmdOpenPreview();
         else if (msg.type === "modelStatus") cmdModelUnlockStatus();
-        else if (msg.type === "saveHandoff") _saveHandoffDoc(msg.content || "");
+        else if (msg.type === "saveHandoff") _saveHandoffDoc(msg.content || "", msg.filename);
         else if (msg.type === "copyHandoff") _copyHandoffDoc(msg.content || "");
         else if (msg.type === "openConfigJson") _openConfigJson();
         else if (msg.type === "openExternal" && msg.url) _openExternalUrl(msg.url);
@@ -6867,7 +6979,7 @@ async function cmdEaConfig() {
         } else if (msg.type === "modelStatus") {
           cmdModelUnlockStatus();
         } else if (msg.type === "saveHandoff") {
-          _saveHandoffDoc(msg.content || "");
+          _saveHandoffDoc(msg.content || "", msg.filename);
         } else if (msg.type === "copyHandoff") {
           _copyHandoffDoc(msg.content || "");
         } else if (msg.type === "openConfigJson") {
