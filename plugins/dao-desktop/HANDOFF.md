@@ -1,0 +1,252 @@
+# dao-desktop 交接备忘（R17-R30 · 给下一个 Agent）
+
+## 目标
+
+把 Devin Desktop IDE 全量移植为通用 VS Code 插件（dao-desktop），与官方 Cascade 面板 1:1 同步：功能、UI、交互、底层调度全部对齐，用户零认知成本。
+
+## ⚡ 核心方法论（用户明确要求 · 反者道之动）
+
+**后端优先，前端为辅。** 此前 R17-R28 的推进方式是「前端逐功能对照官方 GUI → 发现差异 → 修一个 → 实机点一遍」，效率太低（舍近求远）。正确路径：
+
+1. **后端全量对照**：直接以 language_server Connect RPC（ls-bridge 同源直连）为主战场，用脚本批量枚举/调用/对比官方全部 RPC 面（方法、请求/响应字段、枚举），一次性摸清官方能力全集与插件已接入面的差集。
+2. **二进制反查为图纸**：`strings language_server_linux_x64` + grep proto 标注（`json=xxx`、`_pb.` 类型名、`GetXxx` 方法）可完整还原消息结构与枚举，无需任何 GUI 操作。官方前端 JS（`~/devin-desktop/Devin/resources/app/extensions/windsurf/dist/extension.js` 及 webview bundle）可反查官方如何调这些 RPC。
+3. **脚本模拟一切**：驱动/交互/回放全部可以用 node 脚本直连 LS 端口模拟（参考 `/home/ubuntu/lsdrive.js` 思路：StartCascade → SendUserCascadeMessage → 轮询 Steps），在纯后端闭环里调试到位。
+4. **前端只做终验**：所有模块后端整合完、数据流打通后，最后打一次 vsix 到 Devin Desktop 实机，简单交互验证成果即可（测试流程见 `.agents/skills/testing-dao-desktop-cascade/SKILL.md`）。
+
+## 当前状态（全部已合入 main）
+
+| 轮次 | PR | 内容 |
+|---|---|---|
+| R17 | #81 | CODE_ACTION 代码变更卡（官方式 diff 卡） |
+| R18 | #82 | Recent sessions 会话移除（DeleteCascadeTrajectory） |
+| R19 | #83 | 变更卡文件名点击在编辑器打开 |
+| R20 | #84 | 答复内文件路径芯片可点击打开 |
+| R21 | #85 | RUN_COMMAND 官方式终端卡（命令+cwd+退出码徽标+展开输出） |
+| R22 | #86 | Memories 记忆管理（列表/编辑/删除；首页「Memories」入口） |
+| R23 | #87 | 命令审批 Run/Skip（WAITING 步 → HandleCascadeUserInteraction，实机验证通过） |
+| R24 | #88 | ASK_USER_QUESTION 提问交互（被动兼容；toolConfig.askUserQuestion.enabled 已开） |
+| R25 | #90 | LIST_DIRECTORY / GREP_SEARCH / VIEW_FILE 官方式检索浏览卡（实机验证通过） |
+| R25.1 | #92 | 修复 #log flex 子项被压缩（`#log > * { flex-shrink:0 }`） |
+| R26 | #93 | Recent sessions 会话重命名（✎ → RenameCascadeTrajectory + globalState 本地覆盖名，实机验证通过） |
+| R27 | #94 | 新建会话回到 New session 首页（空态恢复，实机验证通过） |
+| R28 | #96 | 目录路径点击改为资源管理器定位（revealInExplorer，实机验证通过） |
+| R29 | #98 | Plan 模式后端探索（未落码，成果见下）+ 交接方法论重写 |
+| R30 | #100 | Plan/Chat 等规划模式落码：modeSel 六模式(cx: 前缀) → plannerConfig 配方 |
+| R31 | #101 | Workflows 斜杠命令：GetAllWorkflows → Cascade 轨 / 补全（LS 服务端自行解析 /name，实测 /review 直接驱动） |
+| R32 | #102 | EXIT_PLAN_MODE 计划就绪步卡（exitPlanMode{planFile} → "Plan ready" 卡） |
+| R32.1 | #103 | 斜杠命令按 agent 分桶 + workflows 拉取重试；实机终验 R30-R32 全部通过（录屏见会话） |
+| R33 | #104 | MCP 面板：GetMcpServerStates/RefreshMcpServers/SaveMcpServerToConfigFile → 首页 MCP 区（状态+工具清单/刷新/添加/打开配置） |
+| R34 | #105 | 硬拦截：readOnly/noTool 模式附 `runCommand.forceDisable`（实测真实移除命令工具） |
+| R35 | #106 | MCP 注册表添加（GetMcpRegistryServers → QuickPick，npm 包/serverUrl 模板+必填 env 引导）+ 每 server 启用/禁用开关（配置 disabled 字段，实测 spec.disabled 回显） |
+| R36-R39 |  | 消息队列管理 / 回退 UI / 归档语义（详见待续方向 6/7） |
+| R40 | #114 | BranchCascade 从用户消息开分支（⑂ 悬停钮 → 编辑首条消息 → 新轨迹继跑，原轨迹不动） |
+| R41 | #115 | 会话转录导出（⤓ → GetCascadeTranscriptForTrajectoryId{cascadeId} → 纯文本 MESSAGE n 对话文档） |
+| R42 | #116 | Rules·Skills 定制面板（GetAllRules→memories(规则) + GetAllSkills→skills，首页「Rules」入口，点击打开源文件） |
+| R43 |  | 修复：历史会话直接分支/入队时 _cascadeModel 为空报错（_cxEnsureModel 兜底）；R40-R42 实机终验全通过（录屏见会话） |
+| R52 | #130 | Agents 面板：GetAllAcpRegistries → 首页「Agents」入口（ACP 注册表清单） |
+| R53 | #131 | DeepWiki 符号解释：GetDeepWiki（connect+json 流式）→ 命令「DeepWiki 解释选中符号」+ Cascade 卡渲染（实机终验通过） |
+| R54 | #132 | Code Maps 面板：GetCodeMapsForRepos + GenerateCodeMap（流式）→ 首页「Maps」入口（地图卡展开 trace 文本图 + locations 可点击跳文件:行，实机终验通过） |
+| R54b | #133 | 修复：dao.cascade.deepwiki 命令登记进 gen-manifest 基线（package.json 是 build.js 再生产物，直接改会被 prepublish 覆盖，命令进不了 vsix） |
+| R55 | #135 | 模型选择器 1:1：全量模型（含 Pro 门控禁用项 🔒 灰置）+ 倍率 `· Nx` 徽标 + disabledReason 作 title |
+| R56 | #136 | @ 提及增 Code 符号类目：GetMatchingContextScopeItems → ƒ/◆ 符号项（lineage · path:line），选中插入 `@Name(path:start-end)` |
+
+核心文件：`plugins/dao-desktop/dao-cascade/panel.js`（扩展端 handler + webview 渲染同文件）、`ls-bridge.js`（language_server Connect RPC 桥）、`host-discover.js`（端口/CSRF/apiKey 发现）。
+
+## R30 后端验证结论（Plan 模式 · 已落码）
+
+- `CascadePlannerConfig.plannerTypeConfig` oneof 实为 `agentic` / `codemap` / `conversationalV2`；其中 `CascadeConversationalV2PlannerConfig.planner_mode`（field 1）接收 `CONVERSATIONAL_PLANNER_MODE_*` 枚举，实测 LS 均 200 接收并正常驱动。
+- `CascadeToolConfig` field 38 = `exit_plan_mode`（`ExitPlanModeToolConfig{enabled}`），官方 Plan 模式 = agentic + exit_plan_mode 工具启用（模型可产出 `CortexStepExitPlanMode{plan_file,user_requested}` 步）。
+- **注意**：`plannerMode` 与 `exitPlanMode` 均为提示词层引导，非硬性权限拦截 —— 实测 READ_ONLY 下模型仍可能执行写盘（LS 步级不拦截）。官方 GUI 的模式态存于扩展 globalState `STATE_KEYS.cascadePlannerMode`，LS 经 `ExtensionServerService/GetNativeValues`（`CascadeManager.getNativePlannerMode`）反向读取。若需硬拦截需另配 toolConfig（如 `runCommand.forceDisable`、`code` 工具配置）。
+- 落码：panel.js `_cxPlannerConfig()`，modeSel 六项（write/plan/chat/readOnly/explore/noTool，值带 `cx:` 前缀与 ACP 模式分流）。
+
+## R29 后端探索成果（Plan 模式）
+
+- `CascadePlannerConfig.plannerTypeConfig` oneof 只有 `agentic` / `codemap` 两个变体（无 plan 变体）。
+- Plan/模式切换真正走的是 `planner_mode`（enum `exa.codeium_common_pb.ConversationalPlannerMode`），在多个消息上均有该字段（CascadePlannerConfig 内为 field 13 `cascade_planner_mode_deprecated`，其他消息 field 4/6/20/26）：
+  - `CONVERSATIONAL_PLANNER_MODE_UNSPECIFIED / DEFAULT / AUTO / PLANNING / EXPLORE / READ_ONLY / NO_TOOL`
+- 推断：官方面板的 Code/Plan（或 Write/Chat）模式切换 = SendUserCascadeMessage 的 plannerConfig 带不同 `plannerMode`；下一步应在后端直接用脚本对 `plannerMode: "CONVERSATIONAL_PLANNER_MODE_PLANNING"`（及 READ_ONLY 等）发消息验证行为差异，再决定 UI 接入形态（modeSel 已有现成下拉，见 panel.js `modeSel`）。
+- 面板现发送体（panel.js ~L585）：`cascadeConfig.plannerConfig = { requestedModelUid, plannerTypeConfig:{agentic:{}}, toolConfig:{askUserQuestion:{enabled:true}} }`，加 `plannerMode` 字段即可试。
+
+## 每轮工作流（修订版 · 后端优先）
+
+1. 后端探索：strings 反查 + node 脚本直连 LS 验证 RPC 行为（不开 GUI）
+2. 落码 `plugins/dao-desktop/dao-cascade/panel.js`，`node --check` 通过
+3. commit → push `devin/<ts>-<name>` 分支 → GitHub API 建 PR（无冲突自动合并）
+4. 阶段性（多轮攒一批）再打 vsix 实机终验：`npx @vscode/vsce package -o /tmp/dao-rXX.vsix --allow-missing-repository` → `~/devin-desktop/Devin/bin/devin-desktop --install-extension ... --force` → Reload Window
+
+## 关键技术事实
+
+- language_server JSON-RPC：`POST http://127.0.0.1:<lsPort>/exa.language_server_pb.LanguageServerService/<Method>`，头 `x-codeium-csrf-token`，body 带 `metadata{ideName,ideVersion,extensionName,extensionVersion,apiKey}`（apiKey 出自 `~/.local/share/devin/credentials.toml`）
+- 驱动配方：StartCascade → SendUserCascadeMessage（plannerConfig{requestedModelUid, plannerTypeConfig:{agentic:{}}, toolConfig}）→ StreamCascadeReactiveUpdates 挂流 → 轮询 GetCascadeTrajectorySteps 增量渲染
+- 交互回传：`HandleCascadeUserInteraction{cascadeId, interaction:{trajectoryId(须由 GetCascadeTrajectory 取), stepIndex, runCommand:{action:RUN_COMMAND_ACTION_CONFIRM|SKIP} | askUserQuestion:{response}}}`
+- RenameCascadeTrajectory{cascadeId,name} 返回 200 且官方页签标题生效，但 GetAllCascadeTrajectories.summary 不变（插件用 globalState["dao.cxNames"] 本地覆盖名兜底）
+- 记忆：GetCascadeMemories / UpdateCascadeMemory{memoryId,title,content,tags} / DeleteCascadeMemory{memoryId}；创建仅能由模型 create_memory 工具产生
+- 枚举/字段名可从二进制反查：`strings language_server_linux_x64 | grep -E "json=|_pb\.|GetXxx"`；枚举值形如 `CONVERSATIONAL_PLANNER_MODE_*`
+- Devin Desktop 二进制：`~/devin-desktop/Devin/bin/devin-desktop`；LS 二进制：`~/devin-desktop/Devin/resources/app/extensions/windsurf/bin/language_server_linux_x64`
+
+## 待续方向（按后端优先重排）
+
+1. **RPC 面全量盘点**：脚本枚举 LanguageServerService 全部方法（strings 反查方法名全集），对照插件已接入面列差集清单，作为总路线图
+2. ~~Plan 模式落地~~（R30 已完成）；后续可补硬拦截 toolConfig 与 EXIT_PLAN_MODE 步卡渲染
+3. ~~Workflows~~（R31）~~MCP 面板~~（R33 已落码，待实机终验）。MCP 后端实测结论：配置文件 `~/.codeium/windsurf/mcp_config.json`；`SaveMcpServerToConfigFile{serverId,templateJson}`（templateJson 为单 server 配置 JSON 字符串）写入后 `RefreshMcpServers{}` → `GetMcpServerStates{}` 返 `states[{spec{serverName,command,args},status:MCP_SERVER_STATUS_READY,tools[{name,description,jsonSchemaString}],serverInfo}]`，用 /tmp 极简 stdio echo server 全链路验证通过；`ToggleMcpToolUsing` 在 LS 端口 404（未路由，二进制有串但非本服务可达）；`UpdateMcpServerInConfigFile{serverId}` 返 {}（行为待查）；`GetMcpPrompt` 需 server_name/prompt_name
+4. ~~ASK_USER_QUESTION 排查~~（R34 实测结论：`toolConfig.askUserQuestion.enabled:true` 下，AGENTIC 与 PLAN 配方均无法让模型获得该工具 —— 模型自报“无 ask_user_question 工具”，未产出 CORTEX_STEP_TYPE_ASK_USER_QUESTION 步；判定为上游模型/服务端 feature-gate（SWE-1.6 free），非客户端可控。插件渲染侧已就绪，待上游开启自然生效）。R34 硬拦截结论：`runCommand.forceDisable:true` 真实移除命令工具（实测模型无法执行命令）；写盘路径（code 工具）无 forceDisable 字段，`toolAllowlist`(field 32) 与 `code.fileAllowlist` 实测均不拦截，写盘仍为提示词层引导
+5. 上游模型偶发 "invalid tool call" 错误步的重试/续驱动体验优化
+6. R36 消息队列已落码：运行中再发 → `QueueCascadeMessage{cascadeId,items,cascadeConfig}`（**必须带 cascadeConfig 否则永不续驱**），轮次结束 LS 自动续驱（实测 AUTO-DRAIN 通过）；`InterruptWithQueuedMessage{cascadeId,queueId}` 立即打断当前轮并发送队列消息（实测通过，可做“立即发送”按钮）；`MoveQueuedMessage`/`RemoveFromQueue` 待接。`ArchiveCascadeTrajectory{cascadeId}` 返 {} 但 GetAllCascadeTrajectories 列表不变、无 isArchived 字段（疑云端归档，行为待查）；`CancelCascadeInvocationAndWait` 实测可停生成
+7. R37 回退已落码并实机终验（#108/#109）：历史重放的用户消息泡悬停 ↩ → `RevertToCascadeStep{cascadeId,stepIndex}` 截断轨迹（实测 8→7 步）后 `_loadCascadeTrajectory` 重放；webview 放开 Cascade 运行中的发送闸门与 R36 排队打通（实机通过：⏳入队回执→轮次结束自动续驱）。注意：回退钮须用独立 `.msgrevert` 样式（复用 .msgcopy 时在用户泡永不可见，且点击会被复制委托拦截——实机发现）。`CreateTrajectoryShare` 上游 internal error（疑 free 套餐门控），跳过
+8. 测试技能见 `.agents/skills/testing-dao-desktop-cascade/SKILL.md`；环境 blueprint 建议待用户批准
+
+## 冷启动清单（下一个 Agent）
+
+1. 读本文件 + `.agents/skills/testing-dao-desktop-cascade/SKILL.md`
+2. 环境若无 Devin Desktop：向用户要安装 zip（附件形式），解压到 `~/devin-desktop/`，登录账号见 Devin Secrets
+3. 启动 Devin Desktop 一次以拉起 language_server（面板底部可见 LS 端口），之后即可纯后端脚本推进
+4. 按「待续方向 1」先做 RPC 全量盘点，再按差集逐模块整合；前端仅终验
+
+## R40-R43 后端实测补充
+
+- `BranchCascade{baseCascadeId,branchFromStepIndex,items,cascadeConfig}` → `{newCascadeId}`；**cascadeConfig.plannerConfig 必须带 requestedModelUid**，否则 500 "neither PlanModel nor RequestedModel specified"（历史会话直接分支时注意先解析模型，见 panel.js `_cxEnsureModel`）
+- `GetCascadeTranscriptForTrajectoryId{cascadeId}` → `{transcript,numTotalSteps}`；字段名是 cascadeId 不是 trajectoryId
+- `GetAllRules{}` → `{memories:[规则: .windsurf/rules, 含 scope.projectScope{absoluteFilePath,trigger}]}`；skills 不在其中，须另调 `GetAllSkills{}` → `{skills:[{name,description,path,content}]}`（.agents/skills）
+- 其余未接高价值方法：GetDeepWiki / GenerateCommitMessage{repo_root_uri} / CancelCascadeSteps / GetUserMemories 等
+
+## R44–R47 后端实测补充
+- R44 `GetRevertPreview{cascadeId,stepIndex}` → `{codeEditPreviews:[{fileUri,diff.lines[{text,type}],actionType}]}`；回退前展示文件改动确认
+- R45 `CreateCustomizationFile{fileName,fileType,workspaceConfigDir}`：workspaceConfigDir **必须是相对路径 `.windsurf`**（绝对路径/URI 均 500 invalid workspace config directory）；RULES → `.windsurf/rules/<name>`，SKILLS → `.windsurf/skills/<name>/SKILL.md`，WORKFLOWS → `.windsurf/workflows/<name>`
+- R46 `GetAllWorkflows{}` → `{workflows:[{name,description,path,content,isBuiltin}]}`；`CopyBuiltinWorkflowToWorkspace{workflow:<全对象>}` → 落盘 `.devin/workflows/<name>.md` 并返回新 workflow；非内建对象报 "workflow is not built-in"
+- R47 `AcknowledgeCascadeCodeEdit{cascadeId,absoluteUri,accept}`：二进制描述符实测 **absolute_uri/contents 均为 repeated string**（传单串报 proto syntax error）；服务端只记录存档态，**拒绝不会回改文件**（新建文件需本地删除，修改类用步骤回退）；重复存档报 "no unacknowledged steps"
+- `GetConversationTags` 上游已移除（"feature has been removed"）；`GetChangelog{version}` 需 major.minor.patch 且常返回空；`GetMessageTokenCount` 需完整 chat_message 结构
+- `ResolveOutstandingSteps{cascadeId}` → `{}`（幂等，可作"全部确认"兜底）
+
+## R48–R49 后端实测补充
+- R47b 实机 bug：webview code-diff 卡状态实为 `completed`（`_cxDiffCard` 映射），判 `done` 导致 ✓✗ 从不渲染（#123 修）
+- R48 `GetAvailableCascadePlugins{}` → `{plugins:[{title,id,link,description,installationCount,trustLevel,readme}]}`（52 项）；安装模板需按 id 匹配 `GetMcpRegistryServers{}`（50 项，`{name:"devin/<id>",packages[{registryType,identifier,runtimeHint,environmentVariables[]}],remotes}`）再走 `SaveMcpServerToConfigFile{serverId,templateJson}`+`RefreshMcpServers{}`；`ToggleMcpToolUsing` strings 有符号但路由 404（未注册）
+- R48 `RefreshCustomization{}` → `{}`：让 LS 重扫 rules/skills/workflows（定制面板 ↻）
+- R49 `GetUserStatus{}` → `{userStatus:{name,email,teamsTier,planStatus.planInfo{planName,monthlyPromptCredits,monthlyFlowCredits,maxNumChatInputTokens,cascadeAllowedModelsConfig}}}`（底栏账户弹卡）
+- 不可用结论：`CreateTrajectoryShare{cascadeId}` 500 internal（免费版）；`GenerateCommitMessage{repoRootUri}` 签名正确但上游 LLM "stream error"（连续复现）；`GetBrainStatus` 501 已移除；`GetRecentLocations`/`GetCascadeUsageData`/`GetMcpServerStatuses`/`ListMcpServers` 404
+- `GetProcesses{}` → `{lspPort}`；`GetWorkspaceInfos{}` → workspace/git root URIs；`GetRepoInfos{}` → 分支清单
+
+## R50–R51 后端实测补充（#127/#128 已合）
+- R50 `GetWebDocsOptions{}` → `{options:[{label,docsUrl}]}`（官方文档源, llms.txt/llms-full.txt）：@ 补全并入 docs: 项，选中插入 `@docs:<label>(<url>)`
+- R51 `GetMessageTokenCount{chatMessage,requestedModelId}` → `{tokenCount}`：**chat_message 是 string 字段**（传对象报 "invalid value for string field"），**requested_model_id 必填**（Model 枚举, 数字 1 或枚举名均可）；composer 停顿 500ms 计数, 上限取 GetUserStatus.planInfo.maxNumChatInputTokens
+- `GetDefaultWebOrigins{}` → 默认 web 搜索源清单；`CaptureFile/CaptureCode` → `{}`（telemetry 类）；`EditConfiguration` 已 deprecated；`GetPatchAndCodeChange` 需 eval mode；`GetDeepWiki`/`GenerateCodeMap`/`GetChatMessage` 415（流式/需特殊 content-type）
+
+## R52–R54 后端实测补充（#130–#133 已合）
+- R52 `GetAllAcpRegistries{}` → `{registries:[...]}`：ACP（Agent Client Protocol）注册表清单，首页「Agents」入口
+- R53 `GetDeepWiki` 走 **application/connect+json 流式**（非普通 JSON，故此前 415）：请求 `{requestType:DEEP_WIKI_REQUEST_TYPE_SUMMARY, symbolName, symbolUri, language, symbolType:DEEP_WIKI_SYMBOL_TYPE_FUNCTION}`；流帧 `response.deltaMessage{messageId,text,isError}`，`messageId` 以 `bot-deepwiki` 前缀者为正文增量，累加即得 markdown 解释。ls-bridge 新增通用 `callStream(method,body,onMessage,timeoutMs)`（Connect 帧: flags(1B)+len(4B)+JSON, 末帧 flags&2 为 trailer 携 error）
+- R54 `GetCodeMapsForRepos{repoPaths}` → `{codeMaps:[<JSON string>]}`（每项 parse 得 `{id,title,metadata{originalPrompt,generationTimestamp},traces:[{title,description,traceTextDiagram,locations:[{path,lineNumber,title,lineContent}]}]}`）；`GenerateCodeMap{prompt}` 流式 → `status` 增量 + `success`（走 callStream, 超时放宽至 600s）
+- R54b 构建坑：`plugins/dao-desktop/package.json` 是 **build.js(vscode:prepublish) 由 gen-manifest.js 基线再生的产物**，直接改 package.json 会在打包时被覆盖 → 新命令须登记进 `gen-manifest.js` 的 commands 数组
+
+## R55–R56 后端实测补充（#135/#136 已合）
+- R55 `GetUserStatus.cascadeModelConfigData.clientModelConfigs`（listModels 同源）每项含 `label/modelUid/creditMultiplier/disabled/disabledReason{shortReason,link}`（实测 133 模型，免费版仅 SWE-1.6 Slow 可用）；`GetUserSettings{}` 的 `cachedCascadeModelConfigs` 为同数据另一入口（另含 modelDimensions 价目）
+- R56 `GetMatchingContextScopeItems{query}` → `items[].codeContext{nodeName,nodeLineage[],workspacePaths[{workspaceUri,relativePath}],startLine(0基),endLine,contextType(CODE_CONTEXT_TYPE_FUNCTION/CLASS),language,snippetByType}`：官方 @ 菜单 Code 类目同源符号检索（无需参数预热，直接可用）
+- 探索排除项：`CreateWorktree{}` 200 且真实建 git worktree（`~/.windsurf/worktrees/<repo>/<name>`）但 GetWorktrees/DeleteWorktree 均 404 未路由（无列表/删除面，暂不接入）；`GetSuggestedContextScopeItems` 需非空 relative filepaths；`GetMatchingIndexedRepos`/`GetKnowledgeBaseItemsForTeam`/`GetGithubPullRequestSearchInfo` 501 已弃用；`GetCodeMapsForFile` 已弃用（用 GetCodeMapsForRepos）；`GenerateCommitMessage` 复测仍 LLM stream error（免费门控）；`GetAllPlans{}`/`GetModelStatuses{}`/`GetCascadeMemories{}` 空对象；`CheckChatCapacity{}` → `{hasCapacity}`；`GetActiveAppDeploymentForWorkspace{workspaceUri}` → `{}`（无活跃部署）；`GetUserTrajectoryDescriptions{}` → 各分支 trajectoryId 清单
+
+## 实机终验状态（交接要点）
+- R45–R47 终验通过（R47b 状态字段 done→completed bug 已修 #123）；R48–R49 终验通过（录屏+test-report-r48-49.md）
+- R50 @docs 实机通过；R51 token 计数已实装+后端验证
+- **R53 DeepWiki + R54 Code Maps 实机终验通过**（录屏见会话）：命令面板「Devin Desktop: DeepWiki 解释选中符号」流式渲染 `_onAcpUpdate` 解释卡；首页「Maps」入口列出 code map，展开显示 trace 文本图 + locations，点击 location 打开 panel.js:1067
+- **R55 模型选择器 + R56 @ 符号：实机终验通过**（vsix r56b/r59）；R56b 修 `_handleFilesQuery` 两处 `_post` 漏带 `syms` 致 @ 菜单不渲染符号（#138）
+
+## R57–R59 首屏模型选择器修复（#139/#140/#141 已合，实机终验通过）
+- **R57 症状**：官方 composer 首屏(New session)即列全模型，但本插件全量目录只在「首条消息发送且 `_cascadeModel` 为空」时懒推 → 首屏模型下拉只有默认项。抽出 `_pushCascadeConfigOptions()` 复用，在 webview `ready` 时提前推
+- **R58 根因**：`_ensureAcp→newSession→_pushSessionMeta` 推的 ACP 单模型 config-options **无 agent 标记**，覆盖了 Cascade(LS) 的 133 模型全量目录（实机 devtools 查证：`modelSel.childElementCount===1`，唯一项 "SWE-1.6 Slow" 无倍率/锁标 → 非我方 push）。修复：ACP 三处 config-options 推送均打 `agent:"acp"`；webview 按轨(cascade/acp)分组存 `cfgStore`，`renderConfigFor(curGroup())` 仅渲当前 agent 选择器，切 agent 时重渲 → 两轨互不覆盖
+- **R59 时序**：R57 固定 2.5s 重试早于宿主 LS 发现（实测约 8s：共生日志 02:37:30 vs reload 02:37:22）→ 首屏仍空。改 `ready` 后每 2s 轮询 `_pushCascadeConfigOptions()`（返回 bool）直至成功（≤12 次），并在 `hostState` 变更监听里同样重推。**实机确认**：首屏模型下拉全量 133 项，🔒 锁标 + 倍率(· Nx)，仅 SWE-1.6 Slow · 0.5x 可选
+- 下一步候选差集：ConvergeArenaCascades、InterruptWithQueuedMessage 立即发送按钮、MoveQueuedMessage/RemoveFromQueue 队列管理 UI、DismissCodeMapSuggestion/GetCodeMapSuggestions（需导航历史预热）等
+- 每轮工作流不变：lsq.js 后端实测 → panel.js 落码 → node --check → vsix 实机 → PR(squash 自动合) → 更新本文件
+- **R56 @ 符号实机复验通过（R60 会话）**：`@handleFilesQuery` 下拉列 `ƒ _handleFilesQuery`，Tab 插入 `@_handleFilesQuery(plugins/.../panel.js:350-379)`；早前空结果仅因 LS 符号索引未就绪(reload 后即可)。查证 `GetMatchingContextScopeItems` 返回 `codeContext{nodeName,nodeLineage,workspacePaths,startLine,endLine,contextType,language,snippetByType}` 结构正确
+
+## R60 模型选择器按模型族分组（#143 已合，实机终验通过）
+- **背景**：官方模型选择器把 159 模型按「模型族」(Claude Opus 4.8 / GPT-5.5 …共 32 族)分组并标推荐/图像/维度；本插件此前 133 项扁平列表。**数据本就在 `GetUserStatus.cascadeModelConfigData.clientModelConfigs` 内**——每项即携 `modelInfo.modelFamilyUid`、`modelFamilyMetadata{modelFamilyLabel,entries:[{key:Effort/Thinking/Fast Mode/1M Context, value{name,order}}]}`、`isRecommended`、`isDefaultModelInFamily`、`supportsImages`、`modelDimensions`(Input/Cached/Output 价目)。无需新增 RPC(`GetUserSettings.cachedCascadeModelConfigs` 为同数据 159 全量入口，133 为其可见子集)
+- **实现**：`ls-bridge.listModels` 透出 familyUid/familyLabel/recommended/defaultInFamily/images/dims；`panel.js _pushCascadeConfigOptions` 透传 family/familyLabel/recommended/images(dims 并入 description hover)；webview `renderConfigFor` 按 familyLabel 建 `<optgroup>`(native select 分组分隔)，选项文本标 `⭐推荐 / 🔒门控 / 🖼图像` + 倍率。ACP 轨无族 → 平铺，不受影响
+- **实机确认**：下拉按族分隔渲染(Claude Opus 4.8 / Claude Fable 5 / Claude Sonnet 5 / GLM-5.2 / GPT-5.5 / Kimi …)，每族默认/推荐项带 ⭐，门控项 🔒，图像项 🖼，倍率 · Nx（如「⭐🔒 Claude Fable 5 Medium · 50x 🖼」「GPT-5.5 High Thinking · 24x 🖼」）
+- 附带修：`_symbolsQuery` catch 由静默改记录日志
+
+## R61 模型选择器悬停价目（模型 tooltip 加成本明细）
+- **背景**：官方模型选择器悬停/展开单模型时显示 Input/Cached/Output 每 1M tokens 成本；本插件此前 tooltip 仅门控原因+维度
+- **数据**：`GetUserStatus.clientModelConfigs[].modelDimensions` = `[{label:"Input"|"Cached input"|"Output", value, denominator:"1M tokens", kind:"MODEL_DIMENSION_KIND_COST", minRange, maxRange, info}]`（另有非 COST 维度如上下文窗口）
+- **实现**：`ls-bridge.listModels` 过滤 `kind===MODEL_DIMENSION_KIND_COST` 组成 `pricing` 串（`Input $5/1M tokens · Cached input $0.5/1M tokens · Output $...`）；`panel.js` option.description 三段拼接（门控原因 | 维度 | 价目, ` | ` 分隔）→ 悬停 title 显示
+- 队列管理复核：`RemoveFromQueue`/`MoveQueuedMessage{toIndex:0}`/`InterruptWithQueuedMessage` 三操作 + webview ⚡/↑/✕ 按钮**早已在 panel.js 落码**（HANDOFF 旧「候选」行已过时）；`SetPinnedContext` 501 未实现、`GetSuggestedContextScopeItems` 请求字段名不可解（多变体均报 relative filepaths empty）、`GetUserMemories`/`GetCascadeMemories`/`InitializeCascadePanelState` 空对象
+- R61 tooltip 局限：native `<option title>` 单行渲染，窄面板下价目段被裁切（维度段可见、价目段需宽窗才全显）——受 native select 约束，如需富卡片式悬停需改写为自定义下拉（后续候选，风险高）
+
+## R62 图像附件（composer 粘贴/选择图片 → 随消息发给支持图像的模型）
+- **背景**：官方 composer 支持粘贴/附加图片发给图像模型（R60 已按 `supportsImages` 标 🖼，SWE-1.6 Slow 亦支持）；本插件此前只发文本
+- **后端实测**：官方消息 proto 顶层 `images`(repeated `ImageData{base64Data,mimeType,caption}`)与 `items`/`cascade_config` 平级；`StartCascade → SendUserCascadeMessage{items,images:[{base64Data:<1x1png b64>,mimeType:"image/png",caption}],cascadeConfig}` 返回 **HTTP 200 {}**（格式获接受，非 proto 校验错）
+- **实现**：webview 加 🖼 钮 + `<input type=file accept=image/*>` + `paste` 监听 → dataURL 暂存 `pendingImages`，composer 内 `.imgstrip` 缩略图预览（✕ 移除）；`send()` 随 `chat` 消息带 `images:[dataURL]` 并在 user 气泡回显缩略图；宿主 `_cxImages()` 把 dataURL 解析为 `{base64Data,mimeType,caption}`，**仅当当前模型 ∈ `_cxImageModels`(supportsImages 集) 才带图**，注入 `SendUserCascadeMessage`/`QueueCascadeMessage`/not-idle 退回入队三路径顶层 `images`
+- 后续候选：轨迹回放(GetCascadeTrajectorySteps 的 user step)内图像的重渲(R63)、拖拽入图、ConvergeArenaCascades(需 target_cascade_id)、GetCodeMapSuggestions(需导航历史预热)
+- **R62 实机终验(通过)**：SWE-1.6 Slow 下粘贴图片 → composer 缩略图(✕)→ 发送 → 用户气泡回显缩略图 → **视觉模型正确描述图像颜色**(Red 方块/White "DAO" 字与背景/Blue 圆)；证明 `images[base64Data]` 已随 RPC 送达并被视觉模型消费
+- **R63(#147) 轨迹回放重渲图像**：`GetCascadeTrajectorySteps` 的 `USER_INPUT` 步 `userInput.images:[{base64Data,mimeType,caption}]`(与 `items` 平级；LS 还自动生成描述 `caption`)。`_loadCascadeTrajectory` 用户步回放时把 `userInput.images` 映射为 dataURL 随 `user-replay` 下发，webview `addMsg("user",text,images)` 复用 `.imgstrip` 重渲。**实机通过**：重开 "Image Color Identification" 会话 → 用户气泡缩略图重现
+- **R64(#148) 拖拽入图**：composer 卡片区(`.card`)监听 `dragenter/dragover`(含 file 项时高亮 `.dragover`)/`dragleave/dragend`/`drop`(image/* 走 R62 `addImageFile`)；CSS `.card.dragover` accent 描边
+- **R65(#149) Response Statistics 页脚**：`GetCascadeTrajectoryGeneratorMetadata` 每 planner 步 `chatModel.{usage(inputTokens/outputTokens),modelCost,timeToFirstToken,responseDimensionGroups(Model 标签)}`。宿主 `_cxGenStats(cascadeId)` → 紧凑串 `模型 · ↑in ↓out · $cost · Xs 首字`(键 stepIndex 与轨迹步下标同, 另出 `last` 末步聚合);回放按 stepIndex、实时按 `last` 补发 `msg-stats`;webview 助手气泡追加 `.msgstats` 页脚(复制取 `dataset.acc` 不含页脚)。**实机通过**：重开图像会话 → 助手回复下显示 `SWE-1.6 Slow · ↑10095 ↓142 · $0.0032 · 0.49s 首字`
+- **R66(#151) 官方式 Arena 模式（实机终验通过·录屏见会话）**：
+  - 后端契约(lsq.js 实测)：`StartCascade{startArena:2}` → `{cascadeId, arenaCascadeIds:[id1,id2]}`（N 路并行 cascade）；对**每个** arena id 各发一次同题 `SendUserCascadeMessage{cascadeId,items,cascadeConfig}`（广播）；并行轮询各自 `GetCascadeTrajectorySteps` 取 plannerResponse 增量；用户拣选后 `ConvergeArenaCascades{targetCascadeId:<胜者id>}` → 后续消息在胜者 cascade 续行（败者弃）
+  - 落码：宿主 `_cxArenaRace()`(仅新会话首条, `msg.arena && !_cascadeLsId` 分流) + `_handleArenaPick(slot)`(converge 后切 `_cascadeLsId`、重置 `_cascadeSeen`、补发 `msg-stats`)；webview ⚔ 开关钮(发送即复位) + `arena-start/delta/done/picked` 消息 → 双列 `.arenacol` 卡(各带「选用此回复」钮, done 后启用; picked 后胜列 `.win` 高亮/败列 `.lose` 淡出)
+  - 实机：⚔ 发送 → 双列并行流式出字 → 拣选候选2 → 胜/败列样式生效 + 统计页脚 → 续问「Which university…」答 "University of Helsinki."（胜者上下文续行正确）
+  - 另实测 `SpawnArenaModeMidConversation` 存在（会话中途开 Arena，未接 UI, 后续候选）
+- **R67(#152) 会话中途 Arena（实机终验通过·录屏见会话）**：
+  - 后端契约：`SpawnArenaModeMidConversation{cascadeId,count}` → `{cascadeIds:[原id,克隆id…]}`（克隆携完整历史）；广播/轮询/converge 与 R66 相同。**限制**：已 converge 过的 cascade 再开报 `failed_precondition: cascade already in an arena`（webview 显示轨失败卡即可）
+  - 落码：`_cxArenaRace` 分流——`_cascadeLsId` 存在走 SpawnArenaModeMidConversation，否则 StartCascade{startArena:2}；轮询前先取各 cascade 既有 plannerResponse 全文作**增量基线**（`base[slot]`），`hadHistory` 防有历史时误判提前终止；过滤 `CORTEX_STEP_TYPE_ARENA_TRAJECTORY_CONVERGE` 步；⚔ 钮 tooltip 改「新会话/会话中途均可」
+  - 实机：加载历史会话 → ⚔ 发送 → 双列候选卡（携历史基线）→ 拣选 → 续问在胜者上下文正确作答
+- **R68(#153) Recent sessions 实时同步（实机终验通过·录屏见会话）**：
+  - 后端契约（lsstream.js 实测）：`StreamCascadeSummariesReactiveUpdates{protocolVersion:1,id:"summaries"}`（Connect server-streaming, 需 `connect-protocol-version:1` 头 + 消息级 `protocolVersion:1`）——任一会话新建/改名/归档即推帧（`version` + base64 `fullState`/diff protobuf）。id 必须为 `"summaries"`（`cascade-summaries` 等报 not found）。反应式组件系另有 `StreamUserTrajectoryReactiveUpdates` 等同构方法（后续候选）
+  - 落码：`_watchCascadeSummaries()` 以流帧作变更信号 400ms 去抖重拉 `_handleSessionsList()`；断流 5s 自动重连；首次列表拉取懒启动；`onDidDispose` 置 `_disposed` 停止重连（重进 resolveWebviewView 复位）
+  - 实机：lsq.js 新建 cascade + 发消息 → 插件首页 Recent 列表**免手动刷新**即时出现新会话
+- **R70(#155) 反应式唤醒轮询（实机终验通过·录屏见会话）**：`StreamCascadeReactiveUpdates{protocolVersion:1,id:<裸cascadeId>}`（即 driveStream 所连方法）每帧即该 cascade 轨迹变更信号（此前 driveStream 丢弃帧数据仅作驱动）。`ls-bridge.driveStream(cascadeId,onFrame?)` 解析 Connect 帧逐帧回调；发送轮询由固定 1s sleep 改为帧到即唤醒拉增量（150ms 限速 + 850ms 静默兜底 + pendingFrame 防信号丢失），显著降流式出字延迟。另 `callStream(...,cancelRef?)` 支持主动断流。实机：1-10 逐行流式 + 思考泡 + 统计页脚（0.46s 首字），无回归
+- **R72(#159) Arena 可用性感知（实机终验通过·录屏见会话）**：官方限制——已 `ConvergeArenaCascades` 收敛过的 cascade 再开 Arena 报 failed_precondition。轨迹载入/收敛后检测 `CORTEX_STEP_TYPE_ARENA_TRAJECTORY_CONVERGE` 步 → webview `arena-avail` 消息置灰 ⚔（opacity .4 + disabled + tooltip 说明）；中途 Spawn 命中 precondition 时友好 ⚠ 气泡而非裸报错；新建会话恢复可用。**打包踩坑**：`vsce package` 交互提示(repository/LICENSE)未逐一喂 y 会中断且**留下旧 vsix 假象成功**——务必 `printf 'y\ny\ny\ny\n' | npx vsce package …` 并在装前 `unzip -p <vsix> extension/dao-cascade/panel.js | grep -c <新特征>` 验新
+- **R73(#161) 发送前配额闸（实机无回归验证通过）**：`CheckUserMessageRateLimit{}` → `{hasCapacity,messagesRemaining,maxMessages}`（free 版 `true,-1,-1`=无硬限）。Cascade 发送路径前置：`hasCapacity===false` 即官方式 ⚠ 气泡拦截（含余量），探测异常容错放行。附探索：`GetPatchAndCodeChange` 报 "requires eval mode"（评测门控，不可用）；`GetWorkspaceEditState{}` 可用（返回 `workspaceEdits[].repoRoot`）
+- **R74(#163) 外部续写实时回放（实机终验通过·录屏见会话）**：载入历史会话后 `_watchCascadeTrajectory` 挂 `driveStream`（即 StreamCascadeReactiveUpdates）反应式监听：帧到 300ms 去抖拉 `GetCascadeTrajectorySteps` 增量，从 `_cascadeSeen` 起按历史回放规则渲染（用户泡/思考/答复/步卡/统计页脚），未完步（status 非 DONE/ERROR）留待下帧；`_cxRunning` 让位不重复渲染；重载/新建/dispose 时 close 断流。实机：面板载入会话 → lsq 外部续写 → 面板免刷新实时跟进（与 R68 列表同步同构，补齐会话体同步）
+- **R75(#165) 外部续写监听覆盖新会话（实机终验通过·录屏见会话）**：面板内新建会话首轮发送结束（finally）后自动 `_watchCascadeTrajectory`（`_cxWatchId` 判重防重复挂/新建时清）——面板内新生会话被他端续写同样免刷新实时回放。另 R75 探索排除：`GetChangelog`/`GetConversationTags`/`GetBrainStatus` 各形态挂起；`GetModelStatuses` 空对象；剩余未接 RPC 多为遥测/评测/门控项
+- **R77(#168) 用户设置同源**：后端实测 `GetUserSettings.userSettings = {openMostRecentChatConversation, lastArenaModeEnabled, cachedCascadeModelConfigs, cachedCascadeModelSorts}`；**`SetUserSettings` 为整体替换**（直写补丁会清掉其余字段）→ 落码 `_handleSetUserSetting` 读-改-写全量合并。面板 ready 时 `_pushUserSettings` 灌入：⚔ Arena 初始态取 `lastArenaModeEnabled`（切换即写回，跨面板/重启与官方同步）；首页新增「启动时自动打开最近会话」勾选读写 `openMostRecentChatConversation`（官方 Settings 页同源）。新消息 `user-settings` / `set-user-setting` 贯通 host↔webview
+- **R78 Suggested maps**：后端实测 `GetCodeMapSuggestions{cascadeId?}` 在有会话历史后返回 `{suggestions:[{id,prompt,subtitle,startingPoints[]}]}`（R71 时空结果系无历史预热）；**id 每次调用由 LLM 重新生成不可持久 → `DismissCodeMapSuggestion{cascadeId,suggestionId}` 恒 not found（服务端未存储，排除接入）**。落码：`_handleCodeMapsList` 附带拉取 suggestions，Maps 页生成栏下渲染「Suggested maps」候选卡（✧ 标题/副题/起点），点选即以其 prompt 走既有 `codemap-generate` 流
+- **R79(#170)+R79.1 Worktree 模式（实机终验通过·录屏见会话）**：
+  - 后端契约（lsq.js + 二进制反查实测）：`StartCascade{gitWorktree:true}` → 首次发消息时 LS 自动 `git worktree add -b <slug> ~/.windsurf/worktrees/<repo>/<repo>-<slug>`，改动隔离于 worktree（主工作区无文件）；轨迹摘要（GetAllCascadeTrajectories）含 `gitWorktreePaths[]` 与 `referencedFiles[]`（worktree 内文件 URI）
+  - **合并契约关键坑：`ResolveWorktreeChanges{cascadeId, uris[], mode}` 的 `uris` 必填**——不带 uris 恒返回 `{}` 空操作（首版 #170 即踩此坑，实机合并无效）。带 worktree 内文件 URI 后合并生效，文件落回主工作区；响应 `{hadConflicts, conflictingFiles[]}`；mode 枚举 MERGE=1/STASH=2；另有 `UndoWorktreeMerge{cascadeId,forceOverwrite,failOnConflicts}` 与 `CreateWorktree`（后续候选）
+  - 落码：composer ⎇ 开关（仅新会话首条生效）→ StartCascade 带 gitWorktree；`worktree-info` 消息驱动 #wtBar 横幅 + 「合并回工作区」钮；R79.1 热修——合并前拉轨迹摘要取 gitWorktreePaths 前缀过滤 referencedFiles 作 uris；载入历史轨迹时按 gitWorktreePaths 恢复 worktree 态横幅
+  - 实机：⎇ 发送「创建 R79-gui-test.txt」→ 文件仅存在于 worktree、主工作区干净 → 点合并 → 文件落回主工作区 ✓
+- **R80 撤销合并（实机终验通过）**：`UndoWorktreeMerge{cascadeId}` 弹出最近一次合并（栈式），主工作区恢复合并前文件态（实测：merge 后文件存在 → undo 后文件消失、工作区干净）；无合并记录时报 `not_found: no worktree merge found`；另有 `forceOverwrite/failOnConflicts` 参数。落码：合并成功（无冲突）后 `worktree-info` 带 `undo:true` → wtBar 显「撤销合并」钮 → `worktree-undo` 消息 → `_handleWorktreeUndo`；撤销后/失败时按 `undo` 标志隐钮
+- **R81 打开 worktree（实机终验通过）**：wtBar 增「打开 worktree」钮——`worktree-open` → 轨迹摘要 `gitWorktreePaths[0]` → `vscode.openFolder{forceNewWindow:true}` 新窗直开隔离 worktree（wmctrl 验证新窗标题为 worktree 目录名）。另实测 `CreateWorktree{targetPath?}`（standalone 建 worktree, 返回 `{worktrees:[{original:{workspaceUri,gitRootUri},worktreePath}]}`, 未接 UI 后续候选）
+- **R82 Status 诊断页（实机终验通过）**：首页 rhead 增「Status」入口——`status-info` → 宿主并发 `GetProcesses{}(lspPort)` / `GetWorkspaceInfos{}(workspaceInfos[].workspaceUri)` / `GetRepoInfos{}(repos[].name/branches[].name, 含 cascade/* worktree 分支)` / `GetDebugDiagnostics{}(languageServerDiagnostics.logs)` → 渲染 LS RPC 端口/LSP 端口/工作区/仓库分支/日志尾部。R82 探索排除：`SetPinnedContext` unimplemented；`CreateTrajectoryShare{cascadeId,shareStatus}` internal error（免费版门控）；`GetStatus{}` 恒空；`GetSuggestedContextScopeItems` 需 relative filepaths（后续候选）
+- **R83 Timeline 活动轨迹页（实机终验通过）**：首页 rhead 增「Timeline」入口——`timeline-list` → `GetUserTrajectoryDescriptions{}`(取 `current:true` 的 trajectoryId+branchName) → `GetUserTrajectory{trajectoryId}` → steps 映射摘要（GIT_COMMIT 提交信息+短哈希 / USER_INPUT / PLANNER_RESPONSE / VIEW_FILE / GREP_SEARCH_V2 / CODE_ACTION / CHECKPOINT userIntent / ERROR_MESSAGE），过滤空文本，倒序近 40 步。契约注意：steps 内大量 trace 类 PLANNER_RESPONSE 的 response 为空须过滤。另排除：`GetCascadeTranscriptForTrajectoryId` 对 cascadeId 报 trajectory not found（仅收 user trajectoryId）；`GetConversationTags` 后端已移除该特性；`SetPinnedGuideline`/`ResolveOutstandingSteps` unimplemented/恒空
+- **R84 新建 worktree（实机终验通过）**：Status 页「Language Server」节头增 ⎇＋ 钮——`worktree-create` → `CreateWorktree{}`（standalone, 免 cascade）→ `worktrees[0].worktreePath` → 刷新 Status + 信息框带「新窗打开」动作（`vscode.openFolder{forceNewWindow:true}`）。实测 git worktree list 新增分支（如 slate-jacquard）。R84 探索排除：`GetSuggestedContextScopeItems{suggestionSources(COMMIT_HISTORY=1/CURRENT_PLAN=2),query,maxItems}` 契约已明但恒报 relative filepaths must not be empty（需内部提交历史预热，未解）
+- **R85 Timeline 实时追踪（实机终验通过）**：`StreamUserTrajectoryReactiveUpdates{protocolVersion:1,id:<trajectoryId>}` 反应式流——帧到 600ms 去抖重拉 GetUserTrajectory，断流 5s 重连（与 sessions 的 StreamCascadeSummariesReactiveUpdates 同型）。实测 #177 合入拉回 main 后 Timeline 顶部自动出现新提交（无手动刷新）。契约发现：**用户轨迹按分支割裂**——每分支一条 trajectory，`current:true` 恒为主工作区当前分支；异 worktree/分支提交不入 main 轨迹
+- **R86 Outline 文件大纲页（实机终验通过）**：首页 rhead 增「Outline」入口——`outline-list` → 活动编辑器 document → 并发 `GetFunctions`/`GetClassInfos{document:{absoluteUri,workspaceUri,editorLanguage,text}}` → 类◆/函数ƒ 按行号升序渲染，点击 `open-file-line` 跳行（实测点 callStream 跳 Ln124）。**契约注意：document 必须随请求送全量 text（否则返回空 {}）；仅传 absolutePath 报 no absolute path provided，须用 absoluteUri**。functionCaptures 字段：nodeName/params/definitionLine/startLine/endLine/rawSource/cleanFunction
+- **R87 Plans 计划文档面板**：首页 rhead 增「Plans」入口——`plans-list` → `GetAllPlans{}` → `{plans:[{path(fileURI),title,description}]}` 渲染清单（▤ 标题 — 摘要），点击 `open-file` 打开计划 md；节头 ＋（`plan-create`）输入名后生成 `.windsurf/plans/<slug>.md` 骨架并打开。**契约（实测）：计划源为 `<workspace>/.windsurf/plans/*.md`，title 取首个 H1，description 取正文首段；与 Plan 模式 exit_plan_mode 的 planFile 同源**。R87 探索排除：`GetPlanDirs` HTTP 404（binary 有 symbol 但 JSON 端点未暴露）
+- **R88 从 Cursor 导入规则**：Customizations 页 Rules 节头增 ⇤ 钮——`custom-import-cursor` → 探测 `~/.cursor/rules` 与各工作区 `.cursor/rules`（多命中 quickPick，无命中开目录选择器）→ `ImportFromCursor{sourcePath}` → `{copiedFiles:[...]}` → 信息框 + 刷新清单。**契约（实测）：sourcePath 必须以 `.cursor/rules` 结尾（否则 500 source path must end with .cursor/rules）；`*.mdc` 拷入 `~/.devin/rules/*.md`（全局规则）**。R88 探索排除：`GetProfileData` 401（api server 需 token 鉴权）；`GetSystemPromptAndTools` 恒 planner config not set（cascadeConfig 包裹亦不认，且请求会短暂卡死 LS 端口探测，慎试）；`GetChangelog{version}` 恒 `{}`；`GetBrainStatus`/`GetMatchingIndexedRepos` 501 已弃用
+- **R89 Rules 清单补显全局规则**：`GetAllRules` 只返回工作区 `.windsurf/rules` 规则（R88 实机发现，重载窗口后亦然）——`_handleCustomizationsList` 直读 `~/.devin/rules/*.md`（含 Cursor 导入产物）补入 rules，name 取首个 H1（无则文件名），trigger 标 `global`，去重按 path
+- **R90 MCP 工具级开关**：MCP 面板 server 卡片工具清单改为逐工具可点 chip（●=启用 ◌=禁用灰显删除线）——`mcp-tool-toggle` → `ToggleMcpTool{serverId,toolName}`（无 enabled 参数, 纯翻转）→ 重拉清单。**契约（实测, mini-mcp stdio 假服务验证）：翻转结果写入 spec.disabledTools 并持久化到 `~/.codeium/windsurf/mcp_config.json` 的 disabledTools 数组**。R90 探索排除：`SetPinnedContext`/`SetPinnedGuideline`/`GetMatchingCodeContext` 501；`GetConversationTags` 500 已移除；`GetCascadeModelConfigs` 501（让用 GetUserStatus）；`GetUserMemories`/`GetUserTrajectoryDebug` 与既有能力重复
+- **R91 Status 页补显消息额度与待处置编辑**：`CheckUserMessageRateLimit{}` → `{hasCapacity,messagesRemaining,maxMessages,resetsInSeconds}`（-1=无限额）渲染「消息额度」节；`GetWorkspaceEditState{}` → `{workspaceEdits:[{repoRoot,…}]}` 有内容时渲染「Cascade 待处置编辑」节。R91 探索排除：`GetMessageTokenCount` 已在既有 token-query 接入（chatMessage 为 string、requestedModelId 须 Model 枚举）；`GetSuggestedContextScopeItems` 各形态恒 relative filepaths must not be empty（须 LS 内部 commit 上下文预热）；`GetCodeMapsForFile` 500 已弃用（让用 GetCodeMapsForRepos）；`RecordChatFeedback{messageId,feedback,timestamp}` 可用但纯遥测无 UI 回读价值
+- **R92 Status 页补显 Lifeguard 与 Web 白名单**：`GetLifeguardConfig{}` → `{config:{modes:{agent:{enabled,model,modelDisplayName,agentVersion}}}}` 渲染「Lifeguard 审阅」节；`GetDefaultWebOrigins{}` → `{defaultOrigins:[15 域]}` 渲染「Cascade Web 默认白名单」节。R92 探索排除：`EditConfiguration` 500 deprecated；`GetCascadeUserAllowedWebOrigins`/`CascadeRemovedDefaultWebOrigins` 仅为配置字段名（无独立 RPC 端点）；`ProgressBars{}` 恒 `{}`（需索引进行中）；`GetTranscription`（语音转写）需 webview getUserMedia，VS Code webview 麦克风受限暂缓；`InitializeCascadePanelState`/`SendActionToChatPanel`/`CaptureFile` 恒 `{}` 无回读；`ResolveOutstandingSteps` 恒 run state not found
+- **R93 MCP prompts 支持**：MCP 面板 server 卡片补 prompts 行（▤ 蓝色 chip）——`mcp-prompt-run` → 按 `arguments[].name` 逐个 inputBox 收参 → `GetMcpPrompt{serverName,promptName,arguments}` → `{messages:[{role,content:[{text}]}]}` 拼接文本 → `insert-input` 塗入 composer。**契约（实测, mini-mcp prompts/list+prompts/get 验证）：GetMcpServerStates 的 states[].prompts[{name,description,arguments[{name}]}]；server 不支持 prompts 时 GetMcpPrompt 500 does not support prompts**。踩坑：webview 内字符串 `"\n"` 也会被外层模板串吞成真换行 → 须写 `"\\n"`（同 R62 正则约定）。R93 探索排除：`CreateTrajectoryShare{cascadeId}` 恒 500 internal（空会话与出错会话均然，疑免费版/云端门控）；`GetGithubPullRequestSearchInfo` 501 knowledge base deprecated；`CheckChatCapacity{}` 与 CheckUserMessageRateLimit 重复；`WellSupportedLanguages` 纯静态清单无 UI 价值
+- **R94 MCP server 开关改走官方 RPC**：`_handleMcpToggle` 由手写读改写 mcp_config.json 换成 `UpdateMcpServerInConfigFile{serverId}`（仅 serverId 一个字段, 语义=翻转 disabled 并持久化, LS 自行重载）。**契约（实测）：请求前 disabled 缺省 → 置 true；再调 → false**。R94 探索排除：`GetTeamOrganizationalControls{}` 返回 teamId/extensionModelLabels 但对个人版无 UI 价值；`GetUnleashData{}` 返回 feature flag 上下文（含 session token, 敏感, 不入面板）；`SubmitBugReport{}` 会真发官方 Slack 频道（勿测）；`StatUri` 需 uri scheme、与 vscode.workspace.fs.stat 重复
+- **R95 停止改走同步等待**：cancel 分支由 `CancelCascadeInvocation`（发完即忘）升级为 `CancelCascadeInvocationAndWait{cascadeId}`（LS 落定运行态后回执 → 清 `_cxRunning` 并回 assistant-done），失败回退旧法。**契约（实测）：二者均 `{}` 回执；`CancelCascadeSteps{cascadeId,stepIndices[]}` 亦可用（步级撤销, 后续候选）**
+- **R96 Status 页补显 Command 模型**：`GetCommandModelConfigs{}` → `{clientModelConfigs:[{label,modelUid,provider,allowedTiers}]}` 渲染「Command 模型」节（label 清单）。R96 探索排除：`GetSystemPromptAndTools` 恒 500 planner config not set（需活跃 planner 会话）；`GetCodeValidationStates` 恒 `{}`；`RawGetChatMessage` HTTP 415（非 Connect 端点）；`MountCascadeFilesystem{cascadeId}` 500 not a RedirectFS；`GetActiveAppDeploymentForWorkspace{workspaceUri}` 恒 `{}`（Windsurf JS app 部署, 免费版无）；`GetExternalModel{apiKey}` BYOK 专用；`ShareCodeMap{codeMapJson}` 需完整 codemap JSON（后续候选）
+- **R99 步级取消**：进行中(cascade in_progress)工具步卡头部补「✕」——`cx-step-cancel{stepIndex}` → `CancelCascadeSteps{cascadeId,stepIndices:[i]}`（契约 R95 已 RPC 实测），只取消该步不停整轮。步卡消息补带 stepIndex（仅通用 tool-call 卡, diff/cmd/browse 卡不带）
+- **R101 模型下拉键盘导航（实机终验通过）**：R100 弹层补键盘可达——搜索框内 ↑/↓ 在可选项间循环移动 `.kbd` 高亮（`querySelectorAll(".mit:not(.dis)")` 自动跳过🔒门控与组头），Enter 选中当前高亮（无高亮回退 `.sel`）。实测：↓ 从选中项循环跳过全部门控项落到 BYOK 平铺项、Enter 选中同步标签、过滤后导航照常
+- **R103 官方式 agent 下拉（实机终验通过）**：agent 切换器由 native `<select id=agent>` 换成同款弹层（`#agentBtn`+`#agentMenu`）——行=图标+标签+Preview 徽标（`.bdg`），hint 副行；点击切换走原 onAgentChange（badge/图标/配置轨同步）；三弹层互斥外点关闭；Ctrl+' 循环保留（直接改 agent 变量, 不再依赖 select.value）。实测：3 agent 列出带徽标副行，Ctrl+'与点选切换均生效、配置轨恢复。**UI 债：composer pill 行在窄面板溢出裁切（agent pill/发送钮被挤出视口），R104 候选=pill 行换行或压缩**
+- **R104 pill 行折行（实机终验通过）**：`.row` 补 `flex-wrap:wrap; row-gap:2px`——窄面板（265px 左侧栏）下 agent pill/发送钮折至第二行全部可见可点（此前被裁切出视口），宽面板行为不变。实测：折行后 agent 弹层照常开合
+- **R105 mode/agent 弹层键盘导航（实机终验通过）**：document 级 keydown——任一弹层打开时 ↑↓ 循环 `.kbd` 高亮、Enter 选中（无高亮回退 `.sel`）、Escape 关闭不改选。实测：↓↓+Enter 选 Plan/切回 Write 标签同步；agent 弹层 Escape 关闭保持 Cascade
+- **R98 错误步重试**：assistant-done 文本命中 `⚠`（开头或换行后）时，气泡下追加「↻ 重试」按钮 —— 取 state.history 最后一条 user 消息回填 composer 并走原 send() 通道（运行中自动落 QueueCascadeMessage 队列）。覆盖上游 "invalid tool call"/高负载/限额等错误步的续驱体验（待续方向 5）。纯 webview 实现，无新 RPC
+- **R97 全量盘点收官**：对二进制 171 个 LanguageServerService 方法做已用/已排除差集复核，剩余未接方法均为遥测（RecordEvent/RecordLints/UploadRecentCommands/AcceptCompletion 等）、已弃用（GetKnowledgeBaseItemsForTeam 501 deprecated、UpdateConversationTags 500 removed、ForceBackgroundResearchRefresh 501 not implemented）、门控/环境不适（GetWindsurfJSAppDeployment 需 deploymentId、GetExternalModel BYOK、SetupUniversitySandbox、MountCascadeFilesystem 500 not RedirectFS）或不可达（GetSystemPromptAndTools 各 cascadeConfig 形态均 socket hang up；RawGetChatMessage 415 非 Connect）。**结论：可行 RPC 面已基本接完，后续以 UI 打磨与官方行为对齐为主**
+- R71 探索排除项：`GenerateVibeAndReplaceStreaming{prompt,files:[{fileUri}]}`（inline edit）契约正确、流帧含 MultiEdit toolCall，但免费版 LLM stream error（同 GenerateCommitMessage 门控）；`StreamUserTrajectoryReactiveUpdates{protocolVersion:1,id:<trajectoryId>}` 可用（帧结构同 summaries, 后续候选）；`StreamCascadePanelReactiveUpdates` 各 id 形态均挂起/hang up 未解；`GetCodeMapSuggestions` 各形态均 `{}`（需导航历史预热，未解）
+- R69 探索排除项：`GenerateCommitMessage{repoRootUri}` 契约正确但免费版 LLM stream error（同 R56 结论）；`StreamTerminalShellCommand` 为**双向流**（首帧须 header, Connect POST 单发不适用, 暂不接入）
+- **R107(#203) 官方式实时面板状态+账户卡配额（实机终验通过）**：
+  - **登录态 apiKey 回退（关键坑）**：会话令牌登录模式（浏览器 token 登录）**不落 credentials.toml** → 此前插件全部 LS RPC 无 apiKey 可用。回退链：credentials.toml → `~/.config/{Devin,Windsurf,…}/User/globalStorage/state.vscdb` 按字节正则提取 `windsurfAuthStatus{apiKey}`（**须遍历全部 indexOf 出现点**——首个命中常是无 JSON 的索引记录）。ls-bridge.apiKey() 与 host-discover.apiKey() 同源
+  - `GetUserStatus.userStatus.planStatus` **顶层**（planInfo 之外）实测携实时配额：`dailyQuotaRemainingPercent/weeklyQuotaRemainingPercent/availableFlexCredits/dailyQuotaResetAtUnix/weeklyQuotaResetAtUnix` → 账户卡新增 5 行（重置时刻本地时间渲染）
+  - `StreamCascadePanelReactiveUpdates{protocolVersion:1,id:<apiKey>}`（R71 时"各 id 形态均挂起"已解：**id 即 apiKey**）：Connect server-streaming，配额/套餐变化即推 fullState/diff 帧；`_watchPanelState()` 以帧为信号 400ms 去抖重拉 GetUserStatus，仅账户卡可见(_acctPopOpen)时刷新，断流 5s 重连
+  - 实机：账户卡渲染 12 行（含 今日/本周配额 100%、日/周重置时刻）；LS 端口经 host-discover /proc 扫描自发现 ✓
+- **R108(#205) 官方式地图管理: Maps 页 ★置顶/归档分区/⇗分享（实机终验通过）**：
+  - 元数据真源 = `~/.codeium/windsurf/codemaps/codemapindex.json`（starred/archived/fileName/repos，LS 持久化）；`_codeMapIndex()` 读取合并入 `GetCodeMapsForRepos` 列表；归档地图 RPC 不返回，由 index 兜底补条目（仅标题行，供恢复）
+  - `UpdateCodeMapMetadata{id,starred,archived}` = **整字段写**（未发送字段被重置 false）→ 插件发送前从 index 补齐缺省字段。**官方语义坑：archived:true 会强制清 starred（即使显式发 starred:true）**——归档往返丢星标是官方行为非缺陷（直连 RPC 复现）
+  - `ShareCodeMap{codeMapJson,fileName}` → `{shareUrl}`(windsurf.com/codemaps/…)：读 index 定位 .codemap 文件全文提交 → 复制剪贴板 + 信息框「打开」
+  - webview：mkCard 工厂（live/归档共用），★ 排序置顶、「已归档 (n)」折叠分区、卡头三钮 stopPropagation 防误展开
+  - 手工构造最小 .codemap JSON 不被 GetCodeMapsForRepos 返回（缺 traces/repo 元数据）——测试夹具须用 `GenerateCodeMap`（server-streaming，~2-3min）真实生成
+- **R109(#207) 官方式共享地图导入: Maps 页 ⇘ 导入（实机终验通过）**：
+  - `GetSharedCodeMap{codeMapId}` → `{codeMapData}`（地图 JSON 全文）；codeMapId = 分享链接末段（`uuid-hash` 复合 ID，非 stableId）
+  - `SaveCodeMapFromJson{codeMapJson}` → LS **自动重发号 id**（标题+新时间戳后缀）并落盘 `codemaps/` + codemapindex.json，导入后 GetCodeMapsForRepos 即返回（含 traces 故可列出）
+  - 两 RPC 均要求完整 `metadata{ideName,ideVersion,extensionName,extensionVersion,apiKey}`（缺任一字段 400）——lsq.js 裸调时须手工补
+  - 宿主 `_handleCodeMapImport()`：InputBox 收链接/ID → 去 query/尾斜杠取末段 → 二连 RPC → 刷新列表；webview 节头 ↻ 旁 ⇘ 钮
+- **R110(#209) 官方式建议忽略: Suggested maps 卡 × 钮**：
+  - `DismissCodeMapSuggestion{cascadeId,suggestionId}` 两字段均必填（lsq 实测；无效 cascadeId 报 "cascade not found"）→ 仅有活动会话(_cascadeLsId)时可用
+  - `GetCodeMapSuggestions` 建议对象透传 `id`；无 Cascade 上下文时该 RPC 500（"no context available… navigation history, git log, and cascade titles are all empty"）
+  - 探索排除：`GetCodeMapsForFile` 已废弃（LS 500 明示改用 GetCodeMapsForRepos）
+- **R62 热修(#146)·踩坑必读**：webview 脚本整体在 `_html` 的**模板字符串**内，其中正则里的 `\/` 会被模板字符串吞掉反斜杠 → 运行时变 `/^image//`（空正则 + 悬空 `/`）→ **整段 webview `<script>` SyntaxError, 全部交互失效**。#145 就这样带病发布(粘贴/🖼/发送全废)。**约定：webview 脚本内所有正则反斜杠都要写双份 `\\`**（`/^image\\//` 才在运行时得 `/^image\//`）。校验法：`node --check panel.js` 查不出模板串内错误，须把 `_html` 模板 eval 出真身脚本再 `node --check`（见本轮 /tmp 校验片段）
+

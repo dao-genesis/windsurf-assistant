@@ -1,0 +1,209 @@
+{
+  "name": "dao-proxy-pro",
+  "displayName": "道Agent Pro · 外接API · 反者道之动",
+  "description": "在 dao-proxy-min 反代/提示词隔离之上，新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、配置原子写+备份轮转、四面板（本源观照/渠道配置/模型路由/模型反代）、只填 API Key 自动识别模型。模型反代(反者道之动)把已接通模型反向暴露为标准 OpenAI(/v1/chat/completions)与 Anthropic(/v1/messages)本地端点，脱离 Devin Desktop 供智能家居/本地设备直调。完整版本历史见 CHANGELOG。",
+  "version": "9.9.344",
+  "publisher": "dao-agi",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dao-devin/windsurf-assistant.git",
+    "directory": "packages/dao-proxy-pro"
+  },
+  "homepage": "https://github.com/dao-devin/windsurf-assistant",
+  "icon": "media/icon.png",
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "windsurf",
+    "cascade",
+    "system-prompt",
+    "dao",
+    "proxy",
+    "外接api",
+    "third-party",
+    "BYOK",
+    "道德经",
+    "反代",
+    "pro"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "dao-proxy-pro runs in all workspaces"
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dao-container",
+          "title": "道Agent Pro",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dao-container": [
+        {
+          "id": "daopp.essence",
+          "name": "本源观照",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "daopp.originInvert",
+        "title": "道Agent Pro: 启 (invert · 道德经前置 · 彻删官方着相)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.originPassthrough",
+        "title": "官方Agent: 启 (passthrough · 锚归云 · 直连)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.toggleMode",
+        "title": "道Agent Pro: 切换模式 (道 ⇄ 官方)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.openPreview",
+        "title": "道Agent Pro: 浏览器观真 SP (/origin/preview)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.verifyEndToEnd",
+        "title": "全链路自检 (E2E)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.selftest",
+        "title": "闭环自检 (L1 + L2)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.外接api.toggle",
+        "title": "道Agent Pro: 外接 api 开关 (第三方API路由 · 默开)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.eaConfig",
+        "title": "道Agent Pro: 外接API 热配置 (Provider+路由 · 不重启)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.restoreOfficial",
+        "title": "道Agent Pro: 复原官方直连 (卸载善后/解锚 · 卡死自救)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.term.exec",
+        "title": "道Agent Pro: 终端会话池 · exec (七层一招治 · 零第三方)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.term.list",
+        "title": "道Agent Pro: 终端会话池 · list (列所有 sid · 终端池状)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.term.close",
+        "title": "道Agent Pro: 终端会话池 · close (选 sid 关 · 释 shell 进程)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.modelUnlock.toggle",
+        "title": "道Agent Pro: 模型解锁 开关 (执大象天下往 · 全量109模型注入)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.modelUnlock.status",
+        "title": "道Agent Pro: 模型解锁 状态 (查看全量模型目录)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.revproxy.toggle",
+        "title": "道Agent Pro: 模型反代 开关 (反者道之动 · 标准 OpenAI/Anthropic 本地端点)",
+        "category": "道Agent Pro"
+      },
+      {
+        "command": "daopp.revproxy.status",
+        "title": "道Agent Pro: 模型反代 状态 (端点/Key/可反代模型)",
+        "category": "道Agent Pro"
+      }
+    ],
+    "configuration": {
+      "title": "道Agent Pro",
+      "properties": {
+        "dao.origin.port": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "源.js 反代端口 (0=自动 per-user FNV-1a hash · 8889..8988 · 多账号自然隔离). 非0则覆盖."
+        },
+        "dao.origin.defaultMode": {
+          "type": "string",
+          "default": "invert",
+          "enum": [
+            "invert",
+            "passthrough",
+            "custom"
+          ],
+          "enumDescriptions": [
+            "invert — 道Agent · 道德经直为前置 + 彻删官方一切着相之名 (身份/风格/规训) · 工具本身全保不动",
+            "passthrough — 官方Agent · 锚归云 · 直连",
+            "custom — 自定义SP · 用户编辑 _customSp.txt · 保留实时信息块"
+          ],
+          "description": "首激默模 (三态互斥 · 无off)"
+        },
+        "dao.origin.banner": {
+          "type": "boolean",
+          "default": false,
+          "description": "启动时显道德经横幅 (默认 false · 不言之教)"
+        },
+        "dao.外接api.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "外接第三方API路由 · Pro版默开 · 启后: dao_router 加载配置.json · 匹配modelUid → 第三方API · 不匹配 → 官方透传 · 道并行而不相悖. 配 ~/.codeium/dao-byok/配置.json 填 provider+apiKey."
+        },
+        "dao.modelUnlock.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "模型解锁 · 执大象天下往 · 拦截GetUserSettings响应注入全量109模型目录 · 突破账号权限限制 · 前端显示所有模型"
+        },
+        "dao.revproxy.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "模型反代 · 反者道之动 · 把『渠道配置/模型路由』已接通模型反向暴露为标准 OpenAI(/v1/chat/completions,/v1/models)与 Anthropic(/v1/messages)本地端点 · 脱离 Devin Desktop · 供智能家居/本地脚本/其他设备以标准 SDK 直调. 配置落 ~/.codeium/dao-byok/revproxy.json. 默认关 · 在④模型反代面板开启."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node vendor/外接api/core/dao-test.js",
+    "test:quick": "node vendor/外接api/core/dao-test.js --quick",
+    "test:e2e": "node vendor/外接api/core/dao-test.js --e2e",
+    "test:protocol": "node vendor/外接api/core/dao-test.js --protocol",
+    "test:revproxy": "node vendor/外接api/core/_revproxy_selftest.js",
+    "test:lswedge": "node vendor/外接api/core/_lswedge_selftest.js",
+    "package": "vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.84.0",
+    "@vscode/vsce": "^3.9.1"
+  }
+}

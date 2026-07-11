@@ -1,0 +1,52 @@
+{
+  "name": "@windsurf-assistant/dao-devin-vm",
+  "version": "0.122.0",
+  "description": "印 122 · 反者道之动 · Devin VM 反代核心 + 自启换之 watchdog (deployer + dao_proxy + vm_omni spawner + vm_proxy_deploy + meta_router 三池 + vm_pool_watchdog 自换)",
+  "private": true,
+  "main": "deployer.js",
+  "bin": {
+    "dao-devin-deploy": "deployer.js",
+    "dao-devin-watchdog": "vm_pool_watchdog.js",
+    "dao-devin-meta-deploy": "vm_meta_deploy.js"
+  },
+  "files": [
+    "deployer.js",
+    "dao_proxy.js",
+    "vm_omni.js",
+    "vm_proxy_deploy.js",
+    "vm_meta_deploy.js",
+    "meta_router.cjs",
+    "sp_observe_patch.js",
+    "vm_pool_watchdog.js",
+    "silk/",
+    "README.md"
+  ],
+  "scripts": {
+    "deploy": "node deployer.js",
+    "deploy:dry": "node deployer.js --n 1 --dry-gist",
+    "deploy:reuse": "node deployer.js --reuse-pool --n 1 --dry-gist",
+    "watchdog": "node vm_pool_watchdog.js",
+    "watchdog:once": "node vm_pool_watchdog.js --once --no-spawn",
+    "meta:deploy": "node vm_meta_deploy.js --idx 0 --restart"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "devin",
+    "vm",
+    "proxy",
+    "reverse-proxy",
+    "openai-compatible",
+    "github-actions",
+    "fleet",
+    "watchdog",
+    "meta-router",
+    "yin115",
+    "yin121",
+    "yin122"
+  ],
+  "license": "Apache-2.0",
+  "author": "zhouyoukang",
+  "_道": "印 115→122 · 反者道之动 · 自启换之 · 软伴软启 · 鸡犬相闻 · 民至老死不相往来"
+}

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>DAO 模型反代 · 网页对话台</title>
+<style>
+  :root {
+    --bg: #0e1116; --bg2: #161b22; --bg3: #1f2630; --line: #2a313c;
+    --fg: #d6dde7; --fg2: #8b97a6; --acc: #4aa3ff; --green: #3fb950;
+    --red: #f85149; --yellow: #d29922; --user: #1f3a5f; --bot: #1b222c;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    background: var(--bg2); border-bottom: 1px solid var(--line); flex: none;
+  }
+  header .title { font-weight: 600; font-size: 15px; letter-spacing: .5px; }
+  header .title small { color: var(--fg2); font-weight: 400; margin-left: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg2); flex: none; }
+  .dot.ok { background: var(--green); } .dot.bad { background: var(--red); }
+  .spacer { flex: 1; }
+  button, select, input, textarea {
+    font: inherit; color: var(--fg); background: var(--bg3);
+    border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; outline: none;
+  }
+  button { cursor: pointer; transition: background .12s, border-color .12s; }
+  button:hover { border-color: var(--acc); }
+  button.primary { background: var(--acc); color: #04101e; border-color: var(--acc); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .main { flex: 1; display: flex; min-height: 0; }
+  .side {
+    width: 320px; flex: none; background: var(--bg2); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; overflow-y: auto; padding: 12px; gap: 14px;
+  }
+  .side h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg2); }
+  .card { background: var(--bg3); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+  .field label { font-size: 12px; color: var(--fg2); }
+  .field input, .field select, .field textarea { width: 100%; }
+  .chatwrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .msgs { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 860px; width: fit-content; padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: var(--bot); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+  .msg.bot.err { border-color: var(--red); color: #ffb4ae; }
+  .msg .meta { font-size: 11px; color: var(--fg2); margin-bottom: 4px; }
+  .msg .think { color: var(--fg2); font-style: italic; border-left: 2px solid var(--line); padding-left: 8px; margin-bottom: 6px; font-size: 13px; }
+  .composer { flex: none; border-top: 1px solid var(--line); padding: 12px; background: var(--bg2); }
+  .composer textarea { width: 100%; resize: none; min-height: 46px; max-height: 200px; }
+  .mlist { display: flex; flex-direction: column; gap: 6px; }
+  .fam { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--bg2); }
+  .fam .fhead { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .fam .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fam select { font-size: 12px; padding: 3px 6px; max-width: 150px; }
+  .badge { font-size: 10px; padding: 1px 6px; border-radius: 10px; border: 1px solid; }
+  .badge.green { color: var(--green); border-color: var(--green); }
+  .badge.red { color: var(--red); border-color: var(--red); }
+  .badge.yellow { color: var(--yellow); border-color: var(--yellow); }
+  .stat { font-size: 12px; color: var(--fg2); }
+  .stat b { color: var(--fg); }
+  .test-item { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .test-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .test-item .rt { color: var(--fg2); }
+  .hint { font-size: 11px; color: var(--fg2); }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--acc); color: var(--fg); padding: 9px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
+  .toast.show { opacity: 1; }
+  .menu-btn { display: none; }
+  @media (max-width: 760px) {
+    .side { position: absolute; z-index: 5; height: calc(100% - 44px); box-shadow: 4px 0 16px rgba(0,0,0,.5); transform: translateX(-105%); transition: transform .2s; }
+    .side.open { transform: translateX(0); }
+    .menu-btn { display: inline-flex; }
+    .msg { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <button class="menu-btn" id="menuBtn" title="模块">☰</button>
+  <span class="dot" id="conn"></span>
+  <span class="title">DAO 模型反代 · 网页对话台 <small id="ver"></small></span>
+  <span class="spacer"></span>
+  <span class="stat" id="topStat"></span>
+</header>
+<div class="main">
+  <aside class="side" id="side">
+    <div>
+      <h3>① 接入 · API Key</h3>
+      <div class="card">
+        <div class="field">
+          <label>Bearer Key（远程访问必填 · 本机自动带出）</label>
+          <input id="key" type="password" placeholder="dao-local-xxxx" autocomplete="off" />
+        </div>
+        <div class="row">
+          <button id="saveKey">保存</button>
+          <button id="showKey">显示</button>
+          <span class="hint" id="keyHint"></span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>② 模型 · 一切可反代</h3>
+      <div class="row" style="margin-bottom:8px">
+        <button id="refresh">刷新</button>
+        <span class="stat" id="modelStat"></span>
+      </div>
+      <div class="mlist" id="mlist"></div>
+    </div>
+    <div>
+      <h3>③ AI 测试验证</h3>
+      <div class="card">
+        <div class="row" style="margin-bottom:8px">
+          <button id="testActive">测试当前模型</button>
+          <button id="testAll">逐一测全部</button>
+        </div>
+        <div class="hint">向各模型发一条最小探针，记录连通/时延/回包。</div>
+        <div id="testOut" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </aside>
+  <section class="chatwrap">
+    <div class="msgs" id="msgs"></div>
+    <div class="composer">
+      <div class="row" style="margin-bottom:8px">
+        <label class="hint" for="model">模型</label>
+        <select id="model" style="flex:1;min-width:120px"></select>
+        <label class="hint"><input type="checkbox" id="stream" checked style="vertical-align:-2px" /> 流式</label>
+        <button id="clear">清空</button>
+      </div>
+      <div class="field" style="margin:0 0 8px">
+        <input id="sys" placeholder="系统提示（可选）" />
+      </div>
+      <div class="row">
+        <textarea id="input" placeholder="输入消息，Enter 发送 · Shift+Enter 换行" rows="1"></textarea>
+        <button class="primary" id="send">发送</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function () {
+  "use strict";
+  // ── 同源 API base：从本页路径剥去 /origin/revproxy/<...> 后缀，得到挂载前缀 ──
+  //   支持被反代到子路径前缀（如经隧道 /prefix/origin/revproxy/console）。
+  var BASE = (function () {
+    var p = location.pathname || "/";
+    var i = p.indexOf("/origin/revproxy");
+    var base = i >= 0 ? p.slice(0, i) : "";
+    return base.replace(/[/]+$/, "");
+  })();
+  function api(path) { return BASE + path; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { models: [], families: [], history: [], busy: false, key: "" };
+
+  function toast(t) {
+    var el = $("toast"); el.textContent = t; el.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(function () { el.classList.remove("show"); }, 2200);
+  }
+  function loadKey() {
+    try { return localStorage.getItem("dao_revproxy_key") || ""; } catch (e) { return ""; }
+  }
+  function saveKeyVal(v) {
+    state.key = v || "";
+    try { if (v) localStorage.setItem("dao_revproxy_key", v); else localStorage.removeItem("dao_revproxy_key"); } catch (e) {}
+  }
+  function authHeaders(extra) {
+    var h = extra || {};
+    if (state.key) h["Authorization"] = "Bearer " + state.key;
+    return h;
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>]/g, function (c) {
+      return c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;";
+    });
+  }
+
+  // ── 状态 + 模型列表 ──
+  function refresh() {
+    $("conn").className = "dot";
+    fetch(api("/origin/revproxy/status"), { headers: authHeaders() })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) throw new Error((d && d.error) || "status error");
+        $("conn").className = "dot ok";
+        $("ver").textContent = d.version ? "v" + d.version : "";
+        if (d.apiKey && !state.key) { saveKeyVal(d.apiKey); $("key").value = d.apiKey; $("keyHint").textContent = "已自动带出本机 key"; }
+        state.models = d.models || [];
+        state.families = d.families || [];
+        var s = d.stats || {};
+        $("topStat").innerHTML = "模型 <b>" + (d.model_count || state.models.length) + "</b> · "
+          + '<span style="color:var(--green)">●</span> ' + (s.green || 0)
+          + ' <span style="color:var(--red)">●</span> ' + (s.red || 0)
+          + (d.premiumQuota && d.premiumQuota !== "unknown" ? " · 付费配额:" + d.premiumQuota : "")
+          + (d.enabled ? "" : " · ⚠ 反代未启用");
+        $("modelStat").textContent = state.models.length + " 个模型 / " + state.families.length + " 族";
+        renderModels();
+        renderModelSelect();
+      })
+      .catch(function (e) {
+        $("conn").className = "dot bad";
+        $("topStat").textContent = "连接失败: " + e.message;
+      });
+  }
+
+  function colorOf(m) { return m.color === "green" || m.color === "red" || m.color === "yellow" ? m.color : "yellow"; }
+
+  function renderModels() {
+    var box = $("mlist"); box.innerHTML = "";
+    // 多档族用家族控件（可热切档位）；其余按单模型行渲染。
+    var inFamily = {};
+    state.families.forEach(function (f) {
+      (f.members || []).forEach(function (mm) { inFamily[mm.id] = true; });
+      var div = document.createElement("div");
+      div.className = "fam";
+      var head = document.createElement("div"); head.className = "fhead";
+      var active = (f.members || []).filter(function (x) { return x.id === f.activeUid; })[0] || {};
+      head.innerHTML = '<span class="badge ' + colorOf(active) + '">●</span>'
+        + '<span class="fname" title="' + esc(f.familyLabel) + '">' + esc(f.familyLabel || f.familyUid) + '</span>';
+      if (f.multi) {
+        var sel = document.createElement("select");
+        (f.members || []).forEach(function (mm) {
+          var o = document.createElement("option");
+          o.value = mm.id; o.textContent = (mm.label || mm.id) + (mm.free ? " ·免费" : "");
+          if (mm.id === f.activeUid) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.onchange = function () { switchTier(f.familyUid, sel.value); };
+        head.appendChild(sel);
+      } else {
+        var sp = document.createElement("span"); sp.className = "hint"; sp.textContent = active.free ? "免费" : "";
+        head.appendChild(sp);
+      }
+      div.appendChild(head);
+      box.appendChild(div);
+    });
+    // 非家族归组的独立模型（渠道/stub 等）
+    var loose = state.models.filter(function (m) { return !inFamily[m.id] && !m.dao_family; });
+    if (loose.length) {
+      loose.slice(0, 200).forEach(function (m) {
+        var div = document.createElement("div"); div.className = "fam";
+        div.innerHTML = '<div class="fhead"><span class="badge ' + colorOf(m) + '">●</span>'
+          + '<span class="fname" title="' + esc(m.id) + '">' + esc(m.label || m.id) + '</span>'
+          + (m.free ? '<span class="hint">免费</span>' : '<span class="hint">' + esc(m.provider || m.owned_by || "") + '</span>') + '</div>';
+        div.style.cursor = "pointer";
+        div.onclick = function () { selectModel(m.id); toast("已选模型 " + m.id); };
+        box.appendChild(div);
+      });
+    }
+  }
+
+  function renderModelSelect() {
+    var sel = $("model"); var prev = sel.value; sel.innerHTML = "";
+    var seen = {};
+    function addOpt(id, label) {
+      if (seen[id]) return; seen[id] = true;
+      var o = document.createElement("option"); o.value = id; o.textContent = label || id; sel.appendChild(o);
+    }
+    // 家族别名（干净名 → 当前活跃档）优先，便于直观选择
+    state.families.forEach(function (f) {
+      var alias = f.aliasSlug && f.aliasSlug !== f.activeUid ? f.aliasSlug : f.activeUid;
+      addOpt(alias, (f.familyLabel || f.familyUid) + (f.multi ? " ·当前档" : ""));
+    });
+    state.models.forEach(function (m) { if (!m.dao_family) addOpt(m.id, (m.label || m.id) + (m.free ? " ·免费" : "")); });
+    if (prev && seen[prev]) sel.value = prev;
+  }
+  function selectModel(id) {
+    var sel = $("model");
+    var found = Array.prototype.some.call(sel.options, function (o) { return o.value === id; });
+    if (!found) { var o = document.createElement("option"); o.value = id; o.textContent = id; sel.appendChild(o); }
+    sel.value = id;
+  }
+
+  function switchTier(familyUid, modelUid) {
+    fetch(api("/origin/revproxy/tier"), {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ familyUid: familyUid, modelUid: modelUid })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.ok) { toast("已切档 " + modelUid); refresh(); }
+      else toast("切档失败: " + ((d && d.error) || "?"));
+    }).catch(function (e) { toast("切档失败: " + e.message); });
+  }
+
+  // ── 对话 ──
+  function addMsg(role, text, opts) {
+    opts = opts || {};
+    var box = $("msgs");
+    var div = document.createElement("div");
+    div.className = "msg " + (role === "user" ? "user" : "bot") + (opts.err ? " err" : "");
+    if (opts.meta) { var mt = document.createElement("div"); mt.className = "meta"; mt.textContent = opts.meta; div.appendChild(mt); }
+    if (role !== "user") { var th = document.createElement("div"); th.className = "think"; th.style.display = "none"; div.appendChild(th); div._think = th; }
+    var body = document.createElement("div"); body.textContent = text || ""; div.appendChild(body); div._body = body;
+    box.appendChild(div); box.scrollTop = box.scrollHeight;
+    return div;
+  }
+  function setBody(div, text) { div._body.textContent = text; $("msgs").scrollTop = $("msgs").scrollHeight; }
+  function setThink(div, text) { if (!div._think) return; div._think.style.display = text ? "block" : "none"; div._think.textContent = text; }
+
+  function send() {
+    if (state.busy) return;
+    var text = $("input").value.trim();
+    if (!text) return;
+    var model = $("model").value;
+    if (!model) { toast("请先选择模型"); return; }
+    var sys = $("sys").value.trim();
+    $("input").value = ""; autoGrow();
+    addMsg("user", text);
+    state.history.push({ role: "user", content: text });
+
+    var messages = [];
+    if (sys) messages.push({ role: "system", content: sys });
+    messages = messages.concat(state.history);
+
+    var stream = $("stream").checked;
+    var botDiv = addMsg("bot", "", { meta: model + (stream ? " · 流式" : "") });
+    state.busy = true; $("send").disabled = true;
+    var t0 = Date.now();
+
+    var payload = { model: model, messages: messages, stream: stream };
+    fetch(api("/v1/chat/completions"), {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(payload)
+    }).then(function (r) {
+      if (!stream) {
+        return r.json().then(function (d) {
+          if (d && d.error) { setBody(botDiv, "✗ " + (d.error.message || JSON.stringify(d.error))); botDiv.className = "msg bot err"; return; }
+          var c = d && d.choices && d.choices[0] && d.choices[0].message ? d.choices[0].message.content : "";
+          setBody(botDiv, c || "(空回包)");
+          state.history.push({ role: "assistant", content: c || "" });
+          botDiv.querySelector(".meta").textContent = model + " · " + ((Date.now() - t0) / 1000).toFixed(1) + "s"
+            + (d.usage ? " · tok " + (d.usage.completion_tokens || "?") : "");
+        });
+      }
+      if (!r.ok && r.status !== 200) {
+        return r.text().then(function (tx) { setBody(botDiv, "✗ HTTP " + r.status + " " + tx.slice(0, 400)); botDiv.className = "msg bot err"; });
+      }
+      return readStream(r, botDiv, model, t0);
+    }).catch(function (e) {
+      setBody(botDiv, "✗ " + e.message); botDiv.className = "msg bot err";
+    }).then(function () { state.busy = false; $("send").disabled = false; });
+  }
+
+  function readStream(resp, botDiv, model, t0) {
+    var reader = resp.body.getReader();
+    var dec = new TextDecoder();
+    var buf = "", acc = "", think = "";
+    function pump() {
+      return reader.read().then(function (res) {
+        if (res.done) {
+          state.history.push({ role: "assistant", content: acc });
+          botDiv.querySelector(".meta").textContent = model + " · " + ((Date.now() - t0) / 1000).toFixed(1) + "s";
+          if (!acc && !think) setBody(botDiv, "(空回包)");
+          return;
+        }
+        buf += dec.decode(res.value, { stream: true });
+        var lines = buf.split("\n"); buf = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line || line.indexOf("data:") !== 0) continue;
+          var data = line.slice(5).trim();
+          if (data === "[DONE]") continue;
+          try {
+            var j = JSON.parse(data);
+            if (j.error) { setBody(botDiv, "✗ " + (j.error.message || JSON.stringify(j.error))); botDiv.className = "msg bot err"; continue; }
+            var d = j.choices && j.choices[0] && j.choices[0].delta ? j.choices[0].delta : {};
+            if (d.reasoning_content || d.thinking) { think += (d.reasoning_content || d.thinking); setThink(botDiv, think); }
+            if (d.content) { acc += d.content; setBody(botDiv, acc); }
+          } catch (e) { /* 守柔: 跳过半帧 */ }
+        }
+        return pump();
+      });
+    }
+    return pump();
+  }
+
+  // ── AI 测试验证：向模型发最小探针 ──
+  function probe(model) {
+    var t0 = Date.now();
+    return fetch(api("/v1/chat/completions"), {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ model: model, stream: false, max_tokens: 16, messages: [{ role: "user", content: "ping" }] })
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        var dt = Date.now() - t0;
+        if (d && d.error) return { ok: false, ms: dt, msg: d.error.message || "error" };
+        var c = d && d.choices && d.choices[0] && d.choices[0].message ? d.choices[0].message.content : "";
+        return { ok: r.ok && !!c, ms: dt, msg: (c || "").slice(0, 40) };
+      });
+    }).catch(function (e) { return { ok: false, ms: Date.now() - t0, msg: e.message }; });
+  }
+  function renderTest(items) {
+    var out = $("testOut"); out.innerHTML = "";
+    items.forEach(function (it) {
+      var div = document.createElement("div"); div.className = "test-item";
+      var mark = it.pending ? "·" : (it.ok ? "✓" : "✗");
+      var col = it.pending ? "var(--fg2)" : (it.ok ? "var(--green)" : "var(--red)");
+      div.innerHTML = '<span style="color:' + col + ';width:14px">' + mark + '</span>'
+        + '<span class="nm" title="' + esc(it.model) + '">' + esc(it.model) + '</span>'
+        + '<span class="rt">' + (it.pending ? "…" : (it.ms + "ms")) + '</span>';
+      if (!it.pending && it.msg) { div.title = it.msg; }
+      out.appendChild(div);
+    });
+  }
+  function testModels(list) {
+    if (!list.length) { toast("无可测模型"); return; }
+    var items = list.map(function (m) { return { model: m, pending: true }; });
+    renderTest(items);
+    var i = 0;
+    function next() {
+      if (i >= items.length) { toast("测试完成"); return; }
+      var idx = i++;
+      probe(items[idx].model).then(function (r) {
+        items[idx] = { model: items[idx].model, ok: r.ok, ms: r.ms, msg: r.msg };
+        renderTest(items); next();
+      });
+    }
+    next();
+  }
+
+  // ── 交互绑定 ──
+  function autoGrow() { var t = $("input"); t.style.height = "auto"; t.style.height = Math.min(200, t.scrollHeight) + "px"; }
+  $("input").addEventListener("input", autoGrow);
+  $("input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  $("send").onclick = send;
+  $("clear").onclick = function () { state.history = []; $("msgs").innerHTML = ""; };
+  $("refresh").onclick = refresh;
+  $("saveKey").onclick = function () { saveKeyVal($("key").value.trim()); toast("已保存 key"); refresh(); };
+  $("showKey").onclick = function () { var k = $("key"); k.type = k.type === "password" ? "text" : "password"; };
+  $("testActive").onclick = function () { var m = $("model").value; if (m) testModels([m]); };
+  $("testAll").onclick = function () {
+    var ids = [];
+    state.families.forEach(function (f) { ids.push(f.aliasSlug && f.aliasSlug !== f.activeUid ? f.aliasSlug : f.activeUid); });
+    state.models.forEach(function (m) { if (!m.dao_family && ids.indexOf(m.id) < 0) ids.push(m.id); });
+    testModels(ids.slice(0, 40));
+  };
+  $("menuBtn").onclick = function () { $("side").classList.toggle("open"); };
+
+  // 启动
+  state.key = loadKey();
+  $("key").value = state.key;
+  refresh();
+  setInterval(function () { if (!state.busy) refresh(); }, 30000);
+})();
+</script>
+</body>
+</html>
