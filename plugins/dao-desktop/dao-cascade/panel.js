@@ -840,7 +840,7 @@ class CascadePanelProvider {
   async _handleMemoriesList() {
     try {
       const ls = require("./ls-bridge");
-      const r = await ls.call("GetCascadeMemories", {});
+      const r = (await ls.call("GetCascadeMemories", {})) || {};
       // 官方双源: 账号级 GetUserMemories 与工作区级 GetCascadeMemories 合并(按 id 去重)
       try {
         const um = await ls.call("GetUserMemories", {});
@@ -1374,6 +1374,13 @@ class CascadePanelProvider {
       const ps = u.planStatus || {};
       const pi = ps.planInfo || {};
       const num = (x) => (typeof x === "number" ? x : (x === undefined || x === null ? null : Number(x)));
+      // 官方式团队管控: GetTeamOrganizationalControls → 组织级可用模型标签(先取缓存, 首帧即带标签)
+      if (this._teamModelLabels === undefined) {
+        try {
+          const tc = await ls.call("GetTeamOrganizationalControls", {});
+          this._teamModelLabels = ((tc && tc.controls) || {}).extensionModelLabels || [];
+        } catch (_) { this._teamModelLabels = []; }
+      }
       this._post({ type: "account", name: u.name || "", email: u.email || "",
         plan: pi.planName || "", promptCredits: pi.monthlyPromptCredits || 0,
         flowCredits: pi.monthlyFlowCredits || 0, maxInputTokens: pi.maxNumChatInputTokens || "",
@@ -1381,13 +1388,6 @@ class CascadePanelProvider {
         flexCredits: num(ps.availableFlexCredits),
         dailyResetUnix: num(ps.dailyQuotaResetAtUnix), weeklyResetUnix: num(ps.weeklyQuotaResetAtUnix),
         teamModelLabels: this._teamModelLabels || [] });
-      // 官方式团队管控: GetTeamOrganizationalControls → 组织级可用模型标签(一次性拉取缓存)
-      if (this._teamModelLabels === undefined) {
-        try {
-          const tc = await ls.call("GetTeamOrganizationalControls", {});
-          this._teamModelLabels = ((tc && tc.controls) || {}).extensionModelLabels || [];
-        } catch (_) { this._teamModelLabels = []; }
-      }
       this._watchPanelState();
     } catch (e) { this._post({ type: "error", text: "读取账户状态失败: " + e.message }); }
   }
