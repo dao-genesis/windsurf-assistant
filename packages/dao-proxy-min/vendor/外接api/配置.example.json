@@ -1,0 +1,70 @@
+{
+  "_道": "外接api · 配置极简版 · 一键开通会自动填这里 · 14 家 provider 全字段见 配置.full.example.json",
+  "_本源": "settings.json:codeium.apiServerUrl=:8878 → 010反代 → 070桥 → 070网关 :11435 → 上游",
+  "_用法": "复制为 配置.json · 或直接跑 →一键开通.cmd 自动填",
+
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 11435,
+    "logLevel": "info"
+  },
+
+  "providers": {
+    "github": {
+      "_注": "GitHub Models 免费 · 取 PAT: https://github.com/settings/tokens (fine-grained · 仅勾 Models)",
+      "enabled": false,
+      "driver": "openai",
+      "baseUrl": "https://models.github.ai/inference",
+      "apiKey": "",
+      "label": "GitHub Models",
+      "models": [
+        "openai/gpt-4o-mini",
+        "openai/gpt-4.1-mini",
+        "openai/gpt-4.1",
+        "deepseek/deepseek-v3-0324",
+        "meta/llama-3.3-70b-instruct"
+      ]
+    },
+    "ollama": {
+      "_注": "本地 · 装 Ollama 后改 enabled:true · 零网络 · auto = 自动列已下载模型",
+      "enabled": false,
+      "baseUrl": "http://127.0.0.1:11434",
+      "models": ["auto"]
+    },
+    "lgcode": {
+      "_注": "LG-Code · new-api 聚合中转 · OpenAI 兼容 · 注册取 token: https://lgcode.lgtc.top",
+      "_激活": ".\\_lgcode_activate.ps1 sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "enabled": false,
+      "driver": "openai",
+      "baseUrl": "https://lgcode.lgtc.top/v1",
+      "apiKey": "",
+      "label": "LG-Code",
+      "models": [
+        "claude-sonnet-4-5-20250929",
+        "claude-opus-4-5-20250929",
+        "claude-haiku-4-5-20251001",
+        "gpt-4o",
+        "gpt-4.1",
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ]
+    }
+  },
+
+  "cascadeInjection": {
+    "_注": "用户唯一开关 · enabled=true 时 070 桥把 injectModels 注入 Cascade 模型选择器",
+    "_后手": "010-反代_Proxy 启动 · settings.json:codeium.apiServerUrl=http://127.0.0.1:8878",
+    "_一键": "→一键开通.cmd 自动办妥后手",
+    "enabled": false,
+    "injectModels": [
+      {
+        "provider": "github",
+        "model": "openai/gpt-4.1-mini",
+        "label": "GPT-4.1 mini (免费 · GitHub)",
+        "supportsImages": false,
+        "supportsToolCalls": true,
+        "maxTokens": 128000
+      }
+    ]
+  }
+}

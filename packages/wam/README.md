@@ -1,5 +1,10 @@
 # WAM · RT Flow · v4.8.5 · 道法自然 · 万法归宗
 
+> **一气化三清 · Three Pure · 道并行而不悖**
+> [I · 反代 API · `dao-core`](../dao-core/README.md) &middot; **II · 切号 WAM · 本** &middot; [III · 提示词反代 · `dao-proxy-min`](../dao-proxy-min/README.md)
+>
+> wam 服 Windsurf IDE 多账号轮转 · dao-core 服任意 OpenAI 客户端 · dao-proxy-min 服 Cascade 提示词替换. 三者正交, **道并行而不悖**.
+
 > 太上，下知有之 · 道法自然 · 用户无为 · 插件无不为
 >
 > *天下莫柔弱于水，而攻坚强者莫之能胜也，以其无以易之也*
