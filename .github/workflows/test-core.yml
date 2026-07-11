@@ -12,9 +12,13 @@ on:
   pull_request:
     paths:
       - 'packages/dao-core/**'
+      - 'packages/dao-devin-vm/**'
+      - 'packages/dao-proxy-min/**'
+      - 'packages/wam/**'
       - 'web/**'
       - 'tests/**'
       - 'scripts/**'
+      - '.github/workflows/test-core.yml'
   workflow_dispatch:
 
 jobs:
@@ -26,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Syntax check all dao-core files
         run: |

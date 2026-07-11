@@ -1,5 +1,10 @@
 # 道Agent · dao-proxy-min · **v9.9.53** · 首尾互文双锚 · 道法自然
 
+> **一气化三清 · Three Pure · 道并行而不悖**
+> [I · 反代 API · `dao-core`](../dao-core/README.md) &middot; [II · 切号 WAM · `wam`](../wam/README.md) &middot; **III · 提示词反代 · 本**
+>
+> dao-proxy-min 服 Cascade 提示词替换；dao-core 服任意 OpenAI 客户端；wam 服 Windsurf IDE 多账号轮转。三者正交，**道并行而不悖**。
+
 > **反者, 道之动; 弱者, 道之用.** —《四十章》
 > **损之又损, 以至于无为, 无为而无不为.** —《四十八章》
 > **道法自然.** —《二十五章》

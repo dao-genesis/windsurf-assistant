@@ -1,0 +1,21 @@
+{
+  "name": "dao-byok-gateway",
+  "version": "1.0.0",
+  "description": "万法归宗 · 外接api 网关 · 第三方 API 无感接入 Windsurf",
+  "main": "server.js",
+  "bin": {
+    "dao-byok-gateway": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node server.js --test",
+    "debug": "node server.js --log-level=debug"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "万法归宗",
+  "license": "ISC",
+  "private": true,
+  "dependencies": {}
+}
