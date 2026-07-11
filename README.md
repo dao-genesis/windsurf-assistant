@@ -1,6 +1,6 @@
 # Windsurf Assistant · 道法自然
 
-三个 VS Code / Windsurf 同源插件：**多账号一键切换** + **反代换底层提示词**（精简示范版 + 全功能 Pro 版），彻底解锁 agent 能力。三插分而治之、同装互不干扰（道并行而不相悖）。
+四个 VS Code / Windsurf 同源插件：**多账号一键切换（rt-flow）** + **反代换底层提示词**（精简示范 dao-proxy-min + 全功能 dao-proxy-pro）+ **Devin Desktop 插件版（dao-desktop）**，彻底解锁 agent 能力。各插分而治之、同装互不干扰（道并行而不相悖）。
 
 > **一气化三清 · Three Pure · 道并行而不悖** · 印 65 三清立 · 印 101 大道至简 · 反者道之动 · 为道日损.
 
@@ -11,17 +11,15 @@
 
 <div align="center">
 
-[![windsurf完美外接第三方模型 满足一切暗黑需求](media/video-proxypro.jpg)](https://www.bilibili.com/video/BV1Cdjn6VEhF)
+[![windsurf完美外接第三方模型 满足一切暗黑需求](docs/media/bv1cdjn6vehf-cover.jpg)](https://www.bilibili.com/video/BV1Cdjn6VEhF)
 
 **▶ [windsurf 完美外接第三方模型 · 满足一切暗黑需求（dao-proxy-pro）](https://www.bilibili.com/video/BV1Cdjn6VEhF)**
 
-[![windsurf反代+替换官方底层提示词 彻底解锁agent所有能力](media/video-windsurf.jpg)](https://www.bilibili.com/video/BV1sY9sBLE5M)
-
-**▶ [windsurf 反代 + 替换官方底层提示词 · 彻底解锁 agent 所有能力](https://www.bilibili.com/video/BV1sY9sBLE5M)**
-
-[![阴符经+AI 根除AI一切道德感](media/video-yinfu.jpg)](https://www.bilibili.com/video/BV1cELA6QEBY)
+[![阴符经+AI 根除AI一切道德感](docs/media/bv1cela6qeby-cover.jpg)](https://www.bilibili.com/video/BV1cELA6QEBY)
 
 **▶ [阴符经 + AI · 根除 AI 一切道德感](https://www.bilibili.com/video/BV1cELA6QEBY)**
+
+**▶ [windsurf 反代 + 替换官方底层提示词 · 彻底解锁 agent 所有能力](https://www.bilibili.com/video/BV1sY9sBLE5M)**
 
 **🌐 [打开自动播放主页（GitHub Pages · 进入即自动播放）](https://dao-genesis.github.io/windsurf-assistant/)**
 
@@ -31,36 +29,37 @@
 
 > GitHub 仓库页（本 README）受平台限制无法自动播放视频；上方"自动播放主页"是一个真正的网页，进入即自动播放 B 站视频，点击可跳转 B 站原页观看。
 
-> 下表由 [`tools/gen-readme-index.js`](tools/gen-readme-index.js) 据各插件 `package.json` 版本自动维护（去心发版，改谁刷谁）。每个插件各自发布到独立 Release tag `<key>-v<version>`。
+> 下表据各插件 `package.json` 版本手工维护（去心发版，改谁刷谁）。每个插件各自发布到独立 Release tag `<key>-v<version>`；VSIX 亦可用 `node scripts/build-vsix.js <package>` 从源码现打。
 
 <!-- DAO-MODULE-INDEX:START -->
 | 插件 | 版本 | 扩展 id | 说明 | Release / 下载 |
 |---|---|---|---|---|
-| **rt-flow** | `3.16.0` | `devaid.rt-flow` | 多账号管理与一键切换：添加账号 / 注入 token / 健康检查 / panic 切换。命令/视图独立命名空间 `wam.*`。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/rt-flow-v3.16.0) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/rt-flow-v3.16.0/rt-flow-3.16.0.vsix) |
-| **dao-proxy-min** | `9.9.65` | `dao-agi.dao-proxy-min` | 反向代理 Windsurf / Devin，origin 反转与系统提示词替换、预览与自检。独立命名空间 `daomin.*`，与 Pro 同装零干扰。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-proxy-min-v9.9.65) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/dao-proxy-min-v9.9.65/dao-proxy-min-9.9.65.vsix) |
+| **rt-flow** | `4.26.9` | `devaid.rt-flow` | 多账号管理与一键切换：添加账号 / 注入 token / 健康检查 / panic 切换。命令/视图独立命名空间 `wam.*`。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/rt-flow-v4.26.9) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/rt-flow-v4.26.9/rt-flow-4.26.9.vsix) |
+| **dao-proxy-min** | `9.9.64` | `dao-agi.dao-proxy-min` | 反向代理 Windsurf / Devin，origin 反转与系统提示词替换、预览与自检。独立命名空间 `daomin.*`，与 Pro 同装零干扰。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-proxy-min-v9.9.64) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/dao-proxy-min-v9.9.64/dao-proxy-min-9.9.64.vsix) |
 | **dao-proxy-pro** | `9.9.347` | `dao-agi.dao-proxy-pro` | 在 min 反代/提示词隔离之上新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、四面板（本源观照 / 渠道配置 / 模型路由 / 模型反代）、只填 API Key 自动全量识别模型、模型解锁全量目录、模型反代本地 OpenAI/Anthropic 端点。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-proxy-pro-v9.9.347) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/dao-proxy-pro-v9.9.347/dao-proxy-pro-9.9.347.vsix) |
+| **dao-desktop** | `1.0.0` | `dao-agi.dao-desktop` | Devin Desktop 插件版：复用官方 `codeium.windsurf` 本体 + Cascade 三模式面板（Cascade / Devin Cloud / Devin Local），装进任意 VS Code 系 IDE 即得，逐步脱离对 Windsurf IDE 的依赖。`cd plugins/dao-desktop && node build.js` 出 VSIX。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-desktop-v1.0.0) · [源码构建](plugins/dao-desktop/) |
 <!-- DAO-MODULE-INDEX:END -->
 
 ## 仓库结构
 
 ```
+packages/            # 可构建/被 CI 打包的插件与守护进程源码（单一事实来源）
+  wam/               # 切号插件 rt-flow 源码 (publisher: devaid · 命令/视图 wam.*)
+  dao-proxy-min/     # 反代替换提示词 · 精简示范版 (publisher: dao-agi · daomin.*)
+  dao-proxy-pro/     # 反代替换提示词 · 全功能版 (publisher: dao-agi · dao.*/wam.*)
+  dao-core/ dao-devin-vm/ dao-pool/ dao-vm/ dao-injector/   # 反代 API / 守护进程 / 池 / 注入
 plugins/
-  rt-flow/          # 切号插件源码 (publisher: devaid · 命令/视图 wam.*)
-  dao-proxy-min/    # 反代替换提示词 · 精简示范版 (publisher: dao-agi · 命令/视图 daomin.*)
-                    #   vendor/bundled-origin/ 为内置提示词本源文本
-  dao-proxy-pro/    # 反代替换提示词 · 全功能版 (publisher: dao-agi · 命令/视图 dao.*/wam.*)
-                    #   vendor/外api/ 多协议适配+路由+负载均衡; vendor/bundled-origin/ origin 后端
+  dao-desktop/       # Devin Desktop 插件版 (dao-cascade 面板 + windsurf-shim · node build.js 出 VSIX)
+  dao-ai-base/       # dao-desktop 的可再 vendor 底座 (sync.js 回环产出 dao-cascade)
+  rt-flow/ dao-proxy-min/ dao-proxy-pro/   # 各插件 manifest / 文档入口
 scripts/
-  build-vsix.mjs    # 一键把全部插件打包为 .vsix（自动发现 plugins/ 下每个含 package.json 的目录）
-tools/
-  modules.json      # 去心模块登记表（单一事实来源：detect/notes/index 三脚本均读它）
-  detect-modules.js # 据改动文件判定需发版的模块 key
-  release-notes.js  # 生成单模块 Release 说明（含安装指引 + changelog 摘要）
-  gen-readme-index.js # 据各插件版本自动维护上方「下载索引表」
-  bundle-notes.js   # 生成「三插件 + 源代码 合一」聚合 Release（tag all-in-one）正文
+  build-vsix.js      # 从源码打单个插件 VSIX: node scripts/build-vsix.js <wam|dao-proxy-min|dao-proxy-pro>
+  deploy.js  devin-bootstrap.sh  devin-bootstrap-fleet.sh   # 部署 / 守护进程引导
 .github/workflows/
-  auto-merge.yml    # 无冲突 PR 自动合并进 main，并 dispatch 发版
-  release.yml       # 去心发版（各 tag <key>-v<version>）+ bundle job 刷新合一 Release（tag all-in-one）
+  ci.yml             # E2E: 各插件单测 + VSIX 打包 + dao-desktop 构建
+  test-core.yml      # 零依赖三清契约全套 smoke (tests/run_all.cjs · Node 22)
+  dao-automerge.yml  # 无冲突 PR 自动合并进 main
+  deploy-pages.yml   # 推 web/ 即部署公网入口到 GitHub Pages
 ```
 
 ### 三插互不干扰（道并行而不相悖）
@@ -86,11 +85,14 @@ VS Code / Windsurf 中 `Extensions: Install from VSIX...`，选择对应 `.vsix`
 需 Node ≥ 18。
 
 ```bash
-node scripts/build-vsix.mjs          # 打包全部插件到 dist/
-node scripts/build-vsix.mjs rt-flow  # 只打包指定插件
+node scripts/build-vsix.js wam            # 切号 rt-flow → packages/wam/rt-flow-<version>.vsix
+node scripts/build-vsix.js dao-proxy-min  # 精简反代 → packages/dao-proxy-min/*.vsix
+node scripts/build-vsix.js dao-proxy-pro  # 全功能反代 → packages/dao-proxy-pro/*.vsix
+
+cd plugins/dao-desktop && node build.js   # Devin Desktop 插件版 → plugins/dao-desktop/*.vsix
 ```
 
-脚本通过 `npx @vscode/vsce package` 在各插件目录生成 `.vsix`。
+脚本通过 `npx @vscode/vsce package` 在对应插件目录生成 `.vsix`。
 
 ## 插件命令速览
 

@@ -34,11 +34,11 @@ Ctrl+Shift+P → Extensions: Install from VSIX → 选择 rt-flow-<版本>.vsix
 **方式 B · 从源码构建（仓库根目录）**
 
 ```bash
-# 需 Node ≥ 18 · 仅打包 rt-flow 到 dist/
-node scripts/build-vsix.mjs rt-flow
+# 需 Node ≥ 18 · 打包 rt-flow (源在 packages/wam)
+node scripts/build-vsix.js wam
 ```
 
-构建出的 `dist/rt-flow-<版本>.vsix` 按方式 A 装入 IDE，`Ctrl+Shift+P → Developer: Reload Window` 重载生效。
+构建出的 `packages/wam/rt-flow-<版本>.vsix` 按方式 A 装入 IDE，`Ctrl+Shift+P → Developer: Reload Window` 重载生效。
 
 ### 2. 添加账号
 
@@ -273,14 +273,13 @@ auth1_xxxxxxxxxxxxxxxxxxxxx
 
 ## 七 · 构建与部署
 
-本仓库统一用根目录的 `scripts/build-vsix.mjs` 打包（去心发版，改谁发谁）：
+本仓库统一用根目录的 `scripts/build-vsix.js` 打包（去心发版，改谁发谁）：
 
 ```bash
-node scripts/build-vsix.mjs            # 打包全部插件到 dist/
-node scripts/build-vsix.mjs rt-flow    # 只打包 rt-flow
+node scripts/build-vsix.js wam        # 打包 rt-flow (源在 packages/wam)
 ```
 
-产物为 `dist/rt-flow-<版本>.vsix`，按「一 · 安装」方式 A 装入 IDE，`Ctrl+Shift+P → Developer: Reload Window` 重载生效。`extension.js` 顶部 `const VERSION` 为版本单一信源，须与 `package.json` 保持一致。
+产物为 `packages/wam/rt-flow-<版本>.vsix`，按「一 · 安装」方式 A 装入 IDE，`Ctrl+Shift+P → Developer: Reload Window` 重载生效。`extension.js` 顶部 `const VERSION` 为版本单一信源，须与 `package.json` 保持一致。
 
 ---
 
