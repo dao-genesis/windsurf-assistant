@@ -21,27 +21,11 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
+// 宿主态中枢下沉至通用底层(零 IDE 依赖); shim 仅作 IDE 侧灌入/桥接。
+const { hostState, hostFire } = require("./dao-cascade/host-state");
+
 function noop() {}
 function disposable() { return { dispose: noop }; }
-
-// ── 官方宿主态汇聚点: 官方扩展主动上报的 LS 端口/CSRF/登录态, 供面板 1:1 消费(全进程单例) ──
-function hostState() {
-  const g = globalThis;
-  if (!g.__daoWindsurfHost) g.__daoWindsurfHost = { lsPort: 0, csrfToken: "", auth: null, profileUrl: "", listeners: new Set() };
-  return g.__daoWindsurfHost;
-}
-function hostFire() {
-  const h = hostState();
-  for (const fn of h.listeners) { try { fn(h); } catch (_) {} }
-  // 落盘 ~/.dao/windsurf-host.json(本机私有,0600): 供 dao 生态(脚本/诊断)读取 LS 会话信息
-  try {
-    const dir = path.join(os.homedir(), ".dao");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "windsurf-host.json"),
-      JSON.stringify({ lsPort: h.lsPort, csrfToken: h.csrfToken, profileUrl: h.profileUrl,
-        auth: h.auth, updatedAt: new Date().toISOString() }), { mode: 0o600 });
-  } catch (_) {}
-}
 
 // ── 魔法节点: 任意属性 → 递归魔法节点; toString/valueOf → 稳定字符串; 迭代 → 空; 可调用。────
 function magicNode(hint) {

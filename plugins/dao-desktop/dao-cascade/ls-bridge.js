@@ -18,14 +18,14 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-let hostState = null;
-try { ({ hostState } = require("../windsurf-shim")); } catch (_) {}
+// 宿主态取自通用底层中枢(零 IDE 依赖): 进程内共生单例优先, 否则回落 ~/.dao/windsurf-host.json,
+// 故本桥在纯 Node(无 vscode)环境亦可就绪 —— 只要机上官方 LS 会话已被捕获落盘或经 host-discover 发现。
+const { resolveHost } = require("./host-state");
 
 const SVC = "/exa.language_server_pb.LanguageServerService/";
 
 function ready() {
-  const h = hostState && hostState();
-  return h && h.lsPort && h.csrfToken ? h : null;
+  return resolveHost();
 }
 
 // 官方登录态 apiKey(windsurf_api_key): credentials.toml 为真源(官方 LS 鉴权用同一把钥匙);

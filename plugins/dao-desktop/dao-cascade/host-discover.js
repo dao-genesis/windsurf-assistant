@@ -11,8 +11,8 @@ const os = require("os");
 const path = require("path");
 const { execSync } = require("child_process");
 
-let hostState = null;
-try { ({ hostState } = require("../windsurf-shim")); } catch (_) {}
+// 宿主态中枢(零 IDE 依赖): 发现即灌入单例并落盘, 供进程内面板与跨进程 headless 核共享。
+const { hostState, hostFire } = require("./host-state");
 
 const SVC = "/exa.language_server_pb.LanguageServerService/";
 
@@ -121,11 +121,9 @@ async function discover() {
     if (!csrf) continue;
     for (const port of listenPortsOf(pid)) {
       if (await probe(port, csrf, key)) {
-        if (hostState) {
-          const h = hostState();
-          h.lsPort = port; h.csrfToken = csrf;
-          for (const fn of h.listeners || []) { try { fn(h); } catch (_) {} }
-        }
+        const h = hostState();
+        h.lsPort = port; h.csrfToken = csrf;
+        hostFire(); // 广播监听者 + 落盘, 供跨进程 headless 核复用
         return { lsPort: port, csrfToken: csrf };
       }
     }

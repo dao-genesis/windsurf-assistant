@@ -250,3 +250,14 @@
   - 探索排除：`GetCodeMapsForFile` 已废弃（LS 500 明示改用 GetCodeMapsForRepos）
 - **R62 热修(#146)·踩坑必读**：webview 脚本整体在 `_html` 的**模板字符串**内，其中正则里的 `\/` 会被模板字符串吞掉反斜杠 → 运行时变 `/^image//`（空正则 + 悬空 `/`）→ **整段 webview `<script>` SyntaxError, 全部交互失效**。#145 就这样带病发布(粘贴/🖼/发送全废)。**约定：webview 脚本内所有正则反斜杠都要写双份 `\\`**（`/^image\\//` 才在运行时得 `/^image\//`）。校验法：`node --check panel.js` 查不出模板串内错误，须把 `_html` 模板 eval 出真身脚本再 `node --check`（见本轮 /tmp 校验片段）
 
+
+## R111 通用底层解耦: 宿主态中枢下沉(零 IDE 依赖) · headless RPC 核
+- **动机(反者道之动)**：`hostState` 原定义在 `windsurf-shim.js`，而 shim 顶层 `require("vscode")` → `ls-bridge`/`host-discover` 一旦碰 `hostState` 即被拖入 vscode；纯 Node(无 IDE)环境 shim 载入即抛、hostState 恒空，RPC 核无法脱离 IDE 独立运行。彻底脱离 IDE 依赖的第一刀应从「态」下手，而非急着重写 `panel.js`。
+- **新增 `dao-cascade/host-state.js`(仅 fs/os/path，零 IDE 依赖)**：LS 端口/CSRF/登录态单一事实来源。
+  - `hostState()` globalThis 单例(与官方扩展/面板/桥同引用)；`hostFire()` 广播监听者 + 落盘 `~/.dao/windsurf-host.json`(0600)
+  - `loadPersisted()` 从落盘回补单例(仅当进程内无端口/CSRF)；`resolveHost()` 三路解析: 进程内单例 → 落盘文件 → null
+  - 落盘路径可经 `DAO_WINDSURF_HOST_FILE` 重定向(测试/非默认家目录宿主)
+- **接线**：`windsurf-shim.js`/`ls-bridge.js`/`host-discover.js` 均改 `require("./host-state")`(去 `require("../windsurf-shim")`)；shim 仍 re-export `hostState` 保后向兼容；`host-discover.discover()` 命中改调 `hostFire()`(监听+落盘一并触发，供跨进程 headless 核复用)
+- **三路兜底(道并行而不悖)**：①进程内与官方扩展共生(shim setPort/setCsrfToken 灌入) ②跨进程 headless(读官方扩展落盘的 host.json) ③无宿主写入时 host-discover 就地 /proc 扫描发现
+- **契约测试 `test/headless-core.test.js`**(CI dao-desktop job 于 ubuntu 无 vscode 环境跑，即「零 IDE 依赖」活证据)：验 host-state/ls-bridge/host-discover 无 vscode 可载入 + 导出面完整；未就绪 ready() 返 null；落盘后跨进程解析出端口/CSRF；进程内单例压过落盘旧值。`node build.js` 打包排除 test/(.vscodeignore)
+- **边界结论(下一刀)**：`ls-bridge`(传输) + `host-discover`(宿主发现) + `host-state`(态) 现为 vscode-free 通用核，任意宿主(VS Code 扩展/CLI/独立进程/他 IDE)可消费。`panel.js` 仍混编运行时编排 + VS Code UI + webview 渲染 + 功能处理器；后续解耦宜先抽「会话/运行时编排」(driveStream 之上的 Cascade 生命周期)为宿主无关模块，再令 VS Code UI 作纯适配壳——仍遵后端优先、勿一次性重写 panel。
