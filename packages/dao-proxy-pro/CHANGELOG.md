@@ -2,6 +2,63 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.347 · 内网穿透对齐二合一本源 · 激活即自动连接 + 模型反代专属交接文档
+: 承接用户实证「Proxy Pro 内网穿透整体没跑通·甚至没自动连接好」——本源(dao-vsix 二合一)的公网穿透
+  是开机即自动打通的去中心化通道, 而 Proxy Pro 仅在用户已绑 CF API Token 时才自动拉起固定中继,
+  **零账号快速隧道从不自动起**, 用户须手点「启动隧道」→ 表象即「没有自动连接好」。本版补齐:
+  ① **激活自动连接(`_brgAutoConnect`)**: `server.on("listening")` 延迟 6s(待反代就绪)自动打通公网,
+     优先级「善用者不弃物」= 已绑 workers.dev 固定中继(持久·永不轮换)> 已存命名隧道令牌(固定域名)
+     > **零账号快速隧道(去中心化默认·无需任何账号)**; 缺 cloudflared 二进制后台 6 路镜像拉取, 就绪后
+     watchdog 自起(不阻塞激活)。实测激活 <5s 即得 `*.trycloudflare.com` 公网URL。
+  ② **手动停止即真停(`_BRG_USERSTOP` 旗·移植 dao-vsix `bridgeUserStopped`)**: 用户点「停止」落盘暂停旗,
+     自动连接/自愈见旗即挂起(尊重用户意志); 任一手动「启动/重启」撤旗恢复常驻; 24h 安全自复防遗忘致
+     公网端点永久断线。`_brgStartTunnel(named, manual)` / `_brgStopTunnel(manual)` 新增 manual 形参贯通。
+  ③ **模型反代专属 Agent 交接文档 `GET /origin/revproxy/handoff.md`**: 与总交接文档 `/origin/ea/handoff.md`
+     分工, 专注「模型反代 → 内网穿透 → 公网第三方无感直调」这一条链路的接管。实时含: 当前状态表
+     (反代开关/可反带模型数/本地Base/Key/隧道状态/公网Base/持久中继)、公网直调 curl+Python 范例
+     (换 Base 不换 Key)、三条开通/自愈路(零账号快速隧道 / 一个 CF API Token 零域名固定中继 / 命名隧道)、
+     热管理 API、自愈要点。④「模型反代」面板底部新增「📄 Agent 交接文档 · 模型反代→公网直调」区
+     (复制/下载/预览), 与②「渠道配置」面板底部的总交接文档并列。
+  ④ endpoint.json 的 `revproxy` 段增 `handoff_url`; ⑤ 面板顶部文案标注「激活即自动连接·断线 15s 自愈·
+     手动停止后点启动/重启恢复」。道义: 三十七章「道常无为而无不为」· 无为=用户零操作, 无不为=公网恒通。
+
+v9.9.346 · 捆绑 ACP 代理 · 实证收口(DESKTOP-MASTER 现场日志驱动)
+: 承 v9.9.345 把捆绑 ACP 代理(chisel)的 `WINDSURF_API_SERVER_URL` 锚向本地反代后, 现场实测
+  (controlled spawn·`devin.exe acp` 注入 env)暴露两处收口点, 本版补齐:
+  ① **`GetCliTeamSettings` 归 PASSTHROUGH(修 Connect 解码 `invalid tag value: 0`)**: 该 RPC 原
+  命中 v9.9.344 的 `LOCAL_AUTH` 短路 → `_replyGrpcOk` 回的是 **gRPC 帧**(5 字节前缀·首字节 0x00
+  压缩位)。LS 走 gRPC 只验 `grpc-status` 故无碍; 但 chisel 走 **Connect** 协议按 unary(裸
+  protobuf·无帧前缀)解 payload → 首字节 0x00 被当作 field tag 0 →
+  `Connect decode error: Protobuf decode error: invalid tag value: 0` → `Failed to fetch team
+  settings`。解: 把 `GetCliTeamSettings` 并入 `SEATMGMT_PASSTHROUGH_METHODS`(与 `GetUserStatus`
+  同), 由真端(self-serve)按客户端协议正确成帧回**真 TeamSettings** → chisel 解码必过; 官方不可达
+  时 chisel 自有磁盘缓存兜底(实测 0ms `Team settings loaded from cache`)→ 仍不卡。
+  ② **`dao-acp-stdio-proxy.js` 永久版·健康门控自注入**: v9.9.345 的 env 注入在 `extension.js`
+  spawn-hook, 仅新装 ≥v9.9.345 生效; 用户机现装 **v9.9.334** 无此逻辑。故把「反代健康→锚定
+  `WINDSURF_API_SERVER_URL`+`NO_PROXY`」下沉进 stdio 中间人: spawn 前探本地反代 `/origin/ping`,
+  200 才注入(与 `_proxyHealthy` 同源门控·失败安全直连官方); stdin 探测期间缓冲保序回放。中间人
+  每次 spawn 重读本文件 → **已装 v9.9.334 基座无需 reload/重装即刻生效**。若上游 spawn-hook 已锚则
+  不覆写(分工不重)。实证: 注入后 `Model registry fetched from API in 906ms`(经反代出站)·team
+  settings 不再 3s 超时·`authenticate` 正常受理·无「Connecting to server」。
+  道义: 五十二章「天下有始 以为天下母 · 既得其母 以知其子」· 母=本地兜底 · 子=鉴权态。
+
+v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定 · 根治「Connecting to server」残余
+: 病(根因·实证于 DESKTOP-MASTER exthost/ACP 日志): v9.9.344 已把 LS(language_server)的
+  `--api_server_url`/`--inference_api_server_url` 反代至本地 8937, 但 IDE 另起的**捆绑 ACP 代理**
+  (`devin.exe acp --agent-type summarizer`, 即 chisel · 自持 windsurf_api_client)**漏网**——它绕开
+  8937, 经系统 VPN 直连 `WINDSURF_API_SERVER_URL`(默认 server.codeium.com)取 `GetCliTeamSettings`
+  做启动鉴权。官方经系统代理偶发 >3s 即 `Team settings refresh timed out after 3000ms` →
+  `Failed to authenticate bundled agent` → 前端永卡「Connecting to server」(与官方可达性强耦合·
+  VPN 抖动即复发, 故 v9.9.344 后台式机仍偶现)。
+  治(既得其母 以知其子): `installSpawnHook` 拦截 devin.exe(ACP)时, 反代健康即注入
+  `WINDSURF_API_SERVER_URL=http://127.0.0.1:<反代口>`(经 stdio 中间人 `env:process.env` 透传至
+  devin.exe), 并把 `127.0.0.1,localhost,::1` 纳入 `NO_PROXY`(本地反代走明文 h2c·须绕开系统 VPN 代理,
+  否则 127.0.0.1 被兜转致连不上)。于是 `GetCliTeamSettings` 命中反代→即刻本地 gRPC OK(实测 ~75ms)·
+  无 3s 超时·鉴权必过·与官方可达性彻底解耦; `GetUserStatus`/`GetCliModelConfigs` 经反代 PASSTHROUGH
+  取真数据(官方可达时)。新增 `_acpEnvAnchorApi(env)` 复用于 spawn/spawnSync/execFile 三处。
+  fail-safe: 仅 `_proxyHealthy` 时改写(与 `maybeRewriteLsArgs` 同源门控)·否则原样直连官方·
+  "至少和没装插件一样能用"。道义: 五十二章「天下有始 以为天下母 · 既得其母 以知其子」。
+
 v9.9.344 · 座席鉴权本地兜底 · 根治「Connecting to server」(釜底抽薪)
 : 病(根因): LS 启动后周期调 SeatManagement/GetUser 座席鉴权 + Heartbeat 心跳。
   SeatManagement 非 API_SERVER/INFERENCE → 默认归 PASSTHROUGH 路由至 UPSTREAM_MGMT
