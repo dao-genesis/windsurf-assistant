@@ -11,6 +11,13 @@
 > · GetExternalModel(deprecated) · GetKnowledgeBaseItemsForTeam(deprecated)
 > · GetMatchingIndexedRepos(index service deprecated) · GetMatchingCodeContext(not implemented)
 > · GetProfileData(需 token 认证, apiKey 不可用) · GetAuthToken(超时无回)。
+>
+> 第四轮探测(2026-07-11): GetCascadeModelConfigs(unimplemented·官方指向 GetUserStatus)
+> · GetCodeMapsForFile(deprecated·改用 GetCodeMapsForRepos——已接) · SetPinnedContext(not implemented)
+> · GetPatchAndCodeChange(仅 eval mode) · CheckBugs(api server wire error)
+> · CreateTrajectoryShare(契约确认 cascade_id 必填, 但真实 id 下服务端 internal error, 暂不接)
+> · UpdatePanelStateWithUserStatus(契约确认 user_status 必填·推送式, 面板已用 StreamCascadePanelReactiveUpdates 拉取式等效)
+> · GetStatus 实测返回 {"status":{}}(无增量信息, 不单独接入)。
 
 ## 未接入方法（按域分类）
 
@@ -18,7 +25,7 @@
 - UpdatePanelStateWithUserStatus
 
 ### 模型/状态 (2)
-- GetCascadeModelConfigs
+- GetCascadeModelConfigs(官方已指向 GetUserStatus)
 - GetExternalModel(已废弃)
 
 ### 会话协作/分享 (3)
@@ -40,7 +47,7 @@
 - RefreshContextForIdeAction
 
 ### CodeMap 扩展 (2)
-- GetCodeMapsForFile
+- GetCodeMapsForFile(已废弃·改用 GetCodeMapsForRepos)
 - BranchCascadeAndGenerateCodeMap
 
 ### 辅助生成 (3)
