@@ -85,11 +85,11 @@ class CascadePanelProvider {
         if (msg.type === "login-code") return this._loginCtrl && this._loginCtrl.submitCode(msg.code);
         if (msg.type === "set-mode") {
           // Cascade 规划模式(cx: 前缀)与 ACP 会话模式分流; 官方对应 STATE_KEYS.cascadePlannerMode
-          if (/^cx:/.test(msg.modeId || "")) { this._cascadeMode = msg.modeId.slice(3); return; }
+          if (/^cx:/.test(msg.modeId || "")) { this._cascadeMode = msg.modeId.slice(3); this._sbSet({ mode: this._cascadeMode }); return; }
           return this._acp && this._acp.setMode(msg.modeId).catch(() => {});
         }
         if (msg.type === "set-config") {
-          if (msg.configId === "model" && msg.agent === "cascade") { this._cascadeModel = msg.value; return; }
+          if (msg.configId === "model" && msg.agent === "cascade") { this._cascadeModel = msg.value; this._sbSet({ modelLabel: (this._cxModelLabels || {})[msg.value] || msg.value }); return; }
           return this._acp && this._acp.setConfigOption(msg.configId, msg.value).catch((e) => this._post({ type: "error", text: e.message }));
         }
         if (msg.type === "cancel") {
@@ -178,6 +178,9 @@ class CascadePanelProvider {
 
   _post(m) { if (this._view) this._view.webview.postMessage(m); }
 
+  // 同步底部状态栏(官方本体把账号/引擎态放 IDE 状态栏, 插件版在 status-bar.js 补齐)
+  _sbSet(patch) { try { if (this._sb) this._sb.set(patch); } catch (_) {} }
+
   // Cascade 规划模式 → 官方 plannerConfig 配方(二进制实测):
   //   write=agentic; plan=agentic+exit_plan_mode 工具;
   //   其余走 conversationalV2.plannerMode(exa.codeium_common_pb.ConversationalPlannerMode)
@@ -217,11 +220,14 @@ class CascadePanelProvider {
       let mStatus = {};
       try { const st = await ls.call("GetModelStatuses", {}); mStatus = (st && st.statuses) || {}; } catch (_) {}
       this._cxImageModels = new Set(models.filter((m) => m.images).map((m) => m.uid));
+      this._cxModelLabels = {};
+      for (const m of models) this._cxModelLabels[m.uid] = m.label;
       if (!this._cascadeModel) {
         const usable = models.filter((m) => !m.disabled);
         const en = usable.find((m) => !/BYOK/i.test(m.label)) || usable[0];
         this._cascadeModel = (en && en.uid) || "swe-1-6-slow";
       }
+      this._sbSet({ modelLabel: this._cxModelLabels[this._cascadeModel] || null, mode: this._cascadeMode || "write" });
       this._post({ type: "config-options", agent: "cascade", configOptions: [{
         id: "model", category: "model", currentValue: this._cascadeModel,
         options: models.map((m) => ({
@@ -291,6 +297,7 @@ class CascadePanelProvider {
       && vscode.workspace.workspaceFolders[0].name) || null;
     this._post({ type: "env", devinBin: bin || null, agents: AGENTS,
       loggedIn: auth.loggedIn, userName: auth.name, windsurf: ws, folder });
+    this._sbSet({ lsReady: !!(ws && ws.lsPort), user: (ws && ws.authName) || auth.name || null });
     this._cxPushWorkflows();
   }
 
@@ -1695,8 +1702,11 @@ class CascadePanelProvider {
     if (!name || !name.trim()) return;
     try {
       const ls = require("./ls-bridge");
+      // rule/workflow 是 markdown 文件, LS 不自动补扩展名, 无 .md 会不被扫描收录
+      let fn = name.trim();
+      if (kind !== "skill" && !/\.md$/i.test(fn)) fn += ".md";
       const r = await ls.call("CreateCustomizationFile", {
-        fileName: name.trim(), fileType: ft, workspaceConfigDir: ".windsurf" });
+        fileName: fn, fileType: ft, workspaceConfigDir: ".windsurf" });
       const p = ((r && r.filePath) || "").replace(/^file:\/\//, "");
       if (p) await this._handleOpenFile(p);
       this._handleCustomizationsList();
@@ -3298,6 +3308,24 @@ function register(context, log, opts) {
       webviewOptions: { retainContextWhenHidden: true },
     })
   );
+  // 官方式底部状态栏(账号/引擎/模型态与面板同源同步)
+  try { provider._sb = require("./status-bar").createStatusBar(context, viewId); } catch (_) {}
+  // 官方把 Cascade 面板默认放右侧辅助栏 —— 首次安装对齐官方布局(仅一次, 此后尊重用户拖动)。
+  // Devin Desktop 工作台无 moveViewToSecondarySideBar 命令, 但内建 vscode.moveViews 可把视图
+  // 迁入官方原生 Cascade 容器(windsurf.cascadeViewContainerId, 常驻辅助栏); 标准 VS Code 走后者兜底。
+  const MOVED_KEY = viewId + ".movedToAuxBar";
+  if (!context.globalState.get(MOVED_KEY)) {
+    context.globalState.update(MOVED_KEY, true);
+    vscode.commands.executeCommand(viewId + ".focus").then(async () => {
+      try {
+        await vscode.commands.executeCommand("vscode.moveViews", {
+          viewIds: [viewId], destinationId: "windsurf.cascadeViewContainerId",
+        });
+      } catch (_) {
+        try { await vscode.commands.executeCommand("workbench.action.moveViewToSecondarySideBar"); } catch (_) {}
+      }
+    }, () => {});
+  }
   context.subscriptions.push(
     // 注意: 视图 id 为 <ns>.cascade 时, 工作台自动生成 "<ns>.cascade.focus" —— 不可自注册同名命令
     // (会遮蔽内建并自递归)。这里用 <ns>.cascade.open 转发内建 focus。

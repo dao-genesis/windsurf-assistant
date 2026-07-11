@@ -82,6 +82,20 @@
         "title": "Devin Desktop: 解释并修复 (Explain and Fix)"
       }
     ],
+    "keybindings": [
+      {
+        "command": "dao.cascade.open",
+        "key": "ctrl+l",
+        "mac": "cmd+l",
+        "when": "!terminalFocus && !editorHasSelection"
+      },
+      {
+        "command": "dao.cascade.newSession",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l",
+        "when": "!terminalFocus"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -93,6 +107,13 @@
           "command": "dao.cascade.history",
           "when": "view == dao.cascade",
           "group": "navigation@2"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "dao.cascade.genCommit",
+          "when": "scmProvider == git",
+          "group": "navigation@1"
         }
       ],
       "editor/context": [
