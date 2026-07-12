@@ -9,7 +9,10 @@
 //   🔀 切号    — 插件自持账号池(~/.dao/cascade-pool.json): 收录当前号/切换/移除, 无回退铁律
 //   🌐 桥接    — 插件自持本地 HTTP API(local-api.js): 只绑 127.0.0.1 + Bearer, 暴露插件真源
 //   🐙 GitHub  — 插件自持 GitHub 舰队(github-fleet.js): PAT 池/角色/在线核验, 与 Devin 池分离
-// 后续并入: 💉 反向注入 / 🔌 Proxy Pro / 🔎 浏览器搜索。
+//   🔌 Proxy Pro — 插件自持第三方模型渠道 + 模型路由(proxy-pro.js): 填 Key 即全量识别模型, 与官方模型并存
+//   🔎 搜索    — 插件自持站内网页搜索(web-search.js): DuckDuckGo/Bing 直出结果, 不弹外部浏览器
+//   💉 反向注入 — 插件自持注入档案(inject.js): MCP/Secret/Knowledge 批量注入账号池(账号池同真源)
+// 归一竟功: dao-one 六大板块 + GitHub 纵向 + Proxy Pro 三面板皆已并入插件本源。
 "use strict";
 const vscode = require("vscode");
 const backup = require("./backup");
@@ -17,6 +20,9 @@ const hostStateMod = require("./host-state");
 const acctPool = require("./account-pool");
 const localApi = require("./local-api");
 const ghFleet = require("./github-fleet");
+const proxyPro = require("./proxy-pro");
+const webSearch = require("./web-search");
+const inject = require("./inject");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -89,6 +95,18 @@ class UnifiedPanel {
       case "gh-remove": return this._ghRemove(String(msg.login || ""));
       case "gh-role": return this._ghRole(String(msg.login || ""), String(msg.role || "member"));
       case "gh-verify": return this._ghVerify();
+      case "px-list": return this._pxList();
+      case "px-add": return this._pxAdd();
+      case "px-remove": return this._pxRemove(String(msg.name || ""));
+      case "px-refresh": return this._pxRefresh(String(msg.name || ""));
+      case "px-route": return this._pxRoute();
+      case "ws-search": return this._wsSearch(String(msg.query || ""), String(msg.engine || ""));
+      case "ws-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
+      case "ws-clear": return this._wsClear();
+      case "inj-list": return this._injList();
+      case "inj-add": return this._injAdd();
+      case "inj-remove": return this._injRemove(String(msg.kind || ""), String(msg.name || ""));
+      case "inj-apply-mcp": return this._injApplyMcp();
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
       default: return;
     }
@@ -222,6 +240,106 @@ class UnifiedPanel {
     this._ghList();
   }
 
+  // Proxy Pro 板块(插件自持模型渠道+路由): apiKey 永不出后端, 只回尾4位。
+  _pxList() { this._post({ type: "px-list", data: proxyPro.listView(), file: proxyPro.cfgPath() }); }
+
+  async _pxAdd() {
+    try {
+      const presets = proxyPro.PRESETS.map((p) => ({ label: p.n, description: p.u, detail: "拿 Key: " + p.r, _p: p }));
+      presets.push({ label: "＋ 自定义渠道", description: "手填名称/类型/base URL", _p: null });
+      const pick = await vscode.window.showQuickPick(presets, { placeHolder: "选择模型渠道预设(或自定义)" });
+      if (!pick) return;
+      let name = pick._p ? pick._p.n : await vscode.window.showInputBox({ prompt: "渠道名称" });
+      if (!name) return;
+      const type = pick._p ? pick._p.t : ((await vscode.window.showQuickPick(["openai", "anthropic"], { placeHolder: "渠道类型" })) || "openai");
+      const baseURL = pick._p ? pick._p.u : await vscode.window.showInputBox({ prompt: "base URL(如 https://api.deepseek.com/v1)" });
+      if (!baseURL) return;
+      const apiKey = await vscode.window.showInputBox({ prompt: "API Key(留空=保留原 Key)", password: true, ignoreFocusOut: true });
+      const r = await proxyPro.addChannel(name, type, baseURL, apiKey || "");
+      vscode.window.showInformationMessage("渠道 " + r.name + " 已配置 · 识别 " + r.models + " 模型 · " + (r.verify === "ok" ? "在线✓" : r.verify === "bad" ? "Key 无效" : "待核"));
+    } catch (e) { vscode.window.showErrorMessage("配置渠道失败: " + e.message); }
+    this._pxList();
+  }
+
+  _pxRemove(name) { try { proxyPro.removeChannel(name); } catch (e) { vscode.window.showErrorMessage(e.message); } this._pxList(); }
+
+  async _pxRefresh(name) {
+    try { const r = await proxyPro.refreshModels(name); vscode.window.showInformationMessage("渠道 " + name + " 识别 " + r.models + " 模型 · " + (r.verify === "ok" ? "在线✓" : r.verify)); }
+    catch (e) { vscode.window.showErrorMessage("刷新模型失败: " + e.message); }
+    this._pxList();
+  }
+
+  async _pxRoute() {
+    try {
+      const view = proxyPro.listView();
+      const withModels = view.channels.filter((c) => c.modelCount > 0);
+      if (!withModels.length) { vscode.window.showWarningMessage("先添加带 Key 的渠道并识别模型, 再配路由"); return; }
+      const uid = await vscode.window.showInputBox({ prompt: "官方模型 UID(留空则解除某路由)" });
+      if (uid === undefined) return;
+      const cPick = await vscode.window.showQuickPick(withModels.map((c) => ({ label: c.name, description: c.modelCount + " 模型", _c: c })), { placeHolder: "路由到哪个渠道(取消=解除该 UID 路由)" });
+      if (!cPick) { proxyPro.setRoute(uid, "", ""); this._pxList(); return; }
+      const mPick = await vscode.window.showQuickPick(cPick._c.models, { placeHolder: "选择目标模型" });
+      if (!mPick) return;
+      proxyPro.setRoute(uid, cPick._c.name, mPick);
+      vscode.window.showInformationMessage("路由 " + uid + " → " + cPick._c.name + "/" + mPick);
+    } catch (e) { vscode.window.showErrorMessage("配置路由失败: " + e.message); }
+    this._pxList();
+  }
+
+  // 搜索板块(插件自持站内网页搜索)。
+  async _wsSearch(query, engine) {
+    this._post({ type: "ws-progress", running: true });
+    try { const r = await webSearch.search(query, engine); this._post({ type: "ws-result", data: r, history: webSearch.historyView() }); }
+    catch (e) { this._post({ type: "ws-result", data: { ok: false, query, results: [], error: e.message }, history: webSearch.historyView() }); }
+  }
+
+  _wsClear() { try { webSearch.clearHistory(); } catch (_) {} this._post({ type: "ws-result", data: null, history: [] }); }
+
+  // 反向注入板块(插件自持注入档案): secret 值永不出后端。
+  _injList() {
+    let pool = [];
+    try { const ls = require("./ls-bridge"); pool = acctPool.listView(ls.apiKey()); } catch (_) {}
+    this._post({ type: "inj-list", items: inject.listView(), plan: inject.plan(pool), file: inject.profilePath() });
+  }
+
+  async _injAdd() {
+    try {
+      const kind = await vscode.window.showQuickPick(
+        [{ label: "mcp", description: "MCP 服务器(可即刻本机落地)" }, { label: "secret", description: "密钥(脱敏存储)" }, { label: "knowledge", description: "知识片段" }],
+        { placeHolder: "注入档类型" });
+      if (!kind) return;
+      const name = await vscode.window.showInputBox({ prompt: kind.label + " 档名称" });
+      if (!name) return;
+      let spec = {};
+      if (kind.label === "mcp") {
+        const tpl = await vscode.window.showInputBox({ prompt: 'MCP 配置 JSON(如 {"command":"npx","args":[...]} 或 {"serverUrl":...})', value: '{"command":"","args":[]}' });
+        if (!tpl) return;
+        try { spec = JSON.parse(tpl); } catch (e) { vscode.window.showErrorMessage("JSON 无效: " + e.message); return; }
+      } else if (kind.label === "secret") {
+        const val = await vscode.window.showInputBox({ prompt: "密钥值", password: true, ignoreFocusOut: true });
+        if (!val) return; spec = { value: val };
+      } else {
+        const content = await vscode.window.showInputBox({ prompt: "知识内容(文本)" });
+        if (!content) return; spec = { content };
+      }
+      const r = inject.addItem(kind.label, name, spec);
+      vscode.window.showInformationMessage("已入档 " + r.kind + "/" + r.name + " · 档案 " + r.count + " 项");
+    } catch (e) { vscode.window.showErrorMessage("入档失败: " + e.message); }
+    this._injList();
+  }
+
+  _injRemove(kind, name) { try { inject.removeItem(kind, name); } catch (e) { vscode.window.showErrorMessage(e.message); } this._injList(); }
+
+  async _injApplyMcp() {
+    try {
+      const ls = require("./ls-bridge");
+      if (!ls.ready()) { vscode.window.showWarningMessage("LS 未就绪, 无法落地 MCP; 打开 Cascade 面板登录后重试"); return; }
+      const r = await inject.applyMcp(ls);
+      vscode.window.showInformationMessage("MCP 注入本机: " + r.applied + "/" + r.total + " 已写入 Cascade 配置");
+    } catch (e) { vscode.window.showErrorMessage("MCP 落地失败: " + e.message); }
+    this._injList();
+  }
+
   // 切号板块(插件自持账号池): key 永不出后端, 只回尾4位指纹; 目标号无 key 即报错不回退。
   _poolList() {
     try {
@@ -316,7 +434,7 @@ h2{font-size:15px;margin:0 0 4px}
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"],["github","🐙 GitHub"]];
+const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"],["github","🐙 GitHub"],["proxy","🔌 Proxy Pro"],["search","🔎 搜索"],["inject","💉 反向注入"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
   '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
@@ -464,6 +582,91 @@ function renderMcp(){
   }
   return h;
 }
+let PX=null;
+function renderProxy(){
+  let h='<div class="row"><h2 style="flex:1">Proxy Pro · 插件自持模型路由</h2>'+
+    '<button class="btn" id="pxAdd">添加渠道</button>'+
+    '<button class="btn sec" id="pxRoute">配路由</button>'+
+    '<button class="btn sec" id="pxRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">第三方模型渠道存 ~/.dao/proxy-channels.json(mode 600), 只填 Key 即经 /v1/models 全量识别; apiKey 只显尾4位。渠道模型可路由到官方模型 UID(与官方并存)。</div>';
+  if(PX===null){h+='<div class="card muted">加载渠道…</div>';return h;}
+  const ch=PX.channels||[];
+  if(!ch.length){h+='<div class="card muted">尚无渠道。点「添加渠道」选预设(OpenRouter/DeepSeek/GLM/OpenAI…)或自定义, 填 Key 即自动识别模型。</div>';}
+  for(const c of ch){
+    const st=c.verify==='ok'?'✓ 在线':(c.verify==='pending'?'⏳ 待核':'✗ Key 无效');
+    h+='<div class="acc"><div class="hd"><span>'+E(c.name)+
+      '<span class="badge cloud">'+E(c.type)+'</span>'+
+      '<span class="badge'+(c.verify==='ok'?'':' cloud')+'">'+st+'</span></span><span>'+
+      '<button class="btn sec" data-pxref="'+E(c.name)+'">识别模型</button> '+
+      '<button class="btn sec" data-pxrm="'+E(c.name)+'">移除</button></span></div>'+
+      '<div class="conv" style="cursor:default"><span class="muted">'+E(c.baseURL)+' · Key …'+E(c.keyTail||'(无)')+' · '+c.modelCount+' 模型</span></div>';
+    if(c.models&&c.models.length){
+      const show=c.models.slice(0,12).map(m=>E(m)).join('、')+(c.models.length>12?(' …等 '+c.models.length+' 个'):'');
+      h+='<div class="conv" style="cursor:default"><span class="muted">模型: '+show+'</span></div>';
+    }
+    h+='</div>';
+  }
+  const rt=PX.routes||[];
+  h+='<div class="st">模型路由</div>';
+  if(!rt.length)h+='<div class="card muted">暂无路由。点「配路由」把官方模型 UID 指向某渠道模型。</div>';
+  else{h+='<div class="card">';for(const r of rt)h+=cr(E(r.uid),'→ '+E(r.channel)+' / '+E(r.model)+' <span class="back" data-pxunroute="'+E(r.uid)+'">解除</span>');h+='</div>';}
+  return h;
+}
+let WS={data:null,history:[],running:false};
+function renderSearch(){
+  let h='<div class="row"><h2 style="flex:1">搜索 · 插件自持站内网页搜索</h2>'+
+    '<button class="btn sec" id="wsClear">清历史</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">经搜索引擎直取结果(不弹外部系统浏览器); 结果点开走 IDE 外链。历史仅存查询串于 ~/.dao/web-search.json(mode 600)。</div>';
+  h+='<div class="card"><div class="cr"><input id="wsQ" placeholder="输入搜索词…" style="flex:1;background:var(--vscode-input-background,#222);color:inherit;border:1px solid var(--vscode-input-border,#444);border-radius:4px;padding:6px" />'+
+    '<select id="wsE" style="margin:0 6px;background:var(--vscode-input-background,#222);color:inherit;border:1px solid #444;border-radius:4px;padding:6px"><option value="duckduckgo">DuckDuckGo</option><option value="bing">Bing</option></select>'+
+    '<button class="btn" id="wsGo">搜索</button></div></div>';
+  if(WS.running)h+='<div class="card muted">搜索中…</div>';
+  else if(WS.data){
+    const d=WS.data;
+    if(!d.ok)h+='<div class="card">⚠ '+E(d.error||'无结果')+(d.serp?' <span class="back" data-wsurl="'+E(d.serp)+'">在浏览器打开搜索页↗</span>':'')+'</div>';
+    else if(d.serp)h+='<div class="muted" style="margin-bottom:6px"><span class="back" data-wsurl="'+E(d.serp)+'">在浏览器打开完整搜索页↗</span></div>';
+    h+='<div class="st">结果 · "'+E(d.query)+'" @ '+E(d.engineName||d.engine||'')+'</div>';
+    for(const r of (d.results||[])){
+      h+='<div class="acc"><div class="conv" data-wsurl="'+E(r.url)+'"><span>'+E(r.title||r.url)+'</span><span class="m">打开↗</span></div>'+
+        '<div class="conv" style="cursor:default"><span class="muted">'+E(r.url)+'</span></div>'+
+        (r.snippet?'<div class="conv" style="cursor:default"><span class="muted">'+E(r.snippet)+'</span></div>':'')+'</div>';
+    }
+  }
+  if(WS.history&&WS.history.length){
+    h+='<div class="st">最近搜索</div><div class="card">';
+    for(const x of WS.history.slice(0,10))h+='<div class="cr" data-wshist="'+E(x.query)+'" style="cursor:pointer"><span class="l">'+E(x.query)+'</span><span class="v muted">'+x.n+' 条 · '+E(String(x.at||'').replace('T',' ').slice(0,16))+'</span></div>';
+    h+='</div>';
+  }
+  return h;
+}
+let INJ=null;
+function renderInject(){
+  let h='<div class="row"><h2 style="flex:1">反向注入 · 插件自持注入档案</h2>'+
+    '<button class="btn" id="injAdd">添加档</button>'+
+    '<button class="btn sec" id="injMcp">MCP 落地本机</button>'+
+    '<button class="btn sec" id="injRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">共享资源(MCP/Secret/Knowledge)存 ~/.dao/inject-profile.json(mode 600); 注入目标=切号板块账号池全体。secret 值绝不出后端(只显尾4位)。MCP 档可一键落地本机 Cascade 配置(全账号共享)。</div>';
+  if(INJ===null){h+='<div class="card muted">加载注入档案…</div>';return h;}
+  const items=INJ.items||[];
+  if(!items.length)h+='<div class="card muted">档案空。点「添加档」入 MCP/Secret/Knowledge。</div>';
+  for(const it of items){
+    const icon=it.kind==='mcp'?'🧩':(it.kind==='secret'?'🔑':'📖');
+    let sub='';
+    if(it.kind==='secret')sub='值 …'+E(it.valueTail||'')+(it.hasValue?'':' (未设)');
+    else if(it.kind==='mcp')sub=E(it.transport)+' · '+E(it.summary||'');
+    else sub=it.chars+' 字';
+    h+='<div class="acc"><div class="hd"><span>'+icon+' '+E(it.name)+'<span class="badge cloud">'+E(it.kind)+'</span></span>'+
+      '<button class="btn sec" data-injrm="'+E(it.kind)+'|'+E(it.name)+'">移除</button></div>'+
+      '<div class="conv" style="cursor:default"><span class="muted">'+sub+'</span></div></div>';
+  }
+  const p=INJ.plan||{};
+  h+='<div class="st">注入计划</div><div class="card">'+
+    cr('档案项',(p.itemCount||0)+' 项')+cr('目标账号',(p.targetCount||0)+' 个')+cr('应注总量',(p.total||0)+' 次')+'</div>';
+  if(p.accounts&&p.accounts.length){
+    for(const a of p.accounts)h+='<div class="conv" style="cursor:default"><span>'+E(a.email)+'</span><span class="m">'+a.items.length+' 档</span></div>';
+  } else h+='<div class="card muted">账号池为空; 到「切号」板块收录账号后即出现注入目标。</div>';
+  return h;
+}
 function render(){
   renderNav();
   const main=document.getElementById('main');
@@ -475,6 +678,9 @@ function render(){
   else if(S.board==='mcp')h=renderMcp();
   else if(S.board==='bridge')h=renderBridge();
   else if(S.board==='github')h=renderGithub();
+  else if(S.board==='proxy')h=renderProxy();
+  else if(S.board==='search')h=renderSearch();
+  else if(S.board==='inject')h=renderInject();
   main.innerHTML=h;
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
   const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
@@ -502,6 +708,25 @@ function render(){
   document.querySelectorAll('[data-ghremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'gh-remove',login:el.dataset.ghremove}));
   document.querySelectorAll('[data-ghrole]').forEach(el=>el.onclick=()=>{const [lg,rl]=el.dataset.ghrole.split('|');vscode.postMessage({type:'gh-role',login:lg,role:rl});});
   if(S.board==='github'&&GH===null)vscode.postMessage({type:'gh-list'});
+  const pxa=document.getElementById('pxAdd'); if(pxa)pxa.onclick=()=>vscode.postMessage({type:'px-add'});
+  const pxrt=document.getElementById('pxRoute'); if(pxrt)pxrt.onclick=()=>vscode.postMessage({type:'px-route'});
+  const pxrf=document.getElementById('pxRf'); if(pxrf)pxrf.onclick=()=>{PX=null;render();vscode.postMessage({type:'px-list'});};
+  document.querySelectorAll('[data-pxref]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-refresh',name:el.dataset.pxref}));
+  document.querySelectorAll('[data-pxrm]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-remove',name:el.dataset.pxrm}));
+  document.querySelectorAll('[data-pxunroute]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-route',uid:el.dataset.pxunroute}));
+  if(S.board==='proxy'&&PX===null)vscode.postMessage({type:'px-list'});
+  const wsGo=document.getElementById('wsGo'); const wsQ=document.getElementById('wsQ'); const wsE=document.getElementById('wsE');
+  function doSearch(q){const query=q!==undefined?q:(wsQ?wsQ.value:'');if(!query)return;WS.running=true;render();vscode.postMessage({type:'ws-search',query:query,engine:wsE?wsE.value:'duckduckgo'});}
+  if(wsGo)wsGo.onclick=()=>doSearch();
+  if(wsQ)wsQ.onkeydown=(e)=>{if(e.key==='Enter')doSearch();};
+  const wsC=document.getElementById('wsClear'); if(wsC)wsC.onclick=()=>vscode.postMessage({type:'ws-clear'});
+  document.querySelectorAll('[data-wsurl]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'ws-open',url:el.dataset.wsurl}));
+  document.querySelectorAll('[data-wshist]').forEach(el=>el.onclick=()=>doSearch(el.dataset.wshist));
+  const inja=document.getElementById('injAdd'); if(inja)inja.onclick=()=>vscode.postMessage({type:'inj-add'});
+  const injm=document.getElementById('injMcp'); if(injm)injm.onclick=()=>vscode.postMessage({type:'inj-apply-mcp'});
+  const injrf=document.getElementById('injRf'); if(injrf)injrf.onclick=()=>{INJ=null;render();vscode.postMessage({type:'inj-list'});};
+  document.querySelectorAll('[data-injrm]').forEach(el=>el.onclick=()=>{const [k,nm]=el.dataset.injrm.split('|');vscode.postMessage({type:'inj-remove',kind:k,name:nm});});
+  if(S.board==='inject'&&INJ===null)vscode.postMessage({type:'inj-list'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
@@ -509,6 +734,10 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
+  else if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};if(S&&S.board==='proxy')render();}
+  else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
+  else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}
+  else if(m.type==='inj-list'){INJ={items:m.items||[],plan:m.plan||{}};if(S&&S.board==='inject')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
   else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}

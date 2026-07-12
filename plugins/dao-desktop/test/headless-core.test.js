@@ -279,3 +279,78 @@ test("插件自持 GitHub 舰队: 池文件 600/视图脱敏/首号 admin/角色
   assert.strictEqual((fs.statSync(process.env.DAO_GITHUB_FLEET_FILE).mode & 0o777), 0o600);
   delete process.env.DAO_GITHUB_FLEET_FILE;
 });
+
+test("插件自持 Proxy Pro: 渠道文件 600/视图脱敏 apiKey/路由增删/删渠道连带清路由", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-px-"));
+  process.env.DAO_PROXY_CHANNELS_FILE = path.join(dir, "px.json");
+  const px = require(path.join(CASCADE, "proxy-pro.js"));
+  // 直接种池(不打网): 渠道带 Key + 已识别模型
+  px.save({ channels: [
+    { name: "DeepSeek", type: "openai", baseURL: "https://api.deepseek.com/v1", apiKey: "sk-secretAAAA1111", models: ["deepseek-chat", "deepseek-reasoner"], verify: "ok" },
+  ], routes: {} });
+  const v = px.listView();
+  assert.strictEqual(v.channels.length, 1);
+  assert.ok(!JSON.stringify(v).includes("sk-secretAAAA"), "完整 apiKey 不得出视图");
+  assert.strictEqual(v.channels[0].keyTail, "1111");
+  assert.strictEqual(v.channels[0].modelCount, 2);
+  // 路由增删
+  px.setRoute("windsurf-swe-1", "DeepSeek", "deepseek-chat");
+  assert.strictEqual(px.listView().routes.length, 1);
+  assert.throws(() => px.setRoute("x", "NoSuch", "m"), /无此渠道/);
+  // 删渠道连带清指向它的路由
+  assert.strictEqual(px.removeChannel("DeepSeek").removed, true);
+  assert.strictEqual(px.listView().routes.length, 0);
+  // 落盘 600
+  assert.strictEqual((fs.statSync(process.env.DAO_PROXY_CHANNELS_FILE).mode & 0o777), 0o600);
+  assert.ok(Array.isArray(px.PRESETS) && px.PRESETS.length > 5, "内置预设渠道");
+  delete process.env.DAO_PROXY_CHANNELS_FILE;
+});
+
+test("插件自持浏览器搜索: DDG 结果解析 + 历史落盘 600(仅查询串)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ws-"));
+  process.env.DAO_WEB_SEARCH_FILE = path.join(dir, "ws.json");
+  const ws = require(path.join(CASCADE, "web-search.js"));
+  const html = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fa&rut=x">Ex&amp;ample Title</a>' +
+    '<a class="result__snippet" href="#">A <b>snippet</b> here.</a>';
+  const r = ws.parseDuckDuckGo(html);
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(r[0].url, "https://example.com/a");
+  assert.strictEqual(r[0].title, "Ex&ample Title");
+  assert.strictEqual(r[0].snippet, "A snippet here.");
+  assert.ok(ws.engineList().length >= 2);
+  // 历史(仅查询串)落盘 600
+  const fsmod = require("fs");
+  fsmod.mkdirSync(path.dirname(process.env.DAO_WEB_SEARCH_FILE), { recursive: true });
+  fsmod.writeFileSync(process.env.DAO_WEB_SEARCH_FILE, JSON.stringify({ history: [{ query: "hello", engine: "duckduckgo", at: "2026-07-12T00:00:00Z", n: 3 }] }), { mode: 0o600 });
+  assert.strictEqual(ws.historyView()[0].query, "hello");
+  assert.strictEqual((fsmod.statSync(process.env.DAO_WEB_SEARCH_FILE).mode & 0o777), 0o600);
+  ws.clearHistory();
+  assert.strictEqual(ws.historyView().length, 0);
+  delete process.env.DAO_WEB_SEARCH_FILE;
+});
+
+test("插件自持反向注入: 档案 600/secret 脱敏/计划=池×档 交叉", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-inj-"));
+  process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
+  const inj = require(path.join(CASCADE, "inject.js"));
+  inj.addItem("mcp", "github", { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] });
+  inj.addItem("secret", "GH_PAT", { value: "ghp_secretBBBB2222" });
+  inj.addItem("knowledge", "readme", { content: "hello world" });
+  assert.throws(() => inj.addItem("nope", "x", {}), /未知注入类型/);
+  const v = inj.listView();
+  assert.strictEqual(v.length, 3);
+  assert.ok(!JSON.stringify(v).includes("ghp_secretBBBB"), "secret 值不得出视图");
+  const sec = v.find((x) => x.kind === "secret");
+  assert.strictEqual(sec.hasValue, true); assert.strictEqual(sec.valueTail, "2222");
+  assert.strictEqual(v.find((x) => x.kind === "mcp").transport, "stdio");
+  // 计划: 2 号 × 3 档 = 6
+  const plan = inj.plan([{ email: "a@x.y" }, { email: "b@x.y" }]);
+  assert.strictEqual(plan.itemCount, 3);
+  assert.strictEqual(plan.targetCount, 2);
+  assert.strictEqual(plan.total, 6);
+  // 移除
+  assert.strictEqual(inj.removeItem("secret", "GH_PAT").removed, true);
+  assert.strictEqual(inj.listView().length, 2);
+  assert.strictEqual((fs.statSync(process.env.DAO_INJECT_PROFILE_FILE).mode & 0o777), 0o600);
+  delete process.env.DAO_INJECT_PROFILE_FILE;
+});
