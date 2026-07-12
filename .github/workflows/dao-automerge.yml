@@ -18,7 +18,7 @@ on:
     types: [completed]
   workflow_dispatch:
   schedule:
-    - cron: '17 * * * *'   # 每小时兜底扫一遍，防事件丢失
+    - cron: '*/15 * * * *'   # 每 15 分钟兜底扫一遍，防事件丢失/降低延迟
 
 permissions:
   contents: write
@@ -66,7 +66,21 @@ jobs:
               const maxPerHour = parseInt((yaml.match(/max_merges_per_hour:\s*(\d+)/) || [])[1] || '12', 10);
               const minGap = parseInt((yaml.match(/min_seconds_between_merges:\s*(\d+)/) || [])[1] || '90', 10);
               const delBranch = /delete_branch_after:\s*true/.test(yaml);
-              cfg.automerge = { label, method, reqCI, trustMembers, maxPerHour, minGap, delBranch };
+              // ignore_checks: 逐行 `-` 列表，匹配到的 check 名(子串,忽略大小写)不纳入
+              // 全绿判定 —— 用于 fork 仓库上游天然红、与本 PR 无关的 CI(如 HA 的
+              // `Check other linters`/`Prepare dependencies`)，避免 dependabot PR 永久卡住。
+              const ignoreChecks = [];
+              let inIgnore = false;
+              for (const raw of yaml.split('\n')) {
+                const line = raw.replace(/#.*$/, '');
+                if (/^\s*ignore_checks:\s*$/.test(line)) { inIgnore = true; continue; }
+                if (inIgnore) {
+                  const m = line.match(/^\s*-\s*(.+?)\s*$/);
+                  if (m) { ignoreChecks.push(m[1].replace(/^["']|["']$/g, '').toLowerCase()); continue; }
+                  if (/^\S/.test(line) || /^\s{0,2}\S/.test(line)) inIgnore = false;
+                }
+              }
+              cfg.automerge = { label, method, reqCI, trustMembers, maxPerHour, minGap, delBranch, ignoreChecks };
             } catch (e) {
               core.setFailed('无法读取 .dao/automation.yml: ' + e.message);
               return;
@@ -81,8 +95,9 @@ jobs:
               return A.trustMembers && MEMBERISH.has(pr.author_association || '');
             };
 
-            // 收集候选 PR（永远全量扫，事件只是触发器）
+            // 收集候选 PR（永远全量扫，事件只是触发器）；按创建时间从旧到新处理，避免饿死
             const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', per_page: 100 });
+            prs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
             // ① 自动打标：可信作者 + 非草稿 + 标题无 [wip]/[hold]
             for (const pr of prs) {
@@ -118,7 +133,9 @@ jobs:
               if (A.reqCI) {
                 const sha = pr.head.sha;
                 const cr = await github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 });
-                const runs = (cr.data.check_runs || []).filter(c => c.name !== 'automerge');
+                const ign = A.ignoreChecks || [];
+                const runs = (cr.data.check_runs || []).filter(c =>
+                  c.name !== 'automerge' && !ign.some(p => (c.name || '').toLowerCase().includes(p)));
                 const notGreen = runs.filter(c => c.status !== 'completed' || !['success','neutral','skipped'].includes(c.conclusion));
                 if (runs.length === 0 || notGreen.length > 0) { core.info(`PR #${pr.number} CI 未全绿，等待`); continue; }
               }
