@@ -221,3 +221,33 @@ test("插件自持账号池: 收录/视图脱敏/切换写 credentials.toml/无 
   delete process.env.DAO_CASCADE_POOL_FILE;
   delete process.env.DAO_DEVIN_CRED_FILE;
 });
+
+test("插件自持本地 API: 健康免鉴权/无 token 401/带 token 读插件真源(脱敏)", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-api-"));
+  process.env.DAO_LOCAL_API_FILE = path.join(dir, "local-api.json");
+  const api = require(path.join(CASCADE, "local-api.js"));
+  const { port, token } = await api.start(0);
+  assert.ok(port > 0 && token.length >= 32);
+  const get = (p, hdrs) => new Promise((resolve, reject) => {
+    require("http").get({ host: "127.0.0.1", port, path: p, headers: hdrs || {} }, (r) => {
+      let b = ""; r.on("data", (c) => { b += c; });
+      r.on("end", () => resolve({ code: r.statusCode, body: JSON.parse(b) }));
+    }).on("error", reject);
+  });
+  const h = await get("/api/health");
+  assert.strictEqual(h.code, 200); assert.strictEqual(h.body.ok, true);
+  const noAuth = await get("/api/overview");
+  assert.strictEqual(noAuth.code, 401);
+  const ov = await get("/api/overview", { Authorization: "Bearer " + token });
+  assert.strictEqual(ov.code, 200);
+  assert.ok("account" in ov.body && "backups" in ov.body && "mcp" in ov.body);
+  assert.ok(!JSON.stringify(ov.body).includes(token), "响应绝不含 token");
+  assert.ok(!("apiKey" in ov.body.account), "账号视图脱敏无 apiKey");
+  const nf = await get("/api/nope", { Authorization: "Bearer " + token });
+  assert.strictEqual(nf.code, 404);
+  // 状态文件 600
+  assert.strictEqual((fs.statSync(process.env.DAO_LOCAL_API_FILE).mode & 0o777), 0o600);
+  await api.stop();
+  assert.strictEqual(api.running(), false);
+  delete process.env.DAO_LOCAL_API_FILE;
+});

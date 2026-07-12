@@ -7,12 +7,14 @@
 //   💬 对话备份 — 扫描备份根: Cascade 账号与 Devin Cloud 账号同列, 点开即读转录(双源统一)
 //   🧩 MCP     — 插件版完整管理: 明细/工具级+server级开关/重载/添加/配置直开(直连 LS)
 //   🔀 切号    — 插件自持账号池(~/.dao/cascade-pool.json): 收录当前号/切换/移除, 无回退铁律
-// 后续并入: 🌐 桥接 / 💉 反向注入 / 🐙 GitHub / 🔌 Proxy Pro / 🔎 浏览器搜索。
+//   🌐 桥接    — 插件自持本地 HTTP API(local-api.js): 只绑 127.0.0.1 + Bearer, 暴露插件真源
+// 后续并入: 💉 反向注入 / 🐙 GitHub / 🔌 Proxy Pro / 🔎 浏览器搜索。
 "use strict";
 const vscode = require("vscode");
 const backup = require("./backup");
 const hostStateMod = require("./host-state");
 const acctPool = require("./account-pool");
+const localApi = require("./local-api");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -76,6 +78,10 @@ class UnifiedPanel {
       case "pool-capture": return this._poolCapture();
       case "pool-switch": return this._poolSwitch(String(msg.email || ""));
       case "pool-remove": return this._poolRemove(String(msg.email || ""));
+      case "bridge-state": return this._bridgeState();
+      case "bridge-start": return this._bridgeStart();
+      case "bridge-stop": return this._bridgeStop();
+      case "bridge-copy-token": return vscode.env.clipboard.writeText(localApi.token()).then(() => vscode.window.showInformationMessage("已复制本地 API token"), () => {});
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
       default: return;
     }
@@ -156,6 +162,23 @@ class UnifiedPanel {
     const os = require("os"); const path = require("path");
     const p = path.join(os.homedir(), ".codeium", "windsurf", "mcp_config.json");
     vscode.workspace.openTextDocument(p).then((d) => vscode.window.showTextDocument(d), () => {});
+  }
+
+  // 桥接板块(插件自持本地 API): token 不入 webview, 只回尾4位指纹。
+  _bridgeState() {
+    const t = localApi.token();
+    this._post({ type: "bridge-state", running: localApi.running(), port: localApi.port(),
+      tokenTail: t ? t.slice(-4) : "", stateFile: localApi.statePath() });
+  }
+
+  async _bridgeStart() {
+    try { await localApi.start(0); } catch (e) { vscode.window.showErrorMessage("本地 API 启动失败: " + e.message); }
+    this._bridgeState();
+  }
+
+  async _bridgeStop() {
+    try { await localApi.stop(); } catch (_) {}
+    this._bridgeState();
   }
 
   // 切号板块(插件自持账号池): key 永不出后端, 只回尾4位指纹; 目标号无 key 即报错不回退。
@@ -252,7 +275,7 @@ h2{font-size:15px;margin:0 0 4px}
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"]];
+const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
   '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
@@ -334,6 +357,24 @@ function renderSwitch(){
   }
   return h;
 }
+let BR=null;
+function renderBridge(){
+  let h='<div class="row"><h2 style="flex:1">桥接 · 插件自持本地 API</h2>'+
+    (BR&&BR.running?'<button class="btn sec" id="brStop">停止</button>':'<button class="btn" id="brStart">启动</button>')+
+    '<button class="btn sec" id="brRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">只绑 127.0.0.1 · 除 /api/health 外均需 Bearer token(随机生成·落盘 mode 600); 暴露插件自持真源(账号/备份/MCP/LS 主机), 绝不含凭据。</div>';
+  if(BR===null){h+='<div class="card muted">加载桥接状态…</div>';return h;}
+  h+='<div class="card">'+cr('状态',BR.running?'⚡运行中':'已停止')+
+    (BR.running?cr('地址','http://127.0.0.1:'+BR.port):'')+
+    (BR.running?cr('token','…'+E(BR.tokenTail)+' <span class="back" id="brTok">复制完整 token</span>'):'')+
+    cr('状态文件',E(BR.stateFile||''))+'</div>';
+  if(BR.running){
+    h+='<div class="st">端点(全只读)</div><div class="card">'+
+      ['/api/health — 健康(免鉴权)','/api/overview — 账号+备份+MCP+LS 总览','/api/account — 账号(脱敏)','/api/backups — 备份水位','/api/mcp — MCP 快照','/api/host — LS 主机态']
+      .map(x=>'<div class="cr"><span class="v" style="text-align:left">'+E(x)+'</span></div>').join('')+'</div>';
+  }
+  return h;
+}
 let MCPD=null;
 function renderMcp(){
   let h='<div class="row"><h2 style="flex:1">MCP · 插件版管理</h2>'+
@@ -369,6 +410,7 @@ function render(){
   else if(S.board==='switch')h=renderSwitch();
   else if(S.board==='backups')h=renderBackups();
   else if(S.board==='mcp')h=renderMcp();
+  else if(S.board==='bridge')h=renderBridge();
   main.innerHTML=h;
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
   const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
@@ -385,11 +427,17 @@ function render(){
   document.querySelectorAll('[data-poolswitch]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-switch',email:el.dataset.poolswitch}));
   document.querySelectorAll('[data-poolremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-remove',email:el.dataset.poolremove}));
   if(S.board==='switch'&&POOL===null)vscode.postMessage({type:'pool-list'});
+  const bs=document.getElementById('brStart'); if(bs)bs.onclick=()=>vscode.postMessage({type:'bridge-start'});
+  const bp=document.getElementById('brStop'); if(bp)bp.onclick=()=>vscode.postMessage({type:'bridge-stop'});
+  const brf=document.getElementById('brRf'); if(brf)brf.onclick=()=>{BR=null;render();vscode.postMessage({type:'bridge-state'});};
+  const btk=document.getElementById('brTok'); if(btk)btk.onclick=()=>vscode.postMessage({type:'bridge-copy-token'});
+  if(S.board==='bridge'&&BR===null)vscode.postMessage({type:'bridge-state'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
   else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
+  else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
   else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}
