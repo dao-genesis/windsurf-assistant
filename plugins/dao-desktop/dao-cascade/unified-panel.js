@@ -23,11 +23,17 @@ const ghFleet = require("./github-fleet");
 const proxyPro = require("./proxy-pro");
 const webSearch = require("./web-search");
 const inject = require("./inject");
+const mcpConfig = require("./mcp-config");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
 class UnifiedPanel {
-  constructor(log) { this._log = typeof log === "function" ? log : () => {}; this._view = null; this._board = "overview"; }
+  constructor(log, ctx) {
+    this._log = typeof log === "function" ? log : () => {};
+    this._view = null; this._board = "overview";
+    this._extRoot = (ctx && ctx.extensionUri && ctx.extensionUri.fsPath) || "";
+    this._storageDir = (ctx && ctx.globalStorageUri && ctx.globalStorageUri.fsPath) || "";
+  }
 
   resolveWebviewView(view) {
     this._view = view;
@@ -41,9 +47,11 @@ class UnifiedPanel {
 
   // 插件自主刷新融合真源(不依赖 Cascade 面板是否打开): LS 就绪即直连拉
   // 账号(GetUserStatus)与 MCP 快照(GetMcpServerStates)并 publishFused → 落盘 + 回推。
+  // 三模式引擎态(engines)亦自持探测: 不依赖 Cascade 面板, 主页即有三模式感知。
   async _refreshFused() {
     if (this._fusing) return; this._fusing = true;
     try {
+      await this._refreshEngines();
       const ls = require("./ls-bridge");
       if (!ls.ready() || !ls.apiKey()) return;
       try {
@@ -68,6 +76,30 @@ class UnifiedPanel {
     finally { this._fusing = false; }
   }
 
+  // 三模式引擎态自持探测(与 Cascade 面板 _pushEnv 同源同结构):
+  //   Cascade = LS 端口/CSRF + 官方登录态; Devin Local = 本机 devin 二进制 + CLI 登录态;
+  //   Devin Cloud = CLI 登录态(同一凭据) + 远端 ACP 端点。
+  async _refreshEngines() {
+    try {
+      const { resolveDevinBin } = require("./acp-client");
+      const { authStatus } = require("./devin-provision");
+      const bin = resolveDevinBin(this._extRoot, this._storageDir);
+      const auth = await authStatus(bin);
+      const hs = hostStateMod.loadPersisted() || hostStateMod.hostState();
+      const acct = (hs.fused && hs.fused.account) || {};
+      const ls = require("./ls-bridge");
+      const signedIn = !!((hs.auth && (hs.auth.loggedIn === true || hs.auth.state === "signed-in" || hs.auth.apiKey || hs.auth.userName || hs.auth.name)) ||
+        acct.email || acct.name || ls.apiKey());
+      hostStateMod.publishFused("engines", {
+        cascade: { ready: !!(hs.lsPort && hs.csrfToken), lsPort: hs.lsPort || 0, signedIn,
+          name: (hs.auth && (hs.auth.userName || hs.auth.name || hs.auth.email)) || acct.name || acct.email || "" },
+        devinLocal: { bin: !!bin, signedIn: !!auth.loggedIn, name: auth.name || "" },
+        devinCloud: { signedIn: !!auth.loggedIn, name: auth.name || "",
+          endpoint: "wss://app.devin.ai/api/acp/live" },
+      });
+    } catch (e) { this._log("[unified] refreshEngines: " + e.message); }
+  }
+
   _post(m) { if (this._view) try { this._view.webview.postMessage(m); } catch (_) {} }
 
   _onMessage(msg) {
@@ -76,10 +108,11 @@ class UnifiedPanel {
       case "refresh": this._refreshFused(); return this._pushState();
       case "open-conv": return this._openConversation(msg.dir, msg.folder);
       case "backup-now": return this._backupNow();
+      case "conv-manage": return this._convManage(msg);
       case "mcp-detail": return this._mcpDetail();
       case "mcp-refresh": return this._mcpOp("RefreshMcpServers", {});
-      case "mcp-toggle": return this._mcpOp("UpdateMcpServerInConfigFile", { serverId: String(msg.name || "") });
-      case "mcp-tool-toggle": return this._mcpOp("ToggleMcpTool", { serverId: String(msg.server || ""), toolName: String(msg.tool || "") });
+      case "mcp-toggle": return this._mcpToggle(String(msg.name || ""));
+      case "mcp-tool-toggle": return this._mcpToolToggle(String(msg.server || ""), String(msg.tool || ""));
       case "mcp-add": return this._mcpAdd();
       case "mcp-config": return this._mcpConfigOpen();
       case "pool-list": return this._poolList();
@@ -120,14 +153,20 @@ class UnifiedPanel {
     const lsReady = !!(hs && hs.lsPort && hs.csrfToken);
     let backups = { root: "", accounts: [] };
     try { backups = backup.listBackups(); } catch (e) { this._log("[unified] listBackups: " + e.message); }
+    let github = null, proxy = null;
+    try { const v = ghFleet.listView(); github = { count: v.length, ok: v.filter((a) => a.verify === "ok").length }; } catch (_) {}
+    try { const v = proxyPro.listView(); proxy = { channels: v.channels.length, routes: v.routes.length }; } catch (_) {}
     return {
       board: this._board,
       lsReady,
       account: fused.account || null,
       mcp: fused.mcp || null,
+      engines: fused.engines || null,
       cascadeBackup: fused.cascadeBackup || null,
       auth: hs.auth || null,
       backups,
+      github,
+      proxy,
     };
   }
 
@@ -140,7 +179,44 @@ class UnifiedPanel {
     } catch (e) { this._post({ type: "conv-error", error: e.message }); }
   }
 
+  // Cascade 轨迹管理(备份板块延伸): 重命名/归档/取消归档/删除 —— LS 官方 RPC + 本地备份树同步。
+  async _convManage(msg) {
+    const op = String(msg.op || "");
+    const opts = { accDir: String(msg.dir || ""), folder: String(msg.folder || ""), cascadeId: String(msg.cascadeId || ""), op };
+    try {
+      if (op === "rename") {
+        const name = await vscode.window.showInputBox({ prompt: "重命名会话", value: String(msg.title || "") });
+        if (name == null || !name.trim()) return;
+        opts.name = name.trim();
+      }
+      if (op === "delete") {
+        const pick = await vscode.window.showWarningMessage("删除该 Cascade 会话及其本地备份?", { modal: true }, "删除");
+        if (pick !== "删除") return;
+      }
+      const ls = require("./ls-bridge");
+      const r = await backup.manageTrajectory(ls, opts);
+      if (!r.ok) vscode.window.showErrorMessage("会话管理失败: " + (r.error || op));
+    } catch (e) { vscode.window.showErrorMessage("会话管理失败: " + e.message); }
+    this._pushState();
+  }
+
   // MCP 完整管理(插件版直连 LS): 明细(含工具/prompts/错误) + server 级开关 + 工具级开关 + 重载 + 添加 + 配置直开。
+  // 开关直写配置真源 mcp_config.json(三模式同一份配置), 再 RefreshMcpServers 令 LS 重载。
+  async _mcpToggle(name) {
+    const r = mcpConfig.toggleServer(name);
+    if (!r.ok) { vscode.window.showErrorMessage("MCP 开关失败: " + r.error); return this._mcpDetail(); }
+    return this._mcpOp("RefreshMcpServers", {});
+  }
+
+  async _mcpToolToggle(server, tool) {
+    const r = mcpConfig.toggleTool(server, tool);
+    if (!r.ok) {
+      // 配置无此 server(如内建)时回退官方 RPC
+      return this._mcpOp("ToggleMcpTool", { serverId: server, toolName: tool });
+    }
+    return this._mcpOp("RefreshMcpServers", {});
+  }
+
   async _mcpDetail() {
     try {
       const ls = require("./ls-bridge");
@@ -425,6 +501,8 @@ body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vsco
 .muted{opacity:.55}
 pre{white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,#0002);padding:10px;border-radius:6px;max-height:64vh;overflow:auto}
 .back{cursor:pointer;color:var(--vscode-textLink-foreground,#4af)}
+.mgr{cursor:pointer;opacity:.55;margin-left:2px}
+.mgr:hover{opacity:1}
 h2{font-size:15px;margin:0 0 4px}
 </style></head><body>
 <div class="wrap">
@@ -441,9 +519,18 @@ function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{CONV=null;vscode.postMessage({type:'nav',board:b.dataset.b})});}
 function q(x){return (x===0||x)?(x+'%'):'—';}
 function renderOverview(){
-  const a=S.account||{}, mb=S.mcp&&S.mcp.servers, cb=S.cascadeBackup;
+  const a=S.account||{}, mb=S.mcp&&S.mcp.servers, cb=S.cascadeBackup, eg=S.engines;
   const run=mb?mb.filter(s=>String(s.status||'').toUpperCase().indexOf('RUN')>=0).length:0;
   let h='<h2>归一主页 · 插件自持真源</h2><div class="muted" style="margin-bottom:10px">数据源: 本插件 host-state(fused)+ 本机备份树, 不依赖 IDE 宿主。</div>';
+  h+='<div class="st">三模式引擎</div><div class="card">';
+  if(eg){
+    const cx=eg.cascade||{}, dl=eg.devinLocal||{}, dc=eg.devinCloud||{};
+    h+=cr('🌊 Cascade',(cx.ready?'⚡LS 就绪(:'+cx.lsPort+')':'LS 未就绪')+' · '+(cx.signedIn?('已登录'+(cx.name?' '+E(cx.name):'')):'未登录'));
+    h+=cr('⬢ Devin Local',(dl.bin?'引擎就绪':'无 devin 二进制')+' · '+(dl.signedIn?('CLI 已登录'+(dl.name?' '+E(dl.name):'')):'CLI 未登录'));
+    h+=cr('☁ Devin Cloud',(dc.signedIn?'凭据就绪(同 CLI)':'未登录')+' · 远端 ACP');
+    if(eg.updatedAt)h+=cr('探测于',E(String(eg.updatedAt).replace('T',' ').slice(0,19)));
+  } else h+='<div class="cr muted">无引擎态快照(点右上刷新或打开 Cascade 面板后自动探测)</div>';
+  h+='</div>';
   h+='<div class="st">Cascade · Devin Desktop 账号</div><div class="card">';
   if(a.email){h+=cr('账号',(a.name?E(a.name)+' · ':'')+E(a.email));}
   else h+='<div class="cr muted">未获取到账号(LS '+(S.lsReady?'就绪':'未就绪')+', 打开 Cascade 面板登录后自动同步)</div>';
@@ -459,6 +546,10 @@ function renderOverview(){
   h+='</div>';
   h+='<div class="st">本地 MCP(插件版)</div><div class="card">';
   h+= mb ? cr('已配置', mb.length+' 个 · '+run+' 运行中') : '<div class="cr muted">无 MCP 快照(打开 Cascade 面板 MCP 列表后同步)</div>';
+  h+='</div>';
+  h+='<div class="st">GitHub 舰队 · Proxy Pro</div><div class="card">';
+  h+= S.github ? cr('GitHub 舰队', S.github.count+' 号 · '+S.github.ok+' 在线✓') : cr('GitHub 舰队','—');
+  h+= S.proxy ? cr('Proxy Pro', S.proxy.channels+' 渠道 · '+S.proxy.routes+' 路由') : cr('Proxy Pro','—');
   h+='</div>';
   return h;
 }
@@ -477,9 +568,13 @@ function renderBackups(){
       '<span class="badge '+cls+'">'+(a.source==='cloud'?'Devin Cloud':(a.source==='mixed'?'混合':'Cascade'))+'</span></span>'+
       '<span class="muted" style="font-weight:400">'+a.convCount+' 条</span></div>';
     for(const c of a.conversations){
-      h+='<div class="conv'+(c.isArchived?' arch':'')+'" data-dir="'+E(a.dir)+'" data-folder="'+E(c.folder)+'">'+
+      const mg=(c.source==='cascade'&&c.cascadeId)?
+        ' <span class="mgr" data-op="rename" title="重命名">✏</span>'+
+        ' <span class="mgr" data-op="'+(c.isArchived?'unarchive':'archive')+'" title="'+(c.isArchived?'取消归档':'归档')+'">🗄</span>'+
+        ' <span class="mgr" data-op="delete" title="删除">🗑</span>':'';
+      h+='<div class="conv'+(c.isArchived?' arch':'')+'" data-dir="'+E(a.dir)+'" data-folder="'+E(c.folder)+'" data-cid="'+E(c.cascadeId||'')+'" data-title="'+E(c.title)+'">'+
         '<span>'+(c.convNo?('#'+c.convNo+' '):'')+E(c.title)+(c.isArchived?' 🗄':'')+'</span>'+
-        '<span class="m">'+E(String(c.lastModifiedTime||c.backedUpAt||'').replace('T',' ').slice(0,16))+'</span></div>';
+        '<span class="m">'+E(String(c.lastModifiedTime||c.backedUpAt||'').replace('T',' ').slice(0,16))+mg+'</span></div>';
     }
     h+='</div>';
   }
@@ -685,7 +780,15 @@ function render(){
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
   const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
   const back=document.getElementById('back'); if(back)back.onclick=()=>{CONV=null;render();};
-  document.querySelectorAll('.conv[data-dir]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder}));
+  document.querySelectorAll('.conv[data-dir]').forEach(el=>el.onclick=(ev)=>{
+    const t=ev.target;
+    if(t&&t.classList&&t.classList.contains('mgr')){
+      ev.stopPropagation();
+      vscode.postMessage({type:'conv-manage',op:t.dataset.op,dir:el.dataset.dir,folder:el.dataset.folder,cascadeId:el.dataset.cid,title:el.dataset.title});
+      return;
+    }
+    vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder});
+  });
   const ma=document.getElementById('mcpAdd'); if(ma)ma.onclick=()=>vscode.postMessage({type:'mcp-add'});
   const mc=document.getElementById('mcpCfg'); if(mc)mc.onclick=()=>vscode.postMessage({type:'mcp-config'});
   const mr=document.getElementById('mcpRefresh'); if(mr)mr.onclick=()=>{MCPD=null;render();vscode.postMessage({type:'mcp-refresh'});};
@@ -748,7 +851,7 @@ vscode.postMessage({type:'refresh'});
 }
 
 function register(context, log, opts) {
-  const panel = new UnifiedPanel(log);
+  const panel = new UnifiedPanel(log, context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("dao.unified", panel, { webviewOptions: { retainContextWhenHidden: true } })
   );
