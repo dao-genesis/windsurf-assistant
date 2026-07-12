@@ -46,6 +46,11 @@
           "id": "dao.cascade",
           "name": "Cascade · 三模式",
           "type": "webview"
+        },
+        {
+          "id": "dao.unified",
+          "name": "归一 · 插件本源",
+          "type": "webview"
         }
       ]
     },
@@ -53,6 +58,10 @@
       {
         "command": "dao.cascade.open",
         "title": "Devin Desktop: 聚焦 Cascade 三模式面板"
+      },
+      {
+        "command": "dao.unified.open",
+        "title": "Devin Desktop: 打开归一面板(主页/备份/MCP)"
       },
       {
         "command": "dao.cascade.newSession",
@@ -63,6 +72,10 @@
         "command": "dao.cascade.history",
         "title": "Devin Desktop: Cascade 历史会话",
         "icon": "$(history)"
+      },
+      {
+        "command": "dao.cascade.backupAll",
+        "title": "Devin Desktop: 备份全部 Cascade 对话"
       },
       {
         "command": "dao.cascade.deepwiki",
@@ -123,6 +136,21 @@
           "group": "1_modification@9"
         }
       ]
+    },
+    "configuration": {
+      "title": "Devin Desktop",
+      "properties": {
+        "dao.cascade.autoBackup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cascade 对话自动备份：会话变更即增量导出轨迹转录到备份目录（与 dao-one 对话备份板块同源消费）。"
+        },
+        "dao.cascade.backupDir": {
+          "type": "string",
+          "default": "",
+          "description": "Cascade 对话备份根目录；留空用 ~/.wam/conversation_backups（亦可经环境变量 DAO_CASCADE_BACKUP_DIR 重定向）。"
+        }
+      }
     }
   },
   "scripts": {
