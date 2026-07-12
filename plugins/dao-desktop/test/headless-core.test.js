@@ -162,6 +162,9 @@ test("归一面板数据层 listBackups: Cascade 与 Devin Cloud 账号同列双
   assert.strictEqual(c2.meta.source, "cloud");
   // ⑤ 空根不炸
   assert.deepStrictEqual(backup.listBackups(path.join(root, "nope")).accounts, []);
+  // ⑥ readConversation 路径穿越防护
+  assert.throws(() => backup.readConversation(root, "..", ".."), /非法会话路径/);
+  assert.throws(() => backup.readConversation(root, "../..", "x"), /非法会话路径/);
 });
 
 test("融合态跨重启保鲜: 新进程首次 hostFire 不抹掉磁盘上已发布的 fused 分片", () => {

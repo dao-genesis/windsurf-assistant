@@ -64,6 +64,12 @@ class UnifiedPanel {
       case "refresh": this._refreshFused(); return this._pushState();
       case "open-conv": return this._openConversation(msg.dir, msg.folder);
       case "backup-now": return this._backupNow();
+      case "mcp-detail": return this._mcpDetail();
+      case "mcp-refresh": return this._mcpOp("RefreshMcpServers", {});
+      case "mcp-toggle": return this._mcpOp("UpdateMcpServerInConfigFile", { serverId: String(msg.name || "") });
+      case "mcp-tool-toggle": return this._mcpOp("ToggleMcpTool", { serverId: String(msg.server || ""), toolName: String(msg.tool || "") });
+      case "mcp-add": return this._mcpAdd();
+      case "mcp-config": return this._mcpConfigOpen();
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
       default: return;
     }
@@ -95,6 +101,55 @@ class UnifiedPanel {
       const c = backup.readConversation(undefined, dir, folder);
       this._post({ type: "conv", dir, folder, meta: c.meta, md: c.md, path: c.path });
     } catch (e) { this._post({ type: "conv-error", error: e.message }); }
+  }
+
+  // MCP 完整管理(插件版直连 LS): 明细(含工具/prompts/错误) + server 级开关 + 工具级开关 + 重载 + 添加 + 配置直开。
+  async _mcpDetail() {
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("GetMcpServerStates", {});
+      const servers = ((r && r.states) || []).map((s) => {
+        const off = new Set((s.spec || {}).disabledTools || []);
+        return {
+          name: (s.spec || {}).serverName || "",
+          status: (s.status || "").replace("MCP_SERVER_STATUS_", ""),
+          disabled: !!(s.spec || {}).disabled,
+          error: s.error || "",
+          tools: (s.tools || []).map((t) => ({ name: t.name, description: t.description || "", off: off.has(t.name) })),
+          prompts: (s.prompts || []).map((p) => ({ name: p.name })),
+        };
+      });
+      this._post({ type: "mcp-detail", servers });
+      hostStateMod.publishFused("mcp", { servers: servers.map((s) => ({ name: s.name, status: s.status, disabled: s.disabled, toolCount: s.tools.length })) });
+    } catch (e) { this._post({ type: "mcp-detail", servers: null, error: e.message }); }
+  }
+
+  async _mcpOp(method, req) {
+    try { const ls = require("./ls-bridge"); await ls.call(method, req); }
+    catch (e) { this._log("[unified] " + method + ": " + e.message); }
+    setTimeout(() => this._mcpDetail(), 1200);
+  }
+
+  async _mcpAdd() {
+    try {
+      const ls = require("./ls-bridge");
+      const id = await vscode.window.showInputBox({ prompt: "MCP server 名称(写入 mcp_config.json 的键)" });
+      if (!id) return;
+      const tpl = await vscode.window.showInputBox({
+        prompt: 'server 配置 JSON(如 {"command":"npx","args":[...]} 或 {"serverUrl":...})',
+        value: '{"command":"","args":[]}' });
+      if (!tpl) return;
+      let tplObj; try { tplObj = JSON.parse(tpl); } catch (e) { vscode.window.showErrorMessage("JSON 无效: " + e.message); return; }
+      await ls.call("SaveMcpServerToConfigFile", { serverId: id, templateJson: JSON.stringify(tplObj) });
+      await ls.call("RefreshMcpServers", {});
+      setTimeout(() => this._mcpDetail(), 1500);
+    } catch (e) { vscode.window.showErrorMessage("添加 MCP 失败: " + e.message); }
+  }
+
+  _mcpConfigOpen() {
+    const os = require("os"); const path = require("path");
+    const p = path.join(os.homedir(), ".codeium", "windsurf", "mcp_config.json");
+    vscode.workspace.openTextDocument(p).then((d) => vscode.window.showTextDocument(d), () => {});
   }
 
   async _backupNow() {
@@ -215,18 +270,30 @@ function renderConv(){
   h+='</div><pre>'+E(CONV.md)+'</pre>';
   return h;
 }
+let MCPD=null;
 function renderMcp(){
-  const mb=S.mcp&&S.mcp.servers;
-  let h='<div class="row"><h2 style="flex:1">MCP 服务器 · 插件版</h2><button class="btn sec" id="rf">刷新</button></div>';
-  if(!mb){h+='<div class="card muted">尚无 MCP 快照。打开 Cascade 面板的 MCP 列表即会经 LS 同步到此(fused.mcp)。</div>';return h;}
-  if(!mb.length){h+='<div class="card muted">无已配置的 MCP 服务器。</div>';return h;}
-  h+='<div class="card">';
+  let h='<div class="row"><h2 style="flex:1">MCP · 插件版管理</h2>'+
+    '<button class="btn" id="mcpAdd">添加</button>'+
+    '<button class="btn sec" id="mcpCfg">配置文件</button>'+
+    '<button class="btn sec" id="mcpRefresh">重载</button></div>';
+  if(MCPD===null){h+='<div class="card muted">正在经 LS 拉取 MCP 明细…</div>';return h;}
+  if(MCPD.error){h+='<div class="card">⚠ '+E(MCPD.error)+'</div>';return h;}
+  const mb=MCPD.servers||[];
+  if(!mb.length){h+='<div class="card muted">无已配置的 MCP 服务器。点「添加」或「配置文件」写入 server 后重载。</div>';return h;}
   for(const s of mb){
-    const running=String(s.status||'').toUpperCase().indexOf('RUN')>=0;
-    h+=cr(E(s.name)+(s.disabled?' · 已禁用':''),(running?'⚡运行中':(E(s.status)||'未运行'))+(s.toolCount?' · '+s.toolCount+' 工具':''));
+    const running=String(s.status||'').toUpperCase().indexOf('READY')>=0||String(s.status||'').toUpperCase().indexOf('RUN')>=0;
+    h+='<div class="acc"><div class="hd"><span>'+E(s.name)+
+      '<span class="badge'+(running?'':' cloud')+'">'+(s.disabled?'已禁用':(running?'⚡运行中':E(s.status)||'未运行'))+'</span></span>'+
+      '<button class="btn sec" data-mcptoggle="'+E(s.name)+'">'+(s.disabled?'启用':'禁用')+'</button></div>';
+    if(s.error)h+='<div class="conv" style="cursor:default"><span>⚠ '+E(s.error)+'</span></div>';
+    for(const t of s.tools){
+      h+='<div class="conv" data-mcptool="'+E(s.name)+'|'+E(t.name)+'" title="'+E(t.description)+'">'+
+        '<span'+(t.off?' class="arch" style="text-decoration:line-through"':'')+'>'+(t.off?'◌ ':'● ')+E(t.name)+'</span>'+
+        '<span class="m">'+(t.off?'已禁用 · 点启':'启用中 · 点禁')+'</span></div>';
+    }
+    if(s.prompts&&s.prompts.length)h+='<div class="conv" style="cursor:default"><span class="muted">prompts: '+s.prompts.map(p=>E(p.name)).join(', ')+'</span></div>';
+    h+='</div>';
   }
-  h+='</div>';
-  if(S.mcp.updatedAt)h+='<div class="muted">更新于 '+E(String(S.mcp.updatedAt).replace('T',' ').slice(0,19))+'</div>';
   return h;
 }
 function render(){
@@ -241,10 +308,17 @@ function render(){
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
   const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
   const back=document.getElementById('back'); if(back)back.onclick=()=>{CONV=null;render();};
-  document.querySelectorAll('.conv').forEach(el=>el.onclick=()=>vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder}));
+  document.querySelectorAll('.conv[data-dir]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder}));
+  const ma=document.getElementById('mcpAdd'); if(ma)ma.onclick=()=>vscode.postMessage({type:'mcp-add'});
+  const mc=document.getElementById('mcpCfg'); if(mc)mc.onclick=()=>vscode.postMessage({type:'mcp-config'});
+  const mr=document.getElementById('mcpRefresh'); if(mr)mr.onclick=()=>{MCPD=null;render();vscode.postMessage({type:'mcp-refresh'});};
+  document.querySelectorAll('[data-mcptoggle]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-toggle',name:el.dataset.mcptoggle}));
+  document.querySelectorAll('[data-mcptool]').forEach(el=>el.onclick=()=>{const [sv,tl]=el.dataset.mcptool.split('|');vscode.postMessage({type:'mcp-tool-toggle',server:sv,tool:tl});});
+  if(S.board==='mcp'&&MCPD===null)vscode.postMessage({type:'mcp-detail'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
+  else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
   else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}

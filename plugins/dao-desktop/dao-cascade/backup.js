@@ -163,7 +163,9 @@ function listBackups(rootOverride) {
 // 读取某会话的转录正文(对话.md)+ 元数据, 供面板详情视图渲染。
 function readConversation(rootOverride, accDir, folder) {
   const root = backupRoot(rootOverride);
-  const convPath = path.join(root, accDir, "对话", folder);
+  const convPath = path.join(root, String(accDir || ""), "对话", String(folder || ""));
+  const rel = path.relative(root, convPath);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("非法会话路径");
   let md = "";
   try { md = fs.readFileSync(path.join(convPath, "对话.md"), "utf8"); } catch (e) { md = "(无法读取转录: " + e.message + ")"; }
   return { meta: _readJson(path.join(convPath, "_meta.json")) || {}, md, path: convPath };
