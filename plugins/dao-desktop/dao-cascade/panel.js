@@ -297,6 +297,16 @@ class CascadePanelProvider {
       && vscode.workspace.workspaceFolders[0].name) || null;
     this._post({ type: "env", devinBin: bin || null, agents: AGENTS,
       loggedIn: auth.loggedIn, userName: auth.name, windsurf: ws, folder });
+    // 三模式引擎态归一发布(fused.engines): 归一面板主页/桥接 API 直接消费, 与本面板 env 同源。
+    try {
+      require("./host-state").publishFused("engines", {
+        cascade: { ready: !!(ws && ws.lsPort), lsPort: (ws && ws.lsPort) || 0,
+          signedIn: !!(ws && ws.authSignedIn), name: (ws && ws.authName) || "" },
+        devinLocal: { bin: !!bin, signedIn: !!auth.loggedIn, name: auth.name || "" },
+        devinCloud: { signedIn: !!auth.loggedIn, name: auth.name || "",
+          endpoint: "wss://app.devin.ai/api/acp/live" },
+      });
+    } catch (_) {}
     this._sbSet({ lsReady: !!(ws && ws.lsPort), user: (ws && ws.authName) || auth.name || null });
     this._cxPushWorkflows();
   }

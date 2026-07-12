@@ -329,6 +329,87 @@ test("插件自持浏览器搜索: DDG 结果解析 + 历史落盘 600(仅查询
   delete process.env.DAO_WEB_SEARCH_FILE;
 });
 
+test("Cascade 轨迹管理: 归档/取消归档/重命名/删除 走官方 RPC 并同步本地备份树", async () => {
+  const backup = require(path.join(CASCADE, "backup.js"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mg-"));
+  const summaries = { cidM: { summary: "待管理会话", lastModifiedTime: "2026-07-12T00:00:00Z" } };
+  const calls = [];
+  const fakeLs = {
+    ready: () => ({ lsPort: 1, csrfToken: "c" }),
+    apiKey: () => "k",
+    call: async (m, req) => {
+      calls.push([m, req]);
+      if (m === "GetAllCascadeTrajectories") return { trajectorySummaries: summaries };
+      if (m === "GetCascadeTranscriptForTrajectoryId") return { transcript: "body" };
+      return {};
+    },
+  };
+  await backup.backupAll(fakeLs, { root, email: "m@x.y" });
+  const accDir = backup.accountDirName("m@x.y");
+  const idx0 = JSON.parse(fs.readFileSync(path.join(root, accDir, "_index.json"), "utf8"));
+  const folder = idx0.entries.cidM.folder;
+  const base = { root, accDir, folder, cascadeId: "cidM" };
+  // 归档: RPC + 本地 meta/index 同步
+  const r1 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "archive" }, base));
+  assert.ok(r1.ok);
+  assert.deepStrictEqual(calls[calls.length - 1], ["ArchiveCascadeTrajectory", { cascadeId: "cidM", isArchived: true }]);
+  const metaP = path.join(root, accDir, "对话", folder, "_meta.json");
+  assert.strictEqual(JSON.parse(fs.readFileSync(metaP, "utf8")).isArchived, true);
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(root, accDir, "_index.json"), "utf8")).entries.cidM.isArchived, true);
+  // 取消归档
+  const r2 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "unarchive" }, base));
+  assert.ok(r2.ok);
+  assert.strictEqual(JSON.parse(fs.readFileSync(metaP, "utf8")).isArchived, false);
+  // 重命名: RPC + 本地标题跟随
+  const r3 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "rename", name: "新名字" }, base));
+  assert.ok(r3.ok);
+  assert.deepStrictEqual(calls[calls.length - 1], ["RenameCascadeTrajectory", { cascadeId: "cidM", name: "新名字" }]);
+  assert.strictEqual(JSON.parse(fs.readFileSync(metaP, "utf8")).title, "新名字");
+  assert.strictEqual((await backup.manageTrajectory(fakeLs, Object.assign({ op: "rename" }, base))).ok, false, "缺名必拒");
+  // 路径穿越防护
+  const bad = await backup.manageTrajectory(fakeLs, { root, accDir: "..", folder: "..", cascadeId: "cidM", op: "delete" });
+  assert.strictEqual(bad.ok, false);
+  assert.match(bad.error, /非法会话路径/);
+  // 删除: RPC + 本地目录与索引项移除
+  const r4 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "delete" }, base));
+  assert.ok(r4.ok);
+  assert.deepStrictEqual(calls[calls.length - 1], ["DeleteCascadeTrajectory", { cascadeId: "cidM" }]);
+  assert.ok(!fs.existsSync(path.join(root, accDir, "对话", folder)), "本地会话目录应移除");
+  assert.ok(!JSON.parse(fs.readFileSync(path.join(root, accDir, "_index.json"), "utf8")).entries.cidM, "索引项应移除");
+  // 缺 cascadeId / 未知操作
+  assert.strictEqual((await backup.manageTrajectory(fakeLs, { op: "archive" })).ok, false);
+  assert.strictEqual((await backup.manageTrajectory(fakeLs, Object.assign({ op: "nope" }, base))).ok, false);
+  // LS 未就绪: 不打 RPC, 本地同步照常(离线管理备份树)
+  const off = { ready: () => null, apiKey: () => "" };
+  const r5 = await backup.manageTrajectory(off, Object.assign({ op: "archive" }, base));
+  assert.ok(r5.ok, "离线仅本地同步亦可");
+});
+
+test("MCP 配置真源开关: server 级 disabled 位 + 工具级 disabledTools 直写 mcp_config.json", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mcpc-"));
+  process.env.DAO_MCP_CONFIG_FILE = path.join(dir, "mcp_config.json");
+  const mc = require(path.join(CASCADE, "mcp-config.js"));
+  fs.writeFileSync(process.env.DAO_MCP_CONFIG_FILE, JSON.stringify({
+    mcpServers: { github: { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] } },
+  }));
+  // server 级: 翻转 → disabled:true, 再翻转 → false
+  assert.deepStrictEqual(mc.toggleServer("github"), { ok: true, name: "github", disabled: true });
+  assert.strictEqual(mc.readConfig().mcpServers.github.disabled, true);
+  assert.strictEqual(mc.toggleServer("github").disabled, false);
+  // force 指定
+  assert.strictEqual(mc.toggleServer("github", true).disabled, true);
+  // 无此 server 必拒
+  assert.strictEqual(mc.toggleServer("ghost").ok, false);
+  assert.strictEqual(mc.toggleServer("").ok, false);
+  // 工具级: disabledTools 增删
+  assert.strictEqual(mc.toggleTool("github", "create_issue").off, true);
+  assert.deepStrictEqual(mc.readConfig().mcpServers.github.disabledTools, ["create_issue"]);
+  assert.strictEqual(mc.toggleTool("github", "create_issue").off, false);
+  assert.deepStrictEqual(mc.readConfig().mcpServers.github.disabledTools, []);
+  assert.strictEqual(mc.toggleTool("ghost", "x").ok, false);
+  delete process.env.DAO_MCP_CONFIG_FILE;
+});
+
 test("插件自持反向注入: 档案 600/secret 脱敏/计划=池×档 交叉", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-inj-"));
   process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
