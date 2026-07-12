@@ -5,12 +5,14 @@
 // 现落地板块(持续迭代扩充):
 //   🏠 主页    — Cascade/Devin Desktop 账号·套餐·配额 + 备份水位 + 本地 MCP 概览(fused 真源)
 //   💬 对话备份 — 扫描备份根: Cascade 账号与 Devin Cloud 账号同列, 点开即读转录(双源统一)
-//   🧩 MCP     — 插件版 MCP 服务器列表·活状态·工具数(fused.mcp 真源)
-// 后续并入: 🔀 切号 / 🌐 桥接 / 💉 反向注入 / 🐙 GitHub / 🔌 Proxy Pro / 🔎 浏览器搜索。
+//   🧩 MCP     — 插件版完整管理: 明细/工具级+server级开关/重载/添加/配置直开(直连 LS)
+//   🔀 切号    — 插件自持账号池(~/.dao/cascade-pool.json): 收录当前号/切换/移除, 无回退铁律
+// 后续并入: 🌐 桥接 / 💉 反向注入 / 🐙 GitHub / 🔌 Proxy Pro / 🔎 浏览器搜索。
 "use strict";
 const vscode = require("vscode");
 const backup = require("./backup");
 const hostStateMod = require("./host-state");
+const acctPool = require("./account-pool");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -70,6 +72,10 @@ class UnifiedPanel {
       case "mcp-tool-toggle": return this._mcpOp("ToggleMcpTool", { serverId: String(msg.server || ""), toolName: String(msg.tool || "") });
       case "mcp-add": return this._mcpAdd();
       case "mcp-config": return this._mcpConfigOpen();
+      case "pool-list": return this._poolList();
+      case "pool-capture": return this._poolCapture();
+      case "pool-switch": return this._poolSwitch(String(msg.email || ""));
+      case "pool-remove": return this._poolRemove(String(msg.email || ""));
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
       default: return;
     }
@@ -152,6 +158,44 @@ class UnifiedPanel {
     vscode.workspace.openTextDocument(p).then((d) => vscode.window.showTextDocument(d), () => {});
   }
 
+  // 切号板块(插件自持账号池): key 永不出后端, 只回尾4位指纹; 目标号无 key 即报错不回退。
+  _poolList() {
+    try {
+      const ls = require("./ls-bridge");
+      this._post({ type: "pool-list", accounts: acctPool.listView(ls.apiKey()) });
+    } catch (e) { this._post({ type: "pool-list", accounts: [], error: e.message }); }
+  }
+
+  _poolCapture() {
+    try {
+      const ls = require("./ls-bridge");
+      const hs = hostStateMod.loadPersisted() || hostStateMod.hostState();
+      const r = acctPool.captureCurrent(ls.apiKey(), (hs.fused || {}).account || {});
+      vscode.window.showInformationMessage("已收录 " + r.email + "(池内 " + r.count + " 号)");
+    } catch (e) { vscode.window.showErrorMessage("收录失败: " + e.message); }
+    this._poolList();
+  }
+
+  async _poolSwitch(email) {
+    try {
+      acctPool.switchTo(email);
+      vscode.window.showInformationMessage("已切到 " + email + " — 插件 LS 调用即刻生效; 重载窗口可使官方 UI 同步");
+      await this._refreshAfterSwitch();
+    } catch (e) { vscode.window.showErrorMessage("切号失败: " + e.message); }
+    this._poolList();
+  }
+
+  async _refreshAfterSwitch() {
+    this._fusing = false;
+    await this._refreshFused();
+    this._pushState();
+  }
+
+  _poolRemove(email) {
+    try { acctPool.remove(email); } catch (e) { vscode.window.showErrorMessage("移除失败: " + e.message); }
+    this._poolList();
+  }
+
   async _backupNow() {
     this._post({ type: "backup-progress", running: true });
     try {
@@ -208,7 +252,7 @@ h2{font-size:15px;margin:0 0 4px}
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["backups","💬 对话备份"],["mcp","🧩 MCP"]];
+const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
   '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
@@ -270,6 +314,26 @@ function renderConv(){
   h+='</div><pre>'+E(CONV.md)+'</pre>';
   return h;
 }
+let POOL=null;
+function renderSwitch(){
+  let h='<div class="row"><h2 style="flex:1">切号 · 插件自持账号池</h2>'+
+    '<button class="btn" id="poolCap">收录当前号</button>'+
+    '<button class="btn sec" id="poolRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">池存于 ~/.dao/cascade-pool.json(插件自持, 不依赖 IDE); 切换写入 credentials.toml, 目标号无 key 绝不冒名回退。</div>';
+  if(POOL===null){h+='<div class="card muted">加载账号池…</div>';return h;}
+  if(POOL.error)h+='<div class="card">⚠ '+E(POOL.error)+'</div>';
+  const list=POOL.accounts||[];
+  if(!list.length){h+='<div class="card muted">账号池空。在当前登录态下点「收录当前号」入池。</div>';return h;}
+  for(const a of list){
+    h+='<div class="acc"><div class="hd"><span>'+E(a.email)+(a.active?'<span class="badge">✓ 当前</span>':'')+
+      (a.plan?'<span class="badge cloud">'+E(a.plan)+'</span>':'')+'</span><span>'+
+      (a.active?'':'<button class="btn" data-poolswitch="'+E(a.email)+'">切换</button> ')+
+      '<button class="btn sec" data-poolremove="'+E(a.email)+'">移除</button></span></div>'+
+      '<div class="conv" style="cursor:default"><span class="muted">'+(a.name?E(a.name)+' · ':'')+
+      (a.hasKey?'key …'+E(a.keyTail):'无 key')+' · 收录于 '+E(String(a.addedAt||'').replace('T',' ').slice(0,16))+'</span></div></div>';
+  }
+  return h;
+}
 let MCPD=null;
 function renderMcp(){
   let h='<div class="row"><h2 style="flex:1">MCP · 插件版管理</h2>'+
@@ -302,6 +366,7 @@ function render(){
   if(!S){main.innerHTML='<div class="muted">加载中…</div>';return;}
   let h='';
   if(S.board==='overview')h=renderOverview();
+  else if(S.board==='switch')h=renderSwitch();
   else if(S.board==='backups')h=renderBackups();
   else if(S.board==='mcp')h=renderMcp();
   main.innerHTML=h;
@@ -315,10 +380,16 @@ function render(){
   document.querySelectorAll('[data-mcptoggle]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-toggle',name:el.dataset.mcptoggle}));
   document.querySelectorAll('[data-mcptool]').forEach(el=>el.onclick=()=>{const [sv,tl]=el.dataset.mcptool.split('|');vscode.postMessage({type:'mcp-tool-toggle',server:sv,tool:tl});});
   if(S.board==='mcp'&&MCPD===null)vscode.postMessage({type:'mcp-detail'});
+  const pc=document.getElementById('poolCap'); if(pc)pc.onclick=()=>vscode.postMessage({type:'pool-capture'});
+  const pr=document.getElementById('poolRf'); if(pr)pr.onclick=()=>{POOL=null;render();vscode.postMessage({type:'pool-list'});};
+  document.querySelectorAll('[data-poolswitch]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-switch',email:el.dataset.poolswitch}));
+  document.querySelectorAll('[data-poolremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-remove',email:el.dataset.poolremove}));
+  if(S.board==='switch'&&POOL===null)vscode.postMessage({type:'pool-list'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
   else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
+  else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
   else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}
