@@ -679,7 +679,10 @@ class CascadePanelProvider {
       try {
         const backup = require("./backup");
         const ls = require("./ls-bridge");
-        const r = await backup.backupAll(ls, { root: cfg.get("backupDir") || "", log: this._log });
+        const hs = require("./host-state").hostState();
+        const fusedAcct = (hs.fused && hs.fused.account) || {};
+        const email = fusedAcct.email || (hs.auth && hs.auth.email) || "";
+        const r = await backup.backupAll(ls, { root: cfg.get("backupDir") || "", email, log: this._log });
         if (r.ok && r.saved) this._log("[backup] Cascade 对话备份: 新写 " + r.saved + " / 共 " + r.total + " → " + r.root);
         if (r.ok) this._fusePublish("cascadeBackup", { root: r.root, saved: r.saved, total: r.total });
         if (force) vscode.window.showInformationMessage(r.ok ? ("Cascade 对话备份完成: 新写 " + r.saved + " / 共 " + r.total + " → " + r.root) : ("备份未就绪: " + (r.reason || "")));
