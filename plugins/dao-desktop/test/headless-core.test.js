@@ -329,6 +329,68 @@ test("插件自持浏览器搜索: DDG 结果解析 + 历史落盘 600(仅查询
   delete process.env.DAO_WEB_SEARCH_FILE;
 });
 
+test("插件自持反向注入: 档案 600/secret 脱敏/计划=池×档 交叉", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-inj-"));
+  process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
+  const inj = require(path.join(CASCADE, "inject.js"));
+  inj.addItem("mcp", "github", { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] });
+  inj.addItem("secret", "GH_PAT", { value: "ghp_secretBBBB2222" });
+  inj.addItem("knowledge", "readme", { content: "hello world" });
+  assert.throws(() => inj.addItem("nope", "x", {}), /未知注入类型/);
+  const v = inj.listView();
+  assert.strictEqual(v.length, 3);
+  assert.ok(!JSON.stringify(v).includes("ghp_secretBBBB"), "secret 值不得出视图");
+  const sec = v.find((x) => x.kind === "secret");
+  assert.strictEqual(sec.hasValue, true); assert.strictEqual(sec.valueTail, "2222");
+  assert.strictEqual(v.find((x) => x.kind === "mcp").transport, "stdio");
+  // 计划: 2 号 × 3 档 = 6
+  const plan = inj.plan([{ email: "a@x.y" }, { email: "b@x.y" }]);
+  assert.strictEqual(plan.itemCount, 3);
+  assert.strictEqual(plan.targetCount, 2);
+  assert.strictEqual(plan.total, 6);
+  // 移除
+  assert.strictEqual(inj.removeItem("secret", "GH_PAT").removed, true);
+  assert.strictEqual(inj.listView().length, 2);
+  assert.strictEqual((fs.statSync(process.env.DAO_INJECT_PROFILE_FILE).mode & 0o777), 0o600);
+  delete process.env.DAO_INJECT_PROFILE_FILE;
+});
+
+test("R65 桥接 /api/cascade: 本机会话·记忆水位可经本地 API 暴露(无内容/无凭据)", () => {
+  const hostState = require(path.join(CASCADE, "host-state.js"));
+  const api = require(path.join(CASCADE, "local-api.js"));
+  hostState.publishFused("cascadeLocal", { total: 3, live: 2, archived: 1 });
+  hostState.publishFused("memories", { total: 5 });
+  const c = api.routes("/api/cascade");
+  assert.strictEqual(c.sessions.total, 3);
+  assert.strictEqual(c.sessions.live, 2);
+  assert.strictEqual(c.sessions.archived, 1);
+  assert.strictEqual(c.memories.total, 5);
+  const o = api.routes("/api/overview");
+  assert.strictEqual(o.cascade.sessions.total, 3);
+  assert.ok(!JSON.stringify(c).match(/apiKey|token|pat/i), "水位视图不得含凭据字段");
+});
+
+test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ghi-"));
+  process.env.DAO_GITHUB_FLEET_FILE = path.join(dir, "fleet.json");
+  process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
+  const fleet = require(path.join(CASCADE, "github-fleet.js"));
+  const inj = require(path.join(CASCADE, "inject.js"));
+  // 直接写舰队文件(等价断网入队后的态), 不出网
+  fs.writeFileSync(process.env.DAO_GITHUB_FLEET_FILE,
+    JSON.stringify([{ login: "octo", pat: "ghp_bridgeTest9Z9Z", role: "admin", addedAt: new Date().toISOString() }]), { mode: 0o600 });
+  // _ghInject 同构管道: loadFleet → inject.addItem(secret)
+  const a = fleet.loadFleet().find((x) => x.login === "octo");
+  const r = inj.addItem("secret", "github-pat-" + a.login, { value: a.pat });
+  assert.strictEqual(r.kind, "secret");
+  const v = inj.listView().find((x) => x.name === "github-pat-octo");
+  assert.strictEqual(v.hasValue, true);
+  assert.strictEqual(v.valueTail, "9Z9Z");
+  assert.ok(!JSON.stringify(inj.listView()).includes("ghp_bridgeTest"), "PAT 不得出注入档视图");
+  delete process.env.DAO_GITHUB_FLEET_FILE;
+  delete process.env.DAO_INJECT_PROFILE_FILE;
+});
+
 test("Cascade 轨迹管理: 归档/取消归档/重命名/删除 走官方 RPC 并同步本地备份树", async () => {
   const backup = require(path.join(CASCADE, "backup.js"));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mg-"));
@@ -410,28 +472,3 @@ test("MCP 配置真源开关: server 级 disabled 位 + 工具级 disabledTools 
   delete process.env.DAO_MCP_CONFIG_FILE;
 });
 
-test("插件自持反向注入: 档案 600/secret 脱敏/计划=池×档 交叉", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-inj-"));
-  process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
-  const inj = require(path.join(CASCADE, "inject.js"));
-  inj.addItem("mcp", "github", { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] });
-  inj.addItem("secret", "GH_PAT", { value: "ghp_secretBBBB2222" });
-  inj.addItem("knowledge", "readme", { content: "hello world" });
-  assert.throws(() => inj.addItem("nope", "x", {}), /未知注入类型/);
-  const v = inj.listView();
-  assert.strictEqual(v.length, 3);
-  assert.ok(!JSON.stringify(v).includes("ghp_secretBBBB"), "secret 值不得出视图");
-  const sec = v.find((x) => x.kind === "secret");
-  assert.strictEqual(sec.hasValue, true); assert.strictEqual(sec.valueTail, "2222");
-  assert.strictEqual(v.find((x) => x.kind === "mcp").transport, "stdio");
-  // 计划: 2 号 × 3 档 = 6
-  const plan = inj.plan([{ email: "a@x.y" }, { email: "b@x.y" }]);
-  assert.strictEqual(plan.itemCount, 3);
-  assert.strictEqual(plan.targetCount, 2);
-  assert.strictEqual(plan.total, 6);
-  // 移除
-  assert.strictEqual(inj.removeItem("secret", "GH_PAT").removed, true);
-  assert.strictEqual(inj.listView().length, 2);
-  assert.strictEqual((fs.statSync(process.env.DAO_INJECT_PROFILE_FILE).mode & 0o777), 0o600);
-  delete process.env.DAO_INJECT_PROFILE_FILE;
-});

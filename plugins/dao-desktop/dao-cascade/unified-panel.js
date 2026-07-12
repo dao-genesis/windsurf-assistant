@@ -13,6 +13,11 @@
 //   🔎 搜索    — 插件自持站内网页搜索(web-search.js): DuckDuckGo/Bing 直出结果, 不弹外部浏览器
 //   💉 反向注入 — 插件自持注入档案(inject.js): MCP/Secret/Knowledge 批量注入账号池(账号池同真源)
 // 归一竟功: dao-one 六大板块 + GitHub 纵向 + Proxy Pro 三面板皆已并入插件本源。
+// R65 原生延伸: 把原本依赖 IDE 宿主操作的 Cascade/devin-local 管理也并入板块 ——
+//   备份板块增 Cascade 会话管理(列表/重命名/归档/硬删)与记忆管理(双源合并/编辑/删除);
+//   主页增本机会话·记忆·Flex 额度水位; MCP 添加升级为注册表优先(兼手填 JSON);
+//   Proxy Pro 配路由直选官方模型清单(listModels 真源); GitHub 舰队 PAT 可一键入注入档;
+//   桥接新增 /api/cascade 暴露本机会话与记忆水位。
 "use strict";
 const vscode = require("vscode");
 const backup = require("./backup");
@@ -72,6 +77,18 @@ class UnifiedPanel {
           toolCount: (s.tools || []).length }));
         hostStateMod.publishFused("mcp", { servers });
       } catch (e) { this._log("[unified] fused mcp: " + e.message); }
+      try {
+        const r = await ls.call("GetAllCascadeTrajectories", {});
+        const m = (r && r.trajectorySummaries) || {};
+        const cids = Object.keys(m);
+        hostStateMod.publishFused("cascadeLocal", { total: cids.length,
+          live: cids.filter((c) => !m[c].isArchived).length,
+          archived: cids.filter((c) => !!m[c].isArchived).length });
+      } catch (e) { this._log("[unified] fused cascadeLocal: " + e.message); }
+      try {
+        const r = (await ls.call("GetCascadeMemories", {})) || {};
+        hostStateMod.publishFused("memories", { total: ((r && r.memories) || []).length });
+      } catch (e) { this._log("[unified] fused memories: " + e.message); }
     } catch (e) { this._log("[unified] refreshFused: " + e.message); }
     finally { this._fusing = false; }
   }
@@ -108,6 +125,13 @@ class UnifiedPanel {
       case "refresh": this._refreshFused(); return this._pushState();
       case "open-conv": return this._openConversation(msg.dir, msg.folder);
       case "backup-now": return this._backupNow();
+      case "cx-list": return this._cxList();
+      case "cx-rename": return this._cxRename(String(msg.cid || ""));
+      case "cx-archive": return this._cxArchive(String(msg.cid || ""), !!msg.on);
+      case "cx-delete": return this._cxDelete(String(msg.cid || ""));
+      case "mem-list": return this._memList();
+      case "mem-edit": return this._memEdit(msg.mem || {});
+      case "mem-delete": return this._memDelete(String(msg.id || ""));
       case "conv-manage": return this._convManage(msg);
       case "mcp-detail": return this._mcpDetail();
       case "mcp-refresh": return this._mcpOp("RefreshMcpServers", {});
@@ -128,6 +152,7 @@ class UnifiedPanel {
       case "gh-remove": return this._ghRemove(String(msg.login || ""));
       case "gh-role": return this._ghRole(String(msg.login || ""), String(msg.role || "member"));
       case "gh-verify": return this._ghVerify();
+      case "gh-inject": return this._ghInject(String(msg.login || ""));
       case "px-list": return this._pxList();
       case "px-add": return this._pxAdd();
       case "px-remove": return this._pxRemove(String(msg.name || ""));
@@ -163,6 +188,8 @@ class UnifiedPanel {
       mcp: fused.mcp || null,
       engines: fused.engines || null,
       cascadeBackup: fused.cascadeBackup || null,
+      cascadeLocal: fused.cascadeLocal || null,
+      memories: fused.memories || null,
       auth: hs.auth || null,
       backups,
       github,
@@ -177,6 +204,88 @@ class UnifiedPanel {
       const c = backup.readConversation(undefined, dir, folder);
       this._post({ type: "conv", dir, folder, meta: c.meta, md: c.md, path: c.path });
     } catch (e) { this._post({ type: "conv-error", error: e.message }); }
+  }
+
+  // Cascade 会话管理(本机原生, 并入备份板块): 直连 LS 轨迹真源 ——
+  // 列表(GetAllCascadeTrajectories)/重命名(Rename)/归档·取消归档(Archive)/硬删(Delete)。
+  async _cxList() {
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("GetAllCascadeTrajectories", {});
+      const m = (r && r.trajectorySummaries) || {};
+      const sessions = Object.keys(m).map((cid) => ({
+        cid,
+        title: m[cid].summary || cid,
+        updatedAt: m[cid].lastModifiedTime || "",
+        archived: !!m[cid].isArchived,
+        workspace: (((m[cid].workspaces || [])[0] || {}).workspaceFolderAbsoluteUri) || "",
+      })).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+      this._post({ type: "cx-list", sessions });
+      hostStateMod.publishFused("cascadeLocal", { total: sessions.length,
+        live: sessions.filter((s) => !s.archived).length,
+        archived: sessions.filter((s) => s.archived).length });
+    } catch (e) { this._post({ type: "cx-list", sessions: null, error: e.message }); }
+  }
+
+  async _cxRename(cid) {
+    if (!cid) return;
+    const name = await vscode.window.showInputBox({ prompt: "重命名 Cascade 会话", placeHolder: "新会话名" });
+    if (name == null || !name.trim()) return;
+    try { await require("./ls-bridge").call("RenameCascadeTrajectory", { cascadeId: cid, name: name.trim() }); }
+    catch (e) { vscode.window.showErrorMessage("重命名失败: " + e.message); }
+    this._cxList();
+  }
+
+  async _cxArchive(cid, on) {
+    if (!cid) return;
+    try { await require("./ls-bridge").call("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived: !!on }); }
+    catch (e) { vscode.window.showErrorMessage((on ? "归档" : "取消归档") + "失败: " + e.message); }
+    this._cxList();
+  }
+
+  async _cxDelete(cid) {
+    if (!cid) return;
+    const ok = await vscode.window.showWarningMessage("硬删该 Cascade 会话轨迹? 不可恢复(已有备份不受影响)", { modal: true }, "删除");
+    if (ok !== "删除") return;
+    try { await require("./ls-bridge").call("DeleteCascadeTrajectory", { cascadeId: cid }); }
+    catch (e) { vscode.window.showErrorMessage("删除失败: " + e.message); }
+    this._cxList();
+  }
+
+  // Cascade 记忆管理(并入备份板块): 账号级 GetUserMemories 与工作区级 GetCascadeMemories
+  // 双源合并(按 id 去重), 编辑(Update)/删除(Delete)与官方 Memories 页同构。
+  async _memList() {
+    try {
+      const ls = require("./ls-bridge");
+      const r = (await ls.call("GetCascadeMemories", {})) || {};
+      try {
+        const um = await ls.call("GetUserMemories", {});
+        const seen = new Set(((r && r.memories) || []).map((m) => m.id));
+        for (const m of (um && um.memories) || []) if (!seen.has(m.id)) (r.memories = r.memories || []).push(m);
+      } catch (_) {}
+      const memories = ((r && r.memories) || []).map((m) => ({
+        id: m.memoryId, title: m.title || "",
+        content: ((m.textMemory || {}).content) || "",
+        tags: ((m.metadata || {}).tags) || [] }));
+      this._post({ type: "mem-list", memories });
+      hostStateMod.publishFused("memories", { total: memories.length });
+    } catch (e) { this._post({ type: "mem-list", memories: null, error: e.message }); }
+  }
+
+  async _memEdit(m) {
+    if (!m || !m.id) return;
+    const content = await vscode.window.showInputBox({ prompt: "编辑记忆内容", value: m.content || "" });
+    if (content == null) return;
+    try { await require("./ls-bridge").call("UpdateCascadeMemory", { memoryId: m.id, title: m.title || "", content, tags: m.tags || [] }); }
+    catch (e) { vscode.window.showErrorMessage("更新记忆失败: " + e.message); }
+    this._memList();
+  }
+
+  async _memDelete(id) {
+    if (!id) return;
+    try { await require("./ls-bridge").call("DeleteCascadeMemory", { memoryId: id }); }
+    catch (e) { vscode.window.showErrorMessage("删除记忆失败: " + e.message); }
+    this._memList();
   }
 
   // Cascade 轨迹管理(备份板块延伸): 重命名/归档/取消归档/删除 —— LS 官方 RPC + 本地备份树同步。
@@ -243,16 +352,45 @@ class UnifiedPanel {
     setTimeout(() => this._mcpDetail(), 1200);
   }
 
+  // 添加升级为注册表优先(GetMcpRegistryServers 自动生成配置模板+必填环境变量), 兑底手填 JSON。
   async _mcpAdd() {
     try {
       const ls = require("./ls-bridge");
-      const id = await vscode.window.showInputBox({ prompt: "MCP server 名称(写入 mcp_config.json 的键)" });
-      if (!id) return;
-      const tpl = await vscode.window.showInputBox({
-        prompt: 'server 配置 JSON(如 {"command":"npx","args":[...]} 或 {"serverUrl":...})',
-        value: '{"command":"","args":[]}' });
-      if (!tpl) return;
-      let tplObj; try { tplObj = JSON.parse(tpl); } catch (e) { vscode.window.showErrorMessage("JSON 无效: " + e.message); return; }
+      let picks = [{ label: "＋ 手动输入 JSON…", srv: null }];
+      try {
+        const reg = await ls.call("GetMcpRegistryServers", {});
+        picks = picks.concat(((reg && reg.servers) || []).map((s) => ({
+          label: s.title || s.name, description: (s.name || "").replace(/^devin\//, ""), detail: s.description || "", srv: s })));
+      } catch (_) {}
+      const pick = await vscode.window.showQuickPick(picks, { placeHolder: "添加 MCP server(注册表或手动)", matchOnDescription: true, matchOnDetail: true });
+      if (!pick) return;
+      let id, tplObj;
+      if (pick.srv) {
+        const s = pick.srv;
+        id = (s.name || "").replace(/^devin\//, "") || s.title;
+        const pkg = (s.packages || [])[0];
+        const remote = (s.remotes || [])[0];
+        if (pkg) {
+          tplObj = { command: pkg.runtimeHint || "npx", args: pkg.runtimeHint === "npx" ? ["-y", pkg.identifier] : [pkg.identifier], env: {} };
+          for (const ev of pkg.environmentVariables || []) {
+            if (!ev.isRequired) continue;
+            const v = await vscode.window.showInputBox({ prompt: id + " 需要 " + ev.name + "(" + (ev.description || "") + ")", password: !!ev.isSecret, ignoreFocusOut: true });
+            if (v === undefined) return;
+            tplObj.env[ev.name] = v;
+          }
+          if (!Object.keys(tplObj.env).length) delete tplObj.env;
+        } else if (remote) {
+          tplObj = { serverUrl: remote.url };
+        } else { vscode.window.showErrorMessage("该注册表项无可用安装方式"); return; }
+      } else {
+        id = await vscode.window.showInputBox({ prompt: "MCP server 名称(写入 mcp_config.json 的键)" });
+        if (!id) return;
+        const tpl = await vscode.window.showInputBox({
+          prompt: 'server 配置 JSON(如 {"command":"npx","args":[...]} 或 {"serverUrl":...})',
+          value: '{"command":"","args":[]}' });
+        if (!tpl) return;
+        try { tplObj = JSON.parse(tpl); } catch (e) { vscode.window.showErrorMessage("JSON 无效: " + e.message); return; }
+      }
       await ls.call("SaveMcpServerToConfigFile", { serverId: id, templateJson: JSON.stringify(tplObj) });
       await ls.call("RefreshMcpServers", {});
       setTimeout(() => this._mcpDetail(), 1500);
@@ -316,6 +454,18 @@ class UnifiedPanel {
     this._ghList();
   }
 
+  // GitHub → 反向注入打通: 舰队号的 PAT 一键入注入档(secret, 脱敏存储),
+  // 成为全账号池应注资源; 值只在后端档案文件间流转, 绝不入 webview。
+  _ghInject(login) {
+    try {
+      const a = ghFleet.loadFleet().find((x) => x.login.toLowerCase() === String(login).toLowerCase());
+      if (!a || !a.pat) throw new Error("舰队无此号或无 PAT: " + login);
+      const r = inject.addItem("secret", "github-pat-" + a.login, { value: a.pat });
+      vscode.window.showInformationMessage("已把 " + a.login + " 的 PAT 入注入档(脱敏存储) · 档案 " + r.count + " 项");
+    } catch (e) { vscode.window.showErrorMessage("入档失败: " + e.message); }
+    this._ghList();
+  }
+
   // Proxy Pro 板块(插件自持模型渠道+路由): apiKey 永不出后端, 只回尾4位。
   _pxList() { this._post({ type: "px-list", data: proxyPro.listView(), file: proxyPro.cfgPath() }); }
 
@@ -345,12 +495,26 @@ class UnifiedPanel {
     this._pxList();
   }
 
+  // 配路由适配整合版: 官方模型 UID 直选自 LS 模型清单(listModels 真源, 含标签/倍率),
+  // LS 未就绪或选择手填时兑底输入框。
   async _pxRoute() {
     try {
       const view = proxyPro.listView();
       const withModels = view.channels.filter((c) => c.modelCount > 0);
       if (!withModels.length) { vscode.window.showWarningMessage("先添加带 Key 的渠道并识别模型, 再配路由"); return; }
-      const uid = await vscode.window.showInputBox({ prompt: "官方模型 UID(留空则解除某路由)" });
+      let uid;
+      let official = [];
+      try { const ls = require("./ls-bridge"); if (ls.ready() && ls.apiKey()) official = await ls.listModels(); } catch (_) {}
+      if (official.length) {
+        const up = await vscode.window.showQuickPick(
+          official.map((m) => ({ label: m.label + (m.credit != null ? "  ·  " + m.credit + "x" : ""), description: m.uid, _uid: m.uid }))
+            .concat([{ label: "＋ 手填官方模型 UID", description: "", _uid: null }]),
+          { placeHolder: "选要接管的官方模型(路由到第三方渠道)", matchOnDescription: true });
+        if (!up) return;
+        uid = up._uid !== null ? up._uid : await vscode.window.showInputBox({ prompt: "官方模型 UID(留空则解除某路由)" });
+      } else {
+        uid = await vscode.window.showInputBox({ prompt: "官方模型 UID(留空则解除某路由)" });
+      }
       if (uid === undefined) return;
       const cPick = await vscode.window.showQuickPick(withModels.map((c) => ({ label: c.name, description: c.modelCount + " 模型", _c: c })), { placeHolder: "路由到哪个渠道(取消=解除该 UID 路由)" });
       if (!cPick) { proxyPro.setRoute(uid, "", ""); this._pxList(); return; }
@@ -536,6 +700,7 @@ function renderOverview(){
   else h+='<div class="cr muted">未获取到账号(LS '+(S.lsReady?'就绪':'未就绪')+', 打开 Cascade 面板登录后自动同步)</div>';
   if(a.plan)h+=cr('套餐',E(a.plan));
   if(a.dailyQuotaPct!==undefined||a.weeklyQuotaPct!==undefined)h+=cr('配额(日/周)',q(a.dailyQuotaPct)+' / '+q(a.weeklyQuotaPct));
+  if(a.flexCredits!=null)h+=cr('Flex 额度',E(a.flexCredits));
   if(a.updatedAt)h+=cr('更新于',E(String(a.updatedAt).replace('T',' ').slice(0,19)));
   h+='</div>';
   h+='<div class="st">对话备份</div><div class="card">';
@@ -546,6 +711,12 @@ function renderOverview(){
   h+='</div>';
   h+='<div class="st">本地 MCP(插件版)</div><div class="card">';
   h+= mb ? cr('已配置', mb.length+' 个 · '+run+' 运行中') : '<div class="cr muted">无 MCP 快照(打开 Cascade 面板 MCP 列表后同步)</div>';
+  h+='</div>';
+  const cl=S.cascadeLocal, me=S.memories;
+  h+='<div class="st">Cascade 本机(devin-local)</div><div class="card">';
+  h+= cl ? cr('会话轨迹', cl.total+' 条 · '+cl.live+' 活跃 / '+cl.archived+' 归档') : '<div class="cr muted">无会话快照(LS 就绪后自动同步; 也可进「对话备份」板块即刻拉取)</div>';
+  h+= me ? cr('记忆', me.total+' 条') : '';
+  h+=cr('LS',S.lsReady?'✓ 就绪':'未就绪');
   h+='</div>';
   h+='<div class="st">GitHub 舰队 · Proxy Pro</div><div class="card">';
   h+= S.github ? cr('GitHub 舰队', S.github.count+' 号 · '+S.github.ok+' 在线✓') : cr('GitHub 舰队','—');
@@ -561,7 +732,7 @@ function renderBackups(){
     '<button class="btn sec" id="rf">刷新</button></div>';
   h+='<div class="muted" style="margin-bottom:10px">Cascade(本机)与 Devin Cloud 账号同结构、同列并出; 点击任一对话查看转录。</div>';
   const accs=S.backups.accounts;
-  if(!accs.length){h+='<div class="card muted">暂无备份。点「立即备份 Cascade」导出本机对话。</div>';return h;}
+  if(!accs.length)h+='<div class="card muted">暂无备份。点「立即备份 Cascade」导出本机对话。</div>';
   for(const a of accs){
     const cls=a.source==='cloud'?'cloud':(a.source==='mixed'?'mixed':'');
     h+='<div class="acc"><div class="hd"><span>'+E(a.email)+
@@ -578,6 +749,34 @@ function renderBackups(){
     }
     h+='</div>';
   }
+  h+='<div class="st">Cascade 会话管理(本机原生)</div>';
+  if(CX===null)h+='<div class="card muted">加载会话轨迹…</div>';
+  else if(CX.error)h+='<div class="card">⚠ '+E(CX.error)+'</div>';
+  else{
+    const list=CX.sessions||[];
+    if(!list.length)h+='<div class="card muted">本机暂无 Cascade 会话轨迹。</div>';
+    for(const s of list){
+      h+='<div class="acc"><div class="hd"><span>'+(s.archived?'🗄 ':'🌊 ')+E(s.title)+(s.archived?'<span class="badge mixed">已归档</span>':'')+'</span><span>'+
+        '<button class="btn sec" data-cxrename="'+E(s.cid)+'">重命名</button> '+
+        '<button class="btn sec" data-cxarchive="'+E(s.cid)+'|'+(s.archived?'0':'1')+'">'+(s.archived?'取消归档':'归档')+'</button> '+
+        '<button class="btn sec" data-cxdelete="'+E(s.cid)+'">删除</button></span></div>'+
+        '<div class="conv" style="cursor:default"><span class="muted">'+E(s.cid)+(s.workspace?' · '+E(s.workspace):'')+'</span>'+
+        '<span class="m">'+E(String(s.updatedAt||'').replace('T',' ').slice(0,16))+'</span></div></div>';
+    }
+  }
+  h+='<div class="st">Cascade 记忆管理(账号级+工作区级双源)</div>';
+  if(MEM===null)h+='<div class="card muted">加载记忆…</div>';
+  else if(MEM.error)h+='<div class="card">⚠ '+E(MEM.error)+'</div>';
+  else{
+    const ms=MEM.memories||[];
+    if(!ms.length)h+='<div class="card muted">暂无记忆。</div>';
+    for(const m of ms){
+      h+='<div class="acc"><div class="hd"><span>🧠 '+E(m.title||'(无题)')+'</span><span>'+
+        '<button class="btn sec" data-memedit="'+E(m.id)+'">编辑</button> '+
+        '<button class="btn sec" data-memdel="'+E(m.id)+'">删除</button></span></div>'+
+        '<div class="conv" style="cursor:default"><span class="muted">'+E(String(m.content||'').slice(0,160))+'</span></div></div>';
+    }
+  }
   return h;
 }
 function renderConv(){
@@ -591,6 +790,7 @@ function renderConv(){
   h+='</div><pre>'+E(CONV.md)+'</pre>';
   return h;
 }
+let CX=null, MEM=null;
 let POOL=null;
 function renderSwitch(){
   let h='<div class="row"><h2 style="flex:1">切号 · 插件自持账号池</h2>'+
@@ -624,7 +824,7 @@ function renderBridge(){
     cr('状态文件',E(BR.stateFile||''))+'</div>';
   if(BR.running){
     h+='<div class="st">端点(全只读)</div><div class="card">'+
-      ['/api/health — 健康(免鉴权)','/api/overview — 账号+备份+MCP+LS 总览','/api/account — 账号(脱敏)','/api/backups — 备份水位','/api/mcp — MCP 快照','/api/host — LS 主机态']
+      ['/api/health — 健康(免鉴权)','/api/overview — 账号+备份+MCP+LS 总览','/api/account — 账号(脱敏)','/api/backups — 备份水位','/api/mcp — MCP 快照','/api/host — LS 主机态','/api/cascade — 本机会话·记忆水位']
       .map(x=>'<div class="cr"><span class="v" style="text-align:left">'+E(x)+'</span></div>').join('')+'</div>';
   }
   return h;
@@ -645,6 +845,7 @@ function renderGithub(){
       '<span class="badge'+(a.role==='admin'?'':' cloud')+'">'+(a.role==='admin'?'管理者':'成员')+'</span>'+
       '<span class="badge cloud">'+st+'</span></span><span>'+
       '<button class="btn sec" data-ghrole="'+E(a.login)+'|'+(a.role==='admin'?'member':'admin')+'">'+(a.role==='admin'?'降为成员':'升管理者')+'</button> '+
+      '<button class="btn sec" data-ghinject="'+E(a.login)+'">PAT 入注入档</button> '+
       '<button class="btn sec" data-ghremove="'+E(a.login)+'">移出</button></span></div>'+
       '<div class="conv" style="cursor:default"><span class="muted">PAT …'+E(a.patTail)+' · 入队于 '+E(String(a.addedAt||'').replace('T',' ').slice(0,16))+
       (a.lastVerifiedAt?' · 核于 '+E(String(a.lastVerifiedAt).replace('T',' ').slice(0,16)):'')+'</span></div></div>';
@@ -789,6 +990,13 @@ function render(){
     }
     vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder});
   });
+  document.querySelectorAll('[data-cxrename]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'cx-rename',cid:el.dataset.cxrename}));
+  document.querySelectorAll('[data-cxarchive]').forEach(el=>el.onclick=()=>{const [cid,on]=el.dataset.cxarchive.split('|');vscode.postMessage({type:'cx-archive',cid:cid,on:on==='1'});});
+  document.querySelectorAll('[data-cxdelete]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'cx-delete',cid:el.dataset.cxdelete}));
+  document.querySelectorAll('[data-memedit]').forEach(el=>el.onclick=()=>{const m=((MEM&&MEM.memories)||[]).find(x=>x.id===el.dataset.memedit);if(m)vscode.postMessage({type:'mem-edit',mem:m});});
+  document.querySelectorAll('[data-memdel]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mem-delete',id:el.dataset.memdel}));
+  if(S.board==='backups'&&!CONV&&CX===null)vscode.postMessage({type:'cx-list'});
+  if(S.board==='backups'&&!CONV&&MEM===null)vscode.postMessage({type:'mem-list'});
   const ma=document.getElementById('mcpAdd'); if(ma)ma.onclick=()=>vscode.postMessage({type:'mcp-add'});
   const mc=document.getElementById('mcpCfg'); if(mc)mc.onclick=()=>vscode.postMessage({type:'mcp-config'});
   const mr=document.getElementById('mcpRefresh'); if(mr)mr.onclick=()=>{MCPD=null;render();vscode.postMessage({type:'mcp-refresh'});};
@@ -809,6 +1017,7 @@ function render(){
   const gv=document.getElementById('ghVerify'); if(gv)gv.onclick=()=>{GH=null;render();vscode.postMessage({type:'gh-verify'});};
   const gr=document.getElementById('ghRf'); if(gr)gr.onclick=()=>{GH=null;render();vscode.postMessage({type:'gh-list'});};
   document.querySelectorAll('[data-ghremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'gh-remove',login:el.dataset.ghremove}));
+  document.querySelectorAll('[data-ghinject]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'gh-inject',login:el.dataset.ghinject}));
   document.querySelectorAll('[data-ghrole]').forEach(el=>el.onclick=()=>{const [lg,rl]=el.dataset.ghrole.split('|');vscode.postMessage({type:'gh-role',login:lg,role:rl});});
   if(S.board==='github'&&GH===null)vscode.postMessage({type:'gh-list'});
   const pxa=document.getElementById('pxAdd'); if(pxa)pxa.onclick=()=>vscode.postMessage({type:'px-add'});
@@ -834,6 +1043,8 @@ function render(){
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
   else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
+  else if(m.type==='cx-list'){CX=m.sessions?{sessions:m.sessions}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
+  else if(m.type==='mem-list'){MEM=m.memories?{memories:m.memories}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
