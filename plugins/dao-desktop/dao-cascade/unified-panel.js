@@ -8,13 +8,15 @@
 //   🧩 MCP     — 插件版完整管理: 明细/工具级+server级开关/重载/添加/配置直开(直连 LS)
 //   🔀 切号    — 插件自持账号池(~/.dao/cascade-pool.json): 收录当前号/切换/移除, 无回退铁律
 //   🌐 桥接    — 插件自持本地 HTTP API(local-api.js): 只绑 127.0.0.1 + Bearer, 暴露插件真源
-// 后续并入: 💉 反向注入 / 🐙 GitHub / 🔌 Proxy Pro / 🔎 浏览器搜索。
+//   🐙 GitHub  — 插件自持 GitHub 舰队(github-fleet.js): PAT 池/角色/在线核验, 与 Devin 池分离
+// 后续并入: 💉 反向注入 / 🔌 Proxy Pro / 🔎 浏览器搜索。
 "use strict";
 const vscode = require("vscode");
 const backup = require("./backup");
 const hostStateMod = require("./host-state");
 const acctPool = require("./account-pool");
 const localApi = require("./local-api");
+const ghFleet = require("./github-fleet");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -82,6 +84,11 @@ class UnifiedPanel {
       case "bridge-start": return this._bridgeStart();
       case "bridge-stop": return this._bridgeStop();
       case "bridge-copy-token": return vscode.env.clipboard.writeText(localApi.token()).then(() => vscode.window.showInformationMessage("已复制本地 API token"), () => {});
+      case "gh-list": return this._ghList();
+      case "gh-add": return this._ghAdd();
+      case "gh-remove": return this._ghRemove(String(msg.login || ""));
+      case "gh-role": return this._ghRole(String(msg.login || ""), String(msg.role || "member"));
+      case "gh-verify": return this._ghVerify();
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
       default: return;
     }
@@ -181,6 +188,40 @@ class UnifiedPanel {
     this._bridgeState();
   }
 
+  // GitHub 板块(插件自持舰队): PAT 绝不入 webview, 只回尾4位指纹。
+  _ghList() { this._post({ type: "gh-list", accounts: ghFleet.listView(), file: ghFleet.fleetPath() }); }
+
+  async _ghAdd() {
+    try {
+      const pat = await vscode.window.showInputBox({ prompt: "GitHub PAT(可附 login, 格式: login:PAT 或纯 PAT)", password: true, ignoreFocusOut: true });
+      if (!pat) return;
+      let login = "", p = pat.trim();
+      const i = p.indexOf(":");
+      if (i > 0 && !/^gh[pousr]_/.test(p)) { login = p.slice(0, i).trim(); p = p.slice(i + 1).trim(); }
+      const r = await ghFleet.addAccount(p, login, "member");
+      vscode.window.showInformationMessage("已入队 " + r.login + (r.pending ? "(待网络恢复再核)" : "") + " · 舰队 " + r.count + " 号");
+    } catch (e) { vscode.window.showErrorMessage("入队失败: " + e.message); }
+    this._ghList();
+  }
+
+  _ghRemove(login) {
+    try { ghFleet.remove(login); } catch (e) { vscode.window.showErrorMessage(e.message); }
+    this._ghList();
+  }
+
+  _ghRole(login, role) {
+    try { ghFleet.setRole(login, role); } catch (e) { vscode.window.showErrorMessage(e.message); }
+    this._ghList();
+  }
+
+  async _ghVerify() {
+    try {
+      const r = await ghFleet.verifyAll();
+      vscode.window.showInformationMessage("核验完成: " + r.map((x) => x.login + "=" + x.state).join(", "));
+    } catch (e) { vscode.window.showErrorMessage("核验失败: " + e.message); }
+    this._ghList();
+  }
+
   // 切号板块(插件自持账号池): key 永不出后端, 只回尾4位指纹; 目标号无 key 即报错不回退。
   _poolList() {
     try {
@@ -275,7 +316,7 @@ h2{font-size:15px;margin:0 0 4px}
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"]];
+const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"],["github","🐙 GitHub"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
   '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
@@ -375,6 +416,28 @@ function renderBridge(){
   }
   return h;
 }
+let GH=null;
+function renderGithub(){
+  let h='<div class="row"><h2 style="flex:1">GitHub · 插件自持舰队</h2>'+
+    '<button class="btn" id="ghAdd">入队</button>'+
+    '<button class="btn sec" id="ghVerify">在线核验</button>'+
+    '<button class="btn sec" id="ghRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">纯 GitHub 纵向(与 Devin/Cascade 账号池完全分离); PAT 存 ~/.dao/github-fleet.json(mode 600), 面板只显尾4位; 首号默认管理者; 断网守柔(带 login 仍入队待核)。</div>';
+  if(GH===null){h+='<div class="card muted">加载舰队…</div>';return h;}
+  const list=GH.accounts||[];
+  if(!list.length){h+='<div class="card muted">舰队空。点「入队」粘入 PAT(或 login:PAT)。</div>';return h;}
+  for(const a of list){
+    const st=a.verify==='ok'?'✓ 正常':(a.verify==='pending'?'⏳ 待核':'✗ PAT 失效');
+    h+='<div class="acc"><div class="hd"><span>'+E(a.login)+
+      '<span class="badge'+(a.role==='admin'?'':' cloud')+'">'+(a.role==='admin'?'管理者':'成员')+'</span>'+
+      '<span class="badge cloud">'+st+'</span></span><span>'+
+      '<button class="btn sec" data-ghrole="'+E(a.login)+'|'+(a.role==='admin'?'member':'admin')+'">'+(a.role==='admin'?'降为成员':'升管理者')+'</button> '+
+      '<button class="btn sec" data-ghremove="'+E(a.login)+'">移出</button></span></div>'+
+      '<div class="conv" style="cursor:default"><span class="muted">PAT …'+E(a.patTail)+' · 入队于 '+E(String(a.addedAt||'').replace('T',' ').slice(0,16))+
+      (a.lastVerifiedAt?' · 核于 '+E(String(a.lastVerifiedAt).replace('T',' ').slice(0,16)):'')+'</span></div></div>';
+  }
+  return h;
+}
 let MCPD=null;
 function renderMcp(){
   let h='<div class="row"><h2 style="flex:1">MCP · 插件版管理</h2>'+
@@ -411,6 +474,7 @@ function render(){
   else if(S.board==='backups')h=renderBackups();
   else if(S.board==='mcp')h=renderMcp();
   else if(S.board==='bridge')h=renderBridge();
+  else if(S.board==='github')h=renderGithub();
   main.innerHTML=h;
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
   const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
@@ -432,12 +496,19 @@ function render(){
   const brf=document.getElementById('brRf'); if(brf)brf.onclick=()=>{BR=null;render();vscode.postMessage({type:'bridge-state'});};
   const btk=document.getElementById('brTok'); if(btk)btk.onclick=()=>vscode.postMessage({type:'bridge-copy-token'});
   if(S.board==='bridge'&&BR===null)vscode.postMessage({type:'bridge-state'});
+  const ga=document.getElementById('ghAdd'); if(ga)ga.onclick=()=>vscode.postMessage({type:'gh-add'});
+  const gv=document.getElementById('ghVerify'); if(gv)gv.onclick=()=>{GH=null;render();vscode.postMessage({type:'gh-verify'});};
+  const gr=document.getElementById('ghRf'); if(gr)gr.onclick=()=>{GH=null;render();vscode.postMessage({type:'gh-list'});};
+  document.querySelectorAll('[data-ghremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'gh-remove',login:el.dataset.ghremove}));
+  document.querySelectorAll('[data-ghrole]').forEach(el=>el.onclick=()=>{const [lg,rl]=el.dataset.ghrole.split('|');vscode.postMessage({type:'gh-role',login:lg,role:rl});});
+  if(S.board==='github'&&GH===null)vscode.postMessage({type:'gh-list'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
   else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
+  else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
   else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}
