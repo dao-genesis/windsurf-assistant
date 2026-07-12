@@ -307,7 +307,7 @@ function _originGetProxyAgent(isHttps) {
 const PORT = parseInt(process.env.ORIGIN_PORT || "8889", 10);
 // v9.6.1 · 反者道之动 · 远曰反 · 回归 v9.1.2 之全前端按钮 (七按钮: 道/官/实/原/编/复/卸 + dots/customBadge)
 // 以 v9.1.2 本源哲学为锚 · 守大常不动 · 五细节皆成: isAlreadyInverted · _rawTape+all_fields · 部署不 kill · 前端按钮回归
-const ORIGIN_VERSION_BASE = "v9.9.349"; // v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 DESKTOP-MASTER reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(DESKTOP-MASTER): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
+const ORIGIN_VERSION_BASE = "v9.9.350"; // v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 DESKTOP-MASTER reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(DESKTOP-MASTER): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
 // 印 153 · 唯变所适 · 软编码归宗 · 二十五章「逝曰远 远曰反」· 七十六章「兵强则不胜」
 // 病: 多 ext-host 共端口 :8937 · 旧版 in-process proxy 持续 listen · self_file 锁死旧版目录
 //     → 即便装毕新版 vsix · /ping 仍返 v9.9.19/v9.9.20 之 self_file · canon_name 走旧映射
@@ -407,12 +407,68 @@ let _eaMtime = 0;
 // ★ v9.9.82 · 恢复冷却: _ea=null 时每60秒尝试一次恢复
 //   道义: 七十八章「是以圣人恒无心」· 无心则复归
 let _eaRecoverCooldown = 0;
+// ★ v9.9.348 · 健壮解析「外接api」目录 · 根治「runtime not loaded」
+//   病灶: 硬编码中文目录名「外接api」是非 ASCII, 在 VSIX(zip) 打包/解包时编码不稳,
+//     部分用户机上目录名被搞坏(mojibake) → fs.existsSync(...外接api/runtime.js) 恒 false
+//     → _eaRuntimeMod 永为 null → 加渠道即「添加失败: runtime not loaded」
+//   修法: 先试规范中文名; 找不到即按内容扫描 __dirname/.. 下「含 runtime.js + core/dao_router.js」
+//     的子目录(名字坏掉也能凭内容命中) · 名实相符 · 复归有名
+function _resolveEaDir() {
+  const base = path.join(__dirname, "..");
+  const canon = path.join(base, "外接api");
+  try {
+    if (fs.existsSync(path.join(canon, "runtime.js"))) return canon;
+  } catch {}
+  try {
+    for (const name of fs.readdirSync(base)) {
+      const d = path.join(base, name);
+      try {
+        if (
+          fs.statSync(d).isDirectory() &&
+          fs.existsSync(path.join(d, "runtime.js")) &&
+          fs.existsSync(path.join(d, "core", "dao_router.js"))
+        ) {
+          return d;
+        }
+      } catch {}
+    }
+  } catch {}
+  return canon; // 兜底: 返回规范路径(existsSync 仍会失败 → 上层降级官方透传)
+}
+function _eaRuntimePath() {
+  return path.join(_resolveEaDir(), "runtime.js");
+}
+function _eaRouterPath() {
+  return path.join(_resolveEaDir(), "core", "dao_router.js");
+}
+
 // ★ v9.9.90 · 热配置模块引用 · _ea 是实例 · 热配置函数在模块导出上
 //   五十七章「我无为也 而民自化」· 实例行路由 · 模块行配置 · 名实相符
 let _eaRuntimeMod = null;
 try {
-  _eaRuntimeMod = require(path.join(__dirname, "..", "外接api", "runtime.js"));
+  _eaRuntimeMod = require(_eaRuntimePath());
 } catch {}
+
+// ★ v9.9.348 · 惰性自愈: _eaRuntimeMod 为 null 时按需重载 · ea/* 端点调用前先试
+//   道义: 反者道之动 · 失败后亦当复归 · 不直接抛「runtime not loaded」
+//   (require 缓存命中即免二次开销 · _eaRuntimeMod 已加载则秒返)
+function _ensureEaRuntimeMod() {
+  if (_eaRuntimeMod) return _eaRuntimeMod;
+  try {
+    const p = _eaRuntimePath();
+    if (fs.existsSync(p)) {
+      _eaRuntimeMod = require(p);
+      try {
+        _eaDiag("lazy-load runtime.js ok via " + p);
+      } catch {}
+    }
+  } catch (e) {
+    try {
+      _eaDiag("lazy-load runtime.js fail: " + e.message);
+    } catch {}
+  }
+  return _eaRuntimeMod;
+}
 const _eaDiagPath = path.join(__dirname, "_ea_diag.log");
 function _eaDiag(msg) {
   try {
@@ -606,7 +662,7 @@ function _getAvailableModels() {
 }
 
 try {
-  const _eaPath = path.join(__dirname, "..", "外接api", "runtime.js");
+  const _eaPath = _eaRuntimePath();
   _eaDiag("_eaPath=" + _eaPath + " exists=" + fs.existsSync(_eaPath));
   _eaDiag("__dirname=" + __dirname);
   _eaDiag(
@@ -617,7 +673,7 @@ try {
   );
   if (fs.existsSync(_eaPath)) {
     // Clear all 外接api related cache before require
-    const _coreDir = path.join(__dirname, "..", "外接api", "core");
+    const _coreDir = path.join(_resolveEaDir(), "core");
     Object.keys(require.cache).forEach((k) => {
       if (
         k.includes("外接api") ||
@@ -657,13 +713,7 @@ try {
       log("[外接api] 路由就绪 · " + _ea.getStatus().routerCount + "条");
       _eaDiag("路由就绪 · " + _ea.getStatus().routerCount + "条");
       try {
-        const _routerP = path.join(
-          __dirname,
-          "..",
-          "外接api",
-          "core",
-          "dao_router.js",
-        );
+        const _routerP = _eaRouterPath();
         _eaMtime = fs.statSync(_routerP).mtimeMs;
       } catch {}
     } else {
@@ -695,13 +745,7 @@ try {
 //   只在路由请求时检查mtime · 无定时器 · 无HTTP端点 · 道法自然
 function _eaHotReload() {
   try {
-    const _routerP = path.join(
-      __dirname,
-      "..",
-      "外接api",
-      "core",
-      "dao_router.js",
-    );
+    const _routerP = _eaRouterPath();
     const mt = fs.statSync(_routerP).mtimeMs;
     // ★ v9.9.82 · 修复: 增加 !_ea 恢复条件
     //   原逻辑: mt !== _eaMtime → 仅文件变化时重载
@@ -716,11 +760,11 @@ function _eaHotReload() {
           : "[外接api] _ea=null · 尝试恢复",
       );
       // 清除相关模块缓存
-      const _coreDir = path.join(__dirname, "..", "外接api", "core");
+      const _coreDir = path.join(_resolveEaDir(), "core");
       Object.keys(require.cache).forEach((k) => {
         if (k.startsWith(_coreDir)) delete require.cache[k];
       });
-      const _eaPath = path.join(__dirname, "..", "外接api", "runtime.js");
+      const _eaPath = _eaRuntimePath();
       delete require.cache[require.resolve(_eaPath)];
       const _eaMod = require(_eaPath);
       // ★ v9.9.92-fix · 热重载也同步 _eaRuntimeMod · 同源同生
@@ -3859,7 +3903,9 @@ function handleControl(req, res) {
   //   五十七章「我无为也 而民自化」· 热操作 · 不重启 · 即时生效
   //   供 webview 前端 + Agent 后端使用
   //   ★ v9.9.90-fix · _ea 是实例 · 热配置函数在 _eaRuntimeMod 模块导出上
+  //   ★ v9.9.348 · 惰性自愈: 任何 ea/* 请求先试补载 runtime · 根治「runtime not loaded」
   // ═══════════════════════════════════════════════════════════
+  if (u.pathname.startsWith("/origin/ea/")) _ensureEaRuntimeMod();
 
   // GET /origin/ea/config · 获取完整配置
   if (u.pathname === "/origin/ea/config" && req.method === "GET") {
