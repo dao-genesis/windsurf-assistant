@@ -160,6 +160,73 @@ function listBackups(rootOverride) {
   return { root, accounts };
 }
 
+// Cascade 轨迹管理(备份板块延伸): 归档/取消归档/删除/重命名 —— LS 官方 RPC + 本地备份树同步。
+//   archive/unarchive → ArchiveCascadeTrajectory{cascadeId,isArchived}
+//   delete            → DeleteCascadeTrajectory{cascadeId} + 移除本地会话目录与索引项
+//   rename            → RenameCascadeTrajectory{cascadeId,name} + 本地 meta/index 标题跟随
+// opts: { root, accDir, folder, cascadeId, op, name }。返回 { ok, op, [error] }。
+async function manageTrajectory(ls, opts) {
+  const o = opts || {};
+  const op = String(o.op || "");
+  const cid = String(o.cascadeId || "");
+  if (!cid) return { ok: false, op, error: "缺 cascadeId" };
+  const root = backupRoot(o.root);
+  const convPath = path.join(root, String(o.accDir || ""), "对话", String(o.folder || ""));
+  const rel = path.relative(root, convPath);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return { ok: false, op, error: "非法会话路径" };
+  const accPath = path.join(root, String(o.accDir || ""));
+  const lsUp = !!(ls && ls.ready && ls.ready() && ls.apiKey && ls.apiKey());
+  const callLs = async (method, req) => {
+    if (!lsUp) return false;
+    await ls.call(method, req);
+    return true;
+  };
+  const metaPath = path.join(convPath, "_meta.json");
+  const patchLocal = (patch) => {
+    try {
+      const meta = _readJson(metaPath) || {};
+      fs.writeFileSync(metaPath, JSON.stringify(Object.assign(meta, patch), null, 2));
+    } catch (_) {}
+    try {
+      const idx = _readJson(indexPath(accPath));
+      if (idx && idx.entries && idx.entries[cid]) {
+        Object.assign(idx.entries[cid], patch);
+        fs.writeFileSync(indexPath(accPath), JSON.stringify(idx, null, 2));
+      }
+    } catch (_) {}
+  };
+  try {
+    if (op === "archive" || op === "unarchive") {
+      const isArchived = op === "archive";
+      await callLs("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived });
+      patchLocal({ isArchived });
+      return { ok: true, op };
+    }
+    if (op === "delete") {
+      await callLs("DeleteCascadeTrajectory", { cascadeId: cid });
+      try { fs.rmSync(convPath, { recursive: true, force: true }); } catch (_) {}
+      try {
+        const idx = _readJson(indexPath(accPath));
+        if (idx && idx.entries && idx.entries[cid]) {
+          delete idx.entries[cid];
+          fs.writeFileSync(indexPath(accPath), JSON.stringify(idx, null, 2));
+        }
+      } catch (_) {}
+      return { ok: true, op };
+    }
+    if (op === "rename") {
+      const name = String(o.name || "").trim();
+      if (!name) return { ok: false, op, error: "缺新名称" };
+      await callLs("RenameCascadeTrajectory", { cascadeId: cid, name });
+      patchLocal({ title: name });
+      return { ok: true, op };
+    }
+    return { ok: false, op, error: "未知操作" };
+  } catch (e) {
+    return { ok: false, op, error: e.message };
+  }
+}
+
 // 读取某会话的转录正文(对话.md)+ 元数据, 供面板详情视图渲染。
 function readConversation(rootOverride, accDir, folder) {
   const root = backupRoot(rootOverride);
@@ -171,4 +238,4 @@ function readConversation(rootOverride, accDir, folder) {
   return { meta: _readJson(path.join(convPath, "_meta.json")) || {}, md, path: convPath };
 }
 
-module.exports = { backupRoot, backupAll, loadIndex, indexPath, safeName, accountDirName, listBackups, listConversations, readConversation };
+module.exports = { backupRoot, backupAll, loadIndex, indexPath, safeName, accountDirName, listBackups, listConversations, readConversation, manageTrajectory };

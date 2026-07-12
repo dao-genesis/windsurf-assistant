@@ -2,6 +2,19 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.350 · 根治「添加失败: runtime not loaded」· 健壮解析外接api目录 + ea/* 惰性自愈
+: 承接用户端反馈「加渠道即报 runtime not loaded」——排查确认开发机运行时正常(路由就绪·25模型),
+  故为**安装/环境特定失败**。根因: `source.js`/`extension.js` 硬编码中文目录名「外接api」(非 ASCII),
+  在 VSIX(zip) 打包/解包时非 ASCII 目录名编码不稳, 部分用户机上目录名被搞坏(mojibake) →
+  `fs.existsSync(...外接api/runtime.js)` 恒 false → `_eaRuntimeMod` 永为 null → 加渠道即
+  「添加失败: runtime not loaded」。本版:
+  ① **健壮目录解析**: 新增 `_resolveEaDir()`/`_eaRuntimePath()`/`_eaRouterPath()`(source.js)与
+     `_resolveEaRuntimePath()`(extension.js) —— 先试规范中文名, 找不到即按内容扫描 vendor/ 下
+     「含 runtime.js + core/dao_router.js」的子目录, **名字坏掉也能凭内容命中**。全部硬编码
+     「外接api」路径(初载/热重载/缓存清理)改走解析器。
+  ② **ea/* 惰性自愈**: 新增 `_ensureEaRuntimeMod()`, 任何 `/origin/ea/*` 请求进入前先试按需补载
+     runtime(require 缓存命中即秒返), 不再一遇 null 就直接抛「runtime not loaded」· 反者道之动。
+
 v9.9.347 · 内网穿透对齐二合一本源 · 激活即自动连接 + 模型反代专属交接文档
 : 承接用户实证「Proxy Pro 内网穿透整体没跑通·甚至没自动连接好」——本源(dao-vsix 二合一)的公网穿透
   是开机即自动打通的去中心化通道, 而 Proxy Pro 仅在用户已绑 CF API Token 时才自动拉起固定中继,
