@@ -24,6 +24,36 @@ class UnifiedPanel {
     w.onDidReceiveMessage((m) => this._onMessage(m || {}));
     w.html = this._html(w);
     this._pushState();
+    this._refreshFused();
+  }
+
+  // 插件自主刷新融合真源(不依赖 Cascade 面板是否打开): LS 就绪即直连拉
+  // 账号(GetUserStatus)与 MCP 快照(GetMcpServerStates)并 publishFused → 落盘 + 回推。
+  async _refreshFused() {
+    if (this._fusing) return; this._fusing = true;
+    try {
+      const ls = require("./ls-bridge");
+      if (!ls.ready() || !ls.apiKey()) return;
+      try {
+        const r = await ls.call("GetUserStatus", {});
+        const u = (r && r.userStatus) || {};
+        const ps = u.planStatus || {}; const pi = ps.planInfo || {};
+        const num = (x) => (typeof x === "number" ? x : (x === undefined || x === null ? null : Number(x)));
+        hostStateMod.publishFused("account", { name: u.name || "", email: u.email || "", plan: pi.planName || "",
+          dailyQuotaPct: num(ps.dailyQuotaRemainingPercent), weeklyQuotaPct: num(ps.weeklyQuotaRemainingPercent),
+          flexCredits: num(ps.availableFlexCredits) });
+      } catch (e) { this._log("[unified] fused account: " + e.message); }
+      try {
+        const r = await ls.call("GetMcpServerStates", {});
+        const servers = ((r && r.states) || []).map((s) => ({
+          name: (s.spec || {}).serverName || "",
+          status: (s.status || "").replace("MCP_SERVER_STATUS_", ""),
+          disabled: !!(s.spec || {}).disabled,
+          toolCount: (s.tools || []).length }));
+        hostStateMod.publishFused("mcp", { servers });
+      } catch (e) { this._log("[unified] fused mcp: " + e.message); }
+    } catch (e) { this._log("[unified] refreshFused: " + e.message); }
+    finally { this._fusing = false; }
   }
 
   _post(m) { if (this._view) try { this._view.webview.postMessage(m); } catch (_) {} }
@@ -31,7 +61,7 @@ class UnifiedPanel {
   _onMessage(msg) {
     switch (msg.type) {
       case "nav": this._board = String(msg.board || "overview"); return this._pushState();
-      case "refresh": return this._pushState();
+      case "refresh": this._refreshFused(); return this._pushState();
       case "open-conv": return this._openConversation(msg.dir, msg.folder);
       case "backup-now": return this._backupNow();
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});

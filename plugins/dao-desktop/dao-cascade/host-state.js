@@ -31,6 +31,7 @@ function hostState() {
 // 变更广播 + 落盘(0600 本机私有): 供 dao 生态(脚本/诊断/headless 核)读取会话信息。
 function hostFire() {
   const h = hostState();
+  seedFused(h);
   for (const fn of h.listeners) { try { fn(h); } catch (_) {} }
   try {
     const p = hostFilePath();
@@ -42,9 +43,24 @@ function hostFire() {
   } catch (_) {}
 }
 
-// 从落盘文件回补单例(仅当进程内尚无端口/CSRF): 跨进程(headless)复用官方扩展捕获的会话。
+// 融合态跨重启保鲜: 首次落盘前把磁盘上已有的 fused 分片回补进内存(内存缺失的键才补),
+// 否则进程重启后 shim 首次 hostFire 会用空 fused 整份覆盖磁盘, 抹掉上个进程发布的账号/MCP。
+function seedFused(h) {
+  if (h._fusedSeeded) return;
+  h._fusedSeeded = true;
+  try {
+    const j = JSON.parse(fs.readFileSync(hostFilePath(), "utf8"));
+    if (j && j.fused) {
+      h.fused = h.fused || {};
+      for (const k of Object.keys(j.fused)) if (!(k in h.fused)) h.fused[k] = j.fused[k];
+    }
+  } catch (_) {}
+}
+
+// 从落盘文件回补单例(端口/CSRF 仅当进程内尚无; fused 分片总是回补缺失键): 跨进程复用会话。
 function loadPersisted() {
   const h = hostState();
+  seedFused(h);
   if (h.lsPort && h.csrfToken) return h;
   try {
     const j = JSON.parse(fs.readFileSync(hostFilePath(), "utf8"));
@@ -53,7 +69,6 @@ function loadPersisted() {
       h.csrfToken = String(j.csrfToken || "");
       if (j.profileUrl && !h.profileUrl) h.profileUrl = j.profileUrl;
       if (j.auth && !h.auth) h.auth = j.auth;
-      if (j.fused && !Object.keys(h.fused || {}).length) h.fused = j.fused;
     }
   } catch (_) {}
   return h;

@@ -163,3 +163,26 @@ test("归一面板数据层 listBackups: Cascade 与 Devin Cloud 账号同列双
   // ⑤ 空根不炸
   assert.deepStrictEqual(backup.listBackups(path.join(root, "nope")).accounts, []);
 });
+
+test("融合态跨重启保鲜: 新进程首次 hostFire 不抹掉磁盘上已发布的 fused 分片", () => {
+  const hostState = require(path.join(CASCADE, "host-state.js"));
+  // 上个进程发布过 account/mcp
+  delete globalThis.__daoWindsurfHost;
+  const s0 = hostState.hostState();
+  s0.lsPort = 1; s0.csrfToken = "c";
+  hostState.publishFused("account", { email: "keep@x.y", plan: "Pro" });
+  hostState.publishFused("mcp", { servers: [{ name: "gh" }] });
+  // 模拟重启: 全新单例(fused 为空), shim 灌入端口后首次 hostFire
+  delete globalThis.__daoWindsurfHost;
+  const s1 = hostState.hostState();
+  s1.lsPort = 2; s1.csrfToken = "c2";
+  hostState.hostFire();
+  const j = JSON.parse(fs.readFileSync(HOST_FILE, "utf8"));
+  assert.strictEqual(j.fused.account.email, "keep@x.y", "重启后 fused.account 应保留");
+  assert.strictEqual(j.fused.mcp.servers[0].name, "gh", "重启后 fused.mcp 应保留");
+  // 新发布覆盖同键
+  hostState.publishFused("account", { email: "new@x.y" });
+  const j2 = JSON.parse(fs.readFileSync(HOST_FILE, "utf8"));
+  assert.strictEqual(j2.fused.account.email, "new@x.y");
+  assert.strictEqual(j2.fused.mcp.servers[0].name, "gh");
+});
