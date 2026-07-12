@@ -23,7 +23,7 @@ function hostFilePath() {
 function hostState() {
   const g = globalThis;
   if (!g.__daoWindsurfHost) {
-    g.__daoWindsurfHost = { lsPort: 0, csrfToken: "", auth: null, profileUrl: "", listeners: new Set() };
+    g.__daoWindsurfHost = { lsPort: 0, csrfToken: "", auth: null, profileUrl: "", fused: {}, listeners: new Set() };
   }
   return g.__daoWindsurfHost;
 }
@@ -37,7 +37,7 @@ function hostFire() {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, JSON.stringify({
       lsPort: h.lsPort, csrfToken: h.csrfToken, profileUrl: h.profileUrl,
-      auth: h.auth, updatedAt: new Date().toISOString(),
+      auth: h.auth, fused: h.fused || {}, updatedAt: new Date().toISOString(),
     }), { mode: 0o600 });
   } catch (_) {}
 }
@@ -53,6 +53,7 @@ function loadPersisted() {
       h.csrfToken = String(j.csrfToken || "");
       if (j.profileUrl && !h.profileUrl) h.profileUrl = j.profileUrl;
       if (j.auth && !h.auth) h.auth = j.auth;
+      if (j.fused && !Object.keys(h.fused || {}).length) h.fused = j.fused;
     }
   } catch (_) {}
   return h;
@@ -66,6 +67,17 @@ function resolveHost() {
   return (p.lsPort && p.csrfToken) ? p : null;
 }
 
+// 归一发布: 把插件侧的融合态(账户信息/MCP 快照/备份水位等)并入宿主态并落盘,
+// dao-one / dao-vsix 全功能面板(主页账号信息、MCP 板块)经 windsurf-host.json 直接消费。
+function publishFused(part, data) {
+  const h = hostState();
+  h.fused = h.fused || {};
+  h.fused[part] = Object.assign({ updatedAt: new Date().toISOString() },
+    data && typeof data === "object" ? data : { value: data });
+  hostFire();
+  return h.fused[part];
+}
+
 // 订阅宿主态变更(返回 disposable)。
 function subscribe(fn) {
   const h = hostState();
@@ -73,4 +85,4 @@ function subscribe(fn) {
   return { dispose() { h.listeners.delete(fn); } };
 }
 
-module.exports = { hostState, hostFire, loadPersisted, resolveHost, subscribe, hostFilePath };
+module.exports = { hostState, hostFire, loadPersisted, resolveHost, subscribe, hostFilePath, publishFused };

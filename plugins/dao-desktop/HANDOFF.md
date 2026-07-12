@@ -49,6 +49,7 @@
 | R54b | #133 | 修复：dao.cascade.deepwiki 命令登记进 gen-manifest 基线（package.json 是 build.js 再生产物，直接改会被 prepublish 覆盖，命令进不了 vsix） |
 | R55 | #135 | 模型选择器 1:1：全量模型（含 Pro 门控禁用项 🔒 灰置）+ 倍率 `· Nx` 徽标 + disabledReason 作 title |
 | R56 | #136 | @ 提及增 Code 符号类目：GetMatchingContextScopeItems → ƒ/◆ 符号项（lineage · path:line），选中插入 `@Name(path:start-end)` |
+| R57 |  | dao-one 融合三件套：① Cascade 对话自动备份（backup.js · 增量水位 · 同根 ~/.wam/conversation_backups 供 dao-one「💬 对话备份」统一消费，命令 dao.cascade.backupAll + 设置 autoBackup/backupDir）② 宿主态 publishFused：账户（GetUserStatus）/MCP 快照/备份水位并入 windsurf-host.json（dao-one 主页账号信息 + MCP 双逻辑同源）③ headless 契约测试扩到 backup/publishFused |
 
 核心文件：`plugins/dao-desktop/dao-cascade/panel.js`（扩展端 handler + webview 渲染同文件）、`ls-bridge.js`（language_server Connect RPC 桥）、`host-discover.js`（端口/CSRF/apiKey 发现）。
 

@@ -59,3 +59,56 @@ test("进程内单例优先于落盘文件", () => {
   fs.writeFileSync(HOST_FILE, JSON.stringify({ lsPort: 54321, csrfToken: "stale" }));
   assert.strictEqual(hostState.resolveHost().lsPort, 9999, "共生单例应压过落盘旧值");
 });
+
+test("归一发布 publishFused: 融合态并入宿主态并落盘(dao-one 面板可消费)", () => {
+  const hostState = require(path.join(CASCADE, "host-state.js"));
+  delete globalThis.__daoWindsurfHost;
+  const s = hostState.hostState();
+  s.lsPort = 1234; s.csrfToken = "c";
+  hostState.publishFused("account", { email: "a@b.c", plan: "Free" });
+  hostState.publishFused("mcp", { servers: [{ name: "github", status: "RUNNING", toolCount: 3 }] });
+  const j = JSON.parse(fs.readFileSync(HOST_FILE, "utf8"));
+  assert.strictEqual(j.fused.account.email, "a@b.c");
+  assert.strictEqual(j.fused.mcp.servers[0].name, "github");
+  assert.ok(j.fused.account.updatedAt, "发布应带时间戳");
+  // 跨进程回补
+  delete globalThis.__daoWindsurfHost;
+  const h = hostState.loadPersisted();
+  assert.strictEqual((h.fused.account || {}).plan, "Free");
+});
+
+test("Cascade 对话备份: 增量导出转录 + _index.json 水位(未变化不重写)", async () => {
+  const backup = require(path.join(CASCADE, "backup.js"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-bk-"));
+  const summaries = {
+    cid1: { summary: "修复登录", lastModifiedTime: "2026-07-12T00:00:00Z" },
+    cid2: { summary: "重构 面板/UI", lastModifiedTime: "2026-07-12T01:00:00Z", isArchived: true },
+  };
+  let transcriptCalls = 0;
+  const fakeLs = {
+    ready: () => ({ lsPort: 1, csrfToken: "c" }),
+    apiKey: () => "k",
+    call: async (m, req) => {
+      if (m === "GetAllCascadeTrajectories") return { trajectorySummaries: summaries };
+      if (m === "GetCascadeTranscriptForTrajectoryId") { transcriptCalls++; return { transcript: "MESSAGE 1 - User\nhi " + req.cascadeId }; }
+      throw new Error("unexpected " + m);
+    },
+  };
+  const r1 = await backup.backupAll(fakeLs, { root });
+  assert.ok(r1.ok && r1.saved === 2 && r1.total === 2, "首轮应全量导出");
+  const idx = JSON.parse(fs.readFileSync(path.join(root, "_index.json"), "utf8"));
+  assert.strictEqual(Object.keys(idx.entries).length, 2);
+  assert.ok(fs.existsSync(path.join(root, idx.entries.cid1.file)), "转录 md 应落盘");
+  assert.ok(fs.readFileSync(path.join(root, idx.entries.cid1.file), "utf8").includes("hi cid1"));
+  assert.strictEqual(idx.entries.cid2.isArchived, true, "归档态入索引");
+  // 二轮: 水位未变 → 全跳过; cid1 变更 → 只重写 cid1
+  const r2 = await backup.backupAll(fakeLs, { root });
+  assert.ok(r2.saved === 0 && r2.skipped === 2, "水位未变不重写");
+  summaries.cid1.lastModifiedTime = "2026-07-12T02:00:00Z";
+  const r3 = await backup.backupAll(fakeLs, { root });
+  assert.ok(r3.saved === 1 && r3.skipped === 1, "仅变更轨迹增量导出");
+  assert.strictEqual(transcriptCalls, 3);
+  // 未就绪不误写
+  const r4 = await backup.backupAll({ ready: () => null, apiKey: () => "" }, { root });
+  assert.strictEqual(r4.ok, false);
+});

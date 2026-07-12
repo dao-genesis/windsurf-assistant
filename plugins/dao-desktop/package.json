@@ -65,6 +65,10 @@
         "icon": "$(history)"
       },
       {
+        "command": "dao.cascade.backupAll",
+        "title": "Devin Desktop: 备份全部 Cascade 对话"
+      },
+      {
         "command": "dao.cascade.deepwiki",
         "title": "Devin Desktop: DeepWiki 解释选中符号"
       },
@@ -123,6 +127,21 @@
           "group": "1_modification@9"
         }
       ]
+    },
+    "configuration": {
+      "title": "Devin Desktop",
+      "properties": {
+        "dao.cascade.autoBackup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cascade 对话自动备份：会话变更即增量导出轨迹转录到备份目录（与 dao-one 对话备份板块同源消费）。"
+        },
+        "dao.cascade.backupDir": {
+          "type": "string",
+          "default": "",
+          "description": "Cascade 对话备份根目录；留空用 ~/.wam/conversation_backups（亦可经环境变量 DAO_CASCADE_BACKUP_DIR 重定向）。"
+        }
+      }
     }
   },
   "scripts": {
