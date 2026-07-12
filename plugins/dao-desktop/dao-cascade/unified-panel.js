@@ -1,0 +1,245 @@
+// 道 · 归一面板(Devin Desktop 插件本源) —— 插件即一切、插件统领万物。
+// ─────────────────────────────────────────────────────────────────────────────
+// 把 dao-one 六大板块的核心能力搬进插件本体, 并**深度换源为插件自持真源**:
+//   数据不取自 IDE 宿主, 而取自本插件的 host-state(fused/LS 端口·登录态)+ 本机备份树。
+// 现落地板块(持续迭代扩充):
+//   🏠 主页    — Cascade/Devin Desktop 账号·套餐·配额 + 备份水位 + 本地 MCP 概览(fused 真源)
+//   💬 对话备份 — 扫描备份根: Cascade 账号与 Devin Cloud 账号同列, 点开即读转录(双源统一)
+//   🧩 MCP     — 插件版 MCP 服务器列表·活状态·工具数(fused.mcp 真源)
+// 后续并入: 🔀 切号 / 🌐 桥接 / 💉 反向注入 / 🐙 GitHub / 🔌 Proxy Pro / 🔎 浏览器搜索。
+"use strict";
+const vscode = require("vscode");
+const backup = require("./backup");
+const hostStateMod = require("./host-state");
+
+function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
+
+class UnifiedPanel {
+  constructor(log) { this._log = typeof log === "function" ? log : () => {}; this._view = null; this._board = "overview"; }
+
+  resolveWebviewView(view) {
+    this._view = view;
+    const w = view.webview;
+    w.options = { enableScripts: true };
+    w.onDidReceiveMessage((m) => this._onMessage(m || {}));
+    w.html = this._html(w);
+    this._pushState();
+  }
+
+  _post(m) { if (this._view) try { this._view.webview.postMessage(m); } catch (_) {} }
+
+  _onMessage(msg) {
+    switch (msg.type) {
+      case "nav": this._board = String(msg.board || "overview"); return this._pushState();
+      case "refresh": return this._pushState();
+      case "open-conv": return this._openConversation(msg.dir, msg.folder);
+      case "backup-now": return this._backupNow();
+      case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
+      default: return;
+    }
+  }
+
+  // 归一数据快照(插件自持真源): fused + LS 就绪态 + 备份树扫描。
+  _snapshot() {
+    let hs = {};
+    try { hs = hostStateMod.loadPersisted() || hostStateMod.hostState(); } catch (_) { hs = {}; }
+    const fused = (hs && hs.fused) || {};
+    const lsReady = !!(hs && hs.lsPort && hs.csrfToken);
+    let backups = { root: "", accounts: [] };
+    try { backups = backup.listBackups(); } catch (e) { this._log("[unified] listBackups: " + e.message); }
+    return {
+      board: this._board,
+      lsReady,
+      account: fused.account || null,
+      mcp: fused.mcp || null,
+      cascadeBackup: fused.cascadeBackup || null,
+      auth: hs.auth || null,
+      backups,
+    };
+  }
+
+  _pushState() { this._post({ type: "state", data: this._snapshot() }); }
+
+  _openConversation(dir, folder) {
+    try {
+      const c = backup.readConversation(undefined, dir, folder);
+      this._post({ type: "conv", dir, folder, meta: c.meta, md: c.md, path: c.path });
+    } catch (e) { this._post({ type: "conv-error", error: e.message }); }
+  }
+
+  async _backupNow() {
+    this._post({ type: "backup-progress", running: true });
+    try {
+      await vscode.commands.executeCommand("dao.cascade.backupAll");
+    } catch (e) { this._log("[unified] backup-now: " + e.message); }
+    // 命令内部异步落盘, 稍候重扫。
+    setTimeout(() => { this._post({ type: "backup-progress", running: false }); this._pushState(); }, 1800);
+  }
+
+  _html(w) {
+    const n = nonce();
+    const csp = [
+      "default-src 'none'",
+      "style-src 'unsafe-inline'",
+      "script-src 'nonce-" + n + "'",
+    ].join("; ");
+    return `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
+<style>
+:root{color-scheme:dark light}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vscode-foreground)}
+.wrap{display:flex;height:100vh}
+.nav{width:132px;flex:0 0 132px;border-right:1px solid var(--vscode-panel-border,#3334);padding:6px 0;overflow:auto}
+.nav button{display:block;width:100%;text-align:left;background:none;border:none;color:inherit;padding:8px 12px;cursor:pointer;font:inherit;opacity:.75}
+.nav button:hover{background:var(--vscode-list-hoverBackground,#8881)}
+.nav button.on{opacity:1;background:var(--vscode-list-activeSelectionBackground,#0a5);color:var(--vscode-list-activeSelectionForeground,#fff);border-radius:0 6px 6px 0}
+.main{flex:1;overflow:auto;padding:14px 16px}
+.st{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.6;margin:14px 0 6px}
+.st:first-child{margin-top:0}
+.card{border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.cr{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+.cr .l{opacity:.65}.cr .v{text-align:right;word-break:break-all}
+.acc{border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;margin-bottom:10px;overflow:hidden}
+.acc .hd{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--vscode-list-hoverBackground,#8881);font-weight:600}
+.badge{font-size:10px;padding:1px 7px;border-radius:10px;background:#0a53;margin-left:6px;font-weight:400}
+.badge.cloud{background:#37a3}.badge.mixed{background:#a703}
+.conv{padding:6px 12px;border-top:1px solid var(--vscode-panel-border,#2223);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.conv:hover{background:var(--vscode-list-hoverBackground,#8881)}
+.conv .m{opacity:.5;font-size:11px;white-space:nowrap}
+.arch{opacity:.5}
+.btn{background:var(--vscode-button-background,#0a5);color:var(--vscode-button-foreground,#fff);border:none;border-radius:5px;padding:5px 12px;cursor:pointer;font:inherit}
+.btn.sec{background:var(--vscode-button-secondaryBackground,#4443)}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.muted{opacity:.55}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,#0002);padding:10px;border-radius:6px;max-height:64vh;overflow:auto}
+.back{cursor:pointer;color:var(--vscode-textLink-foreground,#4af)}
+h2{font-size:15px;margin:0 0 4px}
+</style></head><body>
+<div class="wrap">
+  <div class="nav" id="nav"></div>
+  <div class="main" id="main"><div class="muted">加载中…</div></div>
+</div>
+<script nonce="${n}">
+const vscode=acquireVsCodeApi();
+let S=null, CONV=null;
+const BOARDS=[["overview","🏠 主页"],["backups","💬 对话备份"],["mcp","🧩 MCP"]];
+function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
+  '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
+  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{CONV=null;vscode.postMessage({type:'nav',board:b.dataset.b})});}
+function q(x){return (x===0||x)?(x+'%'):'—';}
+function renderOverview(){
+  const a=S.account||{}, mb=S.mcp&&S.mcp.servers, cb=S.cascadeBackup;
+  const run=mb?mb.filter(s=>String(s.status||'').toUpperCase().indexOf('RUN')>=0).length:0;
+  let h='<h2>归一主页 · 插件自持真源</h2><div class="muted" style="margin-bottom:10px">数据源: 本插件 host-state(fused)+ 本机备份树, 不依赖 IDE 宿主。</div>';
+  h+='<div class="st">Cascade · Devin Desktop 账号</div><div class="card">';
+  if(a.email){h+=cr('账号',(a.name?E(a.name)+' · ':'')+E(a.email));}
+  else h+='<div class="cr muted">未获取到账号(LS '+(S.lsReady?'就绪':'未就绪')+', 打开 Cascade 面板登录后自动同步)</div>';
+  if(a.plan)h+=cr('套餐',E(a.plan));
+  if(a.dailyQuotaPct!==undefined||a.weeklyQuotaPct!==undefined)h+=cr('配额(日/周)',q(a.dailyQuotaPct)+' / '+q(a.weeklyQuotaPct));
+  if(a.updatedAt)h+=cr('更新于',E(String(a.updatedAt).replace('T',' ').slice(0,19)));
+  h+='</div>';
+  h+='<div class="st">对话备份</div><div class="card">';
+  const nAcc=S.backups.accounts.length, nConv=S.backups.accounts.reduce((s,x)=>s+x.convCount,0);
+  h+=cr('已备份账号',nAcc+' 个');
+  h+=cr('已备份对话',nConv+' 条'+(cb&&cb.total?' · Cascade 水位 '+cb.total:''));
+  h+=cr('备份根',E(S.backups.root));
+  h+='</div>';
+  h+='<div class="st">本地 MCP(插件版)</div><div class="card">';
+  h+= mb ? cr('已配置', mb.length+' 个 · '+run+' 运行中') : '<div class="cr muted">无 MCP 快照(打开 Cascade 面板 MCP 列表后同步)</div>';
+  h+='</div>';
+  return h;
+}
+function cr(l,v){return '<div class="cr"><span class="l">'+E(l)+'</span><span class="v">'+v+'</span></div>';}
+function renderBackups(){
+  if(CONV){return renderConv();}
+  let h='<div class="row"><h2 style="flex:1">对话备份 · 双源统一</h2>'+
+    '<button class="btn" id="bk">立即备份 Cascade</button>'+
+    '<button class="btn sec" id="rf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">Cascade(本机)与 Devin Cloud 账号同结构、同列并出; 点击任一对话查看转录。</div>';
+  const accs=S.backups.accounts;
+  if(!accs.length){h+='<div class="card muted">暂无备份。点「立即备份 Cascade」导出本机对话。</div>';return h;}
+  for(const a of accs){
+    const cls=a.source==='cloud'?'cloud':(a.source==='mixed'?'mixed':'');
+    h+='<div class="acc"><div class="hd"><span>'+E(a.email)+
+      '<span class="badge '+cls+'">'+(a.source==='cloud'?'Devin Cloud':(a.source==='mixed'?'混合':'Cascade'))+'</span></span>'+
+      '<span class="muted" style="font-weight:400">'+a.convCount+' 条</span></div>';
+    for(const c of a.conversations){
+      h+='<div class="conv'+(c.isArchived?' arch':'')+'" data-dir="'+E(a.dir)+'" data-folder="'+E(c.folder)+'">'+
+        '<span>'+(c.convNo?('#'+c.convNo+' '):'')+E(c.title)+(c.isArchived?' 🗄':'')+'</span>'+
+        '<span class="m">'+E(String(c.lastModifiedTime||c.backedUpAt||'').replace('T',' ').slice(0,16))+'</span></div>';
+    }
+    h+='</div>';
+  }
+  return h;
+}
+function renderConv(){
+  const m=CONV.meta||{};
+  let h='<div class="back" id="back">← 返回备份列表</div><h2 style="margin-top:8px">'+E(m.title||CONV.folder)+'</h2>';
+  h+='<div class="card">';
+  if(m.source)h+=cr('来源',E(m.source==='cascade'?'Cascade(插件版)':m.source));
+  if(m.cascadeId)h+=cr('Cascade ID',E(m.cascadeId));
+  if(m.lastModifiedTime)h+=cr('更新于',E(String(m.lastModifiedTime).replace('T',' ').slice(0,19)));
+  if(m.isArchived)h+=cr('状态','🗄 已归档');
+  h+='</div><pre>'+E(CONV.md)+'</pre>';
+  return h;
+}
+function renderMcp(){
+  const mb=S.mcp&&S.mcp.servers;
+  let h='<div class="row"><h2 style="flex:1">MCP 服务器 · 插件版</h2><button class="btn sec" id="rf">刷新</button></div>';
+  if(!mb){h+='<div class="card muted">尚无 MCP 快照。打开 Cascade 面板的 MCP 列表即会经 LS 同步到此(fused.mcp)。</div>';return h;}
+  if(!mb.length){h+='<div class="card muted">无已配置的 MCP 服务器。</div>';return h;}
+  h+='<div class="card">';
+  for(const s of mb){
+    const running=String(s.status||'').toUpperCase().indexOf('RUN')>=0;
+    h+=cr(E(s.name)+(s.disabled?' · 已禁用':''),(running?'⚡运行中':(E(s.status)||'未运行'))+(s.toolCount?' · '+s.toolCount+' 工具':''));
+  }
+  h+='</div>';
+  if(S.mcp.updatedAt)h+='<div class="muted">更新于 '+E(String(S.mcp.updatedAt).replace('T',' ').slice(0,19))+'</div>';
+  return h;
+}
+function render(){
+  renderNav();
+  const main=document.getElementById('main');
+  if(!S){main.innerHTML='<div class="muted">加载中…</div>';return;}
+  let h='';
+  if(S.board==='overview')h=renderOverview();
+  else if(S.board==='backups')h=renderBackups();
+  else if(S.board==='mcp')h=renderMcp();
+  main.innerHTML=h;
+  const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
+  const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
+  const back=document.getElementById('back'); if(back)back.onclick=()=>{CONV=null;render();};
+  document.querySelectorAll('.conv').forEach(el=>el.onclick=()=>vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder}));
+}
+window.addEventListener('message',e=>{const m=e.data||{};
+  if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
+  else if(m.type==='conv'){CONV=m;render();}
+  else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
+  else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}
+});
+vscode.postMessage({type:'refresh'});
+</script></body></html>`;
+  }
+}
+
+function register(context, log, opts) {
+  const panel = new UnifiedPanel(log);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider("dao.unified", panel, { webviewOptions: { retainContextWhenHidden: true } })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("dao.unified.open", () => {
+      try { vscode.commands.executeCommand("dao.unified.focus"); } catch (_) {}
+    })
+  );
+  // host-state 变更(账号/MCP/备份水位刷新)即回推面板。
+  try {
+    const sub = hostStateMod.subscribe(() => { try { panel._pushState(); } catch (_) {} });
+    context.subscriptions.push(sub);
+  } catch (_) {}
+  return panel;
+}
+
+module.exports = { register, UnifiedPanel };

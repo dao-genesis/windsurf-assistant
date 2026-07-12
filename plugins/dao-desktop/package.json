@@ -46,6 +46,11 @@
           "id": "dao.cascade",
           "name": "Cascade · 三模式",
           "type": "webview"
+        },
+        {
+          "id": "dao.unified",
+          "name": "归一 · 插件本源",
+          "type": "webview"
         }
       ]
     },
@@ -53,6 +58,10 @@
       {
         "command": "dao.cascade.open",
         "title": "Devin Desktop: 聚焦 Cascade 三模式面板"
+      },
+      {
+        "command": "dao.unified.open",
+        "title": "Devin Desktop: 打开归一面板(主页/备份/MCP)"
       },
       {
         "command": "dao.cascade.newSession",

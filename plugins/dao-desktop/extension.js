@@ -53,6 +53,13 @@ async function activate(context) {
     log("✓ Cascade 三模式面板就位 (dao.cascade)");
   } catch (e) { log("✗ Cascade 面板注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②b 归一面板(dao.unified): 插件本源统一管理(主页/双源对话备份/MCP, 持续扩板块)。
+  try {
+    const unified = require("./dao-cascade/unified-panel");
+    unified.register(context, (m) => log("[unified] " + m), { ns: "dao" });
+    log("✓ 归一面板就位 (dao.unified)");
+  } catch (e) { log("✗ 归一面板注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ③ 宿主已内建官方本体(codeium.windsurf) → 共生模式, 面板接宿主 LS, 不重复激活。
   const hostCore = vscode.extensions.getExtension("codeium.windsurf");
   const selfId = context.extension && context.extension.id;

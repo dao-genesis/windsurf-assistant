@@ -50,6 +50,7 @@
 | R55 | #135 | 模型选择器 1:1：全量模型（含 Pro 门控禁用项 🔒 灰置）+ 倍率 `· Nx` 徽标 + disabledReason 作 title |
 | R56 | #136 | @ 提及增 Code 符号类目：GetMatchingContextScopeItems → ƒ/◆ 符号项（lineage · path:line），选中插入 `@Name(path:start-end)` |
 | R57 |  | dao-one 融合三件套：① Cascade 对话自动备份（backup.js · 增量水位 · 同根 ~/.wam/conversation_backups 供 dao-one「💬 对话备份」统一消费，命令 dao.cascade.backupAll + 设置 autoBackup/backupDir）② 宿主态 publishFused：账户（GetUserStatus）/MCP 快照/备份水位并入 windsurf-host.json（dao-one 主页账号信息 + MCP 双逻辑同源）③ headless 契约测试扩到 backup/publishFused。R57b：备份树改为与 dao-one 备份板块同构（`<root>/Cascade·<邮箱>/对话/<NNN_标题_id8>/{对话.md,_meta.json}` + `.account.json`/账号级 `_index.json`），rt-flow `listBackups()` 直接扫出 Cascade 账号与 Cloud 账号同列；`_autoBackup` 自 fused.account 取邮箱传入 |
+| R58 |  | 归一面板落地(插件即本源)：新增视图 `dao.unified`（unified-panel.js）—— 🏠 主页(fused 账号/套餐/配额+备份水位+本地 MCP 概览)、💬 对话备份(双源统一：backup.js 新增 listBackups/listConversations/readConversation 扫描备份根，Cascade 与 Devin Cloud 账号同列、点开即读转录、立即备份按钮)、🧩 MCP(fused.mcp 活状态)；数据全取自插件 host-state + 本机备份树，零 IDE 宿主依赖；host-state.subscribe 变更即回推。后续板块(切号/桥接/GitHub/Proxy Pro/浏览器搜索)持续并入 |
 
 核心文件：`plugins/dao-desktop/dao-cascade/panel.js`（扩展端 handler + webview 渲染同文件）、`ls-bridge.js`（language_server Connect RPC 桥）、`host-discover.js`（端口/CSRF/apiKey 发现）。
 

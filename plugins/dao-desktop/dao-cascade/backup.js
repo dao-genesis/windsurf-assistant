@@ -98,4 +98,75 @@ async function backupAll(ls, opts) {
   return { ok: true, saved, skipped, total: Object.keys(m).length, root, accDir };
 }
 
-module.exports = { backupRoot, backupAll, loadIndex, indexPath, safeName, accountDirName };
+// ─────────────────────────────────────────────────────────────────────────────
+// 归一面板「💬 对话备份」板块数据层(插件自持真源): 扫描备份根下**全部**账号树,
+// Cascade 账号(Cascade·<邮箱>)与 Devin Cloud 账号(rt-flow 落盘者)同结构、同列并出,
+// 实现用户所述「两侧对话在同一备份板块统一列表/查看」。零 IDE 依赖、纯 fs。
+//   <root>/<账号目录>/.account.json                         (可选: email/source)
+//   <root>/<账号目录>/对话/<会话目录>/{对话.md, _meta.json}
+function _readJson(p) { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch (_) { return null; } }
+
+// 列出某账号目录下的全部会话(按 convNo→backedUpAt→目录名 排序)。
+function listConversations(accPath) {
+  const convRoot = path.join(accPath, "对话");
+  let names = [];
+  try { names = fs.readdirSync(convRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); }
+  catch (_) { return []; }
+  const convs = names.map((folder) => {
+    const meta = _readJson(path.join(convRoot, folder, "_meta.json")) || {};
+    let hasMd = false;
+    try { hasMd = fs.statSync(path.join(convRoot, folder, "对话.md")).isFile(); } catch (_) {}
+    return {
+      folder,
+      title: meta.title || folder.replace(/^\d{3}_/, "").replace(/_[0-9a-f]{6,}$/i, ""),
+      convNo: meta.convNo || 0,
+      source: meta.source || "",
+      cascadeId: meta.cascadeId || "",
+      lastModifiedTime: meta.lastModifiedTime || "",
+      isArchived: !!meta.isArchived,
+      backedUpAt: meta.backedUpAt || "",
+      hasMd,
+    };
+  });
+  convs.sort((a, b) => (a.convNo - b.convNo) || String(a.backedUpAt).localeCompare(String(b.backedUpAt)) || a.folder.localeCompare(b.folder));
+  return convs;
+}
+
+// 扫描备份根 → 全部账号(含各账号会话数/来源标签)。source 归一: cascade / cloud / mixed。
+function listBackups(rootOverride) {
+  const root = backupRoot(rootOverride);
+  let dirs = [];
+  try { dirs = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); }
+  catch (_) { return { root, accounts: [] }; }
+  const accounts = dirs.map((name) => {
+    const accPath = path.join(root, name);
+    const acct = _readJson(path.join(accPath, ".account.json")) || {};
+    const convs = listConversations(accPath);
+    const isCascade = /^Cascade[·:]/.test(name) || String(acct.source || "").indexOf("Cascade") >= 0 || convs.some((c) => c.source === "cascade");
+    const source = isCascade
+      ? (convs.some((c) => c.source && c.source !== "cascade") ? "mixed" : "cascade")
+      : "cloud";
+    return {
+      dir: name,
+      email: acct.email || (name.replace(/^Cascade[·:]/, "") || name),
+      source,
+      isCascade,
+      convCount: convs.length,
+      conversations: convs,
+    };
+  }).filter((a) => a.convCount > 0 || a.email);
+  // Cascade 账号在前(本源优先), 其余按目录名。
+  accounts.sort((a, b) => (Number(b.isCascade) - Number(a.isCascade)) || a.dir.localeCompare(b.dir));
+  return { root, accounts };
+}
+
+// 读取某会话的转录正文(对话.md)+ 元数据, 供面板详情视图渲染。
+function readConversation(rootOverride, accDir, folder) {
+  const root = backupRoot(rootOverride);
+  const convPath = path.join(root, accDir, "对话", folder);
+  let md = "";
+  try { md = fs.readFileSync(path.join(convPath, "对话.md"), "utf8"); } catch (e) { md = "(无法读取转录: " + e.message + ")"; }
+  return { meta: _readJson(path.join(convPath, "_meta.json")) || {}, md, path: convPath };
+}
+
+module.exports = { backupRoot, backupAll, loadIndex, indexPath, safeName, accountDirName, listBackups, listConversations, readConversation };

@@ -39,6 +39,18 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - 共享地图导入(⇘)：codeMapId = 分享链接末段(`uuid-hash` 复合 ID)；`GetSharedCodeMap`/`SaveCodeMapFromJson` 直连时须补完整 `metadata{ideName,…,apiKey}`(缺任一字段 400)；导入后 LS 自动重发号 id(新时间戳后缀)。
 - Suggested maps 需活动 Cascade 上下文，无会话时 `GetCodeMapSuggestions` 直接 500("no context available")——× 忽略钮(DismissCodeMapSuggestion)只能在有建议+有会话时实测。
 
+## 冷启动安装与登录（全新机器）
+- 下载安装：`curl -s https://windsurf-stable.codeium.com/api/update/linux-x64/stable/latest` 取 url，解压到 `~/devin-desktop/`。
+- 登录走浏览器 OAuth：IDE 点 Log in → app.devin.ai 输邮箱/密码 → 成功页的 `devin://codeium.windsurf?devin_code=...` 深链在无 xdg 协议注册时不会自动回传；从成功页 HTML 抓该链接后执行 `devin-desktop --open-url "<devin://…>"` 手动回传，再在 IDE 弹窗点 Yes。
+- Linux 无 OS keyring 时会弹 "OS keyring couldn't be identified" —— 选 "Use weaker encryption" 即可继续。
+- 命令面板输入中文可能丢失（computer tool CJK 打字不稳），搜命令用英文前缀如 "Devin Desktop"。
+
+## R57 融合三件套断言点（备份/宿主态）
+- 自动备份：打开面板历史列表(↺)触发 sessions-list → 1.5s 去抖后写 `~/.wam/conversation_backups/_index.json` + 转录 md（头含 `source: dao-desktop(Cascade 插件版)`）。
+- 手动备份：命令「Devin Desktop: 备份全部 Cascade 对话」，toast 显示「新写 N / 共 M」；未变化轨迹按 lastModifiedTime 水位跳过（saved=0 即证明增量生效）。
+- 宿主态归一：点面板底栏 LS/引擎区弹账户卡（触发 GetUserStatus）→ `~/.dao/windsurf-host.json` 应含 `fused.account`；首页链接行点 MCP → `fused.mcp`；备份后 → `fused.cascadeBackup`。
+- 注意：账户卡入口是底栏右侧（引擎/LS 区），点最左 Local 无反应。
+
 ## Devin Secrets Needed
 - Devin Desktop 登录账号/密码（outlook 账号）
 - GitHub PAT（push / PR / 评论）

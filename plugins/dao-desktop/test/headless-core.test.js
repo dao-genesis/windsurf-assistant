@@ -119,3 +119,47 @@ test("Cascade 对话备份: 增量导出转录 + _index.json 水位(未变化不
   const r4 = await backup.backupAll({ ready: () => null, apiKey: () => "" }, { root });
   assert.strictEqual(r4.ok, false);
 });
+
+test("归一面板数据层 listBackups: Cascade 与 Devin Cloud 账号同列双源统一", async () => {
+  const backup = require(path.join(CASCADE, "backup.js"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-uni-"));
+  // ① Cascade 侧: 走真实 backupAll 落盘
+  const summaries = { cidA: { summary: "归一面板联调", lastModifiedTime: "2026-07-12T03:00:00Z" } };
+  const fakeLs = {
+    ready: () => ({ lsPort: 1, csrfToken: "c" }),
+    apiKey: () => "k",
+    call: async (m, req) => {
+      if (m === "GetAllCascadeTrajectories") return { trajectorySummaries: summaries };
+      if (m === "GetCascadeTranscriptForTrajectoryId") return { transcript: "hello " + req.cascadeId };
+      throw new Error("unexpected " + m);
+    },
+  };
+  await backup.backupAll(fakeLs, { root, email: "cas@x.y" });
+  // ② Cloud 侧: 模拟 rt-flow 落盘的同构账号树
+  const cloudAcc = path.join(root, "cloud-user@x.y");
+  fs.mkdirSync(path.join(cloudAcc, "对话", "001_云端会话_deadbeef"), { recursive: true });
+  fs.writeFileSync(path.join(cloudAcc, ".account.json"), JSON.stringify({ email: "cloud-user@x.y", source: "rt-flow" }));
+  fs.writeFileSync(path.join(cloudAcc, "对话", "001_云端会话_deadbeef", "对话.md"), "# 云端会话\n\ncloud body");
+  fs.writeFileSync(path.join(cloudAcc, "对话", "001_云端会话_deadbeef", "_meta.json"),
+    JSON.stringify({ title: "云端会话", convNo: 1, source: "cloud", lastModifiedTime: "2026-07-11T00:00:00Z" }));
+  // ③ 双源同列: Cascade 在前, Cloud 在后, 来源标签正确
+  const l = backup.listBackups(root);
+  assert.strictEqual(l.accounts.length, 2, "两账号同列");
+  assert.strictEqual(l.accounts[0].source, "cascade");
+  assert.strictEqual(l.accounts[0].email, "cas@x.y");
+  assert.strictEqual(l.accounts[1].source, "cloud");
+  assert.strictEqual(l.accounts[1].email, "cloud-user@x.y");
+  assert.strictEqual(l.accounts[0].convCount, 1);
+  const conv = l.accounts[0].conversations[0];
+  assert.strictEqual(conv.title, "归一面板联调");
+  assert.ok(conv.hasMd, "转录存在");
+  // ④ readConversation: 双源皆可读转录正文
+  const c1 = backup.readConversation(root, l.accounts[0].dir, conv.folder);
+  assert.ok(c1.md.includes("hello cidA"));
+  assert.strictEqual(c1.meta.source, "cascade");
+  const c2 = backup.readConversation(root, "cloud-user@x.y", "001_云端会话_deadbeef");
+  assert.ok(c2.md.includes("cloud body"));
+  assert.strictEqual(c2.meta.source, "cloud");
+  // ⑤ 空根不炸
+  assert.deepStrictEqual(backup.listBackups(path.join(root, "nope")).accounts, []);
+});
