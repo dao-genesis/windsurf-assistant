@@ -2,6 +2,13 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.350 · 根治「添加失败: runtime not loaded」· 健壮解析外接api目录
+: 根因: 硬编码中文目录名「外接api」(非 ASCII), VSIX(zip) 打包/解包编码不稳, 部分用户机上
+  目录名被搞坏(mojibake) → `require("./vendor/外接api/runtime.js")` 抛错 → 外接api 不启 →
+  加渠道即「添加失败: runtime not loaded」。新增 `_resolveEaRuntimePath()`: 先试规范中文名,
+  找不到即按内容扫描 vendor/ 下「含 runtime.js + core/dao_router.js」的子目录 —— 名字坏掉
+  也能凭内容命中。同步本源 dao-genesis/devin-remote#61 (v9.9.350)。
+
 v9.9.347 · 内网穿透对齐二合一本源 · 激活即自动连接 + 模型反代专属交接文档
 : 承接用户实证「Proxy Pro 内网穿透整体没跑通·甚至没自动连接好」——本源(dao-vsix 二合一)的公网穿透
   是开机即自动打通的去中心化通道, 而 Proxy Pro 仅在用户已绑 CF API Token 时才自动拉起固定中继,

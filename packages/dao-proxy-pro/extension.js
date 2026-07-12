@@ -4732,6 +4732,34 @@ async function deactivate() {
 
 let _externalApiRuntime = null;
 
+// ★ v9.9.350 · 健壮解析 vendor/外接api/runtime.js · 根治「runtime not loaded」
+//   病灶: 中文目录名「外接api」为非 ASCII, VSIX(zip) 打包/解包编码不稳, 部分用户机
+//     上目录名被搞坏(mojibake) → require("./vendor/外接api/runtime.js") 抛错 → 外接api 不启
+//   修法: 先试规范中文名; 找不到即按内容扫描 vendor/ 下含 runtime.js+core/dao_router.js
+//     的子目录(名字坏掉也能凭内容命中)
+function _resolveEaRuntimePath() {
+  const vendor = path.join(__dirname, "vendor");
+  const canon = path.join(vendor, "外接api", "runtime.js");
+  try {
+    if (fs.existsSync(canon)) return canon;
+  } catch {}
+  try {
+    for (const name of fs.readdirSync(vendor)) {
+      const d = path.join(vendor, name);
+      try {
+        if (
+          fs.statSync(d).isDirectory() &&
+          fs.existsSync(path.join(d, "runtime.js")) &&
+          fs.existsSync(path.join(d, "core", "dao_router.js"))
+        ) {
+          return path.join(d, "runtime.js");
+        }
+      } catch {}
+    }
+  } catch {}
+  return canon; // 兜底: require 会抛 → 上层 catch 降级
+}
+
 async function tryStartExternalApi(ctx) {
   // 默关 · 主公 dao.外接api.enabled=true 才启
   const enabled = vscode.workspace
@@ -4747,7 +4775,7 @@ async function tryStartExternalApi(ctx) {
   }
   let ExternalApiRuntime;
   try {
-    ({ ExternalApiRuntime } = require("./vendor/外接api/runtime.js"));
+    ({ ExternalApiRuntime } = require(_resolveEaRuntimePath()));
   } catch (e) {
     L.warn("外接api", `vendor/外接api/runtime.js 不加载: ${e.message}`);
     return null;
