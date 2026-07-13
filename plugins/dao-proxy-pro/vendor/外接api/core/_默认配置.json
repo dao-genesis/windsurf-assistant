@@ -1,0 +1,30 @@
+{
+  "_说明": "v9.9.98P · 无为模板 · 只路由SWE 1.6 Fast · 填入apiKey后启用 · 其他走官方",
+  "gateway": { "host": "127.0.0.1", "port": 11435 },
+  "providers": {
+    "deepseek": {
+      "enabled": false,
+      "apiKey": "",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "noProviderPrefix": true,
+      "completionPath": "/chat/completions",
+      "type": "openai-compatible",
+      "streamMode": "stream"
+    }
+  },
+  "daoRoutes": {
+    "enabled": true,
+    "substituteEnabled": false,
+    "allowMcpTools": true,
+    "_说明": "只路由SWE 1.6 Fast → deepseek · 不在表中→官方透传 · allowMcpTools=true允许MCP工具",
+    "routes": {
+      "MODEL_SWE_1_6_FAST": {
+        "provider": "deepseek",
+        "model": "deepseek-reasoner",
+        "_label": "SWE 1.6 Fast → DeepSeek Reasoner (需apiKey)",
+        "maxOutputTokens": 32768
+      }
+    }
+  }
+}
