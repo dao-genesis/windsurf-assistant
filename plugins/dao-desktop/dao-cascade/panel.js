@@ -698,9 +698,10 @@ class CascadePanelProvider {
     this._watchCascadeSummaries();
     let acp = [];
     try {
-      await this._ensureAcp();
-      const res = await this._acp.listSessions();
-      acp = (res && res.sessions) || [];
+      if (await this._ensureAcp() && this._acp) {
+        const res = await this._acp.listSessions();
+        acp = (res && res.sessions) || [];
+      }
     } catch (e) { this._log("[sessions] " + e.message); }
     const cx = await this._cascadeSessions();
     const all = acp.concat(cx).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
@@ -881,7 +882,8 @@ class CascadePanelProvider {
       catch (e) { return this._post({ type: "error", text: "加载 Cascade 轨迹失败: " + e.message }); }
     }
     try {
-      await this._ensureAcp();
+      if (!(await this._ensureAcp()) || !this._acp)
+        return this._post({ type: "error", text: "加载会话失败: ACP 未就绪(未登录或启动退避中)" });
       this._post({ type: "history-clear" });
       this._replaying = true;
       this._activeId = "r" + Date.now();
@@ -901,9 +903,10 @@ class CascadePanelProvider {
     try {
       let sessions = [];
       try {
-        await this._ensureAcp();
-        const res = await this._acp.listSessions();
-        sessions = (res && res.sessions) || [];
+        if (await this._ensureAcp() && this._acp) {
+          const res = await this._acp.listSessions();
+          sessions = (res && res.sessions) || [];
+        }
       } catch (_) {}
       sessions = sessions.concat(await this._cascadeSessions())
         .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
@@ -1929,7 +1932,7 @@ class CascadePanelProvider {
     this._post({ type: "history-clear", home: true });
     this._post({ type: "arena-avail", ok: true, reason: "" });
     try {
-      await this._ensureAcp();
+      if (!(await this._ensureAcp()) || !this._acp) throw new Error("ACP 未就绪(未登录或启动退避中)");
       const res = await this._acp.newSession();
       this._pushSessionMeta(res);
       this._post({ type: "history-done" });
@@ -1986,7 +1989,7 @@ class CascadePanelProvider {
       }
       try {
         this._activeId = msg.id;
-        await this._ensureAcp();
+        if (!(await this._ensureAcp()) || !this._acp) throw new Error("ACP 未就绪(未登录或启动退避中)");
         await this._acp.prompt(msg.text);
         return this._post({ type: "assistant-done", id: msg.id });
       } catch (e) {
