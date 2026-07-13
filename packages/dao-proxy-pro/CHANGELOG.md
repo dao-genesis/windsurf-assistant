@@ -2,6 +2,14 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.351 · 发布包补齐全部运行时文件 · 「runtime not loaded」终章
+: 实锤真源: 发布页 9.9.347 VSIX **不含 vendor/外接api/runtime.js** —— `runtime.js`/`cascade_wire.js`/
+  `sp_core.js`/`resilience.js` 等 39 个运行时文件与 `vendor/bundled-origin/` 全套从未提交入仓,
+  打出的安装包天生残缺, 装谁谁报「runtime not loaded」。本版: ① plugins/ 补齐 39 个缺失文件;
+  ② packages/(CI 打包源)补齐 bundled-origin 全套 23 文件并字节对齐本源 devin-remote v9.9.350;
+  ③ 干净克隆重打包并闭环实测: 解包直启 origin → 添加 DeepSeek/小米MiMo 真实渠道 ok → 模型自动
+  发现 → 探活 200 真实补全。渠道配置存于 `~/.codeium/dao-byok/配置.json`, 升级/重装不丢。
+
 v9.9.350 · 根治「添加失败: runtime not loaded」· 健壮解析外接api目录 + ea/* 惰性自愈
 : 承接用户端反馈「加渠道即报 runtime not loaded」——排查确认开发机运行时正常(路由就绪·25模型),
   故为**安装/环境特定失败**。根因: `source.js`/`extension.js` 硬编码中文目录名「外接api」(非 ASCII),
