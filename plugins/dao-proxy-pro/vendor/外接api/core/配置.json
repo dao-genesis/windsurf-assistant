@@ -1,0 +1,106 @@
+{
+  "_道": "外接api · 道法自然 · v9.9.99 · Go移植模块集成",
+  "_注": "无配置=全官方 · 有配置才路由 · 填入apiKey后启用provider",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 11435
+  },
+  "providers": {
+    "deepseek": {
+      "enabled": false,
+      "apiKey": "",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "models": [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro"
+      ],
+      "noProviderPrefix": true,
+      "completionPath": "/chat/completions",
+      "type": "openai-compatible",
+      "streamMode": "stream",
+      "protocol": "openai-chat",
+      "_注_protocol": "openai-chat | anthropic | openai-responses · 自动检测可不填"
+    },
+    "anthropic": {
+      "enabled": false,
+      "apiKey": "",
+      "baseUrl": "https://api.anthropic.com",
+      "models": [
+        "claude-sonnet-4-20250514",
+        "claude-opus-4-20250514"
+      ],
+      "noProviderPrefix": true,
+      "completionPath": "/v1/messages",
+      "type": "anthropic",
+      "streamMode": "stream",
+      "protocol": "anthropic",
+      "_注_protocol": "Anthropic Messages API · 自动检测可不填"
+    },
+    "openai": {
+      "enabled": false,
+      "apiKey": "",
+      "baseUrl": "https://api.openai.com/v1",
+      "models": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "o3",
+        "o4-mini"
+      ],
+      "noProviderPrefix": true,
+      "completionPath": "/chat/completions",
+      "type": "openai",
+      "streamMode": "stream",
+      "protocol": "openai-chat",
+      "_注_responses": "如需 /v1/responses 协议 · 设 protocol=openai-responses"
+    }
+  },
+  "daoRoutes": {
+    "enabled": true,
+    "substituteEnabled": false,
+    "allowMcpTools": true,
+    "_说明": "只路由SWE 1.6 Fast → deepseek · 不在表中→官方透传 · 填apiKey后启用provider",
+    "routes": {
+      "MODEL_SWE_1_6_FAST": {
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "_label": "MODEL_SWE_1_6_FAST → DeepSeek V4 Flash",
+        "maxOutputTokens": 32768,
+        "thinkingEnabled": true,
+        "thinkingBudget": 10000,
+        "budget": {
+          "maxContextTokens": 131072,
+          "maxOutputTokens": 32768,
+          "historyBudgetRatio": 0.7,
+          "toolsBudgetRatio": 0.15,
+          "systemBudgetRatio": 0.1,
+          "compressionEnabled": true,
+          "compactSchemas": true
+        },
+        "resilience": {
+          "autoContinue": true,
+          "maxAutoContinue": 3,
+          "refusalRetry": true,
+          "thinkingDowngrade": true,
+          "contextTrimOnOverflow": true,
+          "maxRetries": 3,
+          "backoffBaseMs": 1000,
+          "backoffMaxMs": 30000
+        },
+        "diagnostics": {
+          "dumpUpstream": false,
+          "dumpBudget": false,
+          "logTokenCount": true
+        }
+      }
+    }
+  },
+  "_Go移植模块说明": {
+    "budget": "Token预算管理 · tiktoken计数 + 历史裁剪 + 工具预算 + schema压缩",
+    "adapters": "多协议适配 · OpenAI Chat + Anthropic Messages + OpenAI Responses",
+    "resilience": "弹性重试 · 自动继续 + 拒绝匹配 + thinking降级 + 退避重试",
+    "protocol字段": "openai-chat(默认) | anthropic | openai-responses · 不填则自动检测",
+    "budget字段": "per-route预算配置 · 不填则用默认值",
+    "resilience字段": "per-route弹性配置 · 不填则用默认值",
+    "AI接口": "hotSetBudgetParam/hotCountTokens/hotDetectProtocol/hotDetectRefusal/hotCompactSchema · AI可辅助用户热配置一切"
+  }
+}
