@@ -472,3 +472,50 @@ test("MCP 配置真源开关: server 级 disabled 位 + 工具级 disabledTools 
   delete process.env.DAO_MCP_CONFIG_FILE;
 });
 
+
+test("Devin(ACP) 会话备份: session/list+load 历史回放拼转录 + 增量水位 + 会话本地管理", async () => {
+  const backup = require(path.join(CASCADE, "backup.js"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-acpbk-"));
+  // 假 ACP 客户端: hookUpdates 截流 + loadSession 重放帧(与 acp-client 同约定)。
+  let hook = null;
+  const frames = {
+    s1: [
+      { sessionId: "s1", update: { sessionUpdate: "user_message_chunk", content: { text: "列出文件" } } },
+      { sessionId: "s1", update: { sessionUpdate: "agent_thought_chunk", content: { text: "(思考不入转录)" } } },
+      { sessionId: "s1", update: { sessionUpdate: "tool_call", title: "ls -la", toolCallId: "t1" } },
+      { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk", content: { text: "共 3 个文件" } } },
+      { sessionId: "other", update: { sessionUpdate: "agent_message_chunk", content: { text: "串台帧须被过滤" } } },
+    ],
+  };
+  const acp = {
+    listSessions: async () => ({ sessions: [{ sessionId: "s1", title: "文件巡览", updatedAt: "2026-07-12T01:00:00Z" }] }),
+    hookUpdates: (fn) => { hook = fn; },
+    loadSession: async (sid) => { for (const f of frames[sid] || []) hook && hook(f); return {}; },
+  };
+  const r1 = await backup.backupAcp(acp, { root, email: "u@x.y" });
+  assert.strictEqual(r1.ok, true); assert.strictEqual(r1.saved, 1); assert.strictEqual(r1.total, 1);
+  const accDir = path.join(root, "Devin·u@x.y");
+  const convs = backup.listConversations(accDir);
+  assert.strictEqual(convs.length, 1);
+  assert.strictEqual(convs[0].source, "devin-acp");
+  const md = fs.readFileSync(path.join(accDir, "对话", convs[0].folder, "对话.md"), "utf8");
+  assert.ok(md.includes("## 🧑 用户"), "用户回合入转录");
+  assert.ok(md.includes("列出文件") && md.includes("共 3 个文件") && md.includes("🔧 ls -la"));
+  assert.ok(!md.includes("思考不入转录") && !md.includes("串台帧"), "思考帧与他会话帧不入转录");
+  // 水位未变 → 跳过
+  const r2 = await backup.backupAcp(acp, { root, email: "u@x.y" });
+  assert.strictEqual(r2.saved, 0); assert.strictEqual(r2.skipped, 1);
+  // 三源统一: listBackups 中 Devin(ACP) 账号并出, source=devin
+  const all = backup.listBackups(root);
+  assert.strictEqual(all.accounts.length, 1);
+  assert.strictEqual(all.accounts[0].isCascade, false);
+  assert.strictEqual(all.accounts[0].source, "devin");
+  // ACP 会话管理 = 本地树同步, 绝不触 LS(传入会爆炸的假 ls 验证不被调用)
+  const bomb = { ready: () => true, apiKey: () => "k", call: async () => { throw new Error("不应调用 LS"); } };
+  const rr = await backup.manageTrajectory(bomb, { root, accDir: "Devin·u@x.y", folder: convs[0].folder, cascadeId: "s1", op: "rename", name: "新名", source: "devin-acp" });
+  assert.strictEqual(rr.ok, true);
+  assert.strictEqual(backup.listConversations(accDir)[0].title, "新名");
+  const rd = await backup.manageTrajectory(bomb, { root, accDir: "Devin·u@x.y", folder: convs[0].folder, cascadeId: "s1", op: "delete", source: "devin-acp" });
+  assert.strictEqual(rd.ok, true);
+  assert.strictEqual(backup.listConversations(accDir).length, 0);
+});

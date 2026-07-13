@@ -82,6 +82,7 @@ class AcpClient {
     }
     // 通知(agent → client):session/update 及 _cognition.ai/* 扩展通知。
     if (msg.method === "session/update") {
+      if (this._hook) { try { this._hook(msg.params); } catch (_) {} return; }
       try { this._onUpdate(msg.params); } catch (_) {}
       return;
     }
@@ -194,6 +195,9 @@ class AcpClient {
       sessionId: this._sessionId, configId, value,
     });
   }
+
+  // 截流 session/update: 备份等后台回放期间接管全部帧(不打扰前端渲染); 传 null 复原。
+  hookUpdates(fn) { this._hook = typeof fn === "function" ? fn : null; }
 
   async listSessions() {
     return this.request("session/list", {});

@@ -291,7 +291,7 @@ class UnifiedPanel {
   // Cascade 轨迹管理(备份板块延伸): 重命名/归档/取消归档/删除 —— LS 官方 RPC + 本地备份树同步。
   async _convManage(msg) {
     const op = String(msg.op || "");
-    const opts = { accDir: String(msg.dir || ""), folder: String(msg.folder || ""), cascadeId: String(msg.cascadeId || ""), op };
+    const opts = { accDir: String(msg.dir || ""), folder: String(msg.folder || ""), cascadeId: String(msg.cascadeId || ""), op, source: String(msg.source || "") };
     try {
       if (op === "rename") {
         const name = await vscode.window.showInputBox({ prompt: "重命名会话", value: String(msg.title || "") });
@@ -665,8 +665,8 @@ body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vsco
 .muted{opacity:.55}
 pre{white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,#0002);padding:10px;border-radius:6px;max-height:64vh;overflow:auto}
 .back{cursor:pointer;color:var(--vscode-textLink-foreground,#4af)}
-.mgr{cursor:pointer;opacity:.55;margin-left:2px}
-.mgr:hover{opacity:1}
+.mgr{cursor:pointer;opacity:.55;margin-left:2px;padding:3px 4px;display:inline-block}
+.mgr:hover{opacity:1;background:var(--vscode-list-hoverBackground,#8882);border-radius:4px}
 h2{font-size:15px;margin:0 0 4px}
 </style></head><body>
 <div class="wrap">
@@ -727,23 +727,23 @@ function renderOverview(){
 function cr(l,v){return '<div class="cr"><span class="l">'+E(l)+'</span><span class="v">'+v+'</span></div>';}
 function renderBackups(){
   if(CONV){return renderConv();}
-  let h='<div class="row"><h2 style="flex:1">对话备份 · 双源统一</h2>'+
-    '<button class="btn" id="bk">立即备份 Cascade</button>'+
+  let h='<div class="row"><h2 style="flex:1">对话备份 · 三源统一</h2>'+
+    '<button class="btn" id="bk">立即备份</button>'+
     '<button class="btn sec" id="rf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">Cascade(本机)与 Devin Cloud 账号同结构、同列并出; 点击任一对话查看转录。</div>';
+  h+='<div class="muted" style="margin-bottom:10px">Cascade(本机)、Devin Local/Cloud(ACP)与 Devin Cloud 账号同结构、同列并出; 点击任一对话查看转录。</div>';
   const accs=S.backups.accounts;
   if(!accs.length)h+='<div class="card muted">暂无备份。点「立即备份 Cascade」导出本机对话。</div>';
   for(const a of accs){
-    const cls=a.source==='cloud'?'cloud':(a.source==='mixed'?'mixed':'');
+    const cls=a.source==='cloud'||a.source==='devin'?'cloud':(a.source==='mixed'?'mixed':'');
     h+='<div class="acc"><div class="hd"><span>'+E(a.email)+
-      '<span class="badge '+cls+'">'+(a.source==='cloud'?'Devin Cloud':(a.source==='mixed'?'混合':'Cascade'))+'</span></span>'+
+      '<span class="badge '+cls+'">'+(a.source==='cloud'?'Devin Cloud':(a.source==='devin'?'Devin(ACP)':(a.source==='mixed'?'混合':'Cascade')))+'</span></span>'+
       '<span class="muted" style="font-weight:400">'+a.convCount+' 条</span></div>';
     for(const c of a.conversations){
-      const mg=(c.source==='cascade'&&c.cascadeId)?
+      const mg=((c.source==='cascade'||c.source==='devin-acp')&&c.cascadeId)?
         ' <span class="mgr" data-op="rename" title="重命名">✏</span>'+
-        ' <span class="mgr" data-op="'+(c.isArchived?'unarchive':'archive')+'" title="'+(c.isArchived?'取消归档':'归档')+'">🗄</span>'+
+        (c.source==='cascade'?' <span class="mgr" data-op="'+(c.isArchived?'unarchive':'archive')+'" title="'+(c.isArchived?'取消归档':'归档')+'">🗄</span>':'')+
         ' <span class="mgr" data-op="delete" title="删除">🗑</span>':'';
-      h+='<div class="conv'+(c.isArchived?' arch':'')+'" data-dir="'+E(a.dir)+'" data-folder="'+E(c.folder)+'" data-cid="'+E(c.cascadeId||'')+'" data-title="'+E(c.title)+'">'+
+      h+='<div class="conv'+(c.isArchived?' arch':'')+'" data-dir="'+E(a.dir)+'" data-folder="'+E(c.folder)+'" data-cid="'+E(c.cascadeId||'')+'" data-source="'+E(c.source||'')+'" data-title="'+E(c.title)+'">'+
         '<span>'+(c.convNo?('#'+c.convNo+' '):'')+E(c.title)+(c.isArchived?' 🗄':'')+'</span>'+
         '<span class="m">'+E(String(c.lastModifiedTime||c.backedUpAt||'').replace('T',' ').slice(0,16))+mg+'</span></div>';
     }
@@ -985,7 +985,7 @@ function render(){
     const t=ev.target;
     if(t&&t.classList&&t.classList.contains('mgr')){
       ev.stopPropagation();
-      vscode.postMessage({type:'conv-manage',op:t.dataset.op,dir:el.dataset.dir,folder:el.dataset.folder,cascadeId:el.dataset.cid,title:el.dataset.title});
+      vscode.postMessage({type:'conv-manage',op:t.dataset.op,dir:el.dataset.dir,folder:el.dataset.folder,cascadeId:el.dataset.cid,source:el.dataset.source,title:el.dataset.title});
       return;
     }
     vscode.postMessage({type:'open-conv',dir:el.dataset.dir,folder:el.dataset.folder});
