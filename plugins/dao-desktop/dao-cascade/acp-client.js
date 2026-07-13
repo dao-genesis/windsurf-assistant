@@ -28,6 +28,7 @@ class AcpClient {
     this._nextId = 1;
     this._pending = new Map(); // id -> {resolve, reject}
     this._onUpdate = opts.onUpdate || (() => {}); // session/update 通知回调
+    this._onExit = opts.onExit || null; // 子进程退出回调(宿主据此复位 ready 态)
     this._onPermission = opts.onPermission || null; // session/request_permission 回调(返回 Promise<optionId>)
     this._sessionId = null;
     this.agentInfo = null;
@@ -50,11 +51,26 @@ class AcpClient {
       for (const { reject } of this._pending.values()) reject(new Error("acp process exited"));
       this._pending.clear();
       this._child = null;
+      if (this._onExit) { try { this._onExit(code); } catch (_) {} }
+    });
+    this._child.on("error", (e) => {
+      this._log("[acp] spawn 失败: " + (e && e.message));
+      for (const { reject } of this._pending.values()) reject(e);
+      this._pending.clear();
+      this._child = null;
+      if (this._onExit) { try { this._onExit(-1); } catch (_) {} }
     });
   }
 
+  // 先 SIGTERM, 3s 未退再 SIGKILL —— 不留 D 态/孤儿进程。
   stop() {
-    if (this._child) { try { this._child.kill(); } catch (_) {} this._child = null; }
+    const c = this._child;
+    if (!c) return;
+    this._child = null;
+    try { c.kill(); } catch (_) {}
+    const t = setTimeout(() => { try { c.kill("SIGKILL"); } catch (_) {} }, 3000);
+    if (t.unref) t.unref();
+    c.once("exit", () => clearTimeout(t));
   }
 
   _onStdout(chunk) {
