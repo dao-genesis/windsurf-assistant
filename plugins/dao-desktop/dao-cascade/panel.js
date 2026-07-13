@@ -295,8 +295,12 @@ class CascadePanelProvider {
       authSignedIn: !!(h.auth && (h.auth.loggedIn === true || h.auth.state === "signed-in" || h.auth.apiKey || h.auth.userName || h.auth.name)) } : null;
     const folder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
       && vscode.workspace.workspaceFolders[0].name) || null;
+    // ACP 会话已就绪即证明凭据有效 — `devin auth status` 冷启动超时时以此兜底, 避免误显未登录
+    const loggedIn = auth.loggedIn || !!(this._acpReady && this._acp);
+    if (bin && !loggedIn && (this._envRetries = (this._envRetries || 0) + 1) <= 3)
+      setTimeout(() => this._pushEnv(), 10000);
     this._post({ type: "env", devinBin: bin || null, agents: AGENTS,
-      loggedIn: auth.loggedIn, userName: auth.name, windsurf: ws, folder });
+      loggedIn, userName: auth.name, windsurf: ws, folder });
     // 三模式引擎态归一发布(fused.engines): 归一面板主页/桥接 API 直接消费, 与本面板 env 同源。
     try {
       require("./host-state").publishFused("engines", {
@@ -385,6 +389,7 @@ class CascadePanelProvider {
         this._acp = acp;
         this._acpReady = true;
         this._acpFailAt = 0; this._acpBackoff = 0;
+        this._pushEnv();
         this._pushSessionMeta(res);
         this._handleSessionsList();
         return true;

@@ -65,6 +65,20 @@ process.stdin.on("data", (chunk) => {
     _pre.push(chunk);
   }
 });
+// 宿主亡则中人亡: stdin EOF/断裂 = 扩宿已逝(Reload Window 等), 限时收割子进程后自退,
+// 免孤儿 devin acp 长持 session lock("already open in another process")。
+let _orphanTimer = null;
+function reapAndExit() {
+  if (_orphanTimer) return;
+  _orphanTimer = setTimeout(() => {
+    try {
+      if (_child) _child.kill();
+    } catch (_) {
+      /* noop */
+    }
+    setTimeout(() => process.exit(0), 1500);
+  }, 2000);
+}
 process.stdin.on("end", () => {
   _stdinEnded = true;
   if (_child && _flushed) {
@@ -74,7 +88,10 @@ process.stdin.on("end", () => {
       /* noop */
     }
   }
+  reapAndExit();
 });
+process.stdin.on("close", reapAndExit);
+process.stdin.on("error", reapAndExit);
 
 function launch() {
   let child;
