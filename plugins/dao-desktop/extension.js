@@ -88,6 +88,16 @@ async function activate(context) {
 
 function startHostDiscovery(context) {
   try {
+    // 由扩展 context 派生 IDE 真实 globalStorage/state.vscdb —— IDE 以自定义
+    // --user-data-dir 运行时, 官方登录态(windsurf_api_key)不在默认 ~/.config/<app> 下,
+    // 唯此可靠定位, 否则 apiKey 取空 → LS 端口/CSRF 恒不采集 → Cascade「连接服务中」。
+    try {
+      const gsu = context.globalStorageUri && context.globalStorageUri.fsPath;
+      if (gsu) {
+        const { registerIdeStateDb } = require("./dao-cascade/host-state");
+        registerIdeStateDb(path.join(path.dirname(gsu), "state.vscdb"));
+      }
+    } catch (_) {}
     const { startDiscovery } = require("./dao-cascade/host-discover");
     const d = startDiscovery(null, log, 3000);
     context.subscriptions.push({ dispose: () => d.stop() });
