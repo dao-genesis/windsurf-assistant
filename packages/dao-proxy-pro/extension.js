@@ -4732,7 +4732,7 @@ async function deactivate() {
 
 let _externalApiRuntime = null;
 
-// ★ v9.9.350 · 健壮解析 vendor/外接api/runtime.js · 根治「runtime not loaded」
+// ★ v9.9.348 · 健壮解析 vendor/外接api/runtime.js · 根治「runtime not loaded」
 //   病灶: 中文目录名「外接api」为非 ASCII, VSIX(zip) 打包/解包编码不稳, 部分用户机
 //     上目录名被搞坏(mojibake) → require("./vendor/外接api/runtime.js") 抛错 → 外接api 不启
 //   修法: 先试规范中文名; 找不到即按内容扫描 vendor/ 下含 runtime.js+core/dao_router.js

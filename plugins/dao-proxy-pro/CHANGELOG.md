@@ -2,6 +2,21 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.351 · 模型反代用量记账归一 · 反代调用亦入「用量与成本」
+: 实机验证(DeepSeek/小米 Mimo 双渠道直连+路由+反代全链路)时发现: 经模型反代
+  `/v1/chat/completions`(OpenAI 兼容)与 `/v1/messages`(Anthropic 兼容)调用第三方渠道,
+  tokens 消耗**不入**面板「用量与成本」(`/origin/ea/usage` 恒空)——用量聚合仅覆盖 Cascade
+  路由路径(`dao_router.route()` 内 `_recordUsage`), 反代路径旁路了记账。四十四章
+  「知足不辱 知止不殆」: 知其所耗, 方知所止。本版:
+  ① `dao_router.js` 导出 `recordUsage`(外部记账入口·与 Cascade 路径共用同一张
+     `_usage` 表·同享缓存命中率/成本估算);
+  ② `runtime.js` 增 `routerRecordUsage()` 透传;
+  ③ `source.js` `_revproxyDeps()` 注入 `recordUsage` 依赖;
+  ④ `revproxy.js` `_bridge()` 在 onUsage 处按渠道/模型记账(仅第三方渠道目标·
+     builtin-stub/官方直通不计·流式与 unary 皆覆盖)。
+  实测: 反代双协议调用后 `/origin/ea/usage` 正确出账(deepseek 与 xiaomi-mimo 各自
+  calls/input/output/cached/hitRate 齐全)。
+
 v9.9.350 · 根治「添加失败: runtime not loaded」· 健壮解析外接api目录 + ea/* 惰性自愈
 : 承接用户端反馈「加渠道即报 runtime not loaded」——排查确认开发机运行时正常(路由就绪·25模型),
   故为**安装/环境特定失败**。根因: `source.js`/`extension.js` 硬编码中文目录名「外接api」(非 ASCII),

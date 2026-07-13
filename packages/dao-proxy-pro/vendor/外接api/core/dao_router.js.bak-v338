@@ -2973,15 +2973,9 @@ async function _callProvider(
         };
         const req = mod.request(opts, resolve);
         req.on("error", reject);
-        // v9.9.339 · 反者道之动 · 撤销 provider 流式请求秒数硬限 · AI 自然而止
-        //   本源: 推理/思考阶段可静默数分钟无字节, 120s socket 超时 destroy → 对话中途截断
-        //   道并行防泄漏: 关默认超时(0) + TCP keepalive 探活, socket 真死方 error 冒泡自然收
-        req.setTimeout(0);
-        req.on("socket", (s) => {
-          try {
-            s.setKeepAlive(true, 45000);
-          } catch {}
-        });
+        req.setTimeout(120000, () =>
+          req.destroy(new Error("provider timeout")),
+        );
         req.write(body);
         req.end();
       });
@@ -3113,15 +3107,7 @@ async function _callProvider(
       };
       const req = mod.request(opts, resolve);
       req.on("error", reject);
-      // v9.9.339 · 反者道之动 · 撤销 provider 流式请求秒数硬限 · AI 自然而止
-      //   本源: 推理/思考阶段可静默数分钟无字节, 120s socket 超时 destroy → 对话中途截断
-      //   道并行防泄漏: 关默认超时(0) + TCP keepalive 探活, socket 真死方 error 冒泡自然收
-      req.setTimeout(0);
-      req.on("socket", (s) => {
-        try {
-          s.setKeepAlive(true, 45000);
-        } catch {}
-      });
+      req.setTimeout(120000, () => req.destroy(new Error("provider timeout")));
       req.write(body);
       req.end();
     });
@@ -5449,8 +5435,6 @@ module.exports = {
   healthSnapshot,
   // ★ v9.9.301 · 用量聚合 (按渠道/模型) · 供「外接API」面板查看
   usage,
-  // ★ v9.9.351 · 外部记账入口 (模型反代/test-chat 等非 Cascade 路径亦入同一张用量表)
-  recordUsage: _recordUsage,
   // ★ 热配置 API · 道法自然
   hotAddProvider,
   hotRemoveProvider,
