@@ -69,7 +69,10 @@ class AcpWssClient {
         m.error ? p.reject(new Error(m.error.message || "Unknown error")) : p.resolve(m.result); }
       return;
     }
-    if (m.method === "session/update") this._onUpdate(m.params || {});
+    if (m.method === "session/update") {
+      if (this._hook) { try { this._hook(m.params || {}); } catch (_) {} return; }
+      this._onUpdate(m.params || {});
+    }
   }
 
   _request(method, params, timeoutMs) {
@@ -85,6 +88,19 @@ class AcpWssClient {
 
   _notify(method, params) {
     if (this._ws) this._ws.send(JSON.stringify({ jsonrpc: "2.0", method, params }));
+  }
+
+  // 截流 session/update(备份回放期间接管帧); 传 null 复原。
+  hookUpdates(fn) { this._hook = typeof fn === "function" ? fn : null; }
+
+  async listSessions() { return this._request("session/list", {}); }
+
+  // 历史会话回放: agent 以 session/update 重放历史帧后返回(与 stdio 客户端同约定)。
+  async loadSession(sessionId, cwd) {
+    const res = await this._request("session/load",
+      { sessionId, cwd: cwd || "/", mcpServers: [] }, 120000);
+    this.sessionId = sessionId;
+    return res;
   }
 
   async newSession(cwd) {

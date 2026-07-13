@@ -695,10 +695,43 @@ class CascadePanelProvider {
         const r = await backup.backupAll(ls, { root: cfg.get("backupDir") || "", email, log: this._log });
         if (r.ok && r.saved) this._log("[backup] Cascade 对话备份: 新写 " + r.saved + " / 共 " + r.total + " → " + r.root);
         if (r.ok) this._fusePublish("cascadeBackup", { root: r.root, saved: r.saved, total: r.total });
-        if (force) vscode.window.showInformationMessage(r.ok ? ("Cascade 对话备份完成: 新写 " + r.saved + " / 共 " + r.total + " → " + r.root) : ("备份未就绪: " + (r.reason || "")));
+        else this._log("[backup] Cascade 备份未就绪: " + (r.reason || ""));
+        const ra = await this._backupAcpSessions(backup, cfg.get("backupDir") || "", email);
+        if (ra && ra.ok && ra.saved) this._log("[backup] Devin(ACP) 会话备份: 新写 " + ra.saved + " / 共 " + ra.total);
+        if (force) {
+          const acpPart = ra && ra.ok ? (" · Devin(ACP) 新写 " + ra.saved + " / 共 " + ra.total) : "";
+          vscode.window.showInformationMessage(r.ok
+            ? ("对话备份完成: Cascade 新写 " + r.saved + " / 共 " + r.total + acpPart + " → " + r.root)
+            : ("Cascade 备份未就绪: " + (r.reason || "") + acpPart));
+        }
       } catch (e) { this._log("[backup] " + e.message); }
       this._bkRunning = false;
     }, force ? 0 : 1500);
+  }
+
+  // Devin Local/Cloud(ACP) 会话备份三模式延伸: session/list + session/load 历史回放拼转录。
+  // 回放会切换客户端活动会话, 备份后恢复原会话(恢复期间帧经 hookUpdates 截流, 不打扰前端)。
+  async _backupAcpSessions(backup, root, email) {
+    const clients = [];
+    if (this._acpReady && this._acp) clients.push(this._acp);
+    if (this._cloud && this._cloud.sessionId) clients.push(this._cloud);
+    let agg = null;
+    for (const c of clients) {
+      if (typeof c.listSessions !== "function" || typeof c.hookUpdates !== "function") continue;
+      const prevSid = c.sessionId;
+      let r = null;
+      try { r = await backup.backupAcp(c, { root, email, log: this._log }); }
+      catch (e) { this._log("[backup-acp] " + e.message); }
+      finally { c.hookUpdates(null); }
+      if (prevSid && c.sessionId !== prevSid) {
+        c.hookUpdates(() => {});
+        try { await c.loadSession(prevSid); } catch (_) {}
+        c.hookUpdates(null);
+      }
+      if (r && !r.ok && r.reason) this._log("[backup-acp] 跳过: " + r.reason);
+      if (r && r.ok) agg = { ok: true, saved: (agg ? agg.saved : 0) + r.saved, total: (agg ? agg.total : 0) + r.total };
+    }
+    return agg;
   }
 
   // 归一发布: 插件侧融合态(账户/MCP/备份水位)写入宿主态中枢 → windsurf-host.json,
