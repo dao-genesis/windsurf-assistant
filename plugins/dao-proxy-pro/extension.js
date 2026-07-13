@@ -198,9 +198,24 @@ function _stamp() {
     p = (n, w = 2) => String(n).padStart(w, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
 }
+// 同 tag+msg 高频重复(如 LS 重连循环致 spawn hook 每秒多次触发)做窗口去重:
+// 10s 窗口内重复行不逐条落盘, 窗口结束补一条 ×N 汇总, 防日志刷爆。
+const _lDedup = new Map();
+function _lDeduped(line) {
+  const now = Date.now();
+  const d = _lDedup.get(line);
+  if (d && now - d.at < 10000) { d.n++; return true; }
+  if (d && d.n > 1) logger().appendLine(`[${_stamp()}] [INFO] [log] 上行重复 ×${d.n} (10s 窗口去重)`);
+  _lDedup.set(line, { at: now, n: 1 });
+  if (_lDedup.size > 64) { const k = _lDedup.keys().next().value; _lDedup.delete(k); }
+  return false;
+}
 const L = {
-  info: (tag, msg) =>
-    logger().appendLine(`[${_stamp()}] [INFO] [${tag}] ${msg}`),
+  info: (tag, msg) => {
+    const line = `[INFO] [${tag}] ${msg}`;
+    if (_lDeduped(line)) return;
+    logger().appendLine(`[${_stamp()}] ${line}`);
+  },
   warn: (tag, msg) =>
     logger().appendLine(`[${_stamp()}] [WARN] [${tag}] ${msg}`),
   error: (tag, msg) =>

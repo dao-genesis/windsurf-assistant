@@ -39,11 +39,25 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - 共享地图导入(⇘)：codeMapId = 分享链接末段(`uuid-hash` 复合 ID)；`GetSharedCodeMap`/`SaveCodeMapFromJson` 直连时须补完整 `metadata{ideName,…,apiKey}`(缺任一字段 400)；导入后 LS 自动重发号 id(新时间戳后缀)。
 - Suggested maps 需活动 Cascade 上下文，无会话时 `GetCodeMapSuggestions` 直接 500("no context available")——× 忽略钮(DismissCodeMapSuggestion)只能在有建议+有会话时实测。
 
+## R67 ACP 生命周期断言点（防 OOM 回归）
+- 泄漏监控（任何面板测试全程跑）：`pgrep -af 'devin acp|dao-acp' | wc -l` + `free -m` 每 20s 采样。健康态 = 进程数恒定（proxy 对 + devin acp + summarizer ≈ 4）、内存无单调增长。若进程数持续攀升即 OOM 回归（修复前实测 5 分钟 660MB→7GB）。
+- 退避实证：面板日志（"Devin Desktop" 输出通道 log 文件）应出现 `[acp] 启动失败(退避 Nms)` 且 N 指数增长（5s→…→300s 封顶），每次失败后紧跟 `devin acp 退出 code=null`（进程被杀净）。
+- 已知功能缺口（截至 R67）：Devin Local 模式在 `devin acp` 未鉴权时不回复——ACP 要求先调 `authenticate`(meta.api_key)，面板尚未把已获取的 Devin Cloud Session Token 传给它。测 Local 模式前先确认此项是否已补，否则"无回复"不是回归。
+- `2-道Agent.log` 可能出现 `[spawn-hook-acp]` 高频刷写（~18/s，疑官方 windsurf LS 重连循环触发）；若进程/内存稳定则非泄漏，但可作为后续排查线索。
+
+## dao-one 折入验证（devin-remote 侧）
+- dao-desktop 改动要进 dao-one：`cd devin-remote && node tools/sync-dao-desktop.js` → `cd core/dao-one && npm i && node build.js && npx @vscode/vsce package --allow-missing-repository --skip-license --allow-star-activation`（dao-vsix 需先 `npm ci`，否则报缺 sucrase/yazl）。
+- 安装后验证折入生效：`grep -c _ensureAcp ~/devin-one-profile/../devin-one-ext/dao.dao-one-*/vendor-desktop/dao-cascade/panel.js`（或对应扩展目录）应 >0。
+- dao-one 面板登录：面板头部若显示「未登录 — 插件自持登录」，点 登录 → 浏览器出 CLI code 页 → Copy code → 回面板粘贴到「粘贴一次性登录 code」输入框 → 提交，toast「Devin Cloud 认证成功 (Session Token)」即成。
+- VS Code 对照侧：装 windsurf-assistant 的 dao-desktop VSIX 后，右侧 CHAT 区出现「DEVIN DESKTOP: CASCADE · 三模式」同构面板，登录态/LS 端口与 Devin Desktop 侧共享（状态栏 `引擎✓·已登录(<账号>)·LS:<port>`）。
+
 ## 冷启动安装与登录（全新机器）
 - 下载安装：`curl -s https://windsurf-stable.codeium.com/api/update/linux-x64/stable/latest` 取 url，解压到 `~/devin-desktop/`。
 - 登录走浏览器 OAuth：IDE 点 Log in → app.devin.ai 输邮箱/密码 → 成功页的 `devin://codeium.windsurf?devin_code=...` 深链在无 xdg 协议注册时不会自动回传；从成功页 HTML 抓该链接后执行 `devin-desktop --open-url "<devin://…>"` 手动回传，再在 IDE 弹窗点 Yes。
 - Linux 无 OS keyring 时会弹 "OS keyring couldn't be identified" —— 选 "Use weaker encryption" 即可继续。
 - 命令面板输入中文可能丢失（computer tool CJK 打字不稳），搜命令用英文前缀如 "Devin Desktop"。
+- 深链另一法：登录成功页若弹 "Open xdg-open?" 且点击无效，从成功页 HTML 抓 `devin://codeium.windsurf?devin_code=...` 后 `devin-desktop --user-data-dir <同一profile> --open-url "<链接>"`（profile 参数必须与运行实例一致才会路由到该实例）。
+- 隔离 profile 启动：`--user-data-dir ~/devin-one-profile --extensions-dir ~/devin-one-ext --disable-workspace-trust --password-store=basic`。
 
 ## R57 融合三件套断言点（备份/宿主态）
 - 自动备份：打开面板历史列表(↺)触发 sessions-list → 1.5s 去抖后写 `~/.wam/conversation_backups/_index.json` + 转录 md（头含 `source: dao-desktop(Cascade 插件版)`）。
