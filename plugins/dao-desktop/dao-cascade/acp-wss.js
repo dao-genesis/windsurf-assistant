@@ -9,14 +9,24 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
+// 凭据链: credentials.toml(devin auth login 落盘) → ls-bridge.apiKey()
+// (会话令牌登录不落 credentials.toml,与 stdio 轨 authenticate 回退同源)。
 function readCredentials() {
-  const p = path.join(
+  const p = process.env.DAO_DEVIN_CRED_FILE || path.join(
     process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"),
     "devin", "credentials.toml");
-  if (!fs.existsSync(p)) return null;
-  const t = fs.readFileSync(p, "utf8");
-  const pick = (k) => { const m = t.match(new RegExp(k + '\\s*=\\s*"([^"]+)"')); return m ? m[1] : null; };
-  return { apiKey: pick("windsurf_api_key"), apiUrl: pick("devin_api_url") || "https://api.devin.ai" };
+  let apiKey = null, apiUrl = null;
+  if (fs.existsSync(p)) {
+    const t = fs.readFileSync(p, "utf8");
+    const pick = (k) => { const m = t.match(new RegExp(k + '\\s*=\\s*"([^"]+)"')); return m ? m[1] : null; };
+    apiKey = pick("windsurf_api_key");
+    apiUrl = pick("devin_api_url");
+  }
+  if (!apiKey) {
+    try { apiKey = require("./ls-bridge").apiKey() || null; } catch (_) {}
+  }
+  if (!apiKey) return null;
+  return { apiKey, apiUrl: apiUrl || "https://api.devin.ai" };
 }
 
 class AcpWssClient {
