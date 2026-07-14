@@ -173,6 +173,7 @@ class UnifiedPanel {
       case "set-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
       case "acp-registry": return this._acpRegistry();
       case "acp-reload": return this._acpReload();
+      case "env-open": return this._envOpen(String(msg.path || ""));
       default: return;
     }
   }
@@ -653,6 +654,7 @@ class UnifiedPanel {
         settings: { openRecent: (((rs || {}).userSettings) || {}).openMostRecentChatConversation === true },
         acp: { running: !!(this._cascade && this._cascade._acpReady && this._cascade._acp),
           registryPath: this._acpRegistryPath() },
+        env: require("./env-sync").detect(),
       } });
     } catch (e) { this._post({ type: "set-detail", error: e.message }); }
   }
@@ -699,6 +701,24 @@ class UnifiedPanel {
       try { await vscode.commands.executeCommand("devin.reloadAcpConnections"); } catch (_) {}
       vscode.window.showInformationMessage("ACP 连接已重置 — 下次消息即重连");
     } catch (e) { vscode.window.showErrorMessage("ACP 重连失败: " + e.message); }
+    this._setDetail();
+  }
+
+  // 环境共生一览的行级打开: 文件开编辑器; 目录/缺失路径在系统文管中揭示其父级。
+  async _envOpen(p) {
+    if (!p) return;
+    try {
+      const fs = require("fs"); const path = require("path");
+      let target = p;
+      if (!fs.existsSync(target)) { fs.mkdirSync(path.extname(target) ? path.dirname(target) : target, { recursive: true }); }
+      if (fs.existsSync(target) && fs.statSync(target).isFile()) {
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
+        await vscode.window.showTextDocument(doc);
+      } else {
+        const dir = fs.existsSync(target) ? target : path.dirname(target);
+        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(dir));
+      }
+    } catch (e) { vscode.window.showErrorMessage("打开失败: " + e.message); }
     this._setDetail();
   }
 
@@ -1082,6 +1102,15 @@ function renderSettings(){
     cr('Devin Local 连接',acp.running?'● 已连接':'○ 未连接(按需懒启动)')+
     cr('本地注册表 registry.json','<span class="back" id="setAcpReg">打开/初始化</span>')+
     cr('重载 ACP 连接','<span class="back" id="setAcpRl">重载↺</span>')+'</div>';
+  const env=SET.env||{};
+  const ide=env.ide||{};
+  h+='<div class="st">环境共生(与官方 Devin IDE 同一配置体系)</div><div class="card">'+
+    cr('官方 IDE 检测',ide.installed?'● 已安装 '+E(ide.binPath||''):(ide.engineTraces?'◐ 检出引擎痕迹(配置根已存在)':'○ 未检出(装上即自动共用本体系)'));
+  for(const s of (env.sources||[])){
+    const st=(s.exists?'●':'○')+(typeof s.count==='number'?' '+s.count+' 项':(s.exists?' 存在':' 待生成'));
+    h+=cr(E(s.label),st+' <span class="back" data-envopen="'+E(s.path)+'">打开↗</span>');
+  }
+  h+='</div>';
   h+='<div class="st">官方门户(外链)</div><div class="card">'+
     cr('Devin 控制台','<span class="back" data-seturl="https://app.devin.ai">打开↗</span>')+
     cr('用量与订阅(Windsurf 门户)','<span class="back" data-seturl="https://windsurf.com/subscription/usage">打开↗</span>')+
@@ -1199,6 +1228,7 @@ function render(){
   document.querySelectorAll('[data-seturl]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-open',url:el.dataset.seturl}));
   const sar=document.getElementById('setAcpReg'); if(sar)sar.onclick=()=>vscode.postMessage({type:'acp-registry'});
   const sal=document.getElementById('setAcpRl'); if(sal)sal.onclick=()=>{SET=null;render();vscode.postMessage({type:'acp-reload'});};
+  document.querySelectorAll('[data-envopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'env-open',path:el.dataset.envopen}));
   if(S.board==='settings'&&SET===null)vscode.postMessage({type:'set-detail'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};

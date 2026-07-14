@@ -598,3 +598,49 @@ test("authStatus 去抖: 单飞合并 + TTL 缓存 + force 绕过(根治子进�
   await prov.authStatus(fake, { ttlMs: 1 });
   assert.strictEqual(calls(), 3, "TTL 过期须重新探测");
 });
+
+test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕迹(DAO_ENV_SYNC_HOME 隔离)", () => {
+  const es = require(path.join(CASCADE, "env-sync.js"));
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), "dao-env-"));
+  process.env.DAO_ENV_SYNC_HOME = h;
+  try {
+    // 1) 全空环境: 无 IDE、无痕迹、各源 exists=false
+    let d = es.detect();
+    assert.strictEqual(d.ide.installed, false);
+    assert.strictEqual(d.ide.engineTraces, false);
+    assert.strictEqual(d.configRootExists, false);
+    assert.strictEqual(d.sources.length, 7);
+    for (const s of d.sources) { assert.strictEqual(s.exists, false); assert.ok(s.path.startsWith(h)); }
+    // 2) 官方式落盘后: 条目数与官方文件结构一致
+    const ws = path.join(h, ".codeium", "windsurf");
+    fs.mkdirSync(path.join(ws, "global_workflows"), { recursive: true });
+    fs.writeFileSync(path.join(ws, "global_workflows", "a.md"), "# a");
+    fs.writeFileSync(path.join(ws, "global_workflows", "b.md"), "# b");
+    fs.mkdirSync(path.join(ws, "skills", "s1"), { recursive: true });
+    fs.writeFileSync(path.join(ws, "skills", "s1", "SKILL.md"), "x");
+    fs.mkdirSync(path.join(ws, "skills", "no-skill"), { recursive: true }); // 无 SKILL.md 不计
+    fs.writeFileSync(path.join(ws, "mcp_config.json"), JSON.stringify({ mcpServers: { gh: {}, fs: {} } }));
+    fs.mkdirSync(path.join(h, ".windsurf", "acp"), { recursive: true });
+    fs.writeFileSync(path.join(h, ".windsurf", "acp", "registry.json"), JSON.stringify({ version: "1.0.0", agents: [{ id: "x" }] }));
+    fs.mkdirSync(path.join(h, ".devin", "rules"), { recursive: true });
+    fs.writeFileSync(path.join(h, ".devin", "rules", "r.md"), "# r");
+    d = es.detect();
+    const by = Object.fromEntries(d.sources.map((s) => [s.key, s]));
+    assert.strictEqual(by.mcp.count, 2);
+    assert.strictEqual(by.gworkflows.count, 2);
+    assert.strictEqual(by.gskills.count, 1, "无 SKILL.md 的目录不计入");
+    assert.strictEqual(by.acp.count, 1);
+    assert.strictEqual(by.grules.count, 1);
+    assert.strictEqual(by.cred.exists, false);
+    // 3) 配置根存在但无 IDE 二进制 → engineTraces
+    assert.strictEqual(d.ide.installed, false);
+    assert.strictEqual(d.ide.engineTraces, true);
+    // 4) IDE 二进制检出
+    const bin = path.join(h, "devin-desktop", "Devin", "bin", "devin-desktop");
+    fs.mkdirSync(path.dirname(bin), { recursive: true });
+    fs.writeFileSync(bin, "");
+    d = es.detect();
+    assert.strictEqual(d.ide.installed, true);
+    assert.strictEqual(d.ide.binPath, bin);
+  } finally { delete process.env.DAO_ENV_SYNC_HOME; }
+});
