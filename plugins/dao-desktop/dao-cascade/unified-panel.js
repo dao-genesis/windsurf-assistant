@@ -708,22 +708,44 @@ class UnifiedPanel {
     this._setDetail();
   }
 
-  // 环境共生一览的行级打开: 文件开编辑器; 目录/缺失路径在系统文管中揭示其父级。
+  // 环境共生一览的行级打开: 文件开编辑器(二进制走 vscode.open); 目录列出条目可续开; 每个分支都有 IDE 内反馈。
   async _envOpen(p) {
     if (!p) return;
     try {
       const fs = require("fs"); const path = require("path");
-      let target = p;
-      if (!fs.existsSync(target)) { fs.mkdirSync(path.extname(target) ? path.dirname(target) : target, { recursive: true }); }
-      if (fs.existsSync(target) && fs.statSync(target).isFile()) {
-        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
-        await vscode.window.showTextDocument(doc);
+      if (!fs.existsSync(p)) {
+        try { fs.mkdirSync(path.extname(p) ? path.dirname(p) : p, { recursive: true }); } catch (_) {}
+        vscode.window.showInformationMessage("路径待生成: " + p + (fs.existsSync(p) ? " — 已建目录" : " — 已备好父目录"));
+      } else if (fs.statSync(p).isFile()) {
+        try {
+          const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+          await vscode.window.showTextDocument(doc, { preview: false });
+        } catch (_) {
+          try { await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(p)); }
+          catch (_) {
+            vscode.window.showInformationMessage("二进制文件, 已在系统中揭示: " + p);
+            vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(p)).then(undefined, () => {});
+          }
+        }
       } else {
-        const dir = fs.existsSync(target) ? target : path.dirname(target);
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(dir));
+        await this._envOpenDir(p);
       }
     } catch (e) { vscode.window.showErrorMessage("打开失败: " + e.message); }
     this._setDetail();
+  }
+
+  // 目录: IDE 内 QuickPick 列条目(不依赖 OS 文管默认程序), 选文件即开、选子目录续入。
+  async _envOpenDir(dir) {
+    const fs = require("fs"); const path = require("path");
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { vscode.window.showErrorMessage("读目录失败: " + e.message); return; }
+    if (!names.length) { vscode.window.showInformationMessage("空目录: " + dir); return; }
+    const items = names.slice(0, 200).map((n) => {
+      let isDir = false; try { isDir = fs.statSync(path.join(dir, n)).isDirectory(); } catch (_) {}
+      return { label: (isDir ? "$(folder) " : "$(file) ") + n, description: isDir ? "目录" : "", _p: path.join(dir, n), _d: isDir };
+    }).sort((a, b) => (b._d - a._d) || a.label.localeCompare(b.label));
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: dir + " — " + names.length + " 项(选择打开)" });
+    if (pick) await this._envOpen(pick._p);
   }
 
   async _setChangelog() {
