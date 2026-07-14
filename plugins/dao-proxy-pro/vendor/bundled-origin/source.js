@@ -8536,6 +8536,53 @@ function _pickReplayFrame(target) {
   if (!_lastChatFrame || !_lastChatFrame.body) _restoreChatFrame(false);
   return _lastChatFrame;
 }
+// ── 陈旧会话/版本失配根治 (反者道之动·没身不殆) ──────────────────────────────
+//   病灶(实证·502 根因): 官方直通复用捕获帧时, 若帧内 Cascade 会话已失活或客户端版本
+//     元数据过旧, 官方上游回「There was an error with your Cascade session, please
+//     update your editor」。旧实现把它当普通 upstream_error 502(暗示网关瞬时故障)→
+//     客户端对同一陈旧帧无限重试, 且盘存坏帧从不失效 → 回环永久卡死, 唯有用户手动再发
+//     一条 Cascade 对话才解。
+//   正法: 精准识别此类「会话/版本」拒绝(名实相符·regex 收紧不误伤), 一经命中即失效
+//     内存主/免费槽 + 盘存帧文件 + 陈旧鉴权信封 → 下一次 IDE 活跃(补全/对话)自然重采
+//     新鲜帧, 并向调用方回明确可执行指引(而非生吞上游原文·或伪装成瞬时故障狂重试)。
+//   守正不伪: 绝不伪造/篡改客户端版本号去绕过官方版本门槛(欺骗且危账号)——
+//     只失效坏帧、引导以「当前真实运行的 IDE」重采真实鉴权信封。
+const _staleFrameStats = { calls: 0, invalidations: 0, last_at: 0, last_reason: "" };
+function _isStaleSessionErr(txt) {
+  const s = String(txt || "");
+  return /please update your editor|error with your Cascade session|invalid(?:ated)? session|session (?:has )?expired|session (?:is )?(?:no longer|not) valid/i.test(
+    s,
+  );
+}
+function _rmQuiet(p) {
+  try {
+    if (p && fs.existsSync(p)) fs.unlinkSync(p);
+  } catch (_) {}
+}
+// 失效陈旧帧: 清内存主/免费槽 + 删盘存帧文件 + 弃陈旧鉴权信封 → 下次活跃自然重采。
+function _invalidateStaleFrames(reason) {
+  try {
+    _staleFrameStats.calls++;
+    _lastChatFrame = null;
+    _lastFreeChatFrame = null;
+    _rmQuiet(_frameBodyPath(false));
+    _rmQuiet(_frameMetaPath(false));
+    _rmQuiet(_frameBodyPath(true));
+    _rmQuiet(_frameMetaPath(true));
+    _lastAuthEnvelope = null;
+    _envBootstrapped = false; // 允许后续从新鲜流量重新自举
+    _staleFrameStats.invalidations++;
+    _staleFrameStats.last_at = Date.now();
+    _staleFrameStats.last_reason = String(reason || "").slice(0, 80);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+const _STALE_MSG =
+  "官方直通会话已失活或客户端版本过旧(官方上游拒绝: Cascade session / please update your editor)。" +
+  "已自动失效陈旧捕获帧, 请在 Devin Desktop 内用【当前版本】与任一官方模型(如 SWE-1.6)对话一次以重采新鲜帧, 随后经反代重试即可; " +
+  "若持续失败, 请将 Devin Desktop 升级到最新版本。";
 // 模块加载即尝试自盘复现预热帧 (插件重启后官方直通即通) · 主槽 + 免费槽
 _restoreChatFrame(false);
 _restoreChatFrame(true);
@@ -8935,6 +8982,12 @@ function _officialChatReplay(target, norm, sink, _forceMain) {
             _frame !== _lastChatFrame
           )
             return resolve(_officialChatReplay(target, norm, sink, true));
+          // 终态·无更鲜主槽可退: 会话失活/版本过旧 → 失效陈旧帧 + 明确指引(不狂重试同一坏帧)
+          if (!exhausted && _isStaleSessionErr(txt)) {
+            _invalidateStaleFrames("http " + status);
+            sink.onError && sink.onError(_STALE_MSG);
+            return resolve({ ok: false, stale: true });
+          }
           sink.onError &&
             sink.onError("官方上游 " + status + ": " + txt);
           return resolve({
@@ -8990,6 +9043,12 @@ function _officialChatReplay(target, norm, sink, _forceMain) {
             _frame !== _lastChatFrame
           )
             return resolve(_officialChatReplay(target, norm, sink, true));
+          // 终态·无更鲜主槽可退: 会话失活/版本过旧 → 失效陈旧帧 + 明确指引(不狂重试同一坏帧)
+          if (!exhausted && _isStaleSessionErr(blob)) {
+            _invalidateStaleFrames("stream " + (streamErr.code || ""));
+            sink.onError && sink.onError(_STALE_MSG);
+            return resolve({ ok: false, stale: true });
+          }
           sink.onError &&
             sink.onError("官方上游错误: " + (streamErr.message || streamErr.code || blob));
           return resolve({ ok: false, quota: exhausted ? "exhausted" : undefined });
@@ -10143,6 +10202,10 @@ module.exports = {
     _harvestAuthEnvelope,
     _looksLikeAuthEnvelope,
     _authGraftStats,
+    _isStaleSessionErr,
+    _invalidateStaleFrames,
+    _staleFrameStats,
+    _STALE_MSG,
     _setLastAuthEnvelopeForTest: (env) => { _lastAuthEnvelope = env; },
     _getLastAuthEnvelopeForTest: () => _lastAuthEnvelope,
     _setLastChatFrameForTest: (fr) => { _lastChatFrame = fr; },

@@ -2,6 +2,25 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.352 · 根治官方直通 502 · 陈旧会话/版本失配自愈(反者道之动·没身不殆)
+: 承接实机 502 排查——经模型反代调官方直通(免费 SWE-1.6 等)时上游回
+  `There was an error with your Cascade session, please update your editor`,
+  旧实现把它当普通 `upstream_error` 502(暗示网关瞬时故障) → 客户端对同一**陈旧捕获帧**
+  无限重试、盘存坏帧从不失效 → 回环永久卡死, 唯有用户手动再发一条 Cascade 对话才解。
+  三十九章「其致之也·侯王毋已贵以高将恐蹶」: 帧之贵在其活, 死帧当弃。本版:
+  ① `source.js` 增 `_isStaleSessionErr()` 精准识别「会话失活/客户端版本过旧」拒绝
+     (regex 收紧·不误伤配额/普通故障);
+  ② 增 `_invalidateStaleFrames()`: 命中即失效内存主/免费槽 + 删盘存帧文件
+     (`chatframe(.free).bin/.json`) + 弃陈旧鉴权信封 → 下次 IDE 活跃(补全/对话)自然
+     重采新鲜帧, 回环自愈(不再狂重试同一坏帧);
+  ③ `_officialChatReplay` 两处错误分支(HTTP≥400 与 Connect end-stream)接入: 换主槽
+     兜底重试仍败且判定陈旧 → 失效坏帧 + 回明确可执行指引(而非生吞上游原文);
+  ④ `revproxy.js` `_classifyUpstreamError` 把会话失活/版本过旧归为 **424 Failed
+     Dependency + `code=stale_session`**(先决条件缺失·非瞬时故障) → 客户端据此停重试
+     并按指引重采, 而非盲目退避。
+  守正不伪: 绝不伪造/篡改客户端版本号绕过官方版本门槛(欺骗且危账号)——只失效坏帧、
+  引导以「当前真实运行的 IDE」重采真实鉴权信封。自检新增 [20] 覆盖归类与失效自愈。
+
 v9.9.351 · 模型反代用量记账归一 · 反代调用亦入「用量与成本」
 : 实机验证(DeepSeek/小米 Mimo 双渠道直连+路由+反代全链路)时发现: 经模型反代
   `/v1/chat/completions`(OpenAI 兼容)与 `/v1/messages`(Anthropic 兼容)调用第三方渠道,

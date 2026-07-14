@@ -877,6 +877,60 @@ let KEY = "";
     ok("有key·公网错 key → 拒", revproxy._authOk(mk({ "cf-ray": "x", authorization: "Bearer BAD" }), { apiKey: "K1" }) === false);
   }
 
+  // ── [20] 陈旧会话/版本失配 502 根治(反者道之动·没身不殆) ──────────────────
+  //   病灶: 官方直通复用捕获帧, 帧内 Cascade 会话失活或客户端版本过旧 → 官方回
+  //     「please update your editor / error with your Cascade session」, 旧实现当作
+  //     普通 502 upstream_error → 客户端对同一陈旧帧狂重试、盘存坏帧从不失效 → 死锁。
+  //   正法: revproxy 归类为 424 stale_session(非瞬时故障·停重试); source 侧失效陈旧帧
+  //     并回明确重采指引 → 下次活跃自然重采新鲜帧, 回环自愈。
+  console.log("[20] 陈旧会话/版本失配: 424 stale_session 归类 + 陈旧帧失效自愈");
+  {
+    const cStale1 = revproxy._classifyUpstreamError(
+      "官方上游错误: There was an error with your Cascade session, please update your editor (error ID: abc123)",
+    );
+    ok("会话失活/版本过旧 → 424 stale_session", cStale1.status === 424 && cStale1.code === "stale_session");
+    ok("stale 不带 Retry-After(非退避)", cStale1.retryAfter === 0);
+    const cStale2 = revproxy._classifyUpstreamError("upstream 502: invalid session");
+    ok("invalid session → 424 stale_session", cStale2.status === 424 && cStale2.code === "stale_session");
+    // 普通上游故障仍 502(不误伤)
+    const cGen = revproxy._classifyUpstreamError("socket hang up");
+    ok("普通故障仍 502 upstream_error", cGen.status === 502 && cGen.code === "upstream_error");
+    // stale 不被 _isRetryableErr 误判为可重试(否则又对坏帧狂切/重试)
+    ok(
+      "stale 非可重试(不狂重试坏帧)",
+      !revproxy._isRetryableErr("There was an error with your Cascade session, please update your editor"),
+    );
+
+    // source.js 侧: _isStaleSessionErr 判定 + _invalidateStaleFrames 真失效盘存帧
+    const SRC = require("../../bundled-origin/source.js")._test;
+    ok(
+      "_isStaleSessionErr 命中官方原文",
+      SRC._isStaleSessionErr("There was an error with your Cascade session, please update your editor"),
+    );
+    ok("_isStaleSessionErr 命中 session expired", SRC._isStaleSessionErr("your session has expired"));
+    ok("_isStaleSessionErr 不误伤配额错误", !SRC._isStaleSessionErr("Your daily usage quota has been exhausted."));
+    ok("_isStaleSessionErr 不误伤普通故障", !SRC._isStaleSessionErr("socket hang up"));
+    ok("_STALE_MSG 为可执行指引(含重采/升级)", /重采|升级|update your editor/.test(SRC._STALE_MSG));
+
+    // 失效: 写两枚假盘存帧文件 → 调 _invalidateStaleFrames → 文件被删 + 内存槽清空 + 信封弃
+    const daoDir = path.join(tmpHome, ".codeium", "dao-byok");
+    fs.mkdirSync(daoDir, { recursive: true });
+    const bBin = path.join(daoDir, "chatframe.bin");
+    const bJson = path.join(daoDir, "chatframe.json");
+    const fBin = path.join(daoDir, "chatframe.free.bin");
+    const fJson = path.join(daoDir, "chatframe.free.json");
+    for (const f of [bBin, bJson, fBin, fJson]) fs.writeFileSync(f, "x");
+    SRC._setLastChatFrameForTest({ body: Buffer.from("stale"), at: 1 });
+    SRC._setLastAuthEnvelopeForTest({ f1: Buffer.from("session-token=x"), cid: null, at: 1 });
+    const before = SRC._staleFrameStats.invalidations;
+    const inv = SRC._invalidateStaleFrames("test");
+    ok("_invalidateStaleFrames 返回 true", inv === true);
+    ok("盘存主帧文件被删", !fs.existsSync(bBin) && !fs.existsSync(bJson));
+    ok("盘存免费帧文件被删", !fs.existsSync(fBin) && !fs.existsSync(fJson));
+    ok("鉴权信封被弃", SRC._getLastAuthEnvelopeForTest() === null);
+    ok("失效计数自增", SRC._staleFrameStats.invalidations === before + 1);
+  }
+
   revproxy.setPremiumQuota("unknown");
   mock.close();
   console.log(failures === 0 ? "\nALL PASS" : "\n" + failures + " FAIL");
