@@ -912,6 +912,19 @@ let KEY = "";
     ok("_isStaleSessionErr 不误伤普通故障", !SRC._isStaleSessionErr("socket hang up"));
     ok("_STALE_MSG 为可执行指引(含重采/升级)", /重采|升级|update your editor/.test(SRC._STALE_MSG));
 
+    // 优先级契约(本次根治核心·实证复现): 官方以 Connect code=failed_precondition 回陈旧
+    //   会话错, 该串同时命中 exhausted 启发式(含 precondition) → 必须 stale 优先, 否则既
+    //   误置 premiumQuota=exhausted、又永不失效陈旧帧 → 死锁。_classifyOfficialErr 保序。
+    const precStale =
+      "failed_precondition There was an error with your Cascade session, please update your editor";
+    ok("precondition 编码的陈旧会话判 stale", SRC._classifyOfficialErr(precStale).stale === true);
+    ok("precondition 编码的陈旧会话不判 exhausted", SRC._classifyOfficialErr(precStale).exhausted === false);
+    const precQuota = "failed_precondition Your daily usage quota has been exhausted.";
+    ok("真配额 precondition 仍判 exhausted", SRC._classifyOfficialErr(precQuota).exhausted === true);
+    ok("真配额 precondition 不误判 stale", SRC._classifyOfficialErr(precQuota).stale === false);
+    const cGen2 = SRC._classifyOfficialErr("socket hang up");
+    ok("普通故障既非 stale 亦非 exhausted", !cGen2.stale && !cGen2.exhausted);
+
     // 失效: 写两枚假盘存帧文件 → 调 _invalidateStaleFrames → 文件被删 + 内存槽清空 + 信封弃
     const daoDir = path.join(tmpHome, ".codeium", "dao-byok");
     fs.mkdirSync(daoDir, { recursive: true });
@@ -929,6 +942,60 @@ let KEY = "";
     ok("盘存免费帧文件被删", !fs.existsSync(fBin) && !fs.existsSync(fJson));
     ok("鉴权信封被弃", SRC._getLastAuthEnvelopeForTest() === null);
     ok("失效计数自增", SRC._staleFrameStats.invalidations === before + 1);
+
+    // 交接文档鉴权守卫(本次安全根治): handoff.md 内嵌本机 apiKey + 公网隧道 URL,
+    //   若公网(隧道转发)无 key 也可读 → 任何知 URL 者即读走 key、架空 apiKey 防护。
+    //   守正: 本机(loopback·无转发头)零配置可读; 公网/非本机必须持有效 key。
+    const _cfg0 = revproxy.loadConfig();
+    _cfg0.apiKey = "handoff-guard-testkey";
+    _cfg0.enabled = true;
+    revproxy.saveConfig(_cfg0);
+    const mkRes = () => {
+      const r = { _status: 0, _body: "", _hdr: null };
+      r.writeHead = (s, h) => {
+        r._status = s;
+        r._hdr = h;
+      };
+      r.end = (b) => {
+        r._body = b || "";
+      };
+      return r;
+    };
+    // ① 本机(loopback·无转发头) → 放行(guard 返 false·不写响应)
+    const rLocal = mkRes();
+    const localBlocked = SRC._handoffGuard(
+      { headers: {}, socket: { remoteAddress: "127.0.0.1" } },
+      rLocal,
+    );
+    ok("handoff: 本机放行(guard 不拦)", localBlocked === false);
+    // ② 公网转发·无 key → 拦截 401(不泄漏 key)
+    const rPub = mkRes();
+    const pubBlocked = SRC._handoffGuard(
+      { headers: { "x-forwarded-for": "203.0.113.9", "cf-ray": "z" }, socket: { remoteAddress: "127.0.0.1" } },
+      rPub,
+    );
+    ok("handoff: 公网无 key 被拦", pubBlocked === true && rPub._status === 401);
+    ok("handoff: 拦截响应不含真 key", rPub._body.indexOf("handoff-guard-testkey") < 0);
+    // ③ 公网转发·持有效 key → 放行(持钥者本已知 key)
+    const rAuth = mkRes();
+    const authBlocked = SRC._handoffGuard(
+      {
+        headers: { "x-forwarded-for": "203.0.113.9", authorization: "Bearer handoff-guard-testkey" },
+        socket: { remoteAddress: "127.0.0.1" },
+      },
+      rAuth,
+    );
+    ok("handoff: 公网持有效 key 放行", authBlocked === false);
+    // ④ 公网转发·错 key → 拦截
+    const rBad = mkRes();
+    const badBlocked = SRC._handoffGuard(
+      {
+        headers: { "x-forwarded-for": "203.0.113.9", authorization: "Bearer wrong-key" },
+        socket: { remoteAddress: "127.0.0.1" },
+      },
+      rBad,
+    );
+    ok("handoff: 公网错 key 被拦", badBlocked === true && rBad._status === 401);
   }
 
   revproxy.setPremiumQuota("unknown");

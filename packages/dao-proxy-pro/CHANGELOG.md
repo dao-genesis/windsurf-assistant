@@ -2,6 +2,24 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.353 · 官方直通 502 根治·收官(stale 优先于配额·实证反代真通)
+: 承接 v9.9.352——实机(Devin Desktop · 免费 SWE-1.6 Slow)复现暴露残缺: 官方以 Connect
+  `code=failed_precondition` 回陈旧会话错, 而旧 `exhausted` 启发式含 `precondition` 关键字
+  → 陈旧会话被**误吞为配额耗尽**(既不失效陈旧帧、又误置 `premiumQuota=exhausted`; stale 分支
+  受 `!exhausted` 守卫从不执行) → 死锁重演。正法: 提取纯函数 `_classifyOfficialErr(txt)` 确立
+  优先级契约「会话失活/版本过旧 > 配额耗尽」, HTTP≥400 与 Connect end-stream 两分支同序判定;
+  stale 命中即失效陈旧帧 + 回明确重采指引(不误置配额)。新增 [20] 回归: precondition 编码的
+  陈旧会话判 stale 不判 exhausted、真配额 precondition 仍判 exhausted 不误判 stale。
+  实证闭环: 新鲜捕获帧下经反代调免费 `swe-1-6-slow` —— OpenAI unary 5/5 HTTP200、SSE 流式
+  增量+`[DONE]`、Anthropic `/v1/messages` 200(官方反代真通); 帧陈旧(约 1min)即 424
+  `stale_session` 自动失效重采。守正: 绝不伪造客户端版本号。
+  安全收官(邦利器不可以视人): 实机审计发现 `GET /origin/{ea,revproxy}/handoff.md` 无鉴权、
+  且文中内嵌本机 `apiKey` + 公网隧道 URL —— 隧道活时任何知公网 URL 者 GET 即读走 key、
+  彻底架空 apiKey 防护(数据面 `/v1/*` 已正确 401, 唯交接文档漏防)。正法: 新增 `_handoffGuard`
+  与数据面同鉴权模型—本机(loopback·无 cf/转发头)零配置可读, 公网(隧道转发)/非本机必须持
+  有效 Bearer key(持钥者本已知 key·返回无害); 两文档端点同守。新增 [21] 回归 5 例:
+  本机放行 / 公网无 key 被 401 且响应不含真 key / 公网持有效 key 放行 / 公网错 key 被 401。
+
 v9.9.352 · 根治官方直通 502 · 陈旧会话/版本失配自愈(反者道之动·没身不殆)
 : 承接实机 502 排查——经模型反代调官方直通(免费 SWE-1.6 等)时上游回
   `There was an error with your Cascade session, please update your editor`,
