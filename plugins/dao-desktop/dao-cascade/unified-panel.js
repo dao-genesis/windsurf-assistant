@@ -166,6 +166,10 @@ class UnifiedPanel {
       case "inj-remove": return this._injRemove(String(msg.kind || ""), String(msg.name || ""));
       case "inj-apply-mcp": return this._injApplyMcp();
       case "copy": return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
+      case "set-detail": return this._setDetail();
+      case "set-toggle": return this._setToggle(String(msg.key || ""), !!msg.on);
+      case "set-changelog": return this._setChangelog();
+      case "set-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
       default: return;
     }
   }
@@ -624,6 +628,53 @@ class UnifiedPanel {
     this._poolList();
   }
 
+  // 设置板块(官方同源二级页): 活体 GetUserStatus(账号详情/配额/套餐限额/组织能力矩阵)
+  // + GetUserSettings 开关读改写 + GetChangelog 更新日志。key 绝不出后端。
+  async _setDetail() {
+    try {
+      const ls = require("./ls-bridge");
+      const [ru, rs] = await Promise.all([ls.call("GetUserStatus", {}), ls.call("GetUserSettings", {})]);
+      const u = (ru && ru.userStatus) || {};
+      const ps = u.planStatus || {};
+      const pi = ps.planInfo || {};
+      this._post({ type: "set-detail", data: {
+        account: {
+          email: u.email || "", name: u.name || "", plan: pi.planName || "", tier: u.teamsTier || "",
+          daily: ps.dailyQuotaRemainingPercent, weekly: ps.weeklyQuotaRemainingPercent,
+          dailyResetAt: Number(ps.dailyQuotaResetAtUnix || 0), weeklyResetAt: Number(ps.weeklyQuotaResetAtUnix || 0),
+          promptCredits: ps.availablePromptCredits, flowCredits: ps.availableFlowCredits,
+          monthlyPromptCredits: pi.monthlyPromptCredits, monthlyFlowCredits: pi.monthlyFlowCredits,
+          maxChatInputTokens: pi.maxNumChatInputTokens, maxPinnedContext: pi.maxNumPinnedContextItems,
+        },
+        teamConfig: u.teamConfig || {},
+        settings: { openRecent: (((rs || {}).userSettings) || {}).openMostRecentChatConversation === true },
+      } });
+    } catch (e) { this._post({ type: "set-detail", error: e.message }); }
+  }
+
+  // 官方式写回: 读-改-写全量合并(SetUserSettings 为整体替换, 只发补丁会清掉其余键)。
+  async _setToggle(key, on) {
+    try {
+      if (key !== "openMostRecentChatConversation") throw new Error("未知设置键: " + key);
+      const ls = require("./ls-bridge");
+      const s = ((await ls.call("GetUserSettings", {})) || {}).userSettings || {};
+      await ls.call("SetUserSettings", { userSettings: Object.assign(s, { openMostRecentChatConversation: on }) });
+    } catch (e) { vscode.window.showErrorMessage("设置失败: " + e.message); }
+    this._setDetail();
+  }
+
+  async _setChangelog() {
+    try {
+      const ls = require("./ls-bridge");
+      let r = await ls.call("GetChangelog", { version: "1.63.9250" });
+      if (!r || !r.path) r = await ls.call("GetChangelog", { version: "1.12.169" });
+      if (!r || !r.path) throw new Error("服务端无对应版本更新日志");
+      const uri = vscode.Uri.file(r.path);
+      try { await vscode.commands.executeCommand("markdown.showPreview", uri); }
+      catch (_) { await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri)); }
+    } catch (e) { vscode.window.showErrorMessage("更新日志: " + e.message); }
+  }
+
   async _backupNow() {
     this._post({ type: "backup-progress", running: true });
     try {
@@ -692,7 +743,7 @@ h2{font-size:15px;margin:0 0 4px}
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"],["github","🐙 GitHub"],["proxy","🔌 Proxy Pro"],["search","🔎 搜索"],["inject","💉 反向注入"]];
+const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"],["github","🐙 GitHub"],["proxy","🔌 Proxy Pro"],["search","🔎 搜索"],["inject","💉 反向注入"],["settings","⚙ 设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
   '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
@@ -951,6 +1002,48 @@ function renderSearch(){
   }
   return h;
 }
+let SET=null;
+function tierName(t){return String(t||'').replace('TEAMS_TIER_','').replace(/_/g,' ')||'—';}
+function resetAt(u){return u?new Date(u*1000).toISOString().replace('T',' ').slice(0,16)+' UTC':'—';}
+function onoff(v){return v===true||v==='enabled'?'✓ 开通':(v===false||v==='disabled'?'✕ 未开':E(String(v)));}
+function renderSettings(){
+  let h='<div class="row"><h2 style="flex:1">设置 · 官方同源二级页</h2>'+
+    '<button class="btn sec" id="setCl">更新日志</button>'+
+    '<button class="btn sec" id="setRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">活体直连 LS(GetUserStatus/GetUserSettings): 账号用量与配额、套餐限额、组织能力矩阵、官方设置开关读改写 —— 与官方 IDE 设置/账号页同源。</div>';
+  if(SET===null){h+='<div class="card muted">活体拉取中…</div>';return h;}
+  if(SET.error){h+='<div class="card">⚠ '+E(SET.error)+'</div>';return h;}
+  const a=SET.account||{}, tc=SET.teamConfig||{}, st=SET.settings||{};
+  h+='<div class="st">账号与用量</div><div class="card">';
+  h+=cr('账号',(a.name?E(a.name)+' · ':'')+E(a.email||'—'));
+  h+=cr('套餐',E(a.plan||'—')+' · '+E(tierName(a.tier)));
+  h+=cr('配额剩余(日/周)',q(a.daily)+' / '+q(a.weekly));
+  h+=cr('日配额重置',resetAt(a.dailyResetAt));
+  h+=cr('周配额重置',resetAt(a.weeklyResetAt));
+  if(a.promptCredits!=null)h+=cr('Prompt 额度',E(a.promptCredits)+(a.monthlyPromptCredits!=null?' / 月 '+E(a.monthlyPromptCredits):''));
+  if(a.flowCredits!=null)h+=cr('Flow 额度',E(a.flowCredits)+(a.monthlyFlowCredits!=null?' / 月 '+E(a.monthlyFlowCredits):''));
+  if(a.maxChatInputTokens)h+=cr('单条输入上限',E(a.maxChatInputTokens)+' tokens');
+  if(a.maxPinnedContext)h+=cr('固定上下文上限',E(a.maxPinnedContext)+' 项');
+  h+='</div>';
+  h+='<div class="st">官方设置开关(读改写同源)</div><div class="card">'+
+    '<div class="cr"><span class="l">启动自动打开最近会话</span><span class="v">'+
+    '<button class="btn'+(st.openRecent?'':' sec')+'" data-settoggle="openMostRecentChatConversation|'+(st.openRecent?'0':'1')+'">'+(st.openRecent?'✓ 已开 · 点关':'◌ 已关 · 点开')+'</button></span></div></div>';
+  h+='<div class="st">组织能力矩阵(teamConfig 活体)</div><div class="card">';
+  h+=cr('Devin Cloud ACP',onoff(tc.devinCloudAcpEnabled));
+  h+=cr('Devin Terminal ACP',onoff(tc.devinTerminalAcpEnabled));
+  h+=cr('MCP 服务器',onoff(tc.allowMcpServers));
+  h+=cr('Cascade 网页搜索',onoff(tc.cascadeWebSearchEnabled));
+  h+=cr('Arena 模式',onoff(tc.allowArenaMode));
+  h+=cr('App 部署',onoff(tc.allowAppDeployments));
+  h+=cr('CodeMap 分享',onoff(tc.allowCodemapSharing));
+  if(tc.maxCascadeAutoExecutionLevel)h+=cr('自动执行上限',E(String(tc.maxCascadeAutoExecutionLevel).replace('CASCADE_COMMANDS_AUTO_EXECUTION_','')));
+  h+='</div>';
+  h+='<div class="st">官方门户(外链)</div><div class="card">'+
+    cr('Devin 控制台','<span class="back" data-seturl="https://app.devin.ai">打开↗</span>')+
+    cr('用量与订阅(Windsurf 门户)','<span class="back" data-seturl="https://windsurf.com/subscription/usage">打开↗</span>')+
+    cr('个人资料','<span class="back" data-seturl="https://windsurf.com/subscription/profile">打开↗</span>')+'</div>';
+  return h;
+}
 let INJ=null;
 function renderInject(){
   let h='<div class="row"><h2 style="flex:1">反向注入 · 插件自持注入档案</h2>'+
@@ -993,6 +1086,7 @@ function render(){
   else if(S.board==='proxy')h=renderProxy();
   else if(S.board==='search')h=renderSearch();
   else if(S.board==='inject')h=renderInject();
+  else if(S.board==='settings')h=renderSettings();
   main.innerHTML=h;
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
   const rf=document.getElementById('rf'); if(rf)rf.onclick=()=>vscode.postMessage({type:'refresh'});
@@ -1055,6 +1149,11 @@ function render(){
   const injrf=document.getElementById('injRf'); if(injrf)injrf.onclick=()=>{INJ=null;render();vscode.postMessage({type:'inj-list'});};
   document.querySelectorAll('[data-injrm]').forEach(el=>el.onclick=()=>{const [k,nm]=el.dataset.injrm.split('|');vscode.postMessage({type:'inj-remove',kind:k,name:nm});});
   if(S.board==='inject'&&INJ===null)vscode.postMessage({type:'inj-list'});
+  const scl=document.getElementById('setCl'); if(scl)scl.onclick=()=>vscode.postMessage({type:'set-changelog'});
+  const srf=document.getElementById('setRf'); if(srf)srf.onclick=()=>{SET=null;render();vscode.postMessage({type:'set-detail'});};
+  document.querySelectorAll('[data-settoggle]').forEach(el=>el.onclick=()=>{const [k,on]=el.dataset.settoggle.split('|');SET=null;render();vscode.postMessage({type:'set-toggle',key:k,on:on==='1'});});
+  document.querySelectorAll('[data-seturl]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-open',url:el.dataset.seturl}));
+  if(S.board==='settings'&&SET===null)vscode.postMessage({type:'set-detail'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
@@ -1068,6 +1167,7 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
   else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}
   else if(m.type==='inj-list'){INJ={items:m.items||[],plan:m.plan||{}};if(S&&S.board==='inject')render();}
+  else if(m.type==='set-detail'){SET=m.data?m.data:{error:m.error||'拉取失败'};if(S&&S.board==='settings')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
   else if(m.type==='backup-progress'){const bk=document.getElementById('bk');if(bk){bk.disabled=m.running;bk.textContent=m.running?'备份中…':'立即备份 Cascade';}}
