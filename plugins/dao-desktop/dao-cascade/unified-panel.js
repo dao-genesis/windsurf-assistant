@@ -588,11 +588,17 @@ class UnifiedPanel {
     } catch (e) { this._post({ type: "pool-list", accounts: [], error: e.message }); }
   }
 
-  _poolCapture() {
+  // 收录必取活体身份: 现场 GetUserStatus 拿当前 key 的真实账号, 绝不信落盘 fused
+  // 旧账号残影(否则换号后收录会把新 key 记到旧邮箱名下, 跨号污染)。
+  async _poolCapture() {
     try {
       const ls = require("./ls-bridge");
-      const hs = hostStateMod.loadPersisted() || hostStateMod.hostState();
-      const r = acctPool.captureCurrent(ls.apiKey(), (hs.fused || {}).account || {});
+      const r0 = await ls.call("GetUserStatus", {});
+      const u = (r0 && r0.userStatus) || {};
+      if (!u.email) throw new Error("无法确认当前登录身份(GetUserStatus 无 email), 拒绝盲收");
+      const pi = ((u.planStatus || {}).planInfo) || {};
+      hostStateMod.publishFused("account", { name: u.name || "", email: u.email, plan: pi.planName || "" });
+      const r = acctPool.captureCurrent(ls.apiKey(), { email: u.email, name: u.name || "", plan: pi.planName || "" });
       vscode.window.showInformationMessage("已收录 " + r.email + "(池内 " + r.count + " 号)");
     } catch (e) { vscode.window.showErrorMessage("收录失败: " + e.message); }
     this._poolList();
@@ -659,7 +665,9 @@ body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vsco
 .cr{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
 .cr .l{opacity:.65}.cr .v{text-align:right;word-break:break-all}
 .acc{border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;margin-bottom:10px;overflow:hidden}
-.acc .hd{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--vscode-list-hoverBackground,#8881);font-weight:600}
+.acc .hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding:8px 12px;background:var(--vscode-list-hoverBackground,#8881);font-weight:600}
+.acc .hd>span:first-child{min-width:0;overflow-wrap:anywhere}
+.acc .hd>span:last-child{flex:0 0 auto}
 .badge{font-size:10px;padding:1px 7px;border-radius:10px;background:#0a53;margin-left:6px;font-weight:400}
 .badge.cloud{background:#37a3}.badge.mixed{background:#a703}
 .conv{padding:6px 12px;border-top:1px solid var(--vscode-panel-border,#2223);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
