@@ -222,6 +222,37 @@ test("插件自持账号池: 收录/视图脱敏/切换写 credentials.toml/无 
   delete process.env.DAO_DEVIN_CRED_FILE;
 });
 
+test("Devin Cloud 凭据链: credentials.toml 真源 → 缺失回退 ls-bridge.apiKey()", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-wss-"));
+  process.env.DAO_DEVIN_CRED_FILE = path.join(dir, "credentials.toml");
+  const wssPath = path.join(CASCADE, "acp-wss.js");
+  const lsPath = path.join(CASCADE, "ls-bridge.js");
+  const savedLs = require.cache[require.resolve(lsPath)];
+  delete require.cache[require.resolve(wssPath)];
+  require.cache[require.resolve(lsPath)] = {
+    id: lsPath, filename: lsPath, loaded: true,
+    exports: { apiKey: () => "key-FALLBACK99" },
+  };
+  try {
+    const { readCredentials } = require(wssPath);
+    // 无 credentials.toml → 回退 ls-bridge
+    let c = readCredentials();
+    assert.strictEqual(c.apiKey, "key-FALLBACK99");
+    assert.strictEqual(c.apiUrl, "https://api.devin.ai");
+    // credentials.toml 落盘后为真源
+    fs.writeFileSync(process.env.DAO_DEVIN_CRED_FILE,
+      'windsurf_api_key = "key-TOML0001"\ndevin_api_url = "https://api.example.dev"\n');
+    c = readCredentials();
+    assert.strictEqual(c.apiKey, "key-TOML0001");
+    assert.strictEqual(c.apiUrl, "https://api.example.dev");
+  } finally {
+    if (savedLs) require.cache[require.resolve(lsPath)] = savedLs;
+    else delete require.cache[require.resolve(lsPath)];
+    delete require.cache[require.resolve(wssPath)];
+    delete process.env.DAO_DEVIN_CRED_FILE;
+  }
+});
+
 test("插件自持本地 API: 健康免鉴权/无 token 401/带 token 读插件真源(脱敏)", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-api-"));
   process.env.DAO_LOCAL_API_FILE = path.join(dir, "local-api.json");
