@@ -666,9 +666,10 @@ body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vsco
 .conv:hover{background:var(--vscode-list-hoverBackground,#8881)}
 .conv .m{opacity:.5;font-size:11px;white-space:nowrap}
 .arch{opacity:.5}
-.btn{background:var(--vscode-button-background,#0a5);color:var(--vscode-button-foreground,#fff);border:none;border-radius:5px;padding:5px 12px;cursor:pointer;font:inherit}
+.btn{background:var(--vscode-button-background,#0a5);color:var(--vscode-button-foreground,#fff);border:none;border-radius:5px;padding:5px 12px;cursor:pointer;font:inherit;white-space:nowrap;flex:0 0 auto}
 .btn.sec{background:var(--vscode-button-secondaryBackground,#4443)}
-.row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.row h2{min-width:120px}
 .muted{opacity:.55}
 pre{white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,#0002);padding:10px;border-radius:6px;max-height:64vh;overflow:auto}
 .back{cursor:pointer;color:var(--vscode-textLink-foreground,#4af)}
