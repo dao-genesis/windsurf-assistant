@@ -670,7 +670,7 @@ class UnifiedPanel {
 
   _acpRegistryPath() {
     const os = require("os"); const path = require("path");
-    return path.join(os.homedir(), ".codeium", "windsurf", "acp", "registry.json");
+    return path.join(os.homedir(), ".windsurf", "acp", "registry.json");
   }
 
   // 官方同源 devin.openAcpLocalRegistry: 不存在则创建 {version:"1.0.0",agents:[]} 后以 jsonc 打开。
