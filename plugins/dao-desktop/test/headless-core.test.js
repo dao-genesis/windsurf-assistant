@@ -609,8 +609,8 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.installed, false);
     assert.strictEqual(d.ide.engineTraces, false);
     assert.strictEqual(d.configRootExists, false);
-    assert.strictEqual(d.sources.length, 7);
-    for (const s of d.sources) { assert.strictEqual(s.exists, false); assert.ok(s.path.startsWith(h)); }
+    assert.strictEqual(d.sources.length, 25, "官方落盘全清单(定制/引擎/IDE层/账户/插件)");
+    for (const s of d.sources) { assert.strictEqual(s.exists, false); assert.ok(s.path.startsWith(h)); assert.ok(s.group); }
     // 2) 官方式落盘后: 条目数与官方文件结构一致
     const ws = path.join(h, ".codeium", "windsurf");
     fs.mkdirSync(path.join(ws, "global_workflows"), { recursive: true });
@@ -632,6 +632,25 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(by.acp.count, 1);
     assert.strictEqual(by.grules.count, 1);
     assert.strictEqual(by.cred.exists, false);
+    // 引擎/IDE层/插件新源
+    fs.writeFileSync(path.join(ws, "user_settings.pb"), Buffer.alloc(2048));
+    fs.mkdirSync(path.join(ws, "memories"), { recursive: true });
+    fs.writeFileSync(path.join(ws, "memories", "global_rules.md"), "# g");
+    fs.mkdirSync(path.join(h, ".config", "Devin", "User", "globalStorage"), { recursive: true });
+    fs.writeFileSync(path.join(h, ".config", "Devin", "User", "settings.json"), "{}");
+    fs.mkdirSync(path.join(h, ".devin", "extensions", "ext-a"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".wam", "conversation_backups", "x"), { recursive: true });
+    d = es.detect();
+    const by2 = Object.fromEntries(d.sources.map((s) => [s.key, s]));
+    if (process.platform === "linux") {
+      assert.ok(d.ideUserDir.startsWith(h));
+      assert.strictEqual(by2.idesettings.exists, true);
+    }
+    assert.ok(by2.usersettings.sizeKb >= 2);
+    assert.strictEqual(by2.memories.count, 1);
+    assert.strictEqual(by2.grulesmd.exists, true);
+    assert.strictEqual(by2.ideexts.count, 1);
+    assert.strictEqual(by2.wam.count, 1);
     // 3) 配置根存在但无 IDE 二进制 → engineTraces
     assert.strictEqual(d.ide.installed, false);
     assert.strictEqual(d.ide.engineTraces, true);
