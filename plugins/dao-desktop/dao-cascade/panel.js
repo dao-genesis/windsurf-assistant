@@ -2006,6 +2006,14 @@ class CascadePanelProvider {
         await this._acp.prompt(msg.text);
         return this._post({ type: "assistant-done", id: msg.id });
       } catch (e) {
+        // 鉴权失败多为 ACP 起在登录之前(旧凭据驻留子进程) —— 杀掉令下轮
+        // _ensureAcp 以新 credentials.toml 重生, 免手动 Reload Window。
+        if (/authenticat|log ?in/i.test(String(e && e.message || e)) && this._acp) {
+          try { this._acp.stop(); } catch (_) {}
+          this._acp = null; this._acpReady = false;
+          return this._post({ type: "assistant-done", id: msg.id,
+            text: "ACP 请求失败: " + e.message + "\n(已重置 ACP 进程; 登录后直接重发即可)" });
+        }
         return this._post({ type: "assistant-done", id: msg.id, text: "ACP 请求失败: " + e.message });
       }
     }
