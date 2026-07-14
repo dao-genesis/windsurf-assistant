@@ -267,6 +267,16 @@ function routerUsage() {
   return R && R.usage ? R.usage() : {};
 }
 
+/** v9.9.351 · 外部记账: 非 Cascade 路径(模型反代等)用量归入同一张表 */
+function routerRecordUsage(providerName, model, tc) {
+  const R = _getRouterModule();
+  if (R && R.recordUsage) {
+    try {
+      R.recordUsage(providerName, model, tc);
+    } catch (_) {}
+  }
+}
+
 /** substitute模式: 获取替代目标UID (source.js 用) */
 function getSubstitution(modelUid) {
   const R = _getRouterModule();
@@ -479,6 +489,7 @@ module.exports = {
   route,
   routerStatus,
   routerUsage,
+  routerRecordUsage,
   getSubstitution,
   patchModelUid,
   // ★ 热配置 API

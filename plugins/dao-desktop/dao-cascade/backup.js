@@ -23,6 +23,11 @@ function accountDirName(email) {
   return "Cascade·" + (String(email || "").trim() || os.hostname() || "local");
 }
 
+// Devin(ACP) 会话备份账号目录(与 Cascade·/Cloud 账号平级并列)。
+function acpAccountDirName(email) {
+  return "Devin·" + (String(email || "").trim() || os.hostname() || "local");
+}
+
 function indexPath(accDir) { return path.join(accDir, "_index.json"); }
 
 function loadIndex(accDir) {
@@ -98,6 +103,93 @@ async function backupAll(ls, opts) {
   return { ok: true, saved, skipped, total: Object.keys(m).length, root, accDir };
 }
 
+// Devin Local/Cloud(ACP) 会话备份: session/list 枚举 + session/load 历史回放拼转录。
+// acp: 具备 listSessions/loadSession/hookUpdates 的 ACP 客户端(stdio 或 wss)。
+// 增量水位: 以会话 updatedAt 为准, 未变化者跳过。回放帧经 hookUpdates 截流,
+// 仅收本会话帧; 思考帧(agent_thought_chunk)不入转录。
+// 返回 { ok, saved, skipped, total, root, accDir }。
+async function backupAcp(acp, opts) {
+  const o = opts || {};
+  const root = backupRoot(o.root);
+  const log = typeof o.log === "function" ? o.log : () => {};
+  if (!acp || typeof acp.listSessions !== "function" || typeof acp.loadSession !== "function"
+    || typeof acp.hookUpdates !== "function")
+    return { ok: false, reason: "acp-not-ready", saved: 0, skipped: 0, total: 0, root };
+  let sessions = [];
+  try { const r = await acp.listSessions(); sessions = (r && r.sessions) || []; }
+  catch (e) { return { ok: false, reason: e.message, saved: 0, skipped: 0, total: 0, root }; }
+  const accDir = path.join(root, acpAccountDirName(o.email));
+  const convDir = path.join(accDir, "对话");
+  fs.mkdirSync(convDir, { recursive: true });
+  try {
+    fs.writeFileSync(path.join(accDir, ".account.json"), JSON.stringify({
+      email: String(o.email || ""), source: "dao-desktop(Devin ACP)", accountNo: 0 }, null, 2));
+  } catch (_) {}
+  const idx = loadIndex(accDir);
+  let nextNo = 1;
+  for (const k of Object.keys(idx)) { const n = idx[k] && idx[k].convNo; if (n >= nextNo) nextNo = n + 1; }
+  let saved = 0, skipped = 0;
+  for (const s of sessions) {
+    const sid = s.sessionId || s.id;
+    if (!sid) continue;
+    const wm = s.updatedAt || "";
+    const prev = idx[sid];
+    if (prev && wm && prev.lastModifiedTime === wm) { skipped++; continue; }
+    // 回放历史帧拼转录: 同角色连续 chunk 合并为一个回合。
+    const parts = [];
+    let cur = null;
+    const flush = () => { if (cur && cur.text.trim()) parts.push(cur); cur = null; };
+    const push = (role, text) => {
+      if (cur && cur.role === role) { cur.text += text; return; }
+      flush(); cur = { role, text: String(text || "") };
+    };
+    acp.hookUpdates((p) => {
+      if (!p || p.sessionId !== sid) return;
+      const u = p.update || {};
+      const kind = u.sessionUpdate || "";
+      const text = (u.content && u.content.text) || "";
+      if (kind === "user_message_chunk") push("user", text);
+      else if (kind === "agent_message_chunk") push("agent", text);
+      else if (kind === "tool_call") { flush(); parts.push({ role: "tool", text: u.title || u.toolCallId || "tool" }); }
+    });
+    try { await acp.loadSession(sid); }
+    catch (e) { acp.hookUpdates(null); log("[backup-acp] " + sid + ": " + e.message); continue; }
+    acp.hookUpdates(null);
+    flush();
+    const body = parts.map((t) => t.role === "user" ? "## 🧑 用户\n\n" + t.text.trim()
+      : t.role === "agent" ? "## 🤖 Devin\n\n" + t.text.trim()
+      : "🔧 " + t.text.trim()).join("\n\n") || "(空转录)";
+    const title = s.title || sid;
+    const convNo = (prev && prev.convNo) || nextNo++;
+    const folder = String(convNo).padStart(3, "0") + "_" + safeName(title) + "_" + String(sid).slice(0, 8);
+    const dir = path.join(convDir, folder);
+    const head = "# " + title + "\n\n" +
+      "- sessionId: `" + sid + "`\n" +
+      "- updatedAt: " + wm + "\n" +
+      "- backedUpAt: " + new Date().toISOString() + "\n" +
+      "- source: dao-desktop(Devin ACP)\n\n---\n\n";
+    try {
+      if (prev && prev.folder && prev.folder !== folder) {
+        try { fs.renameSync(path.join(convDir, prev.folder), dir); } catch (_) {}
+      }
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "对话.md"), head + body);
+      fs.writeFileSync(path.join(dir, "_meta.json"), JSON.stringify({
+        title, convNo, cascadeId: sid, source: "devin-acp",
+        lastModifiedTime: wm, isArchived: false,
+        backedUpAt: new Date().toISOString() }, null, 2));
+      idx[sid] = { title, folder, convNo, lastModifiedTime: wm,
+        backedUpAt: new Date().toISOString(), isArchived: false };
+      saved++;
+    } catch (e) { log("[backup-acp] 写入失败 " + folder + ": " + e.message); }
+  }
+  try {
+    fs.writeFileSync(indexPath(accDir), JSON.stringify({
+      updatedAt: new Date().toISOString(), source: "dao-desktop", root, entries: idx }, null, 2));
+  } catch (e) { log("[backup-acp] 索引写入失败: " + e.message); }
+  return { ok: true, saved, skipped, total: sessions.length, root, accDir };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 归一面板「💬 对话备份」板块数据层(插件自持真源): 扫描备份根下**全部**账号树,
 // Cascade 账号(Cascade·<邮箱>)与 Devin Cloud 账号(rt-flow 落盘者)同结构、同列并出,
@@ -143,12 +235,13 @@ function listBackups(rootOverride) {
     const acct = _readJson(path.join(accPath, ".account.json")) || {};
     const convs = listConversations(accPath);
     const isCascade = /^Cascade[·:]/.test(name) || String(acct.source || "").indexOf("Cascade") >= 0 || convs.some((c) => c.source === "cascade");
+    const isAcp = !isCascade && (/^Devin[·:]/.test(name) || convs.some((c) => c.source === "devin-acp"));
     const source = isCascade
       ? (convs.some((c) => c.source && c.source !== "cascade") ? "mixed" : "cascade")
-      : "cloud";
+      : (isAcp ? "devin" : "cloud");
     return {
       dir: name,
-      email: acct.email || (name.replace(/^Cascade[·:]/, "") || name),
+      email: acct.email || (name.replace(/^(Cascade|Devin)[·:]/, "") || name),
       source,
       isCascade,
       convCount: convs.length,
@@ -158,6 +251,76 @@ function listBackups(rootOverride) {
   // Cascade 账号在前(本源优先), 其余按目录名。
   accounts.sort((a, b) => (Number(b.isCascade) - Number(a.isCascade)) || a.dir.localeCompare(b.dir));
   return { root, accounts };
+}
+
+// Cascade 轨迹管理(备份板块延伸): 归档/取消归档/删除/重命名 —— LS 官方 RPC + 本地备份树同步。
+//   archive/unarchive → ArchiveCascadeTrajectory{cascadeId,isArchived}
+//   delete            → DeleteCascadeTrajectory{cascadeId} + 移除本地会话目录与索引项
+//   rename            → RenameCascadeTrajectory{cascadeId,name} + 本地 meta/index 标题跟随
+// source 非 cascade(如 devin-acp)时为本地树管理, 不触 LS RPC。
+// opts: { root, accDir, folder, cascadeId, op, name, source }。返回 { ok, op, [error] }。
+async function manageTrajectory(ls, opts) {
+  const o = opts || {};
+  const op = String(o.op || "");
+  const cid = String(o.cascadeId || "");
+  if (!cid) return { ok: false, op, error: "缺 cascadeId" };
+  const root = backupRoot(o.root);
+  const convPath = path.join(root, String(o.accDir || ""), "对话", String(o.folder || ""));
+  const rel = path.relative(root, convPath);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return { ok: false, op, error: "非法会话路径" };
+  const accPath = path.join(root, String(o.accDir || ""));
+  const source = String(o.source || "");
+  const lsAllowed = !source || source === "cascade";
+  const lsUp = lsAllowed && !!(ls && ls.ready && ls.ready() && ls.apiKey && ls.apiKey());
+  const callLs = async (method, req) => {
+    if (!lsUp) return false;
+    await ls.call(method, req);
+    return true;
+  };
+  const metaPath = path.join(convPath, "_meta.json");
+  const patchLocal = (patch) => {
+    try {
+      const meta = _readJson(metaPath) || {};
+      fs.writeFileSync(metaPath, JSON.stringify(Object.assign(meta, patch), null, 2));
+    } catch (_) {}
+    try {
+      const idx = _readJson(indexPath(accPath));
+      if (idx && idx.entries && idx.entries[cid]) {
+        Object.assign(idx.entries[cid], patch);
+        fs.writeFileSync(indexPath(accPath), JSON.stringify(idx, null, 2));
+      }
+    } catch (_) {}
+  };
+  try {
+    if (op === "archive" || op === "unarchive") {
+      const isArchived = op === "archive";
+      await callLs("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived });
+      patchLocal({ isArchived });
+      return { ok: true, op };
+    }
+    if (op === "delete") {
+      await callLs("DeleteCascadeTrajectory", { cascadeId: cid });
+      try { fs.rmSync(convPath, { recursive: true, force: true }); } catch (_) {}
+      try {
+        const idx = _readJson(indexPath(accPath));
+        if (idx && idx.entries && idx.entries[cid]) {
+          delete idx.entries[cid];
+          fs.writeFileSync(indexPath(accPath), JSON.stringify(idx, null, 2));
+        }
+      } catch (_) {}
+      return { ok: true, op };
+    }
+    if (op === "rename") {
+      const name = String(o.name || "").trim();
+      if (!name) return { ok: false, op, error: "缺新名称" };
+      await callLs("RenameCascadeTrajectory", { cascadeId: cid, name });
+      patchLocal({ title: name });
+      return { ok: true, op };
+    }
+    return { ok: false, op, error: "未知操作" };
+  } catch (e) {
+    return { ok: false, op, error: e.message };
+  }
 }
 
 // 读取某会话的转录正文(对话.md)+ 元数据, 供面板详情视图渲染。
@@ -171,4 +334,4 @@ function readConversation(rootOverride, accDir, folder) {
   return { meta: _readJson(path.join(convPath, "_meta.json")) || {}, md, path: convPath };
 }
 
-module.exports = { backupRoot, backupAll, loadIndex, indexPath, safeName, accountDirName, listBackups, listConversations, readConversation };
+module.exports = { backupRoot, backupAll, backupAcp, loadIndex, indexPath, safeName, accountDirName, acpAccountDirName, listBackups, listConversations, readConversation, manageTrajectory };

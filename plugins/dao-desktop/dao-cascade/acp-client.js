@@ -28,6 +28,7 @@ class AcpClient {
     this._nextId = 1;
     this._pending = new Map(); // id -> {resolve, reject}
     this._onUpdate = opts.onUpdate || (() => {}); // session/update 通知回调
+    this._onExit = opts.onExit || null; // 子进程退出回调(宿主据此复位 ready 态)
     this._onPermission = opts.onPermission || null; // session/request_permission 回调(返回 Promise<optionId>)
     this._sessionId = null;
     this.agentInfo = null;
@@ -45,16 +46,43 @@ class AcpClient {
     });
     this._child.stdout.on("data", (d) => this._onStdout(d));
     this._child.stderr.on("data", (d) => this._log("[acp:stderr] " + String(d).trim()));
-    this._child.on("exit", (code) => {
+    const c = this._child;
+    c.on("exit", (code) => {
       this._log("[acp] devin acp 退出 code=" + code);
       for (const { reject } of this._pending.values()) reject(new Error("acp process exited"));
       this._pending.clear();
       this._child = null;
+      this._destroyStdio(c);
+      if (this._onExit) { try { this._onExit(code); } catch (_) {} }
+    });
+    c.on("error", (e) => {
+      this._log("[acp] spawn 失败: " + (e && e.message));
+      for (const { reject } of this._pending.values()) reject(e);
+      this._pending.clear();
+      this._child = null;
+      this._destroyStdio(c);
+      if (this._onExit) { try { this._onExit(-1); } catch (_) {} }
     });
   }
 
+  // 先 SIGTERM, 3s 未退再 SIGKILL —— 不留 D 态/孤儿进程。
   stop() {
-    if (this._child) { try { this._child.kill(); } catch (_) {} this._child = null; }
+    const c = this._child;
+    if (!c) return;
+    this._child = null;
+    try { c.kill(); } catch (_) {}
+    const t = setTimeout(() => { try { c.kill("SIGKILL"); } catch (_) {} }, 3000);
+    if (t.unref) t.unref();
+    c.once("exit", () => { clearTimeout(t); this._destroyStdio(c); });
+    this._destroyStdio(c);
+  }
+
+  // 子进程亡后其 stdio 管道 Socket 仍挂在父进程事件循环上(尤其 stdin 写端不自闭),
+  // 不销毁则宿主进程/测试进程永不退出。
+  _destroyStdio(c) {
+    for (const s of [c.stdin, c.stdout, c.stderr]) {
+      try { if (s) s.destroy(); } catch (_) {}
+    }
   }
 
   _onStdout(chunk) {
@@ -82,6 +110,7 @@ class AcpClient {
     }
     // 通知(agent → client):session/update 及 _cognition.ai/* 扩展通知。
     if (msg.method === "session/update") {
+      if (this._hook) { try { this._hook(msg.params); } catch (_) {} return; }
       try { this._onUpdate(msg.params); } catch (_) {}
       return;
     }
@@ -194,6 +223,9 @@ class AcpClient {
       sessionId: this._sessionId, configId, value,
     });
   }
+
+  // 截流 session/update: 备份等后台回放期间接管全部帧(不打扰前端渲染); 传 null 复原。
+  hookUpdates(fn) { this._hook = typeof fn === "function" ? fn : null; }
 
   async listSessions() {
     return this.request("session/list", {});

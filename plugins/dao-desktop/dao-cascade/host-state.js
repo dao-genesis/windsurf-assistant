@@ -100,4 +100,17 @@ function subscribe(fn) {
   return { dispose() { h.listeners.delete(fn); } };
 }
 
-module.exports = { hostState, hostFire, loadPersisted, resolveHost, subscribe, hostFilePath, publishFused };
+// IDE globalStorage state.vscdb 路径登记(供 apiKey 回退定位官方登录态)。
+// 宿主扩展激活时由 context.globalStorageUri 派生真实路径注入 —— IDE 以自定义
+// --user-data-dir 运行时, state.vscdb 不在默认 ~/.config/<app> 下, 唯此可靠。
+function registerIdeStateDb(p) {
+  const h = hostState();
+  h._ideStateDbs = h._ideStateDbs || new Set();
+  if (p && typeof p === "string") h._ideStateDbs.add(p);
+}
+function ideStateDbs() {
+  const h = hostState();
+  return h._ideStateDbs ? [...h._ideStateDbs] : [];
+}
+
+module.exports = { hostState, hostFire, loadPersisted, resolveHost, subscribe, hostFilePath, publishFused, registerIdeStateDb, ideStateDbs };

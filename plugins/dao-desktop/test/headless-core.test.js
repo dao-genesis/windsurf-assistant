@@ -222,6 +222,37 @@ test("插件自持账号池: 收录/视图脱敏/切换写 credentials.toml/无 
   delete process.env.DAO_DEVIN_CRED_FILE;
 });
 
+test("Devin Cloud 凭据链: credentials.toml 真源 → 缺失回退 ls-bridge.apiKey()", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-wss-"));
+  process.env.DAO_DEVIN_CRED_FILE = path.join(dir, "credentials.toml");
+  const wssPath = path.join(CASCADE, "acp-wss.js");
+  const lsPath = path.join(CASCADE, "ls-bridge.js");
+  const savedLs = require.cache[require.resolve(lsPath)];
+  delete require.cache[require.resolve(wssPath)];
+  require.cache[require.resolve(lsPath)] = {
+    id: lsPath, filename: lsPath, loaded: true,
+    exports: { apiKey: () => "key-FALLBACK99" },
+  };
+  try {
+    const { readCredentials } = require(wssPath);
+    // 无 credentials.toml → 回退 ls-bridge
+    let c = readCredentials();
+    assert.strictEqual(c.apiKey, "key-FALLBACK99");
+    assert.strictEqual(c.apiUrl, "https://api.devin.ai");
+    // credentials.toml 落盘后为真源
+    fs.writeFileSync(process.env.DAO_DEVIN_CRED_FILE,
+      'windsurf_api_key = "key-TOML0001"\ndevin_api_url = "https://api.example.dev"\n');
+    c = readCredentials();
+    assert.strictEqual(c.apiKey, "key-TOML0001");
+    assert.strictEqual(c.apiUrl, "https://api.example.dev");
+  } finally {
+    if (savedLs) require.cache[require.resolve(lsPath)] = savedLs;
+    else delete require.cache[require.resolve(lsPath)];
+    delete require.cache[require.resolve(wssPath)];
+    delete process.env.DAO_DEVIN_CRED_FILE;
+  }
+});
+
 test("插件自持本地 API: 健康免鉴权/无 token 401/带 token 读插件真源(脱敏)", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-api-"));
   process.env.DAO_LOCAL_API_FILE = path.join(dir, "local-api.json");
@@ -353,4 +384,217 @@ test("插件自持反向注入: 档案 600/secret 脱敏/计划=池×档 交叉"
   assert.strictEqual(inj.listView().length, 2);
   assert.strictEqual((fs.statSync(process.env.DAO_INJECT_PROFILE_FILE).mode & 0o777), 0o600);
   delete process.env.DAO_INJECT_PROFILE_FILE;
+});
+
+test("R65 桥接 /api/cascade: 本机会话·记忆水位可经本地 API 暴露(无内容/无凭据)", () => {
+  const hostState = require(path.join(CASCADE, "host-state.js"));
+  const api = require(path.join(CASCADE, "local-api.js"));
+  hostState.publishFused("cascadeLocal", { total: 3, live: 2, archived: 1 });
+  hostState.publishFused("memories", { total: 5 });
+  const c = api.routes("/api/cascade");
+  assert.strictEqual(c.sessions.total, 3);
+  assert.strictEqual(c.sessions.live, 2);
+  assert.strictEqual(c.sessions.archived, 1);
+  assert.strictEqual(c.memories.total, 5);
+  const o = api.routes("/api/overview");
+  assert.strictEqual(o.cascade.sessions.total, 3);
+  assert.ok(!JSON.stringify(c).match(/apiKey|token|pat/i), "水位视图不得含凭据字段");
+});
+
+test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ghi-"));
+  process.env.DAO_GITHUB_FLEET_FILE = path.join(dir, "fleet.json");
+  process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
+  const fleet = require(path.join(CASCADE, "github-fleet.js"));
+  const inj = require(path.join(CASCADE, "inject.js"));
+  // 直接写舰队文件(等价断网入队后的态), 不出网
+  fs.writeFileSync(process.env.DAO_GITHUB_FLEET_FILE,
+    JSON.stringify([{ login: "octo", pat: "ghp_bridgeTest9Z9Z", role: "admin", addedAt: new Date().toISOString() }]), { mode: 0o600 });
+  // _ghInject 同构管道: loadFleet → inject.addItem(secret)
+  const a = fleet.loadFleet().find((x) => x.login === "octo");
+  const r = inj.addItem("secret", "github-pat-" + a.login, { value: a.pat });
+  assert.strictEqual(r.kind, "secret");
+  const v = inj.listView().find((x) => x.name === "github-pat-octo");
+  assert.strictEqual(v.hasValue, true);
+  assert.strictEqual(v.valueTail, "9Z9Z");
+  assert.ok(!JSON.stringify(inj.listView()).includes("ghp_bridgeTest"), "PAT 不得出注入档视图");
+  delete process.env.DAO_GITHUB_FLEET_FILE;
+  delete process.env.DAO_INJECT_PROFILE_FILE;
+});
+
+test("Cascade 轨迹管理: 归档/取消归档/重命名/删除 走官方 RPC 并同步本地备份树", async () => {
+  const backup = require(path.join(CASCADE, "backup.js"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mg-"));
+  const summaries = { cidM: { summary: "待管理会话", lastModifiedTime: "2026-07-12T00:00:00Z" } };
+  const calls = [];
+  const fakeLs = {
+    ready: () => ({ lsPort: 1, csrfToken: "c" }),
+    apiKey: () => "k",
+    call: async (m, req) => {
+      calls.push([m, req]);
+      if (m === "GetAllCascadeTrajectories") return { trajectorySummaries: summaries };
+      if (m === "GetCascadeTranscriptForTrajectoryId") return { transcript: "body" };
+      return {};
+    },
+  };
+  await backup.backupAll(fakeLs, { root, email: "m@x.y" });
+  const accDir = backup.accountDirName("m@x.y");
+  const idx0 = JSON.parse(fs.readFileSync(path.join(root, accDir, "_index.json"), "utf8"));
+  const folder = idx0.entries.cidM.folder;
+  const base = { root, accDir, folder, cascadeId: "cidM" };
+  // 归档: RPC + 本地 meta/index 同步
+  const r1 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "archive" }, base));
+  assert.ok(r1.ok);
+  assert.deepStrictEqual(calls[calls.length - 1], ["ArchiveCascadeTrajectory", { cascadeId: "cidM", isArchived: true }]);
+  const metaP = path.join(root, accDir, "对话", folder, "_meta.json");
+  assert.strictEqual(JSON.parse(fs.readFileSync(metaP, "utf8")).isArchived, true);
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(root, accDir, "_index.json"), "utf8")).entries.cidM.isArchived, true);
+  // 取消归档
+  const r2 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "unarchive" }, base));
+  assert.ok(r2.ok);
+  assert.strictEqual(JSON.parse(fs.readFileSync(metaP, "utf8")).isArchived, false);
+  // 重命名: RPC + 本地标题跟随
+  const r3 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "rename", name: "新名字" }, base));
+  assert.ok(r3.ok);
+  assert.deepStrictEqual(calls[calls.length - 1], ["RenameCascadeTrajectory", { cascadeId: "cidM", name: "新名字" }]);
+  assert.strictEqual(JSON.parse(fs.readFileSync(metaP, "utf8")).title, "新名字");
+  assert.strictEqual((await backup.manageTrajectory(fakeLs, Object.assign({ op: "rename" }, base))).ok, false, "缺名必拒");
+  // 路径穿越防护
+  const bad = await backup.manageTrajectory(fakeLs, { root, accDir: "..", folder: "..", cascadeId: "cidM", op: "delete" });
+  assert.strictEqual(bad.ok, false);
+  assert.match(bad.error, /非法会话路径/);
+  // 删除: RPC + 本地目录与索引项移除
+  const r4 = await backup.manageTrajectory(fakeLs, Object.assign({ op: "delete" }, base));
+  assert.ok(r4.ok);
+  assert.deepStrictEqual(calls[calls.length - 1], ["DeleteCascadeTrajectory", { cascadeId: "cidM" }]);
+  assert.ok(!fs.existsSync(path.join(root, accDir, "对话", folder)), "本地会话目录应移除");
+  assert.ok(!JSON.parse(fs.readFileSync(path.join(root, accDir, "_index.json"), "utf8")).entries.cidM, "索引项应移除");
+  // 缺 cascadeId / 未知操作
+  assert.strictEqual((await backup.manageTrajectory(fakeLs, { op: "archive" })).ok, false);
+  assert.strictEqual((await backup.manageTrajectory(fakeLs, Object.assign({ op: "nope" }, base))).ok, false);
+  // LS 未就绪: 不打 RPC, 本地同步照常(离线管理备份树)
+  const off = { ready: () => null, apiKey: () => "" };
+  const r5 = await backup.manageTrajectory(off, Object.assign({ op: "archive" }, base));
+  assert.ok(r5.ok, "离线仅本地同步亦可");
+});
+
+test("MCP 配置真源开关: server 级 disabled 位 + 工具级 disabledTools 直写 mcp_config.json", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mcpc-"));
+  process.env.DAO_MCP_CONFIG_FILE = path.join(dir, "mcp_config.json");
+  const mc = require(path.join(CASCADE, "mcp-config.js"));
+  fs.writeFileSync(process.env.DAO_MCP_CONFIG_FILE, JSON.stringify({
+    mcpServers: { github: { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] } },
+  }));
+  // server 级: 翻转 → disabled:true, 再翻转 → false
+  assert.deepStrictEqual(mc.toggleServer("github"), { ok: true, name: "github", disabled: true });
+  assert.strictEqual(mc.readConfig().mcpServers.github.disabled, true);
+  assert.strictEqual(mc.toggleServer("github").disabled, false);
+  // force 指定
+  assert.strictEqual(mc.toggleServer("github", true).disabled, true);
+  // 无此 server 必拒
+  assert.strictEqual(mc.toggleServer("ghost").ok, false);
+  assert.strictEqual(mc.toggleServer("").ok, false);
+  // 工具级: disabledTools 增删
+  assert.strictEqual(mc.toggleTool("github", "create_issue").off, true);
+  assert.deepStrictEqual(mc.readConfig().mcpServers.github.disabledTools, ["create_issue"]);
+  assert.strictEqual(mc.toggleTool("github", "create_issue").off, false);
+  assert.deepStrictEqual(mc.readConfig().mcpServers.github.disabledTools, []);
+  assert.strictEqual(mc.toggleTool("ghost", "x").ok, false);
+  delete process.env.DAO_MCP_CONFIG_FILE;
+});
+
+
+test("Devin(ACP) 会话备份: session/list+load 历史回放拼转录 + 增量水位 + 会话本地管理", async () => {
+  const backup = require(path.join(CASCADE, "backup.js"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "dao-acpbk-"));
+  // 假 ACP 客户端: hookUpdates 截流 + loadSession 重放帧(与 acp-client 同约定)。
+  let hook = null;
+  const frames = {
+    s1: [
+      { sessionId: "s1", update: { sessionUpdate: "user_message_chunk", content: { text: "列出文件" } } },
+      { sessionId: "s1", update: { sessionUpdate: "agent_thought_chunk", content: { text: "(思考不入转录)" } } },
+      { sessionId: "s1", update: { sessionUpdate: "tool_call", title: "ls -la", toolCallId: "t1" } },
+      { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk", content: { text: "共 3 个文件" } } },
+      { sessionId: "other", update: { sessionUpdate: "agent_message_chunk", content: { text: "串台帧须被过滤" } } },
+    ],
+  };
+  const acp = {
+    listSessions: async () => ({ sessions: [{ sessionId: "s1", title: "文件巡览", updatedAt: "2026-07-12T01:00:00Z" }] }),
+    hookUpdates: (fn) => { hook = fn; },
+    loadSession: async (sid) => { for (const f of frames[sid] || []) hook && hook(f); return {}; },
+  };
+  const r1 = await backup.backupAcp(acp, { root, email: "u@x.y" });
+  assert.strictEqual(r1.ok, true); assert.strictEqual(r1.saved, 1); assert.strictEqual(r1.total, 1);
+  const accDir = path.join(root, "Devin·u@x.y");
+  const convs = backup.listConversations(accDir);
+  assert.strictEqual(convs.length, 1);
+  assert.strictEqual(convs[0].source, "devin-acp");
+  const md = fs.readFileSync(path.join(accDir, "对话", convs[0].folder, "对话.md"), "utf8");
+  assert.ok(md.includes("## 🧑 用户"), "用户回合入转录");
+  assert.ok(md.includes("列出文件") && md.includes("共 3 个文件") && md.includes("🔧 ls -la"));
+  assert.ok(!md.includes("思考不入转录") && !md.includes("串台帧"), "思考帧与他会话帧不入转录");
+  // 水位未变 → 跳过
+  const r2 = await backup.backupAcp(acp, { root, email: "u@x.y" });
+  assert.strictEqual(r2.saved, 0); assert.strictEqual(r2.skipped, 1);
+  // 三源统一: listBackups 中 Devin(ACP) 账号并出, source=devin
+  const all = backup.listBackups(root);
+  assert.strictEqual(all.accounts.length, 1);
+  assert.strictEqual(all.accounts[0].isCascade, false);
+  assert.strictEqual(all.accounts[0].source, "devin");
+  // ACP 会话管理 = 本地树同步, 绝不触 LS(传入会爆炸的假 ls 验证不被调用)
+  const bomb = { ready: () => true, apiKey: () => "k", call: async () => { throw new Error("不应调用 LS"); } };
+  const rr = await backup.manageTrajectory(bomb, { root, accDir: "Devin·u@x.y", folder: convs[0].folder, cascadeId: "s1", op: "rename", name: "新名", source: "devin-acp" });
+  assert.strictEqual(rr.ok, true);
+  assert.strictEqual(backup.listConversations(accDir)[0].title, "新名");
+  const rd = await backup.manageTrajectory(bomb, { root, accDir: "Devin·u@x.y", folder: convs[0].folder, cascadeId: "s1", op: "delete", source: "devin-acp" });
+  assert.strictEqual(rd.ok, true);
+  assert.strictEqual(backup.listConversations(accDir).length, 0);
+});
+
+test("ACP 客户端生命周期: stop 杀净子进程 + onExit 复位钩子 + spawn 失败不悬挂", async () => {
+  const { AcpClient } = require(path.join(CASCADE, "acp-client.js"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-acp-"));
+  const fake = path.join(dir, "fake-devin");
+  fs.writeFileSync(fake, "#!/bin/sh\nsleep 300\n"); fs.chmodSync(fake, 0o755);
+  // 1) stop() 杀净子进程并触发 onExit(泄漏根因回归: 不留孤儿)
+  let exited = 0;
+  const c = new AcpClient({ bin: fake, onExit: () => { exited++; } });
+  c.start();
+  const pid = c._child.pid;
+  c.stop();
+  await new Promise((r) => setTimeout(r, 500));
+  assert.strictEqual(exited, 1, "stop 后 onExit 必须触发");
+  assert.throws(() => process.kill(pid, 0), "子进程须已被杀净");
+  // 2) 二进制不存在: spawn error 不悬挂、onExit 兜底触发
+  let exited2 = 0;
+  const c2 = new AcpClient({ bin: path.join(dir, "no-such-bin"), onExit: () => { exited2++; } });
+  c2.start();
+  await new Promise((r) => setTimeout(r, 500));
+  assert.strictEqual(exited2, 1, "spawn 失败也须触发 onExit");
+  assert.strictEqual(c2._child, null);
+});
+
+test("authStatus 去抖: 单飞合并 + TTL 缓存 + force 绕过(根治子进程风暴)", async () => {
+  const prov = require(path.join(CASCADE, "devin-provision.js"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-auth-"));
+  const cnt = path.join(dir, "cnt");
+  fs.writeFileSync(cnt, "");
+  const fake = path.join(dir, "fake-devin");
+  fs.writeFileSync(fake, '#!/bin/sh\necho x >> "' + cnt + '"\necho "Logged in"\necho "Name: dao"\n');
+  fs.chmodSync(fake, 0o755);
+  const calls = () => fs.readFileSync(cnt, "utf8").split("\n").filter(Boolean).length;
+  // 1) 并发 5 连发 → 单飞合并为 1 次 spawn
+  const rs = await Promise.all([1, 2, 3, 4, 5].map(() => prov.authStatus(fake)));
+  assert.strictEqual(calls(), 1, "并发调用须单飞合并");
+  for (const r of rs) { assert.strictEqual(r.loggedIn, true); assert.strictEqual(r.name, "dao"); }
+  // 2) TTL 窗口内再调 → 命中缓存不再 spawn
+  await prov.authStatus(fake);
+  assert.strictEqual(calls(), 1, "TTL 内须命中缓存");
+  // 3) force 绕过缓存 → 立即重新 spawn
+  await prov.authStatus(fake, { force: true });
+  assert.strictEqual(calls(), 2, "force 须绕过缓存");
+  // 4) TTL 过期 → 重新 spawn
+  await new Promise((r) => setTimeout(r, 10));
+  await prov.authStatus(fake, { ttlMs: 1 });
+  assert.strictEqual(calls(), 3, "TTL 过期须重新探测");
 });

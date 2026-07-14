@@ -1231,7 +1231,15 @@ function _bridge(candidates, norm, deps) {
           sink.onThinking && sink.onThinking(t);
         },
         onFinish: (f) => sink.onFinish && sink.onFinish(f),
-        onUsage: (u) => sink.onUsage && sink.onUsage(u),
+        onUsage: (u) => {
+          // 用量记账: 第三方渠道消耗归入路由器同一张用量表 (面板「用量与成本」可见)
+          if (u && target.provName && !target.builtin && deps.recordUsage) {
+            try {
+              deps.recordUsage(target.provName, target.upstreamModel, u);
+            } catch (_) {}
+          }
+          sink.onUsage && sink.onUsage(u);
+        },
         onEnd: () => sink.onEnd && sink.onEnd(),
         onError: (e) => {
           const msg = String((e && e.message) || e);

@@ -56,7 +56,7 @@ class CascadePanelProvider {
     this._view = webviewView;
     this._disposed = false;
     // 官方宿主态(LS 端口/CSRF/登录)变更 → 刷新 env 行，与官方登录模式同源
-    if (hostState) { const h = hostState(); const fn = () => { this._pushEnv(); this._handleSessionsList(); this._pushCascadeConfigOptions(); }; h.listeners.add(fn);
+    if (hostState) { const h = hostState(); const fn = () => { this._pushEnvSoon(); this._handleSessionsList(); this._pushCascadeConfigOptions(); }; h.listeners.add(fn);
       webviewView.onDidDispose(() => h.listeners.delete(fn)); }
     const w = webviewView.webview;
     w.options = { enableScripts: true, localResourceRoots: [this._ctx.extensionUri] };
@@ -284,10 +284,18 @@ class CascadePanelProvider {
       this._ctx.globalStorageUri && this._ctx.globalStorageUri.fsPath);
   }
 
+  // 宿主态广播可能短窗内连发(端口/CSRF/登录态逐项到位各 fire 一次) —— 400ms 尾沿去抖,
+  // 配合 devin-provision.authStatus 的单飞+TTL 缓存, 根治 auth status 子进程风暴。
+  _pushEnvSoon() {
+    if (this._envDebounce) clearTimeout(this._envDebounce);
+    this._envDebounce = setTimeout(() => { this._envDebounce = null; this._pushEnv(); }, 400);
+  }
+
   // 环境探测:引擎二进制 + 自持鉴权状态(决定 Devin Local/Cloud 能否真实驱动)。
-  async _pushEnv() {
+  // force=true 绕过去抖缓存(登录/登出后需立即取真值)。
+  async _pushEnv(force) {
     const bin = this._bin();
-    const auth = await authStatus(bin);
+    const auth = await authStatus(bin, force ? { force: true } : undefined);
     // 官方本体上报的宿主态: language_server 端口/CSRF(Cascade 轨) + 官方登录态(1:1 同源)
     const h = hostState ? hostState() : null;
     const ws = h ? { lsPort: h.lsPort || 0, lsCsrf: !!h.csrfToken,
@@ -295,8 +303,22 @@ class CascadePanelProvider {
       authSignedIn: !!(h.auth && (h.auth.loggedIn === true || h.auth.state === "signed-in" || h.auth.apiKey || h.auth.userName || h.auth.name)) } : null;
     const folder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
       && vscode.workspace.workspaceFolders[0].name) || null;
+    // ACP 会话已就绪即证明凭据有效 — `devin auth status` 冷启动超时时以此兜底, 避免误显未登录
+    const loggedIn = auth.loggedIn || !!(this._acpReady && this._acp);
+    if (bin && !loggedIn && (this._envRetries = (this._envRetries || 0) + 1) <= 3)
+      setTimeout(() => this._pushEnv(), 10000);
     this._post({ type: "env", devinBin: bin || null, agents: AGENTS,
-      loggedIn: auth.loggedIn, userName: auth.name, windsurf: ws, folder });
+      loggedIn, userName: auth.name, windsurf: ws, folder });
+    // 三模式引擎态归一发布(fused.engines): 归一面板主页/桥接 API 直接消费, 与本面板 env 同源。
+    try {
+      require("./host-state").publishFused("engines", {
+        cascade: { ready: !!(ws && ws.lsPort), lsPort: (ws && ws.lsPort) || 0,
+          signedIn: !!(ws && ws.authSignedIn), name: (ws && ws.authName) || "" },
+        devinLocal: { bin: !!bin, signedIn: !!auth.loggedIn, name: auth.name || "" },
+        devinCloud: { signedIn: !!auth.loggedIn, name: auth.name || "",
+          endpoint: "wss://app.devin.ai/api/acp/live" },
+      });
+    } catch (_) {}
     this._sbSet({ lsReady: !!(ws && ws.lsPort), user: (ws && ws.authName) || auth.name || null });
     this._cxPushWorkflows();
   }
@@ -331,32 +353,65 @@ class CascadePanelProvider {
       onDone: (r) => {
         this._loginCtrl = null;
         this._post({ type: "login-state", state: r.ok ? "ok" : "error", text: r.message });
-        this._pushEnv();
+        this._pushEnv(true);
       },
     });
   }
 
+  // 单飞 + 失败退避 + 先停旧再起新:任何失败路径都不留孤儿 `devin acp` 子进程。
   async _ensureAcp() {
     if (this._acpReady && this._acp) return true;
+    if (this._acpStarting) return this._acpStarting;
+    if (this._acpFailAt && Date.now() - this._acpFailAt < (this._acpBackoff || 0)) return false;
     const bin = this._bin();
     if (!bin) return false;
     this._permPending = this._permPending || new Map();
-    this._acp = new AcpClient({
-      bin,
-      cwd: (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
-        && vscode.workspace.workspaceFolders[0].uri.fsPath) || process.cwd(),
-      log: this._log,
-      onUpdate: (params) => this._onAcpUpdate(params),
-      onPermission: (params) => this._askPermission(params),
-    });
-    this._acp.start();
-    await this._acp.initialize();
-    // 自持凭据:CLI 本地已登录时无需 ACP authenticate(实测 session/new 直接可用)。
-    const res = await this._acp.newSession();
-    this._pushSessionMeta(res);
-    this._acpReady = true;
-    this._handleSessionsList();
-    return true;
+    this._acpStarting = (async () => {
+      if (this._acp) { try { this._acp.stop(); } catch (_) {} this._acp = null; }
+      const acp = new AcpClient({
+        bin,
+        cwd: (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
+          && vscode.workspace.workspaceFolders[0].uri.fsPath) || process.cwd(),
+        log: this._log,
+        onUpdate: (params) => this._onAcpUpdate(params),
+        onPermission: (params) => this._askPermission(params),
+        onExit: () => { if (this._acp === acp) { this._acp = null; this._acpReady = false; } },
+      });
+      try {
+        acp.start();
+        await acp.initialize();
+        // 自持凭据:CLI 本地已登录时 session/new 直接可用;仅会话令牌等未落
+        // credentials.toml 的登录态下 ACP host 会要求先 authenticate(meta.api_key),
+        // 此时用官方登录态 apiKey(ls-bridge 同源: credentials.toml→globalStorage)补鉴权。
+        let res;
+        try {
+          res = await acp.newSession();
+        } catch (e) {
+          if (!/authenticat/i.test(String(e && e.message || e))) throw e;
+          const key = (() => { try { return require("./ls-bridge").apiKey(); } catch (_) { return ""; } })();
+          if (!key) throw new Error("ACP 需鉴权且未取得 apiKey(credentials.toml/globalStorage 均空),请先登录");
+          this._log("[acp] session/new 需鉴权 → authenticate(windsurf-api-key) 后重试");
+          await acp.authenticate("windsurf-api-key", key);
+          res = await acp.newSession();
+        }
+        this._acp = acp;
+        this._acpReady = true;
+        this._acpFailAt = 0; this._acpBackoff = 0;
+        this._pushEnv();
+        this._pushSessionMeta(res);
+        this._handleSessionsList();
+        return true;
+      } catch (e) {
+        try { acp.stop(); } catch (_) {}
+        this._acpFailAt = Date.now();
+        this._acpBackoff = Math.min(Math.max((this._acpBackoff || 0) * 2, 5000), 300000);
+        this._log("[acp] 启动失败(退避 " + this._acpBackoff + "ms): " + String(e && e.message || e));
+        return false;
+      } finally {
+        this._acpStarting = null;
+      }
+    })();
+    return this._acpStarting;
   }
 
   _pushSessionMeta(res) {
@@ -656,9 +711,10 @@ class CascadePanelProvider {
     this._watchCascadeSummaries();
     let acp = [];
     try {
-      await this._ensureAcp();
-      const res = await this._acp.listSessions();
-      acp = (res && res.sessions) || [];
+      if (await this._ensureAcp() && this._acp) {
+        const res = await this._acp.listSessions();
+        acp = (res && res.sessions) || [];
+      }
     } catch (e) { this._log("[sessions] " + e.message); }
     const cx = await this._cascadeSessions();
     const all = acp.concat(cx).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
@@ -685,10 +741,43 @@ class CascadePanelProvider {
         const r = await backup.backupAll(ls, { root: cfg.get("backupDir") || "", email, log: this._log });
         if (r.ok && r.saved) this._log("[backup] Cascade 对话备份: 新写 " + r.saved + " / 共 " + r.total + " → " + r.root);
         if (r.ok) this._fusePublish("cascadeBackup", { root: r.root, saved: r.saved, total: r.total });
-        if (force) vscode.window.showInformationMessage(r.ok ? ("Cascade 对话备份完成: 新写 " + r.saved + " / 共 " + r.total + " → " + r.root) : ("备份未就绪: " + (r.reason || "")));
+        else this._log("[backup] Cascade 备份未就绪: " + (r.reason || ""));
+        const ra = await this._backupAcpSessions(backup, cfg.get("backupDir") || "", email);
+        if (ra && ra.ok && ra.saved) this._log("[backup] Devin(ACP) 会话备份: 新写 " + ra.saved + " / 共 " + ra.total);
+        if (force) {
+          const acpPart = ra && ra.ok ? (" · Devin(ACP) 新写 " + ra.saved + " / 共 " + ra.total) : "";
+          vscode.window.showInformationMessage(r.ok
+            ? ("对话备份完成: Cascade 新写 " + r.saved + " / 共 " + r.total + acpPart + " → " + r.root)
+            : ("Cascade 备份未就绪: " + (r.reason || "") + acpPart));
+        }
       } catch (e) { this._log("[backup] " + e.message); }
       this._bkRunning = false;
     }, force ? 0 : 1500);
+  }
+
+  // Devin Local/Cloud(ACP) 会话备份三模式延伸: session/list + session/load 历史回放拼转录。
+  // 回放会切换客户端活动会话, 备份后恢复原会话(恢复期间帧经 hookUpdates 截流, 不打扰前端)。
+  async _backupAcpSessions(backup, root, email) {
+    const clients = [];
+    if (this._acpReady && this._acp) clients.push(this._acp);
+    if (this._cloud && this._cloud.sessionId) clients.push(this._cloud);
+    let agg = null;
+    for (const c of clients) {
+      if (typeof c.listSessions !== "function" || typeof c.hookUpdates !== "function") continue;
+      const prevSid = c.sessionId;
+      let r = null;
+      try { r = await backup.backupAcp(c, { root, email, log: this._log }); }
+      catch (e) { this._log("[backup-acp] " + e.message); }
+      finally { c.hookUpdates(null); }
+      if (prevSid && c.sessionId !== prevSid) {
+        c.hookUpdates(() => {});
+        try { await c.loadSession(prevSid); } catch (_) {}
+        c.hookUpdates(null);
+      }
+      if (r && !r.ok && r.reason) this._log("[backup-acp] 跳过: " + r.reason);
+      if (r && r.ok) agg = { ok: true, saved: (agg ? agg.saved : 0) + r.saved, total: (agg ? agg.total : 0) + r.total };
+    }
+    return agg;
   }
 
   // 归一发布: 插件侧融合态(账户/MCP/备份水位)写入宿主态中枢 → windsurf-host.json,
@@ -806,7 +895,8 @@ class CascadePanelProvider {
       catch (e) { return this._post({ type: "error", text: "加载 Cascade 轨迹失败: " + e.message }); }
     }
     try {
-      await this._ensureAcp();
+      if (!(await this._ensureAcp()) || !this._acp)
+        return this._post({ type: "error", text: "加载会话失败: ACP 未就绪(未登录或启动退避中)" });
       this._post({ type: "history-clear" });
       this._replaying = true;
       this._activeId = "r" + Date.now();
@@ -826,9 +916,10 @@ class CascadePanelProvider {
     try {
       let sessions = [];
       try {
-        await this._ensureAcp();
-        const res = await this._acp.listSessions();
-        sessions = (res && res.sessions) || [];
+        if (await this._ensureAcp() && this._acp) {
+          const res = await this._acp.listSessions();
+          sessions = (res && res.sessions) || [];
+        }
       } catch (_) {}
       sessions = sessions.concat(await this._cascadeSessions())
         .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
@@ -1854,7 +1945,7 @@ class CascadePanelProvider {
     this._post({ type: "history-clear", home: true });
     this._post({ type: "arena-avail", ok: true, reason: "" });
     try {
-      await this._ensureAcp();
+      if (!(await this._ensureAcp()) || !this._acp) throw new Error("ACP 未就绪(未登录或启动退避中)");
       const res = await this._acp.newSession();
       this._pushSessionMeta(res);
       this._post({ type: "history-done" });
@@ -1911,10 +2002,18 @@ class CascadePanelProvider {
       }
       try {
         this._activeId = msg.id;
-        await this._ensureAcp();
+        if (!(await this._ensureAcp()) || !this._acp) throw new Error("ACP 未就绪(未登录或启动退避中)");
         await this._acp.prompt(msg.text);
         return this._post({ type: "assistant-done", id: msg.id });
       } catch (e) {
+        // 鉴权失败多为 ACP 起在登录之前(旧凭据驻留子进程) —— 杀掉令下轮
+        // _ensureAcp 以新 credentials.toml 重生, 免手动 Reload Window。
+        if (/authenticat|log ?in/i.test(String(e && e.message || e)) && this._acp) {
+          try { this._acp.stop(); } catch (_) {}
+          this._acp = null; this._acpReady = false;
+          return this._post({ type: "assistant-done", id: msg.id,
+            text: "ACP 请求失败: " + e.message + "\n(已重置 ACP 进程; 登录后直接重发即可)" });
+        }
         return this._post({ type: "assistant-done", id: msg.id, text: "ACP 请求失败: " + e.message });
       }
     }

@@ -2,6 +2,35 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.351 · 模型反代用量记账归一 · 反代调用亦入「用量与成本」
+: 实机验证(DeepSeek/小米 Mimo 双渠道直连+路由+反代全链路)时发现: 经模型反代
+  `/v1/chat/completions`(OpenAI 兼容)与 `/v1/messages`(Anthropic 兼容)调用第三方渠道,
+  tokens 消耗**不入**面板「用量与成本」(`/origin/ea/usage` 恒空)——用量聚合仅覆盖 Cascade
+  路由路径(`dao_router.route()` 内 `_recordUsage`), 反代路径旁路了记账。四十四章
+  「知足不辱 知止不殆」: 知其所耗, 方知所止。本版:
+  ① `dao_router.js` 导出 `recordUsage`(外部记账入口·与 Cascade 路径共用同一张
+     `_usage` 表·同享缓存命中率/成本估算);
+  ② `runtime.js` 增 `routerRecordUsage()` 透传;
+  ③ `source.js` `_revproxyDeps()` 注入 `recordUsage` 依赖;
+  ④ `revproxy.js` `_bridge()` 在 onUsage 处按渠道/模型记账(仅第三方渠道目标·
+     builtin-stub/官方直通不计·流式与 unary 皆覆盖)。
+  实测: 反代双协议调用后 `/origin/ea/usage` 正确出账(deepseek 与 xiaomi-mimo 各自
+  calls/input/output/cached/hitRate 齐全)。
+
+v9.9.350 · 根治「添加失败: runtime not loaded」· 健壮解析外接api目录 + ea/* 惰性自愈
+: 承接用户端反馈「加渠道即报 runtime not loaded」——排查确认开发机运行时正常(路由就绪·25模型),
+  故为**安装/环境特定失败**。根因: `source.js`/`extension.js` 硬编码中文目录名「外接api」(非 ASCII),
+  在 VSIX(zip) 打包/解包时非 ASCII 目录名编码不稳, 部分用户机上目录名被搞坏(mojibake) →
+  `fs.existsSync(...外接api/runtime.js)` 恒 false → `_eaRuntimeMod` 永为 null → 加渠道即
+  「添加失败: runtime not loaded」。本版:
+  ① **健壮目录解析**: 新增 `_resolveEaDir()`/`_eaRuntimePath()`/`_eaRouterPath()`(source.js)与
+     `_resolveEaRuntimePath()`(extension.js) —— 先试规范中文名, 找不到即按内容扫描 vendor/ 下
+     「含 runtime.js + core/dao_router.js」的子目录, **名字坏掉也能凭内容命中**。全部硬编码
+     「外接api」路径(初载/热重载/缓存清理)改走解析器。
+  ② **ea/* 惰性自愈**: 新增 `_ensureEaRuntimeMod()`, 任何 `/origin/ea/*` 请求进入前先试按需补载
+     runtime(require 缓存命中即秒返), 不再一遇 null 就直接抛「runtime not loaded」· 反者道之动。
+
+
 v9.9.351 · 发布包补齐全部运行时文件 · 「runtime not loaded」终章
 : 实锤真源: 发布页 9.9.347 VSIX **不含 vendor/外接api/runtime.js** —— `runtime.js`/`cascade_wire.js`/
   `sp_core.js`/`resilience.js` 等 39 个运行时文件与 `vendor/bundled-origin/` 全套从未提交入仓,

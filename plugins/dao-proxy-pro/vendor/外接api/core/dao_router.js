@@ -5449,6 +5449,8 @@ module.exports = {
   healthSnapshot,
   // ★ v9.9.301 · 用量聚合 (按渠道/模型) · 供「外接API」面板查看
   usage,
+  // ★ v9.9.351 · 外部记账入口 (模型反代/test-chat 等非 Cascade 路径亦入同一张用量表)
+  recordUsage: _recordUsage,
   // ★ 热配置 API · 道法自然
   hotAddProvider,
   hotRemoveProvider,

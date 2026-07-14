@@ -32,25 +32,96 @@ function ready() {
 // 部分登录模式(弱加密/仅会话令牌)不落 credentials.toml, 此时回退读 IDE globalStorage
 // state.vscdb 里的 windsurfAuthStatus{apiKey}(sqlite 内明文存储, 直接按字节正则提取)。
 let _keyCache = { key: "", at: 0 };
+
+function credFilePath() {
+  return process.env.DAO_DEVIN_CRED_FILE
+    || path.join(os.homedir(), ".local", "share", "devin", "credentials.toml");
+}
+
+// 用户数据目录默认基址(跨平台): IDE 以默认 --user-data-dir 时的 globalStorage 落点。
+function _defaultUserDataBases() {
+  if (process.platform === "win32")
+    return [process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")];
+  if (process.platform === "darwin")
+    return [path.join(os.homedir(), "Library", "Application Support")];
+  return [path.join(os.homedir(), ".config")];
+}
+
+// 运行中 IDE(devin-desktop/windsurf/code)的 --user-data-dir 派生 state.vscdb ——
+// 自定义 user-data-dir 时官方登录态不落默认路径, 唯此可发现(headless / 冷启动亦然)。
+function _runningUserDataDirs() {
+  const dirs = new Set();
+  if (process.platform !== "linux") return [...dirs];
+  try {
+    for (const d of fs.readdirSync("/proc")) {
+      if (!/^\d+$/.test(d)) continue;
+      let cmd = "";
+      try { cmd = fs.readFileSync("/proc/" + d + "/cmdline", "latin1"); } catch (_) { continue; }
+      if (!cmd) continue;
+      const parts = cmd.split("\0");
+      const idx = parts.indexOf("--user-data-dir");
+      if (idx >= 0 && parts[idx + 1]) { dirs.add(parts[idx + 1]); continue; }
+      const m = cmd.match(/--user-data-dir=([^\0]+)/);
+      if (m) dirs.add(m[1]);
+    }
+  } catch (_) {}
+  return [...dirs];
+}
+
+// 全部 state.vscdb 候选(去重·按可靠度排序): ①扩展注册的真实路径 ②运行中 IDE user-data-dir
+// 派生 ③默认安装路径回退。
+function stateDbCandidates() {
+  const list = [];
+  try {
+    const { ideStateDbs } = require("./host-state");
+    for (const p of ideStateDbs()) list.push(p);
+  } catch (_) {}
+  for (const udd of _runningUserDataDirs())
+    list.push(path.join(udd, "User", "globalStorage", "state.vscdb"));
+  for (const base of _defaultUserDataBases())
+    for (const app of ["Devin", "Windsurf", "Windsurf - Next", "Code", "VSCodium"])
+      list.push(path.join(base, app, "User", "globalStorage", "state.vscdb"));
+  return [...new Set(list)];
+}
+
+function _keysFromStateDb(dbPath) {
+  const keys = [];
+  try {
+    const s = fs.readFileSync(dbPath).toString("latin1");
+    let i = -1;
+    while ((i = s.indexOf("windsurfAuthStatus", i + 1)) >= 0) {
+      const m = s.slice(i, i + 8192).match(/"apiKey":"([^"]+)"/);
+      if (m && keys.indexOf(m[1]) < 0) keys.push(m[1]);
+    }
+  } catch (_) {}
+  return keys;
+}
+
+// 有序去重候选 apiKey 集合: credentials.toml 真源 → 各 state.vscdb 登录态。
+// 供 host-discover 逐个探测, 选中官方 LS 实际接受者(账号池切号/多登录态时不误判)。
+function apiKeyCandidates() {
+  const out = [];
+  const push = (k) => { if (k && out.indexOf(k) < 0) out.push(k); };
+  try {
+    const t = fs.readFileSync(credFilePath(), "utf8");
+    const m = t.match(/windsurf_api_key\s*=\s*"([^"]+)"/);
+    if (m) push(m[1]);
+  } catch (_) {}
+  for (const db of stateDbCandidates()) for (const k of _keysFromStateDb(db)) push(k);
+  return out;
+}
+
+// 首选 apiKey(back-compat): 探测选中的有效 key 经 setApiKey 回灌缓存后即返此。
 function apiKey() {
   if (_keyCache.key && Date.now() - _keyCache.at < 60000) return _keyCache.key;
-  try {
-    const t = fs.readFileSync(path.join(os.homedir(), ".local", "share", "devin", "credentials.toml"), "utf8");
-    const m = t.match(/windsurf_api_key\s*=\s*"([^"]+)"/);
-    if (m) { _keyCache = { key: m[1], at: Date.now() }; return m[1]; }
-  } catch (_) {}
-  for (const app of ["Devin", "Windsurf", "Windsurf - Next", "Code", "VSCodium"]) {
-    try {
-      const db = fs.readFileSync(path.join(os.homedir(), ".config", app, "User", "globalStorage", "state.vscdb"));
-      const s = db.toString("latin1");
-      let i = -1;
-      while ((i = s.indexOf("windsurfAuthStatus", i + 1)) >= 0) {
-        const m = s.slice(i, i + 4096).match(/"apiKey":"([^"]+)"/);
-        if (m) { _keyCache = { key: m[1], at: Date.now() }; return m[1]; }
-      }
-    } catch (_) {}
-  }
+  const cands = apiKeyCandidates();
+  if (cands.length) { _keyCache = { key: cands[0], at: Date.now() }; return cands[0]; }
   return "";
+}
+
+// host-discover 探测命中后回灌: 让后续 RPC 用官方 LS 实际接受的那把 key。
+function setApiKey(k) {
+  if (k && typeof k === "string") _keyCache = { key: k, at: Date.now() };
 }
 
 // 与官方扩展本体一致的调用方元数据(LS 端按此鉴权/归因)
@@ -217,4 +288,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, driveStream, listModels };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, stateDbCandidates, driveStream, listModels };

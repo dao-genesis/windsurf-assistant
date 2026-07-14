@@ -45,19 +45,27 @@ function hostView() {
   return { ready: !!h, lsPort: h ? h.lsPort : 0 };
 }
 
+// 本机 Cascade(devin-local) 水位: 会话轨迹与记忆计数(fused 快照, 无会话内容/凭据)。
+function cascadeView() {
+  const hs = hostStateMod.loadPersisted() || hostStateMod.hostState();
+  const f = hs.fused || {};
+  return { sessions: f.cascadeLocal || null, memories: f.memories || null };
+}
+
 // 路由表(全只读): 路径 → () => 数据。绝不暴露凭据/token 本身。
 function routes(reqUrl) {
   const u = reqUrl.split("?")[0];
   if (u === "/api/account") return accountView();
   if (u === "/api/mcp") return mcpView();
   if (u === "/api/host") return hostView();
+  if (u === "/api/cascade") return cascadeView();
   if (u === "/api/backups") {
     const l = backup.listBackups();
     return { root: l.root, accounts: l.accounts.map((a) => ({ email: a.email, source: a.source, convCount: a.convCount })) };
   }
   if (u === "/api/overview") {
     const l = backup.listBackups();
-    return { account: accountView(), host: hostView(), mcp: mcpView(),
+    return { account: accountView(), host: hostView(), mcp: mcpView(), cascade: cascadeView(),
       backups: { accounts: l.accounts.length, conversations: l.accounts.reduce((s, x) => s + x.convCount, 0) } };
   }
   return null;
@@ -110,4 +118,4 @@ function stop() {
   });
 }
 
-module.exports = { start, stop, running, token, port, statePath, accountView, mcpView, hostView, routes };
+module.exports = { start, stop, running, token, port, statePath, accountView, mcpView, hostView, cascadeView, routes };
