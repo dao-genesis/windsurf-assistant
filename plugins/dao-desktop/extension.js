@@ -48,15 +48,16 @@ async function activate(context) {
   } catch (e) { log("✗ windsurf 垫片失败: " + (e && e.stack ? e.stack : e)); }
 
   // ② Cascade 三模式面板(dao.cascade)。
+  let cascadeProvider = null;
   try {
-    daoCascade.register(context, (m) => log("[cascade] " + m), { ns: "dao" });
+    cascadeProvider = daoCascade.register(context, (m) => log("[cascade] " + m), { ns: "dao" });
     log("✓ Cascade 三模式面板就位 (dao.cascade)");
   } catch (e) { log("✗ Cascade 面板注册失败: " + (e && e.stack ? e.stack : e)); }
 
   // ②b 归一面板(dao.unified): 插件本源统一管理(主页/双源对话备份/MCP, 持续扩板块)。
   try {
     const unified = require("./dao-cascade/unified-panel");
-    unified.register(context, (m) => log("[unified] " + m), { ns: "dao" });
+    unified.register(context, (m) => log("[unified] " + m), { ns: "dao", cascade: cascadeProvider });
     log("✓ 归一面板就位 (dao.unified)");
   } catch (e) { log("✗ 归一面板注册失败: " + (e && e.stack ? e.stack : e)); }
 

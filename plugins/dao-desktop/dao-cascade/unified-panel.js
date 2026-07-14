@@ -33,11 +33,12 @@ const mcpConfig = require("./mcp-config");
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
 class UnifiedPanel {
-  constructor(log, ctx) {
+  constructor(log, ctx, opts) {
     this._log = typeof log === "function" ? log : () => {};
     this._view = null; this._board = "overview";
     this._extRoot = (ctx && ctx.extensionUri && ctx.extensionUri.fsPath) || "";
     this._storageDir = (ctx && ctx.globalStorageUri && ctx.globalStorageUri.fsPath) || "";
+    this._cascade = (opts && opts.cascade) || null; // Cascade 面板 provider(ACP 客户端宿主)
   }
 
   resolveWebviewView(view) {
@@ -170,6 +171,8 @@ class UnifiedPanel {
       case "set-toggle": return this._setToggle(String(msg.key || ""), !!msg.on);
       case "set-changelog": return this._setChangelog();
       case "set-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
+      case "acp-registry": return this._acpRegistry();
+      case "acp-reload": return this._acpReload();
       default: return;
     }
   }
@@ -648,6 +651,8 @@ class UnifiedPanel {
         },
         teamConfig: u.teamConfig || {},
         settings: { openRecent: (((rs || {}).userSettings) || {}).openMostRecentChatConversation === true },
+        acp: { running: !!(this._cascade && this._cascade._acpReady && this._cascade._acp),
+          registryPath: this._acpRegistryPath() },
       } });
     } catch (e) { this._post({ type: "set-detail", error: e.message }); }
   }
@@ -660,6 +665,39 @@ class UnifiedPanel {
       const s = ((await ls.call("GetUserSettings", {})) || {}).userSettings || {};
       await ls.call("SetUserSettings", { userSettings: Object.assign(s, { openMostRecentChatConversation: on }) });
     } catch (e) { vscode.window.showErrorMessage("设置失败: " + e.message); }
+    this._setDetail();
+  }
+
+  _acpRegistryPath() {
+    return path.join(os.homedir(), ".codeium", "windsurf", "acp", "registry.json");
+  }
+
+  // 官方同源 devin.openAcpLocalRegistry: 不存在则创建 {version:"1.0.0",agents:[]} 后以 jsonc 打开。
+  async _acpRegistry() {
+    try {
+      const p = this._acpRegistryPath();
+      const fs = require("fs");
+      if (!fs.existsSync(p)) {
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, JSON.stringify({ version: "1.0.0", agents: [] }, null, 2) + "\n");
+      }
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+      try { await vscode.languages.setTextDocumentLanguage(doc, "jsonc"); } catch (_) {}
+      await vscode.window.showTextDocument(doc);
+    } catch (e) { vscode.window.showErrorMessage("打开 ACP 本地注册表失败: " + e.message); }
+  }
+
+  // 官方同源 devin.reloadAcpConnections 的插件侧对等: 停掉 Cascade 面板持有的 ACP 客户端,
+  // 下次消息懒启动即重连(重读 registry 与最新凭证)。
+  async _acpReload() {
+    try {
+      const c = this._cascade;
+      if (c && c._acp) { try { c._acp.stop(); } catch (_) {} c._acp = null; c._acpReady = false; }
+      if (c) { c._acpFailAt = 0; c._acpBackoff = 0; }
+      // 宿主内建官方命令存在则一并触发(Devin IDE 内)。
+      try { await vscode.commands.executeCommand("devin.reloadAcpConnections"); } catch (_) {}
+      vscode.window.showInformationMessage("ACP 连接已重置 — 下次消息即重连");
+    } catch (e) { vscode.window.showErrorMessage("ACP 重连失败: " + e.message); }
     this._setDetail();
   }
 
@@ -1038,6 +1076,11 @@ function renderSettings(){
   h+=cr('CodeMap 分享',onoff(tc.allowCodemapSharing));
   if(tc.maxCascadeAutoExecutionLevel)h+=cr('自动执行上限',E(String(tc.maxCascadeAutoExecutionLevel).replace('CASCADE_COMMANDS_AUTO_EXECUTION_','')));
   h+='</div>';
+  const acp=SET.acp||{};
+  h+='<div class="st">ACP 连接(官方同源控制)</div><div class="card">'+
+    cr('Devin Local 连接',acp.running?'● 已连接':'○ 未连接(按需懒启动)')+
+    cr('本地注册表 registry.json','<span class="back" id="setAcpReg">打开/初始化</span>')+
+    cr('重载 ACP 连接','<span class="back" id="setAcpRl">重载↺</span>')+'</div>';
   h+='<div class="st">官方门户(外链)</div><div class="card">'+
     cr('Devin 控制台','<span class="back" data-seturl="https://app.devin.ai">打开↗</span>')+
     cr('用量与订阅(Windsurf 门户)','<span class="back" data-seturl="https://windsurf.com/subscription/usage">打开↗</span>')+
@@ -1153,6 +1196,8 @@ function render(){
   const srf=document.getElementById('setRf'); if(srf)srf.onclick=()=>{SET=null;render();vscode.postMessage({type:'set-detail'});};
   document.querySelectorAll('[data-settoggle]').forEach(el=>el.onclick=()=>{const [k,on]=el.dataset.settoggle.split('|');SET=null;render();vscode.postMessage({type:'set-toggle',key:k,on:on==='1'});});
   document.querySelectorAll('[data-seturl]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-open',url:el.dataset.seturl}));
+  const sar=document.getElementById('setAcpReg'); if(sar)sar.onclick=()=>vscode.postMessage({type:'acp-registry'});
+  const sal=document.getElementById('setAcpRl'); if(sal)sal.onclick=()=>{SET=null;render();vscode.postMessage({type:'acp-reload'});};
   if(S.board==='settings'&&SET===null)vscode.postMessage({type:'set-detail'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
@@ -1178,7 +1223,7 @@ vscode.postMessage({type:'refresh'});
 }
 
 function register(context, log, opts) {
-  const panel = new UnifiedPanel(log, context);
+  const panel = new UnifiedPanel(log, context, opts);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("dao.unified", panel, { webviewOptions: { retainContextWhenHidden: true } })
   );
