@@ -573,3 +573,28 @@ test("ACP 客户端生命周期: stop 杀净子进程 + onExit 复位钩子 + sp
   assert.strictEqual(exited2, 1, "spawn 失败也须触发 onExit");
   assert.strictEqual(c2._child, null);
 });
+
+test("authStatus 去抖: 单飞合并 + TTL 缓存 + force 绕过(根治子进程风暴)", async () => {
+  const prov = require(path.join(CASCADE, "devin-provision.js"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-auth-"));
+  const cnt = path.join(dir, "cnt");
+  fs.writeFileSync(cnt, "");
+  const fake = path.join(dir, "fake-devin");
+  fs.writeFileSync(fake, '#!/bin/sh\necho x >> "' + cnt + '"\necho "Logged in"\necho "Name: dao"\n');
+  fs.chmodSync(fake, 0o755);
+  const calls = () => fs.readFileSync(cnt, "utf8").split("\n").filter(Boolean).length;
+  // 1) 并发 5 连发 → 单飞合并为 1 次 spawn
+  const rs = await Promise.all([1, 2, 3, 4, 5].map(() => prov.authStatus(fake)));
+  assert.strictEqual(calls(), 1, "并发调用须单飞合并");
+  for (const r of rs) { assert.strictEqual(r.loggedIn, true); assert.strictEqual(r.name, "dao"); }
+  // 2) TTL 窗口内再调 → 命中缓存不再 spawn
+  await prov.authStatus(fake);
+  assert.strictEqual(calls(), 1, "TTL 内须命中缓存");
+  // 3) force 绕过缓存 → 立即重新 spawn
+  await prov.authStatus(fake, { force: true });
+  assert.strictEqual(calls(), 2, "force 须绕过缓存");
+  // 4) TTL 过期 → 重新 spawn
+  await new Promise((r) => setTimeout(r, 10));
+  await prov.authStatus(fake, { ttlMs: 1 });
+  assert.strictEqual(calls(), 3, "TTL 过期须重新探测");
+});

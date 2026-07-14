@@ -56,7 +56,7 @@ class CascadePanelProvider {
     this._view = webviewView;
     this._disposed = false;
     // 官方宿主态(LS 端口/CSRF/登录)变更 → 刷新 env 行，与官方登录模式同源
-    if (hostState) { const h = hostState(); const fn = () => { this._pushEnv(); this._handleSessionsList(); this._pushCascadeConfigOptions(); }; h.listeners.add(fn);
+    if (hostState) { const h = hostState(); const fn = () => { this._pushEnvSoon(); this._handleSessionsList(); this._pushCascadeConfigOptions(); }; h.listeners.add(fn);
       webviewView.onDidDispose(() => h.listeners.delete(fn)); }
     const w = webviewView.webview;
     w.options = { enableScripts: true, localResourceRoots: [this._ctx.extensionUri] };
@@ -284,10 +284,18 @@ class CascadePanelProvider {
       this._ctx.globalStorageUri && this._ctx.globalStorageUri.fsPath);
   }
 
+  // 宿主态广播可能短窗内连发(端口/CSRF/登录态逐项到位各 fire 一次) —— 400ms 尾沿去抖,
+  // 配合 devin-provision.authStatus 的单飞+TTL 缓存, 根治 auth status 子进程风暴。
+  _pushEnvSoon() {
+    if (this._envDebounce) clearTimeout(this._envDebounce);
+    this._envDebounce = setTimeout(() => { this._envDebounce = null; this._pushEnv(); }, 400);
+  }
+
   // 环境探测:引擎二进制 + 自持鉴权状态(决定 Devin Local/Cloud 能否真实驱动)。
-  async _pushEnv() {
+  // force=true 绕过去抖缓存(登录/登出后需立即取真值)。
+  async _pushEnv(force) {
     const bin = this._bin();
-    const auth = await authStatus(bin);
+    const auth = await authStatus(bin, force ? { force: true } : undefined);
     // 官方本体上报的宿主态: language_server 端口/CSRF(Cascade 轨) + 官方登录态(1:1 同源)
     const h = hostState ? hostState() : null;
     const ws = h ? { lsPort: h.lsPort || 0, lsCsrf: !!h.csrfToken,
@@ -345,7 +353,7 @@ class CascadePanelProvider {
       onDone: (r) => {
         this._loginCtrl = null;
         this._post({ type: "login-state", state: r.ok ? "ok" : "error", text: r.message });
-        this._pushEnv();
+        this._pushEnv(true);
       },
     });
   }
@@ -1998,6 +2006,14 @@ class CascadePanelProvider {
         await this._acp.prompt(msg.text);
         return this._post({ type: "assistant-done", id: msg.id });
       } catch (e) {
+        // 鉴权失败多为 ACP 起在登录之前(旧凭据驻留子进程) —— 杀掉令下轮
+        // _ensureAcp 以新 credentials.toml 重生, 免手动 Reload Window。
+        if (/authenticat|log ?in/i.test(String(e && e.message || e)) && this._acp) {
+          try { this._acp.stop(); } catch (_) {}
+          this._acp = null; this._acpReady = false;
+          return this._post({ type: "assistant-done", id: msg.id,
+            text: "ACP 请求失败: " + e.message + "\n(已重置 ACP 进程; 登录后直接重发即可)" });
+        }
         return this._post({ type: "assistant-done", id: msg.id, text: "ACP 请求失败: " + e.message });
       }
     }
