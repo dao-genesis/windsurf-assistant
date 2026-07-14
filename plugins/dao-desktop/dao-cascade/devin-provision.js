@@ -54,8 +54,8 @@ function resolveEngine(extRoot, storageDir) {
   return null;
 }
 
-// `devin auth status` → { loggedIn, name, raw }
-function authStatus(bin) {
+// `devin auth status` → { loggedIn, name, raw }(裸调, 每次 spawn 子进程)
+function authStatusRaw(bin) {
   return new Promise((resolve) => {
     if (!bin) return resolve({ loggedIn: false, name: null, raw: "no-bin" });
     execFile(bin, ["auth", "status"], { timeout: 15000 }, (err, stdout, stderr) => {
@@ -65,6 +65,27 @@ function authStatus(bin) {
       resolve({ loggedIn, name: m ? m[1].trim() : null, raw: raw.trim() });
     });
   });
+}
+
+// 去抖缓存层: 宿主态广播/面板刷新可在短窗内触发多次探测, 每次都 spawn 子进程
+// (超时上限 15s)会形成进程风暴。按 bin 单飞(in-flight 合并)+ TTL 缓存;
+// { force:true } 绕过缓存(登录/登出后须立即取真值), ttlMs 可覆盖(默认 5s)。
+const _authCache = new Map(); // bin → { at, result, inflight }
+function authStatus(bin, opts = {}) {
+  const ttl = typeof opts.ttlMs === "number" ? opts.ttlMs : 5000;
+  const key = bin || "";
+  const c = _authCache.get(key);
+  const now = Date.now();
+  if (!opts.force && c) {
+    if (c.inflight) return c.inflight;
+    if (c.result && now - c.at < ttl) return Promise.resolve(c.result);
+  }
+  const p = authStatusRaw(bin).then((r) => {
+    _authCache.set(key, { at: Date.now(), result: r, inflight: null });
+    return r;
+  });
+  _authCache.set(key, { at: now, result: c && c.result, inflight: p });
+  return p;
 }
 
 // 编排 `devin auth login --force-manual-token-flow`(自持登录,不依赖宿主)。
@@ -116,4 +137,4 @@ function startLogin(bin, opts = {}) {
   };
 }
 
-module.exports = { resolveEngine, authStatus, startLogin, exeName, platformTag };
+module.exports = { resolveEngine, authStatus, authStatusRaw, startLogin, exeName, platformTag };
