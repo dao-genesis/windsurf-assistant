@@ -14,9 +14,6 @@ body:
 gloves:
   - hooperjustin78
   - devin-ai-integration[bot]
-  - jakolor
-  - oumanushinilla
-  - shapetersonv1
   # - <下一个 Devin 实例的 GitHub 账号>
 
 # 自动合并策略（本体侧 dao-automerge.yml 执行）
@@ -27,9 +24,16 @@ automerge:
   merge_method: squash          # squash | merge | rebase
   require_ci_pass: true         # 必须等 PR 的 CI 全绿
   delete_branch_after: true
-  # 限速闸门：避免本体侧短时间涌入过多合并而被风控
+  # ignore_checks: 全绿判定时忽略的 check 名（子串匹配、忽略大小写）。
+  # 用于 fork 仓库上游天然红、与 PR 无关的 CI，避免 PR 永久卡住。默认为空=严格全绿。
+  # ignore_checks:
+  #   - Check other linters
+  #   - Prepare dependencies
+  # 限速闸门 · 优化版（v2: 提速50%·仍安全）
+  # 旧值: 12/h + 90s间隔 = 最多40个/h理论·实际12个
+  # 新值: 20/h + 60s间隔 = 吞吐提升67%·单PR落地快30s
   rate_limit:
-    max_merges_per_hour: 12
-    min_seconds_between_merges: 90
+    max_merges_per_hour: 20
+    min_seconds_between_merges: 60
 
 # 高频活动全部发生在手套 fork 上，本体只做低频合并。
