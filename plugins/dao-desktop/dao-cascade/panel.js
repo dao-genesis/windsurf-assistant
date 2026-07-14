@@ -1822,19 +1822,24 @@ class CascadePanelProvider {
 
   // 官方式新建定制文件: CreateCustomizationFile{fileName,fileType,workspaceConfigDir:".windsurf"} → filePath 开编辑器
   // 实测: RULES → .windsurf/rules/<name>; SKILLS → .windsurf/skills/<name>/SKILL.md; WORKFLOWS → .windsurf/workflows/<name>
+  // 全局变体(官方 processCreateWorkflow 同源): GLOBAL_WORKFLOWS/GLOBAL_SKILLS 落 ~/.codeium/windsurf 下, 不需 workspaceConfigDir
   async _handleCustomizationCreate(kind) {
     const ft = { rule: "CUSTOMIZATION_FILE_TYPE_RULES", skill: "CUSTOMIZATION_FILE_TYPE_SKILLS",
-      workflow: "CUSTOMIZATION_FILE_TYPE_WORKFLOWS" }[kind];
+      workflow: "CUSTOMIZATION_FILE_TYPE_WORKFLOWS", gskill: "CUSTOMIZATION_FILE_TYPE_GLOBAL_SKILLS",
+      gworkflow: "CUSTOMIZATION_FILE_TYPE_GLOBAL_WORKFLOWS" }[kind];
     if (!ft) return;
-    const name = await vscode.window.showInputBox({ prompt: "新建 " + kind + " 名称(文件名)" });
+    const isGlobal = kind === "gskill" || kind === "gworkflow";
+    const isSkill = kind === "skill" || kind === "gskill";
+    const name = await vscode.window.showInputBox({ prompt: "新建" + (isGlobal ? "全局 " : " ") + kind.replace(/^g/, "") + " 名称(文件名)" });
     if (!name || !name.trim()) return;
     try {
       const ls = require("./ls-bridge");
       // rule/workflow 是 markdown 文件, LS 不自动补扩展名, 无 .md 会不被扫描收录
       let fn = name.trim();
-      if (kind !== "skill" && !/\.md$/i.test(fn)) fn += ".md";
-      const r = await ls.call("CreateCustomizationFile", {
-        fileName: fn, fileType: ft, workspaceConfigDir: ".windsurf" });
+      if (!isSkill && !/\.md$/i.test(fn)) fn += ".md";
+      const req = { fileName: fn, fileType: ft };
+      if (!isGlobal) req.workspaceConfigDir = ".windsurf";
+      const r = await ls.call("CreateCustomizationFile", req);
       const p = ((r && r.filePath) || "").replace(/^file:\/\//, "");
       if (p) await this._handleOpenFile(p);
       this._handleCustomizationsList();
@@ -2951,6 +2956,8 @@ class CascadePanelProvider {
         const hl=document.createElement("span"); hl.textContent=ttl; h.appendChild(hl);
         const ad=document.createElement("span"); ad.className="mi"; ad.title="新建 "+ttl.slice(0,-1); ad.textContent="＋"; ad.style.cursor="pointer";
         ad.onclick=()=>vscode.postMessage({type:"custom-create", kind}); h.appendChild(ad);
+        if(kind==="workflow"||kind==="skill"){ const gd=document.createElement("span"); gd.className="mi"; gd.title="新建全局 "+ttl.slice(0,-1)+"(~/.codeium/windsurf)"; gd.textContent="⊕"; gd.style.cursor="pointer";
+          gd.onclick=()=>vscode.postMessage({type:"custom-create", kind:"g"+kind}); h.appendChild(gd); }
         if(kind==="rule"){ const im=document.createElement("span"); im.className="mi"; im.title="从 Cursor 导入规则(.cursor/rules → 全局规则)"; im.textContent="⇤"; im.style.cursor="pointer";
           im.onclick=()=>vscode.postMessage({type:"custom-import-cursor"}); h.appendChild(im); }
         cusList.appendChild(h);
