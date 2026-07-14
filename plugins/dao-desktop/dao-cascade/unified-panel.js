@@ -669,6 +669,7 @@ class UnifiedPanel {
   }
 
   _acpRegistryPath() {
+    const os = require("os"); const path = require("path");
     return path.join(os.homedir(), ".codeium", "windsurf", "acp", "registry.json");
   }
 
@@ -676,7 +677,7 @@ class UnifiedPanel {
   async _acpRegistry() {
     try {
       const p = this._acpRegistryPath();
-      const fs = require("fs");
+      const fs = require("fs"); const path = require("path");
       if (!fs.existsSync(p)) {
         fs.mkdirSync(path.dirname(p), { recursive: true });
         fs.writeFileSync(p, JSON.stringify({ version: "1.0.0", agents: [] }, null, 2) + "\n");
