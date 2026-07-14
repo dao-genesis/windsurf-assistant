@@ -71,14 +71,17 @@ function remove(email) {
   return { removed: true };
 }
 
-// 面板视图数据(key 永不出后端: 只回显是否有 key + 尾 4 位指纹)
+// 面板视图数据(key 永不出后端: 只回显是否有 key + 尾 4 位指纹)。
+// 活动号以 credentials.toml(切换真源)为唯一判据; 仅当 toml 无 key 时才回退
+// 宿主活动 key —— 否则切换后旧号(state.vscdb 残留 key)会与新号同显「当前」。
 function listView(activeKey) {
   const cred = currentCredKey();
+  const effective = cred || activeKey;
   return loadPool().map((a) => ({
     email: a.email, name: a.name || "", plan: a.plan || "", addedAt: a.addedAt || "",
     hasKey: !!a.apiKey,
     keyTail: a.apiKey ? a.apiKey.slice(-4) : "",
-    active: !!a.apiKey && (a.apiKey === activeKey || a.apiKey === cred),
+    active: !!a.apiKey && a.apiKey === effective,
   }));
 }
 

@@ -268,4 +268,8 @@
 - **R115 ACP 旧凭据自愈**：CLI 登录发生在 ACP 子进程已起之后(旧凭据驻留)时，Devin Local 每轮报「Authentication failed」需手动 Reload Window——实机第三轮暴露。修：`_handleChat` devin-local 轨 catch 中识别鉴权类错误即 stop 并置空 `_acp/_acpReady`，下轮 `_ensureAcp` 以新 credentials.toml 重生自愈
 - **R116 归一面板窄容器自适应**：VS Code 侧栏/副侧栏宽度受限(~350px)时，固定 132px 纵向导航把 `.main` 挤成几像素竖条(文字竖排不可读)——第四轮分屏对照暴露。修：`.main` 补 `min-width:0`；`@media (max-width:420px)` 下 `.wrap` 转纵向、导航变横向 wrap 圆角 chips 顶栏，内容区独占全宽
 - **R117 归一面板板头窄容器挤压**：R116 后第四轮实机复测暴露——各板 `.row` 头(h2 flex:1 + 按钮)在窄侧栏仍被压成竖排单字(Proxy Pro 板最明显)。修：`.row` 补 `flex-wrap:wrap`、`.row h2{min-width:120px}`、`.btn` 补 `white-space:nowrap;flex:0 0 auto`，按钮保持本征宽换行排布
+- **R118 收录当前号取活体身份**：第五轮换号实测暴露——`_poolCapture` 用落盘 fused.account(旧号残影)配当前 key，换号后收录会把新 key 记到旧邮箱名下(跨号污染)。修：收录前现场 `GetUserStatus` 取当前 key 真实账号并回刷 fused；无 email 即报错拒绝盲收
+- **R119 账号卡头窄容器挤压**：窄侧栏下 `.acc .hd`(邮箱+徽标 vs 按钮组)不换行，切换/移除按钮被 `overflow:hidden` 裁掉不可点。修：`.acc .hd` 补 `flex-wrap:wrap;gap:6px`，邮箱 span `min-width:0;overflow-wrap:anywhere`，按钮组 `flex:0 0 auto`
+- **R120 活动号判据归一**：切换后旧号(state.vscdb 残留 key = ls.apiKey())与新号(credentials.toml)同显「当前」。修：`listView` 以 credentials.toml key 为唯一活动判据，仅 toml 无 key 时回退宿主活动 key
+- **第五轮实测结论**：Devin Local 经插件真实调度通过(工具卡 search/execute/read)；Cascade SWE-1.6 Slow 真实 grep 调度通过；@文件引用/斜杠命令菜单通过；Devin Cloud `/acp/live` 对测试组织返回 HTTP 403(CLI 同源直连同拒)，为上游 devin_cloud_acp 未开通，非插件缺陷
 - **边界结论(下一刀)**：`ls-bridge`(传输) + `host-discover`(宿主发现) + `host-state`(态) 现为 vscode-free 通用核，任意宿主(VS Code 扩展/CLI/独立进程/他 IDE)可消费。`panel.js` 仍混编运行时编排 + VS Code UI + webview 渲染 + 功能处理器；后续解耦宜先抽「会话/运行时编排」(driveStream 之上的 Cascade 生命周期)为宿主无关模块，再令 VS Code UI 作纯适配壳——仍遵后端优先、勿一次性重写 panel。
