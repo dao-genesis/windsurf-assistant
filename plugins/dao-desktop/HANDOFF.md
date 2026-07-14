@@ -271,5 +271,6 @@
 - **R118 收录当前号取活体身份**：第五轮换号实测暴露——`_poolCapture` 用落盘 fused.account(旧号残影)配当前 key，换号后收录会把新 key 记到旧邮箱名下(跨号污染)。修：收录前现场 `GetUserStatus` 取当前 key 真实账号并回刷 fused；无 email 即报错拒绝盲收
 - **R119 账号卡头窄容器挤压**：窄侧栏下 `.acc .hd`(邮箱+徽标 vs 按钮组)不换行，切换/移除按钮被 `overflow:hidden` 裁掉不可点。修：`.acc .hd` 补 `flex-wrap:wrap;gap:6px`，邮箱 span `min-width:0;overflow-wrap:anywhere`，按钮组 `flex:0 0 auto`
 - **R120 活动号判据归一**：切换后旧号(state.vscdb 残留 key = ls.apiKey())与新号(credentials.toml)同显「当前」。修：`listView` 以 credentials.toml key 为唯一活动判据，仅 toml 无 key 时回退宿主活动 key
+- **R121 归一面板新增「⚙ 设置」板块（官方同源二级页）**：活体 GetUserStatus/GetUserSettings 直连——账号与用量(套餐/日周配额剩余与重置时间/Prompt·Flow 月度额度/输入与固定上下文上限)、官方设置开关读改写(SetUserSettings 为整体替换故必须读-改-写全量合并)、组织能力矩阵(teamConfig: Cloud/Terminal ACP·MCP·网页搜索·Arena·部署·自动执行上限)、GetChangelog 更新日志(版本无日志时回退 1.12.169)、官方门户外链。双宿主实测通过；一切值活体拉取零硬编码
 - **第五轮实测结论**：Devin Local 经插件真实调度通过(工具卡 search/execute/read)；Cascade SWE-1.6 Slow 真实 grep 调度通过；@文件引用/斜杠命令菜单通过；Devin Cloud `/acp/live` 对测试组织返回 HTTP 403(CLI 同源直连同拒)，为上游 devin_cloud_acp 未开通，非插件缺陷
 - **边界结论(下一刀)**：`ls-bridge`(传输) + `host-discover`(宿主发现) + `host-state`(态) 现为 vscode-free 通用核，任意宿主(VS Code 扩展/CLI/独立进程/他 IDE)可消费。`panel.js` 仍混编运行时编排 + VS Code UI + webview 渲染 + 功能处理器；后续解耦宜先抽「会话/运行时编排」(driveStream 之上的 Cascade 生命周期)为宿主无关模块，再令 VS Code UI 作纯适配壳——仍遵后端优先、勿一次性重写 panel。
