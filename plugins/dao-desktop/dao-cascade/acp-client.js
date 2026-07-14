@@ -46,18 +46,21 @@ class AcpClient {
     });
     this._child.stdout.on("data", (d) => this._onStdout(d));
     this._child.stderr.on("data", (d) => this._log("[acp:stderr] " + String(d).trim()));
-    this._child.on("exit", (code) => {
+    const c = this._child;
+    c.on("exit", (code) => {
       this._log("[acp] devin acp 退出 code=" + code);
       for (const { reject } of this._pending.values()) reject(new Error("acp process exited"));
       this._pending.clear();
       this._child = null;
+      this._destroyStdio(c);
       if (this._onExit) { try { this._onExit(code); } catch (_) {} }
     });
-    this._child.on("error", (e) => {
+    c.on("error", (e) => {
       this._log("[acp] spawn 失败: " + (e && e.message));
       for (const { reject } of this._pending.values()) reject(e);
       this._pending.clear();
       this._child = null;
+      this._destroyStdio(c);
       if (this._onExit) { try { this._onExit(-1); } catch (_) {} }
     });
   }
@@ -70,7 +73,16 @@ class AcpClient {
     try { c.kill(); } catch (_) {}
     const t = setTimeout(() => { try { c.kill("SIGKILL"); } catch (_) {} }, 3000);
     if (t.unref) t.unref();
-    c.once("exit", () => clearTimeout(t));
+    c.once("exit", () => { clearTimeout(t); this._destroyStdio(c); });
+    this._destroyStdio(c);
+  }
+
+  // 子进程亡后其 stdio 管道 Socket 仍挂在父进程事件循环上(尤其 stdin 写端不自闭),
+  // 不销毁则宿主进程/测试进程永不退出。
+  _destroyStdio(c) {
+    for (const s of [c.stdin, c.stdout, c.stderr]) {
+      try { if (s) s.destroy(); } catch (_) {}
+    }
   }
 
   _onStdout(chunk) {
