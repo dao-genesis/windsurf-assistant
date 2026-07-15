@@ -62,13 +62,25 @@ function postJson(urlStr, headers, bodyObj, timeoutMs) {
 }
 
 // 抽取兼容响应正文文本(openai: choices[].message.content; anthropic: content[].text)。
+// 推理模型(deepseek-v4/mimo 等)正文可能落在 message.reasoning_content, content 为空 —— 兜底取之。
 function extractText(type, json) {
   if (!json) return "";
   if (type === "anthropic") {
-    return ((json.content || []).map((b) => (b && b.text) || "").filter(Boolean).join("")) || "";
+    const blocks = json.content || [];
+    const text = blocks.map((b) => (b && b.text) || "").filter(Boolean).join("");
+    if (text) return text;
+    return blocks.map((b) => (b && b.type === "thinking" && (b.thinking || b.text)) || "").filter(Boolean).join("") || "";
   }
   const ch = (json.choices || [])[0] || {};
-  return (ch.message && ch.message.content) || ch.text || "";
+  const m = ch.message || {};
+  return m.content || ch.text || m.reasoning_content || "";
+}
+
+// 抽取完成原因(finish_reason / stop_reason): 用于识别 max_tokens 截断等。
+function finishReason(type, json) {
+  if (!json) return "";
+  if (type === "anthropic") return json.stop_reason || "";
+  return ((json.choices || [])[0] || {}).finish_reason || "";
 }
 
 // 真正发起路由: 给定官方模型 UID + messages, 经配置渠道投递到第三方模型。
@@ -90,22 +102,27 @@ async function chat(uid, opts) {
   if (type === "anthropic") {
     const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
     const conv = messages.filter((m) => m.role !== "system");
-    const bodyObj = { model, max_tokens: opts.maxTokens || 1024, messages: conv };
+    const bodyObj = { model, max_tokens: opts.maxTokens || 2048, messages: conv };
     if (sys) bodyObj.system = sys;
     if (opts.temperature != null) bodyObj.temperature = opts.temperature;
     res = await postJson(base + "/v1/messages", { "x-api-key": ch.apiKey, "anthropic-version": "2023-06-01" }, bodyObj, opts.timeoutMs);
   } else {
-    const bodyObj = { model, messages };
+    const bodyObj = { model, messages, max_tokens: opts.maxTokens || 2048 };
     if (opts.temperature != null) bodyObj.temperature = opts.temperature;
-    if (opts.maxTokens != null) bodyObj.max_tokens = opts.maxTokens;
     res = await postJson(base + "/chat/completions", { "Authorization": "Bearer " + ch.apiKey }, bodyObj, opts.timeoutMs);
   }
   const content = extractText(type, res.json);
+  const finish = finishReason(type, res.json);
   const ok = res.code === 200 && !!content;
-  return {
-    ok, uid, channel: ch.name, model, type, httpCode: res.code, content,
-    ...(ok ? {} : { error: (res.json && (res.json.error && (res.json.error.message || res.json.error)) ) || (res.code === 0 ? "渠道不可达/超时" : ("HTTP " + res.code)) }),
-  };
+  const out = { ok, uid, channel: ch.name, model, type, httpCode: res.code, content, finishReason: finish };
+  if (!ok) {
+    if (res.code === 200 && !content && (finish === "length" || finish === "max_tokens")) {
+      out.error = "正文为空且被 max_tokens 截断(疑纯推理模型/预算过小), 请增大 maxTokens 或换非推理模型";
+    } else {
+      out.error = (res.json && res.json.error && (res.json.error.message || res.json.error)) || (res.code === 0 ? "渠道不可达/超时" : ("HTTP " + res.code));
+    }
+  }
+  return out;
 }
 
-module.exports = { resolve, routeStatus, chat, extractText, normBase };
+module.exports = { resolve, routeStatus, chat, extractText, finishReason, normBase };
