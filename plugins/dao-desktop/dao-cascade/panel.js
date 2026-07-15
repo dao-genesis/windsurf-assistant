@@ -3545,7 +3545,10 @@ function register(context, log, opts) {
         const bin = provision.resolveEngine(context.extensionPath, null);
         if (!bin) throw new Error("未找到 devin 二进制");
         const { execFile } = require("child_process");
-        await new Promise((res) => execFile(bin, ["auth", "logout"], { timeout: 20000 }, () => res()));
+        const r = await new Promise((res) =>
+          execFile(bin, ["auth", "logout"], { timeout: 20000 }, (err, so, se) =>
+            res({ ok: !err, message: String(so || se || (err && err.message) || "").trim() })));
+        if (!r.ok) throw new Error(r.message || "auth logout 退出码非 0");
         vscode.window.setStatusBarMessage("已登出 Devin 账号", 4000);
       } catch (e) { vscode.window.showWarningMessage("登出失败: " + e.message); }
     }),

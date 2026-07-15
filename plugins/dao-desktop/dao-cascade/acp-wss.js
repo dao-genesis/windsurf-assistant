@@ -49,8 +49,19 @@ class AcpWssClient {
     this.sessionId = null;
   }
 
-  // 公开订阅面: 外部可挂多个 session/update 监听器(替代覆写私有 _onUpdate)
-  onUpdate(fn) { if (typeof fn === "function") this._subs.push(fn); return this; }
+  // 公开订阅面: 外部可挂多个 session/update 监听器(替代覆写私有 _onUpdate)。
+  // 返回一次性 unsubscribe 函数(幂等), 调用方无需伸手进私有 _subs 摘除自己的 tap。
+  onUpdate(fn) {
+    if (typeof fn !== "function") return () => {};
+    this._subs.push(fn);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      const i = this._subs.indexOf(fn);
+      if (i >= 0) this._subs.splice(i, 1);
+    };
+  }
 
   async connect() {
     if (this._ws && this._ws.readyState === 1) return;

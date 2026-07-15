@@ -302,13 +302,13 @@ async function postRoutes(u, body) {
           if ((s.sessionUpdate || s.kind) === "agent_message_chunk") out += ((s.content || {}).text) || "";
         } catch (_) {}
       };
-      c.onUpdate(tap);
+      const unsub = c.onUpdate(tap);
       try {
         if ((body || {}).sessionId) await c.loadSession(body.sessionId);
         else if (!c.sessionId) await c.newSession("/");
         const r = await c.prompt(text);
         return { ok: true, live: true, sessionId: c.sessionId, stopReason: (r || {}).stopReason || "", reply: out };
-      } finally { const i = c._subs.indexOf(tap); if (i >= 0) c._subs.splice(i, 1); }
+      } finally { unsub(); }
     }
     return withCloud(async (c) => {
       let out = "";
