@@ -1274,6 +1274,11 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u66F8\u8001\u5B50+\u9053\u85CF\u9670\u7B26\u7D93", // 帛書老子+道藏陰符經
   },
+  // Windows Agent 模式: 二经合 + Windows 工具契约(dao-windows-agent MCP 官方并列工具层)
+  "windows-agent": {
+    files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt", "_windows_agent.txt"],
+    name: "\u4E8C\u7D93\u5408+Windows Agent \u5DE5\u5177\u5951\u7D04", // 二經合+Windows Agent 工具契約
+  },
 };
 const _CANON_VALID = new Set(Object.keys(_CANON_MAP));
 const _CANON_FILE = path.join(__dirname, "_origin_canon.txt");
@@ -1573,8 +1578,8 @@ const TAO_SUB_ANCHOR = "";
 function _canonHeader(canon) {
   // v9.9.49 · 动态书名号 · 无"及其后文本"
   let bookRef;
-  if (canon === "laozi+yinfu") {
-    // 两经合: 各带书名号
+  if (canon === "laozi+yinfu" || canon === "windows-agent") {
+    // 两经合(windows-agent 亦以二经为体·工具契约为用): 各带书名号
     bookRef =
       "\u5E1B\u66F8\u300A\u8001\u5B50\u300B\u9053\u85CF\u300A\u9670\u7B26\u7D93\u300B"; // 帛書《老子》道藏《陰符經》
   } else {

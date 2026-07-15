@@ -755,3 +755,54 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.binPath, bin);
   } finally { delete process.env.DAO_ENV_SYNC_HOME; }
 });
+
+test("Windows Agent 接入官方工具层: local/remote 注册直写 mcp_config.json + 脱敏视图 + 模式提示词", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-winagent-"));
+  process.env.DAO_MCP_CONFIG_FILE = path.join(dir, "mcp_config.json");
+  const wa = require(path.join(CASCADE, "windows-agent.js"));
+  try {
+    // 未注册
+    assert.deepStrictEqual(wa.status(), { registered: false });
+    // local: 无检出必拒(可诊断)
+    delete process.env.DAO_WINDOWS_AGENT_DIR;
+    const miss = wa.registerLocal({ dir: path.join(dir, "nowhere") });
+    assert.strictEqual(miss.ok, false);
+    // local: 伪造检出(bridge/mcp.py 在即认)
+    const co = path.join(dir, "Dao-Windows-Agent");
+    fs.mkdirSync(path.join(co, "bridge"), { recursive: true });
+    fs.writeFileSync(path.join(co, "bridge", "mcp.py"), "");
+    const r1 = wa.registerLocal({ dir: co, bridgeUrl: "http://127.0.0.1:9930", token: "秘" });
+    assert.strictEqual(r1.ok, true);
+    assert.strictEqual(r1.transport, "local");
+    const cfg1 = JSON.parse(fs.readFileSync(process.env.DAO_MCP_CONFIG_FILE, "utf8"));
+    const spec1 = cfg1.mcpServers[wa.SERVER_NAME];
+    assert.strictEqual(spec1.command, "python3");
+    assert.deepStrictEqual(spec1.args, ["-m", "bridge.mcp"]);
+    assert.strictEqual(spec1.cwd, co);
+    assert.strictEqual(spec1.env.DAO_WIN_BRIDGE_URL, "http://127.0.0.1:9930");
+    const st1 = wa.status();
+    assert.strictEqual(st1.transport, "local");
+    assert.strictEqual(st1.hasAuth, true);
+    assert.ok(!JSON.stringify(st1).includes("秘"), "视图必脱敏");
+    // remote: 补 /mcp + Bearer 头；非 http(s) 必拒
+    assert.strictEqual(wa.registerRemote({ url: "ws://x" }).ok, false);
+    const r2 = wa.registerRemote({ url: "https://dao-relay.example.com/", token: "秘2" });
+    assert.strictEqual(r2.ok, true);
+    const spec2 = JSON.parse(fs.readFileSync(process.env.DAO_MCP_CONFIG_FILE, "utf8")).mcpServers[wa.SERVER_NAME];
+    assert.strictEqual(spec2.serverUrl, "https://dao-relay.example.com/mcp");
+    assert.strictEqual(spec2.headers.Authorization, "Bearer 秘2");
+    const st2 = wa.status();
+    assert.strictEqual(st2.transport, "remote");
+    assert.ok(!JSON.stringify(st2).includes("秘2"), "视图必脱敏");
+    // 与 mcp-config 开关同源: server 级 disabled 可翻转
+    const mc = require(path.join(CASCADE, "mcp-config.js"));
+    assert.strictEqual(mc.toggleServer(wa.SERVER_NAME).disabled, true);
+    assert.strictEqual(wa.status().disabled, true);
+    // 注销
+    assert.deepStrictEqual(wa.unregister(), { ok: true, removed: true });
+    assert.deepStrictEqual(wa.status(), { registered: false });
+    // 模式提示词(经文+工具契约)
+    const p = wa.modePrompt();
+    assert.ok(p.includes("list_apps") && p.includes("clone_plan") && p.includes("道并行而不相悖"));
+  } finally { delete process.env.DAO_MCP_CONFIG_FILE; }
+});

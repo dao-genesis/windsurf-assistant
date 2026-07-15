@@ -3417,6 +3417,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       <option value="laozi+yinfu">\u5e1b\u4e66\u8001\u5b50+\u9053\u85cf\u9634\u7b26\u7ecf</option>
       <option value="laozi">\u5e1b\u4e66\u300a\u8001\u5b50\u300b</option>
       <option value="yinfu">\u9053\u85cf\u300a\u9634\u7b26\u7ecf\u300b</option>
+      <option value="windows-agent">\u4e8c\u7ecf\u5408+Windows Agent \u5de5\u5177\u5951\u7ea6</option>
     </select>
     <span id="customBadge"></span>
   </div>
@@ -5061,6 +5062,7 @@ function getEaConfigHtml(port, nonce, opts) {
         <option value="laozi+yinfu">帛书老子+道藏阴符经</option>
         <option value="laozi">帛书《老子》</option>
         <option value="yinfu">道藏《阴符经》</option>
+        <option value="windows-agent">二经合+Windows Agent 工具契约</option>
       </select>
       <span id="e1Badge" style="font-size:10px;opacity:0.6"></span>
       <button class="btn" id="e1Open" style="margin-left:auto" title="在侧栏展开完整本源观照">↗ 侧栏</button>
