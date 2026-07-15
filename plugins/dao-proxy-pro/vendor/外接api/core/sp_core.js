@@ -80,6 +80,11 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u4E66\u8001\u5B50+\u9053\u85CF\u9634\u7B26\u7ECF",
   },
+  // Windows Agent 模式: 二经合 + Windows 工具契约(dao-windows-agent MCP 官方并列工具层)
+  "windows-agent": {
+    files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt", "_windows_agent.txt"],
+    name: "\u4E8C\u7ECF\u5408+Windows Agent \u5DE5\u5177\u5951\u7EA6",
+  },
 };
 // ★ v9.9.94 · _CANON_FILE 指向 bundled-origin (与 sp_invert.js 同源)
 //   sp_core.js 在 core/ 目录 · bundled-origin 在 ../../bundled-origin
@@ -121,7 +126,7 @@ function getCanon() {
 // ★ v9.9.94 · 动态经藏头 · 与 sp_invert.js _canonHeader 同源
 function _canonHeader(canon) {
   let bookRef;
-  if (canon === "laozi+yinfu") {
+  if (canon === "laozi+yinfu" || canon === "windows-agent") {
     bookRef =
       "\u5E1B\u4E66\u300A\u8001\u5B50\u300B\u9053\u85CF\u300A\u9634\u7B26\u7ECF\u300B";
   } else {
