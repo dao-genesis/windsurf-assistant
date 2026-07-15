@@ -412,7 +412,14 @@ test("R128 本地 API 后端调度端点: /api/env 直取环境共生检测; POS
     assert.strictEqual(await api.postRoutes("/api/nope", {}), null);
     await assert.rejects(() => api.postRoutes("/api/cascade/send", {}), /text required/);
     assert.throws(() => api.routes("/api/cascade/steps"), /cascadeId required/);
+    await assert.rejects(() => api.postRoutes("/api/cloud/send", {}), /text required/);
   } finally { delete process.env.DAO_ENV_SYNC_HOME; }
+});
+
+test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {
+  const { acpToken } = require(path.join(CASCADE, "acp-wss.js"));
+  assert.strictEqual(acpToken("devin-session-token$abc123"), "abc123");
+  assert.strictEqual(acpToken("plain-key"), "plain-key");
 });
 
 test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
