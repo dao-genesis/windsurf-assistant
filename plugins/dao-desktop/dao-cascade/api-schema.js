@@ -57,6 +57,41 @@ const ROUTES = [
   { path: "/api/cloud/cancel", method: "post", summary: "取消 Cloud 会话", b: [{ name: "sessionId", req: true }] },
   { path: "/api/backups", method: "get", summary: "对话备份清单(按账号)" },
   { path: "/api/backup/run", method: "post", summary: "执行对话备份" },
+  // ── Proxy Pro(第三方渠道/模型路由; Key 只入私有存储, 视图恒脱敏) ──
+  { path: "/api/proxy", method: "get", summary: "Proxy Pro 渠道+路由视图(脱敏: 仅回 hasKey/keyTail)" },
+  { path: "/api/proxy/channel/add", method: "post", summary: "加/改第三方渠道", b: [{ name: "name", req: true }, { name: "type", desc: "openai|anthropic|..." }, { name: "baseURL" }, { name: "apiKey" }] },
+  { path: "/api/proxy/channel/remove", method: "post", summary: "删渠道", b: [{ name: "name", req: true }] },
+  { path: "/api/proxy/channel/refresh", method: "post", summary: "识别渠道模型清单", b: [{ name: "name", req: true }] },
+  { path: "/api/proxy/route", method: "post", summary: "设/解模型路由(官方 UID → 渠道/模型)", b: [{ name: "uid", req: true }, { name: "channel", desc: "留空=解除" }, { name: "model" }] },
+  { path: "/api/proxy/routes", method: "get", summary: "路由生效视图(每条路由能否真正投递: 渠道/Key/模型齐备)" },
+  { path: "/api/proxy/chat", method: "post", summary: "路由生效层: 按官方 UID 真正投递到第三方渠道/模型(消费路由, 不伪造)", b: [{ name: "uid", req: true }, { name: "messages", desc: "[{role,content}]; 或用 text" }, { name: "text" }, { name: "temperature" }, { name: "maxTokens" }] },
+  // ── 账号池切号(Devin; 严禁回退, 无 key 报错) ──
+  { path: "/api/pool", method: "get", summary: "Cascade 账号池视图(脱敏: hasKey/keyTail/active)" },
+  { path: "/api/pool/capture", method: "post", summary: "收录当前登录号入池", b: [{ name: "account", desc: "缺省取 /api/account 视图" }] },
+  { path: "/api/pool/switch", method: "post", summary: "切换到池内账号(写 credentials.toml)", b: [{ name: "email", req: true }] },
+  { path: "/api/pool/remove", method: "post", summary: "移除池内账号", b: [{ name: "email", req: true }] },
+  // ── 反向注入(全账号; secret 值绝不出后端) ──
+  { path: "/api/inject", method: "get", summary: "注入档视图(脱敏: secret 仅回 hasValue/valueTail)" },
+  { path: "/api/inject/plan", method: "get", summary: "注入计划(账号池 × 注入档 交叉清单)" },
+  { path: "/api/inject/add", method: "post", summary: "加/改注入档(mcp|secret|knowledge)", b: [{ name: "kind", req: true }, { name: "name", req: true }, { name: "spec", req: true }] },
+  { path: "/api/inject/remove", method: "post", summary: "删注入档", b: [{ name: "kind", req: true }, { name: "name", req: true }] },
+  { path: "/api/inject/apply-mcp", method: "post", summary: "MCP 注入档即刻本机落地(写 mcp_config.json)" },
+  // ── GitHub 舰队(纯 GitHub 纵向, 与 Devin 账号池分离; PAT 只出尾 4 位) ──
+  { path: "/api/github", method: "get", summary: "GitHub 舰队视图(脱敏: hasPat/patTail)" },
+  { path: "/api/github/add", method: "post", summary: "加/改 GitHub 号(PAT 反查 login)", b: [{ name: "pat", req: true }, { name: "login", desc: "断网入队需带" }, { name: "role", desc: "admin|member" }] },
+  { path: "/api/github/remove", method: "post", summary: "移除 GitHub 号", b: [{ name: "login", req: true }] },
+  { path: "/api/github/role", method: "post", summary: "定角色", b: [{ name: "login", req: true }, { name: "role", desc: "admin|member" }] },
+  { path: "/api/github/verify", method: "post", summary: "在线核对全队(PAT 活性+仓库探针)" },
+  // ── Web 搜索(站内直出, 不弹外部浏览器) ──
+  { path: "/api/search", method: "get", summary: "站内网页搜索(无 q 则回引擎+历史)", q: [{ name: "q", desc: "查询串" }, { name: "engine", desc: "duckduckgo|bing" }] },
+  { path: "/api/search", method: "post", summary: "站内网页搜索", b: [{ name: "query", req: true }, { name: "engine" }] },
+  { path: "/api/search/history", method: "get", summary: "搜索历史(仅查询串, 无凭据)" },
+  { path: "/api/search/clear", method: "post", summary: "清空搜索历史" },
+  // ── Windows Agent(接入官方 MCP 工具层; headers 只报有无) ──
+  { path: "/api/winagent", method: "get", summary: "Windows Agent 注册状态(脱敏)" },
+  { path: "/api/winagent/local", method: "post", summary: "注册 local 通道(stdio 起 bridge.mcp)", b: [{ name: "dir" }, { name: "bridgeUrl" }, { name: "token" }, { name: "disabled" }] },
+  { path: "/api/winagent/remote", method: "post", summary: "注册 remote 通道(DAO Bridge 穿透 /mcp)", b: [{ name: "url", req: true }, { name: "token" }, { name: "disabled" }] },
+  { path: "/api/winagent/unregister", method: "post", summary: "注销 Windows Agent" },
 ];
 
 function paramSchema(list) {

@@ -26,6 +26,7 @@ const acctPool = require("./account-pool");
 const localApi = require("./local-api");
 const ghFleet = require("./github-fleet");
 const proxyPro = require("./proxy-pro");
+const proxyRuntime = require("./proxy-runtime");
 const webSearch = require("./web-search");
 const inject = require("./inject");
 const mcpConfig = require("./mcp-config");
@@ -159,6 +160,7 @@ class UnifiedPanel {
       case "px-remove": return this._pxRemove(String(msg.name || ""));
       case "px-refresh": return this._pxRefresh(String(msg.name || ""));
       case "px-route": return this._pxRoute();
+      case "px-test": return this._pxTest(String(msg.uid || ""));
       case "ws-search": return this._wsSearch(String(msg.query || ""), String(msg.engine || ""));
       case "ws-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
       case "ws-clear": return this._wsClear();
@@ -475,7 +477,24 @@ class UnifiedPanel {
   }
 
   // Proxy Pro 板块(插件自持模型渠道+路由): apiKey 永不出后端, 只回尾4位。
-  _pxList() { this._post({ type: "px-list", data: proxyPro.listView(), file: proxyPro.cfgPath() }); }
+  _pxList() {
+    let routeStatus = [];
+    try { routeStatus = proxyRuntime.routeStatus(); } catch (_) {}
+    this._post({ type: "px-list", data: proxyPro.listView(), routeStatus, file: proxyPro.cfgPath() });
+  }
+
+  // 路由试跑(生效层): 经 proxy-runtime 真正投递到该 UID 路由的第三方渠道, 与 local-api /api/proxy/chat 同源。
+  async _pxTest(uid) {
+    uid = String(uid || "").trim();
+    if (!uid) { vscode.window.showWarningMessage("先选一个已配路由的官方模型 UID"); return; }
+    const prompt = await vscode.window.showInputBox({ prompt: "试跑提示词(经路由投递到第三方渠道)", value: "你好, 用一句话自我介绍" });
+    if (prompt === undefined) return;
+    try {
+      const r = await proxyRuntime.chat(uid, { messages: [{ role: "user", content: prompt }] });
+      if (r.ok) vscode.window.showInformationMessage("路由生效 ✓ " + r.channel + "/" + r.model + " → " + String(r.content).slice(0, 120));
+      else vscode.window.showErrorMessage("路由投递失败: " + (r.error || "未知"));
+    } catch (e) { vscode.window.showErrorMessage("路由试跑失败: " + e.message); }
+  }
 
   async _pxAdd() {
     try {
@@ -1030,7 +1049,7 @@ function renderMcp(){
   }
   return h;
 }
-let PX=null;
+let PX=null;let PXRS=[];
 function renderProxy(){
   let h='<div class="row"><h2 style="flex:1">Proxy Pro · 插件自持模型路由</h2>'+
     '<button class="btn" id="pxAdd">添加渠道</button>'+
@@ -1055,9 +1074,10 @@ function renderProxy(){
     h+='</div>';
   }
   const rt=PX.routes||[];
-  h+='<div class="st">模型路由</div>';
+  const rsMap={};for(const s of (PXRS||[]))rsMap[s.uid]=s;
+  h+='<div class="st">模型路由(生效层)</div>';
   if(!rt.length)h+='<div class="card muted">暂无路由。点「配路由」把官方模型 UID 指向某渠道模型。</div>';
-  else{h+='<div class="card">';for(const r of rt)h+=cr(E(r.uid),'→ '+E(r.channel)+' / '+E(r.model)+' <span class="back" data-pxunroute="'+E(r.uid)+'">解除</span>');h+='</div>';}
+  else{h+='<div class="card">';for(const r of rt){const s=rsMap[r.uid]||{};const eff=s.effective?'<span class="badge">可投递✓</span>':'<span class="badge cloud">不可投递</span>';h+=cr(E(r.uid),'→ '+E(r.channel)+' / '+E(r.model)+' '+eff+' <span class="back" data-pxtest="'+E(r.uid)+'">试跑</span> <span class="back" data-pxunroute="'+E(r.uid)+'">解除</span>');}h+='</div>';}
   return h;
 }
 let WS={data:null,history:[],running:false};
@@ -1239,6 +1259,7 @@ function render(){
   document.querySelectorAll('[data-pxref]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-refresh',name:el.dataset.pxref}));
   document.querySelectorAll('[data-pxrm]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-remove',name:el.dataset.pxrm}));
   document.querySelectorAll('[data-pxunroute]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-route',uid:el.dataset.pxunroute}));
+  document.querySelectorAll('[data-pxtest]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-test',uid:el.dataset.pxtest}));
   if(S.board==='proxy'&&PX===null)vscode.postMessage({type:'px-list'});
   const wsGo=document.getElementById('wsGo'); const wsQ=document.getElementById('wsQ'); const wsE=document.getElementById('wsE');
   function doSearch(q){const query=q!==undefined?q:(wsQ?wsQ.value:'');if(!query)return;WS.running=true;render();vscode.postMessage({type:'ws-search',query:query,engine:wsE?wsE.value:'duckduckgo'});}
@@ -1269,7 +1290,7 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
-  else if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};if(S&&S.board==='proxy')render();}
+  else if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};PXRS=m.routeStatus||[];if(S&&S.board==='proxy')render();}
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
   else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}
   else if(m.type==='inj-list'){INJ={items:m.items||[],plan:m.plan||{}};if(S&&S.board==='inject')render();}

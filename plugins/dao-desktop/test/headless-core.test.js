@@ -820,3 +820,130 @@ test("Windows Agent 接入官方工具层: local/remote 注册直写 mcp_config.
     assert.ok(p.includes("list_apps") && p.includes("clone_plan") && p.includes("道并行而不相悖"));
   } finally { delete process.env.DAO_MCP_CONFIG_FILE; }
 });
+
+test("R139 六大板块升进统一协议: local-api 直调 proxy/pool/inject/github/search/winagent(脱敏·同一真源)", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-6b-"));
+  process.env.DAO_PROXY_CHANNELS_FILE = path.join(dir, "px.json");
+  process.env.DAO_CASCADE_POOL_FILE = path.join(dir, "pool.json");
+  process.env.DAO_INJECT_PROFILE_FILE = path.join(dir, "inj.json");
+  process.env.DAO_GITHUB_FLEET_FILE = path.join(dir, "gh.json");
+  process.env.DAO_MCP_CONFIG_FILE = path.join(dir, "mcp.json");
+  const api = require(path.join(CASCADE, "local-api.js"));
+  try {
+    // Proxy Pro: 经协议加渠道(种池, 不打网)+ 视图脱敏 + 路由
+    fs.writeFileSync(process.env.DAO_PROXY_CHANNELS_FILE, JSON.stringify({ channels: [
+      { name: "DeepSeek", type: "openai", baseURL: "https://api.deepseek.com/v1", apiKey: "sk-secretZZZZ9999", models: ["deepseek-chat"], verify: "ok" },
+    ], routes: {} }), { mode: 0o600 });
+    const pv = api.routes("/api/proxy");
+    assert.strictEqual(pv.channels.length, 1);
+    assert.ok(!JSON.stringify(pv).includes("sk-secretZZZZ"), "proxy 视图脱敏");
+    const rr = await api.postRoutes("/api/proxy/route", { uid: "windsurf-swe-1", channel: "DeepSeek", model: "deepseek-chat" });
+    assert.ok(rr.ok);
+    const rs = api.routes("/api/proxy/routes").routes;
+    assert.strictEqual(rs[0].uid, "windsurf-swe-1");
+    assert.strictEqual(rs[0].effective, true);
+    assert.ok(!JSON.stringify(rs).match(/sk-secret/), "路由生效视图无 Key");
+    await assert.rejects(() => api.postRoutes("/api/proxy/route", {}), /uid required/);
+    // Proxy 运行期反代: 未配路由的 UID 必报错(绝不伪造)
+    await assert.rejects(() => api.postRoutes("/api/proxy/chat", { uid: "no-route", text: "hi" }), /未配置路由/);
+    await assert.rejects(() => api.postRoutes("/api/proxy/chat", {}), /uid required/);
+
+    // 账号池: 视图脱敏 + 切换缺 email 报错
+    fs.writeFileSync(process.env.DAO_CASCADE_POOL_FILE, JSON.stringify([
+      { email: "a@x.y", name: "A", plan: "pro", apiKey: "key-secretAAAA1234", addedAt: "2026-07-12T00:00:00Z" },
+    ]), { mode: 0o600 });
+    const poolv = api.routes("/api/pool");
+    assert.strictEqual(poolv.accounts.length, 1);
+    assert.ok(!JSON.stringify(poolv).includes("key-secretAAAA"), "账号池视图脱敏");
+    assert.strictEqual(poolv.accounts[0].keyTail, "1234");
+    await assert.rejects(() => api.postRoutes("/api/pool/switch", {}), /email required/);
+    await assert.rejects(() => api.postRoutes("/api/pool/switch", { email: "ghost@x.y" }), /账号池无此号/);
+
+    // 反向注入: 经协议加档 + 视图脱敏 + 计划
+    await api.postRoutes("/api/inject/add", { kind: "secret", name: "TOK", spec: { value: "v-secretBBBB5678" } });
+    await api.postRoutes("/api/inject/add", { kind: "mcp", name: "gh", spec: { command: "npx" } });
+    const iv = api.routes("/api/inject").items;
+    assert.strictEqual(iv.length, 2);
+    assert.ok(!JSON.stringify(iv).includes("v-secretBBBB"), "注入 secret 脱敏");
+    const iplan = api.routes("/api/inject/plan");
+    assert.strictEqual(iplan.total, 2 * 1); // 1 号 × 2 档
+    await assert.rejects(() => api.postRoutes("/api/inject/remove", {}), /kind and name required/);
+
+    // GitHub 舰队: 视图脱敏 + 移除缺 login 报错
+    fs.writeFileSync(process.env.DAO_GITHUB_FLEET_FILE, JSON.stringify([
+      { login: "alpha", pat: "ghp_secretCCCC0000", role: "admin", addedAt: "2026-07-12T00:00:00Z" },
+    ]), { mode: 0o600 });
+    const ghv = api.routes("/api/github");
+    assert.strictEqual(ghv.accounts.length, 1);
+    assert.ok(!JSON.stringify(ghv).includes("ghp_secretCCCC"), "GitHub 视图脱敏");
+    await assert.rejects(() => api.postRoutes("/api/github/remove", {}), /login required/);
+
+    // Web 搜索: 无 q 回引擎+历史; POST 缺 query 报错
+    const sv = api.routes("/api/search");
+    assert.ok(Array.isArray(sv.engines) && sv.engines.length >= 2);
+    await assert.rejects(() => api.postRoutes("/api/search", {}), /query required/);
+
+    // Windows Agent: 状态未注册 + remote 缺 url 报错
+    assert.deepStrictEqual(api.routes("/api/winagent"), { registered: false });
+    await assert.rejects(() => api.postRoutes("/api/winagent/remote", {}), /url required/);
+    const wr = await api.postRoutes("/api/winagent/remote", { url: "https://dao-relay.example.com/", token: "秘X" });
+    assert.strictEqual(wr.ok, true);
+    assert.ok(!JSON.stringify(api.routes("/api/winagent")).includes("秘X"), "winagent 视图脱敏");
+    await api.postRoutes("/api/winagent/unregister", {});
+
+    // openapi 登记全覆盖(六板块+运行期路由)
+    const spec = require(path.join(CASCADE, "api-schema.js")).openapi({ port: 1 });
+    for (const p of ["/api/proxy", "/api/proxy/chat", "/api/proxy/routes", "/api/pool", "/api/pool/switch",
+      "/api/inject", "/api/inject/apply-mcp", "/api/github", "/api/github/verify", "/api/search", "/api/winagent"]) {
+      assert.ok(spec.paths[p], "openapi 应登记 " + p);
+    }
+  } finally {
+    for (const k of ["DAO_PROXY_CHANNELS_FILE", "DAO_CASCADE_POOL_FILE", "DAO_INJECT_PROFILE_FILE", "DAO_GITHUB_FLEET_FILE", "DAO_MCP_CONFIG_FILE"]) delete process.env[k];
+  }
+});
+
+test("R139 Proxy Pro 运行期反代真正生效: 路由消费 → 请求打到配置渠道(mock)且用映射模型(不伪造)", async () => {
+  const http = require("http");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-pxrt-"));
+  process.env.DAO_PROXY_CHANNELS_FILE = path.join(dir, "px.json");
+  // 起一个 OpenAI 兼容 mock 渠道: 记录收到的 model + auth, 回定值内容
+  let seen = null;
+  const srv = http.createServer((req, res) => {
+    let b = ""; req.on("data", (c) => { b += c; });
+    req.on("end", () => {
+      seen = { path: req.url, auth: req.headers["authorization"], body: JSON.parse(b || "{}") };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content: "道生一(来自第三方渠道)" } }] }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const base = "http://127.0.0.1:" + srv.address().port + "/v1";
+  try {
+    const px = require(path.join(CASCADE, "proxy-pro.js"));
+    const rt = require(path.join(CASCADE, "proxy-runtime.js"));
+    px.save({ channels: [
+      { name: "Mock", type: "openai", baseURL: base, apiKey: "sk-mockKEY4321", models: ["mock-large"], verify: "ok" },
+    ], routes: { "windsurf-swe-1": { channel: "Mock", model: "mock-large" } } });
+    // resolve 消费 routes → 指向 Mock/mock-large
+    const rv = rt.resolve("windsurf-swe-1");
+    assert.strictEqual(rv.channel.name, "Mock");
+    assert.strictEqual(rv.model, "mock-large");
+    assert.strictEqual(rt.resolve("unrouted"), null);
+    // chat 真正投递到 mock: 目标 = 配置渠道, 模型 = 映射模型
+    const r = await rt.chat("windsurf-swe-1", { messages: [{ role: "user", content: "你好" }] });
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.channel, "Mock");
+    assert.strictEqual(r.model, "mock-large");
+    assert.strictEqual(r.content, "道生一(来自第三方渠道)");
+    assert.strictEqual(seen.path, "/v1/chat/completions");
+    assert.strictEqual(seen.body.model, "mock-large", "请求体用映射模型名(路由真生效)");
+    assert.strictEqual(seen.auth, "Bearer sk-mockKEY4321");
+    // 返回体绝不含 apiKey
+    assert.ok(!JSON.stringify(r).includes("sk-mockKEY4321"), "返回体脱敏无 Key");
+    // routeStatus 反映可投递
+    assert.strictEqual(rt.routeStatus()[0].effective, true);
+  } finally {
+    srv.close();
+    delete process.env.DAO_PROXY_CHANNELS_FILE;
+  }
+});
