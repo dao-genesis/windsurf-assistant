@@ -3560,6 +3560,44 @@ function register(context, log, opts) {
       await vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {});
       provider._post({ type: "insert-input", text: "@" + rel + " " });
     }),
+    // Windows Agent 接入官方工具层: 把 Dao-Windows-Agent 的 Windows/FreeCAD/KiCad 能力
+    // 注册进 mcp_config.json(官方原生工具扩展面), Cascade 三模式与官方工具同层调度。
+    vscode.commands.registerCommand(viewId + ".windowsAgent", async () => {
+      const wa = require("./windows-agent");
+      const st = wa.status();
+      const items = [
+        { label: "$(plug) 注册 · 本机检出 (stdio bridge.mcp)", act: "local" },
+        { label: "$(globe) 注册 · 远端穿透 (serverUrl /mcp + Bearer)", act: "remote" },
+      ];
+      if (st.registered) items.push({ label: "$(trash) 注销 dao-windows-agent", act: "off" });
+      const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: st.registered
+          ? "已注册(" + st.transport + (st.disabled ? "·已停用" : "") + ") — Windows 工具已在官方工具层"
+          : "未注册 — 选择接入通道",
+      });
+      if (!pick) return;
+      let r;
+      if (pick.act === "off") r = wa.unregister();
+      else if (pick.act === "local") {
+        const found = wa.findLocalCheckout();
+        const dir = await vscode.window.showInputBox({
+          prompt: "Dao-Windows-Agent 检出目录", value: found || "", ignoreFocusOut: true });
+        if (dir === undefined) return;
+        r = wa.registerLocal({ dir: dir || undefined });
+      } else {
+        const url = await vscode.window.showInputBox({
+          prompt: "穿透公网 URL(如 https://dao-relay.example.com)", ignoreFocusOut: true });
+        if (!url) return;
+        const token = await vscode.window.showInputBox({
+          prompt: "Bearer Token(可空)", password: true, ignoreFocusOut: true });
+        if (token === undefined) return;
+        r = wa.registerRemote({ url, token: token || undefined });
+      }
+      if (r && r.ok === false) return void vscode.window.showWarningMessage("Windows Agent: " + r.error);
+      // LS 重载 MCP 配置, 工具即刻并入官方层
+      try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
+      vscode.window.setStatusBarMessage("Windows Agent 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
+    }),
     // 官方 Create New Rule / Workflow / Global Workflow(CreateCustomizationFile 同源)
     vscode.commands.registerCommand(viewId + ".createRule", () => provider._handleCustomizationCreate("rule")),
     vscode.commands.registerCommand(viewId + ".createWorkflow", () => provider._handleCustomizationCreate("workflow")),

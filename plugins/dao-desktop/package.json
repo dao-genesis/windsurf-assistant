@@ -82,6 +82,10 @@
         "title": "Devin Desktop: DeepWiki 解释选中符号"
       },
       {
+        "command": "dao.cascade.windowsAgent",
+        "title": "Devin Desktop: Windows Agent 接入官方工具层 (MCP 注册)"
+      },
+      {
         "command": "dao.cascade.genCommit",
         "title": "Devin Desktop: ✨ 生成提交信息 (GenerateCommitMessage)",
         "icon": "$(sparkle)"
