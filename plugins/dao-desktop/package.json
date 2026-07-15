@@ -93,6 +93,38 @@
       {
         "command": "dao.cascade.explainFix",
         "title": "Devin Desktop: 解释并修复 (Explain and Fix)"
+      },
+      {
+        "command": "dao.cascade.login",
+        "title": "Devin Desktop: Log in (登录 Devin 账号)"
+      },
+      {
+        "command": "dao.cascade.logout",
+        "title": "Devin Desktop: Log Out (登出 Devin 账号)"
+      },
+      {
+        "command": "dao.cascade.addFile",
+        "title": "Devin Desktop: Add Current File to Cascade (当前文件加入对话)"
+      },
+      {
+        "command": "dao.cascade.createRule",
+        "title": "Devin Desktop: Create New Rule (新建规则)"
+      },
+      {
+        "command": "dao.cascade.createWorkflow",
+        "title": "Devin Desktop: Create New Workflow (新建工作流)"
+      },
+      {
+        "command": "dao.cascade.createGlobalWorkflow",
+        "title": "Devin Desktop: Create New Global Workflow (新建全局工作流)"
+      },
+      {
+        "command": "dao.cascade.openProfile",
+        "title": "Devin Desktop: View Account (查看账户)"
+      },
+      {
+        "command": "dao.cascade.openChangelog",
+        "title": "Devin Desktop: Open Changelog (更新日志)"
       }
     ],
     "keybindings": [
@@ -107,6 +139,18 @@
         "key": "ctrl+shift+l",
         "mac": "cmd+shift+l",
         "when": "!terminalFocus"
+      },
+      {
+        "command": "dao.cascade.newSession",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "!terminalFocus"
+      },
+      {
+        "command": "dao.cascade.addFile",
+        "key": "ctrl+shift+8",
+        "mac": "cmd+shift+8",
+        "when": "editorTextFocus"
       }
     ],
     "menus": {
