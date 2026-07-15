@@ -119,6 +119,9 @@ async function main() {
     await wt.execute("windows_input_release", JSON.stringify({ clone_key: "account:dao#1", owner: "agent:cascade" })),
   );
   t("input: 释放归还", rl.released === true && arb.holder === null);
+
+  const miss = JSON.parse(await wt.execute("windows_input_acquire", "{}"));
+  t("input: 缺 clone_key/owner 即客户端明确报错(不打空参到隧道)", miss.status === "error" && /clone_key/.test(miss.error));
   tun.close();
 
   srv.close();
