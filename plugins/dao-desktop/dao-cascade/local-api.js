@@ -17,6 +17,8 @@ const backup = require("./backup");
 const envSync = require("./env-sync");
 const ls = require("./ls-bridge");
 const { AcpWssClient } = require("./acp-wss");
+const provision = require("./devin-provision");
+const { execFile } = require("child_process");
 
 function statePath() { return process.env.DAO_LOCAL_API_FILE || path.join(os.homedir(), ".dao", "local-api.json"); }
 
@@ -114,6 +116,10 @@ function routes(reqUrl) {
     if (!cid) throw new Error("cascadeId required");
     return ls.call("GetCascadeTranscriptForTrajectoryId", { cascadeId: cid });
   }
+  if (u === "/api/auth") {
+    const bin = provision.resolveEngine(null, null);
+    return provision.authStatus(bin, { force: q.get("force") === "1" }).then((r) => ({ loggedIn: r.loggedIn, name: r.name || "", login: _login ? { pending: true, url: _login.url || "" } : null }));
+  }
   if (u === "/api/account") return accountView();
   if (u === "/api/mcp") return mcpView();
   if (u === "/api/host") return hostView();
@@ -129,6 +135,9 @@ function routes(reqUrl) {
   }
   return null;
 }
+
+// 登录体感后端流: 官方 CLI manual-token 登录由插件编排(devin-provision 同源), 状态单飞。
+let _login = null; // { url, ctl, done }
 
 // Devin Cloud 一次性连接(官方 /acp/live 同源): 用完即断, 不常驻。
 async function withCloud(fn) {
@@ -180,6 +189,45 @@ async function postRoutes(u, body) {
   }
   if (u === "/api/backup/run") {
     return backup.backupAll(ls, body || {});
+  }
+  if (u === "/api/auth/login") {
+    if (_login) return { ok: true, pending: true, url: _login.url || "" };
+    const bin = provision.resolveEngine(null, null);
+    if (!bin) throw new Error("devin binary not found");
+    return new Promise((resolve, reject) => {
+      const st = { url: "", ctl: null, done: null };
+      _login = st;
+      const t = setTimeout(() => { if (!st.url) { _login = null; try { st.ctl.cancel(); } catch (_) {} reject(new Error("login url timeout")); } }, 30000);
+      st.ctl = provision.startLogin(bin, {
+        onUrl: (url) => { st.url = url; clearTimeout(t); resolve({ ok: true, pending: true, url }); },
+        onDone: (r) => { st.done = r; _login = null; if (!st.url) { clearTimeout(t); (r.ok ? resolve({ ok: true, pending: false }) : reject(new Error(r.message || "login failed"))); } },
+      });
+    });
+  }
+  if (u === "/api/auth/code") {
+    const code = String((body || {}).code || "").trim();
+    if (!code) throw new Error("code required");
+    if (!_login) throw new Error("no pending login");
+    const st = _login;
+    st.ctl.submitCode(code);
+    for (let i = 0; i < 60; i++) {
+      if (st.done) return { ok: !!st.done.ok, message: st.done.ok ? "Login successful" : (st.done.message || "").slice(0, 200) };
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    throw new Error("login result timeout");
+  }
+  if (u === "/api/auth/cancel") {
+    if (_login) { try { _login.ctl.cancel(); } catch (_) {} _login = null; }
+    return { ok: true };
+  }
+  if (u === "/api/auth/logout") {
+    const bin = provision.resolveEngine(null, null);
+    if (!bin) throw new Error("devin binary not found");
+    return new Promise((resolve) => {
+      execFile(bin, ["auth", "logout"], { timeout: 20000 }, (err, so, se) => {
+        resolve({ ok: !err, message: String(so || se || "").trim().slice(0, 200) });
+      });
+    });
   }
   const cid = String((body || {}).cascadeId || "");
   if (u === "/api/cascade/rename") {
