@@ -663,3 +663,29 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.binPath, bin);
   } finally { delete process.env.DAO_ENV_SYNC_HOME; }
 });
+
+test("环境共生 · Windows Agent 分身整合: DAO_CLONE_USER_DATA_DIR 重定向 IDE 层配置目录", () => {
+  const es = require(path.join(CASCADE, "env-sync.js"));
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), "dao-clone-"));
+  process.env.DAO_ENV_SYNC_HOME = h;
+  const cloneDir = path.join(h, "dao_clones", "session-2", "devin-desktop", "data");
+  process.env.DAO_CLONE_USER_DATA_DIR = cloneDir;
+  try {
+    // IDE 层随分身走: settings/globalStorage 落在分身 user-data-dir 下
+    assert.strictEqual(es.ideUserDir(), path.join(cloneDir, "User"));
+    fs.mkdirSync(path.join(cloneDir, "User"), { recursive: true });
+    fs.writeFileSync(path.join(cloneDir, "User", "settings.json"), "{}");
+    const d = es.detect();
+    const by = Object.fromEntries(d.sources.map((s) => [s.key, s]));
+    assert.strictEqual(by.idesettings.exists, true);
+    assert.ok(by.idesettings.path.startsWith(cloneDir));
+    // 引擎层不随分身走: 仍在家目录 ~/.codeium(全分身共生)
+    assert.strictEqual(d.configRoot, path.join(h, ".codeium", "windsurf"));
+    // 变量缺省即回落官方标准路径
+    delete process.env.DAO_CLONE_USER_DATA_DIR;
+    assert.ok(!es.ideUserDir().startsWith(path.join(h, "dao_clones")));
+  } finally {
+    delete process.env.DAO_ENV_SYNC_HOME;
+    delete process.env.DAO_CLONE_USER_DATA_DIR;
+  }
+});
