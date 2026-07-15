@@ -28,6 +28,7 @@ const inject = require("./inject");
 const githubFleet = require("./github-fleet");
 const webSearch = require("./web-search");
 const winAgent = require("./windows-agent");
+const coexist = require("./coexist");
 
 function statePath() { return process.env.DAO_LOCAL_API_FILE || path.join(os.homedir(), ".dao", "local-api.json"); }
 
@@ -216,7 +217,7 @@ function routes(reqUrl) {
   // 六大板块只读视图(与 unified-panel 同一真源)
   if (u === "/api/proxy") { const v = proxyPro.listView(); return { channels: v.channels, routes: v.routes, file: proxyPro.cfgPath() }; }
   if (u === "/api/proxy/routes") { return { routes: proxyRuntime.routeStatus() }; }
-  if (u === "/api/pool") { return { accounts: accountPool.listView(safeApiKey()), file: accountPool.poolPath() }; }
+  if (u === "/api/pool") { return { accounts: accountPool.listView(safeApiKey()), file: accountPool.poolPath(), siblings: coexist.siblingAccounts() }; }
   if (u === "/api/inject") { return { items: inject.listView(), file: inject.profilePath() }; }
   if (u === "/api/inject/plan") { return inject.plan(accountPool.loadPool()); }
   if (u === "/api/github") { return { accounts: githubFleet.listView(), file: githubFleet.fleetPath() }; }
@@ -228,6 +229,7 @@ function routes(reqUrl) {
   if (u === "/api/search/history") { return { history: webSearch.historyView() }; }
   if (u === "/api/winagent") { return winAgent.status(); }
   if (u === "/api/boundary") { return boundaryView(); }
+  if (u === "/api/coexist") { return coexist.report(); }
   return null;
 }
 
@@ -247,6 +249,7 @@ function boundaryView() {
       { surface: "credentials.toml", policy: "写仅经显式 /api/pool/switch(自动备份+/api/pool/restore 可归还); 读为登录态判据" },
       { surface: "settings/rules/memories/对话/MCP(官方 IDE 数据面)", policy: "1:1 同步镜像(env-sync/backup 只读采集); MCP 写仅经显式 /api/inject/apply-mcp" },
     ],
+    coexistence: { ref: "/api/coexist", note: "与独立同类插件(dao-vsix/dao-one/proxy-pro/min)共存时的共享/隔离判定与只读兄弟账号可见性" },
   };
 }
 
