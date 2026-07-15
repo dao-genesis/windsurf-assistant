@@ -164,6 +164,54 @@ async function main() {
   tun.close();
 
   srv.close();
+
+  // 5. 正交双轴: 经藏(提示) × 工具模式 — 提示换提示的·工具换工具的·两者叠加
+  delete process.env.DAO_WINDOWS_TOOLS;
+  const spInvert = require("./sp_invert");
+
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600)); // 越过 500ms 门缓存
+  t("正交: 工具模式 windows → 工具门开(不依赖经藏)", wt.enabled());
+  process.env.DAO_TOOLS_MODE = "freecad";
+  await new Promise((r) => setTimeout(r, 600));
+  t("正交: 工具模式 freecad → 工具门开", wt.enabled());
+
+  const OFFICIAL_SP =
+    "You are Cascade, a powerful agentic AI coding assistant designed by the Codeium engineering team.\n" +
+    "<communication_style>x</communication_style>\n<tool_calling>use tools</tool_calling>";
+
+  spInvert.setCanon("laozi");
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600)); // 越过 500ms 热读节流
+  const inv1 = spInvert.invertSP(OFFICIAL_SP);
+  t("正交: canon=laozi × tools=windows → 经文+Windows 工具契约叠加", !!inv1 && /Windows Agent 工具契約/.test(inv1));
+
+  process.env.DAO_TOOLS_MODE = "kicad";
+  await new Promise((r) => setTimeout(r, 600));
+  const inv2 = spInvert.invertSP(OFFICIAL_SP);
+  t("正交: canon=laozi × tools=kicad → KiCad 域契约", !!inv2 && /KiCad 域工具契約/.test(inv2));
+
+  process.env.DAO_TOOLS_MODE = "official";
+  await new Promise((r) => setTimeout(r, 600));
+  const inv3 = spInvert.invertSP(OFFICIAL_SP);
+  t("正交: tools=official → 无附加契约(纯经文)", !!inv3 && !/工具契約/.test(inv3));
+
+  spInvert.setCanon("windows-agent");
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600));
+  const inv4 = spInvert.invertSP(OFFICIAL_SP);
+  t(
+    "正交: 旧 canon=windows-agent × tools=windows → 契约不重复叠加",
+    !!inv4 && (inv4.match(/Windows Agent 工具契約/g) || []).length === 1,
+  );
+
+  t("正交: TOOLMODE_MAP 四模齐(official/windows/freecad/kicad)",
+    ["official", "windows", "freecad", "kicad"].every((k) => spInvert.TOOLMODE_MAP[k]));
+  t("正交: setToolMode 非法值拒绝", spInvert.setToolMode("bogus") === false);
+
+  spInvert.setCanon("laozi+yinfu");
+  delete process.env.DAO_TOOLS_MODE;
+
   console.log(`\n  通过 ${pass} · 失败 ${fail}`);
   process.exit(fail > 0 ? 1 : 0);
 }

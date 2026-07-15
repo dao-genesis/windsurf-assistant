@@ -3945,6 +3945,78 @@ function handleControl(req, res) {
     return true;
   }
 
+  // ─── /origin/tools · 工具模式切换 · 与经藏轴正交（提示换提示的·工具换工具的）───
+  if (u.pathname === "/origin/tools" && req.method === "GET") {
+    const tm =
+      _spInvertLib && _spInvertLib.getToolMode
+        ? _spInvertLib.getToolMode()
+        : "official";
+    const map =
+      _spInvertLib && _spInvertLib.TOOLMODE_MAP ? _spInvertLib.TOOLMODE_MAP : {};
+    res.end(
+      JSON.stringify({
+        ok: true,
+        tools: tm,
+        tools_name: (map[tm] || {}).name || tm,
+        valid: Object.keys(map),
+        map: Object.fromEntries(
+          Object.entries(map).map(([k, v]) => [k, v.name]),
+        ),
+        canon: _activeCanon,
+      }),
+    );
+    return true;
+  }
+
+  if (u.pathname === "/origin/tools" && req.method === "POST") {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        const t = String(body.tools || body.mode || "").toLowerCase();
+        const map =
+          _spInvertLib && _spInvertLib.TOOLMODE_MAP
+            ? _spInvertLib.TOOLMODE_MAP
+            : {};
+        if (!map[t]) {
+          res.statusCode = 400;
+          res.end(
+            JSON.stringify({
+              ok: false,
+              error: `invalid tools mode: ${t}`,
+              valid: Object.keys(map),
+            }),
+          );
+          return;
+        }
+        const old =
+          _spInvertLib && _spInvertLib.getToolMode
+            ? _spInvertLib.getToolMode()
+            : "official";
+        if (!(_spInvertLib && _spInvertLib.setToolMode && _spInvertLib.setToolMode(t))) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ ok: false, error: "setToolMode failed" }));
+          return;
+        }
+        log(`\u5DE5\u5177\u6A21\u5F0F: ${old} -> ${t} (${(map[t] || {}).name}) \u00B7 persisted`);
+        res.end(
+          JSON.stringify({
+            ok: true,
+            tools: t,
+            tools_name: (map[t] || {}).name,
+            previous: old,
+            canon: _activeCanon,
+          }),
+        );
+      } catch (e) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return true;
+  }
+
   // ═══════════════════════════════════════════════════════════
   // ★ v9.9.90 · /origin/ea/* · 外接api热配置控制面
   //   五十七章「我无为也 而民自化」· 热操作 · 不重启 · 即时生效
@@ -6292,6 +6364,9 @@ function _buildHandoffMd() {
   L.push("# 经藏热切: laozi+yinfu(默认) / laozi(单帛书老子) / yinfu(单阴符经)");
   L.push("curl -s " + base + "/origin/canon");
   L.push("curl -X POST " + base + "/origin/canon -H 'Content-Type: application/json' -d '" + JSON.stringify({ canon: "laozi" }) + "'");
+  L.push("# 工具模式(与经藏正交叠加): official(默认) / windows / freecad / kicad");
+  L.push("curl -s " + base + "/origin/tools");
+  L.push("curl -X POST " + base + "/origin/tools -H 'Content-Type: application/json' -d '" + JSON.stringify({ tools: "windows" }) + "'");
   L.push("# 自定义注入 SP: GET 看 / POST 设 / DELETE 清");
   L.push("curl -s " + base + "/origin/custom_sp");
   L.push("curl -X POST " + base + "/origin/custom_sp -H 'Content-Type: application/json' -d '" + JSON.stringify({ sp: "你的自定义系统提示词" }) + "'");
