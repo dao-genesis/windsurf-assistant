@@ -76,6 +76,21 @@ function routes(reqUrl) {
       return ss.map((s) => ({ sessionId: s.sessionId || s.id, title: s.title || "" }));
     });
   }
+  if (u === "/api/tasks") return (async () => {
+    // 统一任务视图: 本地 Cascade 轨迹 + Devin Cloud 会话归一为同构条目(云端不可达时仅回本地)
+    const local = await ls.call("GetAllCascadeTrajectories", {}).then((r) =>
+      Object.entries(r.trajectorySummaries || {}).map(([id, s]) => ({
+        id, kind: "local", title: s.summary || "", status: s.status || "",
+        stepCount: s.stepCount || 0, updatedAt: s.lastModifiedTime || "",
+      }))).catch(() => []);
+    const cloud = await withCloud(async (c) => {
+      const l = await c.listSessions();
+      return ((l && l.sessions) || []).map((s) => ({
+        id: s.sessionId || s.id, kind: "cloud", title: s.title || "", status: s.status || "", updatedAt: s.updatedAt || "",
+      }));
+    }).catch(() => []);
+    return { tasks: local.concat(cloud), localCount: local.length, cloudCount: cloud.length };
+  })();
   if (u === "/api/status") {
     return ls.call("GetUserStatus", {}).then((r) => {
       const s = (r && r.userStatus) || r || {};
@@ -165,12 +180,32 @@ async function postRoutes(u, body) {
       const pick = ms.find((m) => m.recommended && !m.disabled) || ms.find((m) => !m.disabled) || ms[0];
       uid = pick && pick.uid;
     }
+    const wait = !!(body || {}).wait;
     const drive = ls.driveStream(cid, null);
     try {
       await ls.call("SendUserCascadeMessage", {
         cascadeId: cid, items: [{ text }],
         cascadeConfig: { plannerConfig: { requestedModelUid: uid, toolConfig: { askUserQuestion: { enabled: true } } } },
       });
+      if (wait) {
+        // wait:true 与 /api/cloud/send 对等: 轮询至运行态归 IDLE, 拿回本轮回复正文
+        const timeoutMs = Math.min(Number((body || {}).timeoutMs) || 120000, 300000);
+        const t0 = Date.now();
+        let reply = "", idleSeen = 0;
+        while (Date.now() - t0 < timeoutMs) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const [tr, st] = await Promise.all([
+            ls.call("GetAllCascadeTrajectories", {}),
+            ls.call("GetCascadeTrajectorySteps", { cascadeId: cid }),
+          ]);
+          const sum = ((tr || {}).trajectorySummaries || {})[cid] || {};
+          reply = (st.steps || [])
+            .map((s) => (s.plannerResponse && s.plannerResponse.response) || "")
+            .filter(Boolean).pop() || "";
+          if (sum.status === "CASCADE_RUN_STATUS_IDLE" && ++idleSeen >= 2 && reply) break;
+        }
+        return { ok: true, cascadeId: cid, modelUid: uid, reply };
+      }
     } finally { setTimeout(() => { try { drive.close(); } catch (_) {} }, 120000).unref(); }
     return { ok: true, cascadeId: cid, modelUid: uid };
   }
@@ -179,12 +214,12 @@ async function postRoutes(u, body) {
     if (!text) throw new Error("text required");
     return withCloud(async (c) => {
       let out = "";
-      c._onUpdate = (u2) => {
+      c.onUpdate((u2) => {
         try {
           const s = u2.update || u2;
           if ((s.sessionUpdate || s.kind) === "agent_message_chunk") out += ((s.content || {}).text) || "";
         } catch (_) {}
-      };
+      });
       if ((body || {}).sessionId) await c.loadSession(body.sessionId);
       else await c.newSession("/");
       const r = await c.prompt(text);
@@ -211,6 +246,8 @@ async function postRoutes(u, body) {
       const st = { url: "", ctl: null, done: null };
       _login = st;
       const t = setTimeout(() => { if (!st.url) { _login = null; try { st.ctl.cancel(); } catch (_) {} reject(new Error("login url timeout")); } }, 30000);
+      // 全程兼平: 领 URL 后若 10 分钟内未完成(未提交 code), 自动收尾释放单飞锁, 避免永久 pending
+      setTimeout(() => { if (_login === st && !st.done) { try { st.ctl.cancel(); } catch (_) {} _login = null; } }, 600000).unref();
       st.ctl = provision.startLogin(bin, {
         onUrl: (url) => { st.url = url; clearTimeout(t); resolve({ ok: true, pending: true, url }); },
         onDone: (r) => { st.done = r; _login = null; if (!st.url) { clearTimeout(t); (r.ok ? resolve({ ok: true, pending: false }) : reject(new Error(r.message || "login failed"))); } },

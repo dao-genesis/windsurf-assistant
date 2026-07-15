@@ -433,12 +433,28 @@ test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/dele
   await assert.rejects(() => api.postRoutes("/api/auth/code", { code: "x" }), /no pending login/);
   assert.deepStrictEqual(await api.postRoutes("/api/auth/cancel", {}), { ok: true });
   await assert.rejects(() => api.postRoutes("/api/cloud/cancel", {}), /sessionId required/);
+  // R135 统一任务视图: LS/Cloud 均不可达时也归一为空集同构结果(不抛)
+  const tasks = await api.routes("/api/tasks");
+  assert.ok(Array.isArray(tasks.tasks));
+  assert.strictEqual(typeof tasks.localCount, "number");
+  assert.strictEqual(typeof tasks.cloudCount, "number");
 });
 
 test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {
   const { acpToken } = require(path.join(CASCADE, "acp-wss.js"));
   assert.strictEqual(acpToken("devin-session-token$abc123"), "abc123");
   assert.strictEqual(acpToken("plain-key"), "plain-key");
+});
+
+test("R135 Cloud 客户端公开订阅面: onUpdate 多监听器分发(替代覆写私有 _onUpdate)", () => {
+  const { AcpWssClient } = require(path.join(CASCADE, "acp-wss.js"));
+  const seen = [];
+  const c = new AcpWssClient({ onUpdate: (u) => seen.push(["ctor", u]) });
+  c.onUpdate((u) => seen.push(["sub", u]));
+  c.onUpdate(null); // 非函数忽略
+  c._onUpdate({ kind: "x" });
+  assert.deepStrictEqual(seen.map((s) => s[0]), ["ctor", "sub"]);
+  assert.strictEqual(seen[0][1].kind, "x");
 });
 
 test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
