@@ -40,6 +40,22 @@ function countAcpAgents(p) {
   } catch (_) { return 0; }
 }
 
+function countEntries(dir) {
+  try { return fs.readdirSync(dir).length; } catch (_) { return 0; }
+}
+
+function sizeKb(p) {
+  try { return Math.max(1, Math.round(fs.statSync(p).size / 1024)); } catch (_) { return 0; }
+}
+
+// 官方 IDE(Electron/VS Code 层)用户配置目录: settings.json/keybindings/globalStorage 所在。
+function ideUserDir() {
+  const h = home();
+  if (process.platform === "darwin") return path.join(h, "Library", "Application Support", "Devin", "User");
+  if (process.platform === "win32") return path.join(process.env.APPDATA || path.join(h, "AppData", "Roaming"), "Devin", "User");
+  return path.join(h, ".config", "Devin", "User");
+}
+
 // 官方 IDE 安装痕迹: 二进制候选(检出任一即视为已装)。
 function ideBinCandidates() {
   const h = home();
@@ -62,27 +78,78 @@ function detectIde() {
   return { installed: false, engineTraces: false };
 }
 
-// 共享配置源全清单: 每项 { key,label,path,exists,count? } —— path 即官方同一路径。
+// 共享配置源全清单: 每项 { key,group,label,path,exists,count?|sizeKb? } —— path 即官方同一路径。
+// 分组反向解构自官方落盘全貌:
+//   定制: MCP / Rules / Workflows / Skills / 记忆
+//   引擎: user_settings.pb(偏好·模型) / codemaps / implicit / brain / cascade / database /
+//         code_tracker / context_state / installation_id
+//   IDE 层: settings.json / keybindings.json / snippets / globalStorage(state.vscdb) / argv.json / 扩展
+//   账户: ACP 注册表 / credentials / Devin CLI
+//   插件: 对话备份(~/.wam)
+// 注: Cascade 对话轨迹正文随账号云端同步(本地无 pb 正文), 本地仅缓存目录 —— 换机/重装
+//     由登录态带回; 本插件的 ~/.wam 备份提供额外本地留存。
 function detect() {
   const h = home();
   const ws = path.join(h, ".codeium", "windsurf");
+  const userDir = ideUserDir();
   const mcp = path.join(ws, "mcp_config.json");
   const acp = path.join(h, ".windsurf", "acp", "registry.json");
   const cred = path.join(h, ".local", "share", "devin", "credentials.toml");
+  const cli = path.join(h, ".local", "share", "devin", "cli");
   const gRules = path.join(h, ".devin", "rules");
   const gRulesMd = path.join(ws, "memories", "global_rules.md");
   const gWf = path.join(ws, "global_workflows");
   const gSk = path.join(ws, "skills");
+  const memories = path.join(ws, "memories");
+  const usp = path.join(ws, "user_settings.pb");
+  const codemaps = path.join(ws, "codemaps");
+  const implicit = path.join(ws, "implicit");
+  const brain = path.join(ws, "brain");
+  const cascade = path.join(ws, "cascade");
+  const database = path.join(ws, "database");
+  const tracker = path.join(ws, "code_tracker");
+  const ctxState = path.join(ws, "context_state");
+  const instId = path.join(ws, "installation_id");
+  const settings = path.join(userDir, "settings.json");
+  const keybinds = path.join(userDir, "keybindings.json");
+  const snippets = path.join(userDir, "snippets");
+  const stateDb = path.join(userDir, "globalStorage", "state.vscdb");
+  const argv = path.join(h, ".devin", "argv.json");
+  const exts = path.join(h, ".devin", "extensions");
+  const wam = path.join(h, ".wam", "conversation_backups");
+  const S = (key, group, label, p, count) => {
+    const s = { key, group, label, path: p, exists: exists(p) };
+    if (typeof count === "number") s.count = count;
+    return s;
+  };
   const sources = [
-    { key: "mcp", label: "MCP 配置 mcp_config.json", path: mcp, exists: exists(mcp), count: countMcpServers(mcp) },
-    { key: "grules", label: "全局 Rules(~/.devin/rules)", path: gRules, exists: exists(gRules), count: countMd(gRules) },
-    { key: "grulesmd", label: "全局规则 global_rules.md", path: gRulesMd, exists: exists(gRulesMd) },
-    { key: "gworkflows", label: "全局 Workflows", path: gWf, exists: exists(gWf), count: countMd(gWf) },
-    { key: "gskills", label: "全局 Skills", path: gSk, exists: exists(gSk), count: countSkills(gSk) },
-    { key: "acp", label: "ACP 本地注册表", path: acp, exists: exists(acp), count: countAcpAgents(acp) },
-    { key: "cred", label: "登录凭据 credentials.toml", path: cred, exists: exists(cred) },
+    S("mcp", "定制", "MCP 配置 mcp_config.json", mcp, countMcpServers(mcp)),
+    S("grules", "定制", "全局 Rules(~/.devin/rules)", gRules, countMd(gRules)),
+    S("grulesmd", "定制", "全局规则 global_rules.md", gRulesMd),
+    S("gworkflows", "定制", "全局 Workflows", gWf, countMd(gWf)),
+    S("gskills", "定制", "全局 Skills", gSk, countSkills(gSk)),
+    S("memories", "定制", "记忆 memories", memories, countMd(memories)),
+    Object.assign(S("usersettings", "引擎", "引擎偏好 user_settings.pb(模型/开关)", usp), { sizeKb: sizeKb(usp) }),
+    S("codemaps", "引擎", "Code Maps", codemaps, countEntries(codemaps)),
+    S("implicit", "引擎", "隐式上下文 implicit(.pb)", implicit, countEntries(implicit)),
+    S("brain", "引擎", "Brain 缓存", brain, countEntries(brain)),
+    S("cascadedir", "引擎", "Cascade 本地缓存(正文云端同步)", cascade, countEntries(cascade)),
+    S("database", "引擎", "引擎数据库 database", database, countEntries(database)),
+    S("codetracker", "引擎", "代码轨迹 code_tracker", tracker, countEntries(tracker)),
+    S("ctxstate", "引擎", "上下文状态 context_state", ctxState, countEntries(ctxState)),
+    S("instid", "引擎", "安装标识 installation_id", instId),
+    S("idesettings", "IDE层", "用户设置 settings.json", settings),
+    S("idekeys", "IDE层", "快捷键 keybindings.json", keybinds),
+    S("idesnippets", "IDE层", "代码片段 snippets", snippets, countEntries(snippets)),
+    S("idestate", "IDE层", "界面状态 state.vscdb", stateDb),
+    S("ideargv", "IDE层", "启动参数 argv.json", argv),
+    S("ideexts", "IDE层", "扩展 ~/.devin/extensions", exts, countEntries(exts)),
+    S("acp", "账户", "ACP 本地注册表", acp, countAcpAgents(acp)),
+    S("cred", "账户", "登录凭据 credentials.toml", cred),
+    S("cli", "账户", "Devin CLI 状态", cli, countEntries(cli)),
+    S("wam", "插件", "对话备份(~/.wam)", wam, countEntries(wam)),
   ];
-  return { ide: detectIde(), configRoot: ws, configRootExists: exists(ws), sources };
+  return { ide: detectIde(), configRoot: ws, configRootExists: exists(ws), ideUserDir: userDir, sources };
 }
 
-module.exports = { home, detect, detectIde, ideBinCandidates, countMcpServers, countAcpAgents, countMd, countSkills };
+module.exports = { home, detect, detectIde, ideBinCandidates, ideUserDir, countMcpServers, countAcpAgents, countMd, countSkills, countEntries, sizeKb };

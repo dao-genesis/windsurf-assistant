@@ -656,7 +656,11 @@ class UnifiedPanel {
           registryPath: this._acpRegistryPath() },
         env: require("./env-sync").detect(),
       } });
-    } catch (e) { this._post({ type: "set-detail", error: e.message }); }
+    } catch (e) {
+      // LS 不在线时仍交付本地检测(环境共生零 LS 依赖)
+      let env = null; try { env = require("./env-sync").detect(); } catch (_) {}
+      this._post({ type: "set-detail", data: { error: e.message, env } });
+    }
   }
 
   // 官方式写回: 读-改-写全量合并(SetUserSettings 为整体替换, 只发补丁会清掉其余键)。
@@ -704,22 +708,44 @@ class UnifiedPanel {
     this._setDetail();
   }
 
-  // 环境共生一览的行级打开: 文件开编辑器; 目录/缺失路径在系统文管中揭示其父级。
+  // 环境共生一览的行级打开: 文件开编辑器(二进制走 vscode.open); 目录列出条目可续开; 每个分支都有 IDE 内反馈。
   async _envOpen(p) {
     if (!p) return;
     try {
       const fs = require("fs"); const path = require("path");
-      let target = p;
-      if (!fs.existsSync(target)) { fs.mkdirSync(path.extname(target) ? path.dirname(target) : target, { recursive: true }); }
-      if (fs.existsSync(target) && fs.statSync(target).isFile()) {
-        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
-        await vscode.window.showTextDocument(doc);
+      if (!fs.existsSync(p)) {
+        try { fs.mkdirSync(path.extname(p) ? path.dirname(p) : p, { recursive: true }); } catch (_) {}
+        vscode.window.showInformationMessage("路径待生成: " + p + (fs.existsSync(p) ? " — 已建目录" : " — 已备好父目录"));
+      } else if (fs.statSync(p).isFile()) {
+        try {
+          const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+          await vscode.window.showTextDocument(doc, { preview: false });
+        } catch (_) {
+          try { await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(p)); }
+          catch (_) {
+            vscode.window.showInformationMessage("二进制文件, 已在系统中揭示: " + p);
+            vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(p)).then(undefined, () => {});
+          }
+        }
       } else {
-        const dir = fs.existsSync(target) ? target : path.dirname(target);
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(dir));
+        await this._envOpenDir(p);
       }
     } catch (e) { vscode.window.showErrorMessage("打开失败: " + e.message); }
     this._setDetail();
+  }
+
+  // 目录: IDE 内 QuickPick 列条目(不依赖 OS 文管默认程序), 选文件即开、选子目录续入。
+  async _envOpenDir(dir) {
+    const fs = require("fs"); const path = require("path");
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { vscode.window.showErrorMessage("读目录失败: " + e.message); return; }
+    if (!names.length) { vscode.window.showInformationMessage("空目录: " + dir); return; }
+    const items = names.slice(0, 200).map((n) => {
+      let isDir = false; try { isDir = fs.statSync(path.join(dir, n)).isDirectory(); } catch (_) {}
+      return { label: (isDir ? "$(folder) " : "$(file) ") + n, description: isDir ? "目录" : "", _p: path.join(dir, n), _d: isDir };
+    }).sort((a, b) => (b._d - a._d) || a.label.localeCompare(b.label));
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: dir + " — " + names.length + " 项(选择打开)" });
+    if (pick) await this._envOpen(pick._p);
   }
 
   async _setChangelog() {
@@ -1071,8 +1097,9 @@ function renderSettings(){
     '<button class="btn sec" id="setRf">刷新</button></div>';
   h+='<div class="muted" style="margin-bottom:10px">活体直连 LS(GetUserStatus/GetUserSettings): 账号用量与配额、套餐限额、组织能力矩阵、官方设置开关读改写 —— 与官方 IDE 设置/账号页同源。</div>';
   if(SET===null){h+='<div class="card muted">活体拉取中…</div>';return h;}
-  if(SET.error){h+='<div class="card">⚠ '+E(SET.error)+'</div>';return h;}
+  if(SET.error)h+='<div class="card">⚠ '+E(SET.error)+' — 以下为本地检测(不依赖 LS)</div>';
   const a=SET.account||{}, tc=SET.teamConfig||{}, st=SET.settings||{};
+  if(!SET.error){
   h+='<div class="st">账号与用量</div><div class="card">';
   h+=cr('账号',(a.name?E(a.name)+' · ':'')+E(a.email||'—'));
   h+=cr('套餐',E(a.plan||'—')+' · '+E(tierName(a.tier)));
@@ -1102,12 +1129,15 @@ function renderSettings(){
     cr('Devin Local 连接',acp.running?'● 已连接':'○ 未连接(按需懒启动)')+
     cr('本地注册表 registry.json','<span class="back" id="setAcpReg">打开/初始化</span>')+
     cr('重载 ACP 连接','<span class="back" id="setAcpRl">重载↺</span>')+'</div>';
+  }
   const env=SET.env||{};
   const ide=env.ide||{};
   h+='<div class="st">环境共生(与官方 Devin IDE 同一配置体系)</div><div class="card">'+
     cr('官方 IDE 检测',ide.installed?'● 已安装 '+E(ide.binPath||''):(ide.engineTraces?'◐ 检出引擎痕迹(配置根已存在)':'○ 未检出(装上即自动共用本体系)'));
+  let envGrp='';
   for(const s of (env.sources||[])){
-    const st=(s.exists?'●':'○')+(typeof s.count==='number'?' '+s.count+' 项':(s.exists?' 存在':' 待生成'));
+    if(s.group&&s.group!==envGrp){envGrp=s.group;h+=cr('— '+E(envGrp)+' —','');}
+    const st=(s.exists?'●':'○')+(typeof s.count==='number'?' '+s.count+' 项':(typeof s.sizeKb==='number'&&s.sizeKb>0?' '+s.sizeKb+'KB':(s.exists?' 存在':' 待生成')));
     h+=cr(E(s.label),st+' <span class="back" data-envopen="'+E(s.path)+'">打开↗</span>');
   }
   h+='</div>';
