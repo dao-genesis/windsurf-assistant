@@ -220,6 +220,90 @@ function defs() {
       },
     },
     {
+      name: "windows_session_list",
+      description:
+        "List all live Windows Agent sessions and the apps opened inside each. Use to resume or inspect existing work contexts instead of blindly creating new sessions.",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_route",
+      description:
+        "Route one natural-language request to the right Windows application(s) and verbs (@-dispatch). Give the raw user sentence, e.g. '@freecad 建一个 20mm 立方体' or 'export the current PCB to gerber'. Returns target app_ids, layer, and verb hints — the fastest way to decide which app/verb to invoke. Apps blocked by the current mode are reported in blocked_by_mode.",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Natural language request (may contain @app mentions)" },
+          verb_limit: { type: "integer", description: "Max verb hints (default 5)" },
+        },
+        required: ["text"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_capabilities",
+      description:
+        "Return the full capability manifest of the Windows Agent: registered apps, layers, current mode and its allowed tool surface. Call once at the start of a Windows task to orient yourself.",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_mode_list",
+      description:
+        "List all Windows Agent modes (prompt overlay + tool-surface trimming, e.g. coding vs machine-control) and which is current.",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_mode_set",
+      description:
+        "Switch the Windows Agent mode. Required when an app is refused with '当前模式…不开放应用' — switch to a mode whose tool surface allows it, then retry.",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {
+          mode: { type: "string", description: "Mode id from windows_mode_list" },
+        },
+        required: ["mode"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_account_list",
+      description:
+        "List Windows accounts managed by the agent for ACCOUNT-tier clone isolation (strongest tier: separate Windows account per clone).",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_account_sessions",
+      description:
+        "List live Windows logon sessions of managed accounts (which account-tier clones are actually running).",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    {
       name: "windows_clone_plan",
       description:
         "Plan desktop-clone isolation for one application on the user's single Windows account. Different clones = independent RDP-like desktop sessions with independent input queues that never interfere. Honest tiering: packaged (AppX) / GPU-composited / global-mutex apps require at least SESSION tier (HDESK alone cannot isolate them).",
@@ -347,6 +431,30 @@ async function execute(name, argsJson) {
         out = await _httpJson("POST", base, "/api/session.destroy", {
           session_id: args.session_id,
         });
+        break;
+      case "windows_session_list":
+        out = await _httpJson("GET", base, "/api/session.list", null);
+        break;
+      case "windows_route":
+        out = await _httpJson("POST", base, "/api/route", {
+          text: String(args.text || ""),
+          verb_limit: args.verb_limit || 5,
+        });
+        break;
+      case "windows_capabilities":
+        out = await _httpJson("GET", base, "/api/capabilities", null);
+        break;
+      case "windows_mode_list":
+        out = await _httpJson("GET", base, "/api/mode.list", null);
+        break;
+      case "windows_mode_set":
+        out = await _httpJson("POST", base, "/api/mode.set", { mode: args.mode });
+        break;
+      case "windows_account_list":
+        out = await _httpJson("GET", base, "/api/account.list", null);
+        break;
+      case "windows_account_sessions":
+        out = await _httpJson("GET", base, "/api/account.sessions", null);
         break;
       case "windows_clone_plan":
         out = await _httpJson("POST", base, "/api/clone.plan", {

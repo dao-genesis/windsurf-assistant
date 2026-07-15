@@ -21,7 +21,7 @@ function t(name, cond) {
 async function main() {
   // 1. 工具定义与官方同格
   const defs = wt.defs();
-  t("defs: 11 个工具", defs.length === 11);
+  t("defs: 18 个工具", defs.length === 18);
   t(
     "defs: 全部 windows_ 前缀",
     defs.every((d) => d.name.startsWith("windows_")),
@@ -51,6 +51,24 @@ async function main() {
       if (req.url === "/api/health") return res.end(JSON.stringify({ ok: true }));
       if (req.url === "/api/apps")
         return res.end(JSON.stringify({ apps: ["freecad", "kicad"] }));
+      if (req.url === "/api/session.list")
+        return res.end(JSON.stringify({ sessions: [{ session_id: "vm_1", apps: ["freecad"] }] }));
+      if (req.url === "/api/capabilities")
+        return res.end(JSON.stringify({ universal: [], domain: [], mode: "primary" }));
+      if (req.url === "/api/mode.list")
+        return res.end(JSON.stringify({ modes: [{ mode_id: "primary" }, { mode_id: "coding" }], current: "primary" }));
+      if (req.url === "/api/mode.set") {
+        const b = JSON.parse(body || "{}");
+        return res.end(JSON.stringify({ current: { mode_id: b.mode }, allowed_apps: [] }));
+      }
+      if (req.url === "/api/route") {
+        const b = JSON.parse(body || "{}");
+        return res.end(JSON.stringify({ targets: ["freecad"], layer: "domain", clean_text: b.text }));
+      }
+      if (req.url === "/api/account.list")
+        return res.end(JSON.stringify({ ok: true, accounts: [{ name: "dao" }] }));
+      if (req.url === "/api/account.sessions")
+        return res.end(JSON.stringify({ ok: true, sessions: [] }));
       if (req.url === "/api/clone.plan") {
         const b = JSON.parse(body || "{}");
         return res.end(
@@ -74,6 +92,27 @@ async function main() {
     ),
   );
   t("execute: clone_plan 透传参数", plan.app_id === "kicad" && plan.clone_id === "c1");
+
+  const sl = JSON.parse(await wt.execute("windows_session_list", "{}"));
+  t("execute: session_list 列会话", Array.isArray(sl.sessions) && sl.sessions[0].session_id === "vm_1");
+
+  const cap = JSON.parse(await wt.execute("windows_capabilities", "{}"));
+  t("execute: capabilities 返回清单", cap.mode === "primary");
+
+  const ml = JSON.parse(await wt.execute("windows_mode_list", "{}"));
+  t("execute: mode_list 列模式", ml.current === "primary" && ml.modes.length === 2);
+
+  const ms = JSON.parse(await wt.execute("windows_mode_set", '{"mode":"coding"}'));
+  t("execute: mode_set 切模式", ms.current.mode_id === "coding");
+
+  const rt = JSON.parse(await wt.execute("windows_route", '{"text":"@freecad 建模"}'));
+  t("execute: route @调度", rt.targets[0] === "freecad" && rt.layer === "domain");
+
+  const al = JSON.parse(await wt.execute("windows_account_list", "{}"));
+  t("execute: account_list 列账号", al.ok === true && al.accounts[0].name === "dao");
+
+  const as = JSON.parse(await wt.execute("windows_account_sessions", "{}"));
+  t("execute: account_sessions 列会话", as.ok === true && Array.isArray(as.sessions));
 
   const unk = JSON.parse(await wt.execute("windows_nope", "{}"));
   t("execute: 未知工具返回 error", unk.status === "error");
