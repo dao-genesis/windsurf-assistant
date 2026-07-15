@@ -1,0 +1,92 @@
+"use strict";
+/**
+ * _windows_tools_selftest.js · Windows Agent 原生工具层自测 · 零依赖
+ * 用法: node vendor/外接api/core/_windows_tools_selftest.js
+ */
+const http = require("http");
+const wt = require("./windows_tools");
+
+let pass = 0,
+  fail = 0;
+function t(name, cond) {
+  if (cond) {
+    pass++;
+    console.log("  ✓ " + name);
+  } else {
+    fail++;
+    console.log("  ✗ " + name);
+  }
+}
+
+async function main() {
+  // 1. 工具定义与官方同格
+  const defs = wt.defs();
+  t("defs: 9 个工具", defs.length === 9);
+  t(
+    "defs: 全部 windows_ 前缀",
+    defs.every((d) => d.name.startsWith("windows_")),
+  );
+  t(
+    "defs: JSON Schema 2020-12 同格",
+    defs.every(
+      (d) =>
+        d.parameters &&
+        d.parameters.$schema === "https://json-schema.org/draft/2020-12/schema" &&
+        d.parameters.type === "object",
+    ),
+  );
+  t("has: windows_clone_plan", wt.has("windows_clone_plan"));
+  t("has: 非本层工具为否", !wt.has("read_file") && !wt.has("clone_plan"));
+
+  // 2. 启用之门(env)
+  process.env.DAO_WINDOWS_TOOLS = "1";
+  t("gate: env DAO_WINDOWS_TOOLS=1 → enabled", wt.enabled());
+
+  // 3. mock 桥 → 执行回环
+  const srv = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      res.setHeader("content-type", "application/json");
+      if (req.url === "/api/health") return res.end(JSON.stringify({ ok: true }));
+      if (req.url === "/api/apps")
+        return res.end(JSON.stringify({ apps: ["freecad", "kicad"] }));
+      if (req.url === "/api/clone.plan") {
+        const b = JSON.parse(body || "{}");
+        return res.end(
+          JSON.stringify({ app_id: b.app_id, clone_id: b.clone_id, tier: "session" }),
+        );
+      }
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: "nf" }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  process.env.DAO_WIN_BRIDGE_URL = "http://127.0.0.1:" + srv.address().port;
+
+  const apps = JSON.parse(await wt.execute("windows_list_apps", "{}"));
+  t("execute: list_apps 经桥返回", Array.isArray(apps.apps) && apps.apps.length === 2);
+
+  const plan = JSON.parse(
+    await wt.execute(
+      "windows_clone_plan",
+      JSON.stringify({ app_id: "kicad", clone_id: "c1" }),
+    ),
+  );
+  t("execute: clone_plan 透传参数", plan.app_id === "kicad" && plan.clone_id === "c1");
+
+  const unk = JSON.parse(await wt.execute("windows_nope", "{}"));
+  t("execute: 未知工具返回 error", unk.status === "error");
+
+  const nf = JSON.parse(await wt.execute("windows_search_verbs", '{"query":"x"}'));
+  t("execute: 桥 4xx → error 不抛", nf.status === "error");
+
+  srv.close();
+  console.log(`\n  通过 ${pass} · 失败 ${fail}`);
+  process.exit(fail > 0 ? 1 : 0);
+}
+
+main().catch((e) => {
+  console.error("致命错误: " + e.message);
+  process.exit(2);
+});

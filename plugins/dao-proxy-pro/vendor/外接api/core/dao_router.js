@@ -202,6 +202,22 @@ try {
   _spInvert = require(path.join(__dirname, "sp_invert"));
 } catch {}
 
+// ★ Windows Agent 原生工具层 · windows-agent 经藏启用时注入+代理执行
+//   与官方服务端工具同格 · LSP 太上不知有之 · 非 MCP 层
+let _winTools = null;
+try {
+  _winTools = require(path.join(__dirname, "windows_tools"));
+} catch {}
+
+function _isWinTool(name) {
+  return !!(_winTools && _winTools.enabled() && _winTools.has(name));
+}
+
+// 代理侧拦截判定归一: 仅代理工具 ∪ Windows 原生工具(启用时)
+function _isProxyExecTool(name) {
+  return _proxyOnlyToolNames.has(name) || _isWinTool(name);
+}
+
 // ★ v9.9.101 · 太上下知有之 · 增强模式幂等标记 + DAO经藏文本
 //   道义: 十七章「太上 下知有之」· DAO存在但不可见 · 官方功能完整保留
 const _ENHANCE_MARKER = "\n\n<!-- DAO-ENHANCE v9.9.101 -->\n\n";
@@ -2181,11 +2197,15 @@ async function _tryRoute({
           `_tryRoute internal retry #${_retryCount}: serverSideCalls=${_remainingServerCalls.length} names=${_remainingServerCalls.map((c) => c.name).join(",")}`,
         );
 
-        // 执行服务端工具 → 生成 tool result
-        const _toolResults = _remainingServerCalls.map((tc) => ({
-          tool_call_id: tc.id,
-          content: _executeServerTool(tc.name, tc.argumentsJson),
-        }));
+        // 执行服务端工具 → 生成 tool result (Windows 原生工具走异步桥执行)
+        const _toolResults = await Promise.all(
+          _remainingServerCalls.map(async (tc) => ({
+            tool_call_id: tc.id,
+            content: _isWinTool(tc.name)
+              ? await _winTools.execute(tc.name, tc.argumentsJson)
+              : _executeServerTool(tc.name, tc.argumentsJson),
+          })),
+        );
 
         // ★ v9.9.86 · 追加 assistant 消息: 保留 thinking + text 内容
         //   DeepSeek 要求 assistant 消息的 reasoning_content 和 content
@@ -2714,6 +2734,16 @@ async function _callProvider(
         if (!_existingNames.has(st.name) && !_existingNames.has(_aliasName)) {
           toolsField.push({ type: "function", function: st });
           _existingNames.add(st.name);
+        }
+      }
+
+      // ★ Windows Agent 原生工具注入 · windows-agent 经藏启用时与官方工具并列
+      if (_winTools && _winTools.enabled()) {
+        for (const wt of _winTools.defs()) {
+          if (!_existingNames.has(wt.name)) {
+            toolsField.push({ type: "function", function: wt });
+            _existingNames.add(wt.name);
+          }
         }
       }
 
@@ -3332,7 +3362,7 @@ async function _unaryOaToCascade(
         //   trajectory_search 等即使 LSP 未发 → isCustomToolCall=false → LSP 正常执行
         //   道义: 十七章「太上不知有之」· LSP 不知有代理 · 工具调用自然流转
         isCustomToolCall:
-          _proxyOnlyToolNames.has(_rawName) &&
+          _isProxyExecTool(_rawName) &&
           !(lspToolNames && lspToolNames.has(_rawName)),
       };
     });
@@ -3548,7 +3578,7 @@ function _streamOaToCascade(
     //   道义: 十七章「太上不知有之」· LSP 不知有代理 · 工具调用自然流转
     for (const tc of _dedupedCalls) {
       const isProxyOnlyTool =
-        _proxyOnlyToolNames.has(tc.name) &&
+        _isProxyExecTool(tc.name) &&
         !(lspToolNames && lspToolNames.has(tc.name));
       if (isProxyOnlyTool) {
         // 仅代理工具: LSP 无执行器 → 拦截 → 代理执行后内部重试
@@ -3564,7 +3594,7 @@ function _streamOaToCascade(
         // ★ v9.9.93 · isCustomToolCall 判定: 仅代理工具且 LSP 未发 → true
         //   trajectory_search 等即使 LSP 未发 → isCustomToolCall=false → LSP 正常执行
         const _isCustom =
-          _proxyOnlyToolNames.has(tc.name) &&
+          _isProxyExecTool(tc.name) &&
           !(lspToolNames && lspToolNames.has(tc.name));
         _lspSideCalls.push({
           ...tc,
