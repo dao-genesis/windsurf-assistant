@@ -19,6 +19,15 @@ const ls = require("./ls-bridge");
 const { AcpWssClient } = require("./acp-wss");
 const provision = require("./devin-provision");
 const { execFile } = require("child_process");
+// 六大板块后端(归一入协议): Proxy Pro / 账号池切号 / 反向注入 / GitHub 舰队 / Web 搜索 / Windows Agent。
+// 与 unified-panel 同一真源(各自 ~/.dao/*.json), 令 AI/脚本经 HTTP 零 GUI 调度全部板块。
+const proxyPro = require("./proxy-pro");
+const proxyRuntime = require("./proxy-runtime");
+const accountPool = require("./account-pool");
+const inject = require("./inject");
+const githubFleet = require("./github-fleet");
+const webSearch = require("./web-search");
+const winAgent = require("./windows-agent");
 
 function statePath() { return process.env.DAO_LOCAL_API_FILE || path.join(os.homedir(), ".dao", "local-api.json"); }
 
@@ -204,8 +213,25 @@ function routes(reqUrl) {
     return { account: accountView(), host: hostView(), mcp: mcpView(), cascade: cascadeView(),
       backups: { accounts: l.accounts.length, conversations: l.accounts.reduce((s, x) => s + x.convCount, 0) } };
   }
+  // 六大板块只读视图(与 unified-panel 同一真源)
+  if (u === "/api/proxy") { const v = proxyPro.listView(); return { channels: v.channels, routes: v.routes, file: proxyPro.cfgPath() }; }
+  if (u === "/api/proxy/routes") { return { routes: proxyRuntime.routeStatus() }; }
+  if (u === "/api/pool") { return { accounts: accountPool.listView(safeApiKey()), file: accountPool.poolPath() }; }
+  if (u === "/api/inject") { return { items: inject.listView(), file: inject.profilePath() }; }
+  if (u === "/api/inject/plan") { return inject.plan(accountPool.loadPool()); }
+  if (u === "/api/github") { return { accounts: githubFleet.listView(), file: githubFleet.fleetPath() }; }
+  if (u === "/api/search") {
+    const query = q.get("q") || "";
+    if (!query) return { engines: webSearch.engineList(), history: webSearch.historyView() };
+    return webSearch.search(query, q.get("engine") || "");
+  }
+  if (u === "/api/search/history") { return { history: webSearch.historyView() }; }
+  if (u === "/api/winagent") { return winAgent.status(); }
   return null;
 }
+
+// 当前活动号 apiKey(用于账号池「活动」判据); LS 未就绪时安全回空串, 不抛。
+function safeApiKey() { try { return ls.apiKey() || ""; } catch (_) { return ""; } }
 
 // 登录体感后端流: 官方 CLI manual-token 登录由插件编排(devin-provision 同源), 状态单飞。
 let _login = null; // { url, ctl, done }
@@ -478,6 +504,111 @@ async function postRoutes(u, body) {
     const r = await ls.call("GetCompletions", req);
     const items = (r && (r.completionItems || r.completions)) || [];
     return { ok: true, count: items.length, completionItems: items };
+  }
+  // ── 六大板块写操作(零 GUI 调度; 凭据只入私有存储, 视图恒脱敏) ──
+  // Proxy Pro: 渠道存取 / 识别模型 / 模型路由(路由生效由 ls-bridge 请求期消费)
+  if (u === "/api/proxy/channel/add") {
+    const b = body || {};
+    const name = String(b.name || "").trim();
+    if (!name) throw new Error("name required");
+    const r = await proxyPro.addChannel(name, b.type || "openai", b.baseURL || "", b.apiKey || "");
+    return { ok: true, channel: r };
+  }
+  if (u === "/api/proxy/channel/remove") {
+    const name = String((body || {}).name || "").trim();
+    if (!name) throw new Error("name required");
+    return { ok: true, removed: proxyPro.removeChannel(name) };
+  }
+  if (u === "/api/proxy/channel/refresh") {
+    const name = String((body || {}).name || "").trim();
+    if (!name) throw new Error("name required");
+    return { ok: true, result: await proxyPro.refreshModels(name) };
+  }
+  if (u === "/api/proxy/route") {
+    const uid = String((body || {}).uid || "").trim();
+    if (!uid) throw new Error("uid required");
+    return { ok: true, result: proxyPro.setRoute(uid, (body || {}).channel || "", (body || {}).model || "") };
+  }
+  if (u === "/api/proxy/chat") {
+    // 路由生效层: 给定官方模型 UID, 真正投递到其路由的第三方渠道/模型(消费 cfg.routes)。
+    const b = body || {};
+    const uid = String(b.uid || "").trim();
+    if (!uid) throw new Error("uid required");
+    let messages = b.messages;
+    if (!Array.isArray(messages)) {
+      const text = String(b.text || "").trim();
+      if (!text) throw new Error("messages(数组) 或 text required");
+      messages = [{ role: "user", content: text }];
+    }
+    return proxyRuntime.chat(uid, { messages, temperature: b.temperature, maxTokens: b.maxTokens, timeoutMs: b.timeoutMs });
+  }
+  // 账号池切号: 收录当前号 / 切换 / 移除(严禁回退, 无 key 报错)
+  if (u === "/api/pool/capture") {
+    const acct = (body || {}).account || accountView();
+    return { ok: true, result: accountPool.captureCurrent(safeApiKey(), acct) };
+  }
+  if (u === "/api/pool/switch") {
+    const email = String((body || {}).email || "").trim();
+    if (!email) throw new Error("email required");
+    return { ok: true, result: accountPool.switchTo(email) };
+  }
+  if (u === "/api/pool/remove") {
+    const email = String((body || {}).email || "").trim();
+    if (!email) throw new Error("email required");
+    return { ok: true, result: accountPool.remove(email) };
+  }
+  // 反向注入: 增删注入档 / MCP 即刻本机落地(secret 值绝不出后端)
+  if (u === "/api/inject/add") {
+    const b = body || {};
+    return { ok: true, result: inject.addItem(b.kind, b.name, b.spec) };
+  }
+  if (u === "/api/inject/remove") {
+    const b = body || {};
+    if (!b.kind || !b.name) throw new Error("kind and name required");
+    return { ok: true, result: inject.removeItem(b.kind, b.name) };
+  }
+  if (u === "/api/inject/apply-mcp") {
+    return { ok: true, result: await inject.applyMcp(ls) };
+  }
+  // GitHub 舰队(纯 GitHub 纵向, 与 Devin 账号池分离): 增删 / 定角 / 核队
+  if (u === "/api/github/add") {
+    const b = body || {};
+    return { ok: true, result: await githubFleet.addAccount(b.pat, b.login || "", b.role || "member") };
+  }
+  if (u === "/api/github/remove") {
+    const login = String((body || {}).login || "").trim();
+    if (!login) throw new Error("login required");
+    return { ok: true, result: githubFleet.remove(login) };
+  }
+  if (u === "/api/github/role") {
+    const b = body || {};
+    if (!b.login) throw new Error("login required");
+    return { ok: true, result: githubFleet.setRole(b.login, b.role) };
+  }
+  if (u === "/api/github/verify") {
+    return { ok: true, results: await githubFleet.verifyAll() };
+  }
+  // Web 搜索: 站内直出 + 历史清理
+  if (u === "/api/search") {
+    const query = String((body || {}).query || (body || {}).q || "").trim();
+    if (!query) throw new Error("query required");
+    return webSearch.search(query, (body || {}).engine || "");
+  }
+  if (u === "/api/search/clear") {
+    return { ok: true, result: webSearch.clearHistory() };
+  }
+  // Windows Agent: 注册 local/remote 通道 / 注销(接入官方 MCP 工具层)
+  if (u === "/api/winagent/local") {
+    const b = body || {};
+    return winAgent.registerLocal({ dir: b.dir, bridgeUrl: b.bridgeUrl, token: b.token, disabled: b.disabled });
+  }
+  if (u === "/api/winagent/remote") {
+    const b = body || {};
+    if (!b.url) throw new Error("url required");
+    return winAgent.registerRemote({ url: b.url, token: b.token, disabled: b.disabled });
+  }
+  if (u === "/api/winagent/unregister") {
+    return winAgent.unregister();
   }
   return null;
 }
