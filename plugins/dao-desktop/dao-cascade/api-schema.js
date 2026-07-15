@@ -68,6 +68,7 @@ const ROUTES = [
   // ── 账号池切号(Devin; 严禁回退, 无 key 报错) ──
   { path: "/api/pool", method: "get", summary: "Cascade 账号池视图(脱敏: hasKey/keyTail/active)" },
   { path: "/api/boundary", method: "get", summary: "同步/隔离边界自描述: 插件自持面(~/.dao/*)与官方共享面(IDE 数据 1:1)的机器可读矩阵" },
+  { path: "/api/coexist", method: "get", summary: "共存场景边界探测: 同装独立插件(dao-vsix/dao-one/proxy-pro/min)时的共享/隔离判定矩阵 + 只读兄弟账号可见性" },
   { path: "/api/pool/capture", method: "post", summary: "收录当前登录号入池", b: [{ name: "account", desc: "缺省取 /api/account 视图" }] },
   { path: "/api/pool/switch", method: "post", summary: "切换到池内账号(写 credentials.toml, 首次自动备份官方原态)", b: [{ name: "email", req: true }] },
   { path: "/api/pool/restore", method: "post", summary: "归还官方原登录态(以首次切号前备份的 credentials.toml.bak 覆写回)" },

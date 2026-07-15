@@ -1076,3 +1076,45 @@ test("R141 同步/隔离边界: 切号可归还(credentials.toml.bak → restore
     delete process.env.DAO_DEVIN_CRED_FILE;
   }
 });
+
+test("R142 共存场景边界: 探测同装独立插件 + 只读兄弟账号可见(不含凭据) + /api/coexist 已登记", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-coex-"));
+  const daoDir = path.join(dir, ".dao");
+  fs.mkdirSync(daoDir, { recursive: true });
+  const extRoot = path.join(dir, ".devin", "extensions");
+  fs.mkdirSync(path.join(extRoot, "dao.dao-vsix-3.54.3"), { recursive: true });
+  fs.mkdirSync(path.join(extRoot, "dao-agi.dao-proxy-pro-9.9.353"), { recursive: true });
+  // dao-vsix 账号库(对象: email→{auth1,...}) —— 含真凭据, 断言绝不外泄
+  fs.writeFileSync(path.join(daoDir, "dao-accounts-auth.json"), JSON.stringify({
+    "peer@x.com": { auth1: "SECRET-auth1-abc", orgName: "OrgX", orgId: "o1" },
+    "peer2@x.com": { auth1: "SECRET-auth1-def", orgName: "" },
+  }));
+  process.env.DAO_COEXIST_HOME = dir;
+  process.env.DAO_EXT_ROOTS = extRoot;
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "coexist.js"))];
+    const coexist = require(path.join(CASCADE, "coexist.js"));
+    const rep = coexist.report();
+    assert.strictEqual(rep.coexisting, true, "已装兄弟插件 → coexisting=true");
+    const vsix = rep.siblings.find((s) => s.key === "dao-vsix");
+    assert.ok(vsix && vsix.installed, "应探测到 dao-vsix 已装");
+    const pro = rep.siblings.find((s) => s.key === "dao-proxy-pro");
+    assert.ok(pro && pro.installed, "应探测到 dao-proxy-pro 已装");
+    // 账号库文件应被识别为存在
+    const authFile = vsix.data.find((d) => d.file.endsWith("dao-accounts-auth.json"));
+    assert.ok(authFile && authFile.exists && authFile.verdict === "share-visibility");
+    // 只读兄弟账号: 有邮箱, 但绝不含 auth1/凭据
+    assert.strictEqual(rep.siblingAccounts.length, 2);
+    assert.ok(rep.siblingAccounts.every((a) => a.source === "dao-vsix" && a.hasAuth === true));
+    assert.ok(!JSON.stringify(rep).includes("SECRET-auth1"), "共存报告绝不外泄兄弟凭据 auth1");
+    // proxy-pro 判定为异命名空间隔离
+    assert.ok(pro.data.every((d) => d.verdict === "isolated-namespace"));
+    // openapi 已登记 /api/coexist
+    const schema = require(path.join(CASCADE, "api-schema.js"));
+    assert.ok(Object.keys(schema.openapi({ port: 0 }).paths).includes("/api/coexist"), "openapi 应含 /api/coexist");
+  } finally {
+    delete process.env.DAO_COEXIST_HOME;
+    delete process.env.DAO_EXT_ROOTS;
+    delete require.cache[require.resolve(path.join(CASCADE, "coexist.js"))];
+  }
+});
