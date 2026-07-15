@@ -432,6 +432,7 @@ test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/dele
   await assert.rejects(() => api.postRoutes("/api/auth/code", {}), /code required/);
   await assert.rejects(() => api.postRoutes("/api/auth/code", { code: "x" }), /no pending login/);
   assert.deepStrictEqual(await api.postRoutes("/api/auth/cancel", {}), { ok: true });
+  await assert.rejects(() => api.postRoutes("/api/cloud/cancel", {}), /sessionId required/);
 });
 
 test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {

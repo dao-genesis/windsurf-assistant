@@ -120,6 +120,10 @@ function routes(reqUrl) {
     const bin = provision.resolveEngine(null, null);
     return provision.authStatus(bin, { force: q.get("force") === "1" }).then((r) => ({ loggedIn: r.loggedIn, name: r.name || "", login: _login ? { pending: true, url: _login.url || "" } : null }));
   }
+  if (u === "/api/workspaces") return ls.call("GetWorkspaceInfos", {});
+  if (u === "/api/workspace/edit-state") return ls.call("GetWorkspaceEditState", {});
+  if (u === "/api/models/statuses") return ls.call("GetModelStatuses", {});
+  if (u === "/api/processes") return ls.call("GetProcesses", {});
   if (u === "/api/account") return accountView();
   if (u === "/api/mcp") return mcpView();
   if (u === "/api/host") return hostView();
@@ -185,6 +189,15 @@ async function postRoutes(u, body) {
       else await c.newSession("/");
       const r = await c.prompt(text);
       return { ok: true, sessionId: c.sessionId, stopReason: (r || {}).stopReason || "", reply: out };
+    });
+  }
+  if (u === "/api/cloud/cancel") {
+    const sid = String((body || {}).sessionId || "");
+    if (!sid) throw new Error("sessionId required");
+    return withCloud(async (c) => {
+      await c.loadSession(sid);
+      await c.cancel();
+      return { ok: true, sessionId: sid };
     });
   }
   if (u === "/api/backup/run") {
