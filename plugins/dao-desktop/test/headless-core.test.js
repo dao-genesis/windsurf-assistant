@@ -426,6 +426,9 @@ test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/dele
   await assert.rejects(() => api.postRoutes("/api/memory/update", {}), /memoryId and content required/);
   await assert.rejects(() => api.postRoutes("/api/memory/delete", {}), /memoryId required/);
   assert.throws(() => api.routes("/api/cascade/transcript"), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/queue", {}), /cascadeId and text required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/branch", {}), /cascadeId, stepIndex and text required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/revert", {}), /cascadeId and stepIndex required/);
 });
 
 test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {

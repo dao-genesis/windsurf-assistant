@@ -218,6 +218,34 @@ async function postRoutes(u, body) {
     await ls.call("UpdateCascadeMemory", { memoryId: id, title: (body || {}).title || "", content, tags: (body || {}).tags || [] });
     return { ok: true, memoryId: id };
   }
+  if (u === "/api/cascade/queue") {
+    const text = String((body || {}).text || "").trim();
+    if (!cid || !text) throw new Error("cascadeId and text required");
+    const r = await ls.call("QueueCascadeMessage", { cascadeId: cid, items: [{ text }] });
+    return { ok: true, cascadeId: cid, queueId: (r || {}).queueId || "" };
+  }
+  if (u === "/api/cascade/branch") {
+    const text = String((body || {}).text || "").trim();
+    const si = (body || {}).stepIndex;
+    if (!cid || !text || typeof si !== "number") throw new Error("cascadeId, stepIndex and text required");
+    let uid = (body || {}).modelUid || "";
+    if (!uid) {
+      const ms = await ls.listModels();
+      const pick = ms.find((m) => m.recommended && !m.disabled) || ms.find((m) => !m.disabled) || ms[0];
+      uid = pick && pick.uid;
+    }
+    const r = await ls.call("BranchCascade", { baseCascadeId: cid, branchFromStepIndex: si, items: [{ text }],
+      cascadeConfig: { plannerConfig: { requestedModelUid: uid } } });
+    return { ok: true, baseCascadeId: cid, newCascadeId: (r || {}).newCascadeId || (r || {}).cascadeId || "" };
+  }
+  if (u === "/api/cascade/revert") {
+    const si = (body || {}).stepIndex;
+    if (!cid || typeof si !== "number") throw new Error("cascadeId and stepIndex required");
+    const pv = await ls.call("GetRevertPreview", { cascadeId: cid, stepIndex: si }).catch(() => ({}));
+    if ((body || {}).previewOnly) return { ok: true, cascadeId: cid, preview: (pv || {}).codeEditPreviews || [] };
+    await ls.call("RevertToCascadeStep", { cascadeId: cid, stepIndex: si });
+    return { ok: true, cascadeId: cid, stepIndex: si, reverted: ((pv || {}).codeEditPreviews || []).length };
+  }
   if (u === "/api/memory/delete") {
     const id = String((body || {}).memoryId || "");
     if (!id) throw new Error("memoryId required");
