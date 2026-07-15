@@ -10,6 +10,19 @@ const path = require("path");
 
 const CASCADE = path.join(__dirname, "..", "dao-cascade");
 
+// R143 · UI 1:1 护栏: composer 模式三元组与官方实机菜单一致(Code/Ask/Plan + 官方文案),
+// 空态含 Try Devin Cloud, 模式菜单含 Ctrl+. 提示, 发送钮具备空闲灰态。
+test("panel.js UI 与官方 composer 1:1 护栏", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(src.includes('{ value: "cx:write", name: "Code", description: "Can write and edit code" }'));
+  assert.ok(src.includes('{ value: "cx:readOnly", name: "Ask", description: "Reads but won\'t edit" }'));
+  assert.ok(src.includes('{ value: "cx:plan", name: "Plan", description: "Plan changes before implementing" }'));
+  assert.ok(src.includes('id="tryCloud"'));
+  assert.ok(src.includes("to switch modes"));
+  assert.ok(src.includes("button.send.idle"));
+  assert.ok(src.includes('id="micBtn"'));
+});
+
 // 隔离落盘路径, 不碰真机 ~/.dao/windsurf-host.json
 const HOST_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "dao-hs-")), "windsurf-host.json");
 process.env.DAO_WINDSURF_HOST_FILE = HOST_FILE;

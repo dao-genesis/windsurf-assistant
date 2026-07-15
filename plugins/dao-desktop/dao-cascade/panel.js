@@ -248,12 +248,14 @@ class CascadePanelProvider {
       }, {
         id: "mode", category: "mode", currentValue: "cx:" + (this._cascadeMode || "write"),
         options: [
-          { value: "cx:write", name: "Write", description: "默认 agentic, 可读写" },
-          { value: "cx:plan", name: "Plan", description: "agentic + exit_plan_mode 工具(官方 Plan 模式配方)" },
-          { value: "cx:chat", name: "Chat", description: "conversationalV2 · DEFAULT" },
-          { value: "cx:readOnly", name: "Read-Only", description: "conversationalV2 · READ_ONLY" },
-          { value: "cx:explore", name: "Explore", description: "conversationalV2 · EXPLORE" },
-          { value: "cx:noTool", name: "No-Tool", description: "conversationalV2 · NO_TOOL" },
+          // 官方 3.4.x 模式三元组(实机菜单 1:1: Code/Ask/Plan + 官方描述文案)
+          { value: "cx:write", name: "Code", description: "Can write and edit code" },
+          { value: "cx:readOnly", name: "Ask", description: "Reads but won't edit" },
+          { value: "cx:plan", name: "Plan", description: "Plan changes before implementing" },
+          // 扩展(LS conversationalV2 直通, 官方菜单不露出)
+          { value: "cx:chat", name: "Chat", description: "扩展 · conversationalV2 · DEFAULT" },
+          { value: "cx:explore", name: "Explore", description: "扩展 · conversationalV2 · EXPLORE" },
+          { value: "cx:noTool", name: "No-Tool", description: "扩展 · conversationalV2 · NO_TOOL" },
         ],
       }] });
       return true;
@@ -2255,6 +2257,10 @@ class CascadePanelProvider {
   .empty .logo { font-size:26px; opacity:.85; margin-bottom:10px; }
   .empty .ttl { font-size:15px; font-weight:600; margin-bottom:4px; }
   .empty .sub { font-size:12px; color:var(--dim); line-height:1.5; }
+  .empty .kbd, .mhint .kbd { display:inline-block; font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:4px; vertical-align:2px; }
+  .empty .trycloud { margin-top:12px; background:transparent; color:inherit; border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; cursor:pointer; }
+  .empty .trycloud:hover { background:var(--pill-hover); }
+  .mhint { padding:6px 10px; font-size:10.5px; color:var(--dim); border-top:1px solid var(--line); }
   #recent { margin:14px auto 0; width:100%; max-width:420px; text-align:left; font-size:12px; display:none; }
   #recent.show { display:block; }
   #recent .rhead { display:flex; align-items:center; color:var(--dim); margin-bottom:4px; }
@@ -2345,6 +2351,8 @@ class CascadePanelProvider {
   .spacer { flex:1; }
   button.send { width:26px; height:26px; border-radius:999px; background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; cursor:pointer; font-size:13px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
   button.send:disabled { opacity:.4; cursor:default; }
+  /* 官方式发送钮: 空输入灰圆, 有内容才亮主题色 */
+  button.send.idle { background:var(--pill-hover); color:var(--dim); }
   /* 卡片下方目标行: Local · 工作区 —— 与官方一致 */
   .target { display:flex; gap:10px; align-items:center; font-size:11.5px; color:var(--dim); padding:5px 4px 0; }
   .target .seg { display:inline-flex; gap:4px; align-items:center; }
@@ -2421,8 +2429,9 @@ class CascadePanelProvider {
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo">⬡</div>
-      <div class="ttl">Cascade · 三模式</div>
+      <div class="ttl" id="emptyTtl">Cascade Code <span class="kbd">Ctrl</span><span class="kbd">.</span></div>
       <div class="sub">Kick off a new project. Make changes across your entire codebase.</div>
+      <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent">☁ Try Devin Cloud</button>
       <div id="recent">
         <div class="rhead"><span>Recent sessions</span><span class="va" id="agBtn">Agents</span><span class="va" id="cmBtn">Maps</span><span class="va" id="cusBtn">Rules</span><span class="va" id="mcpBtn">MCP</span><span class="va" id="memsBtn">Memories</span><span class="va" id="olBtn">Outline</span><span class="va" id="plBtn">Plans</span><span class="va" id="stBtn">Status</span><span class="va" id="tlBtn">Timeline</span><span class="va" id="viewAll">View all</span></div>
         <div id="recentList"></div>
@@ -2459,14 +2468,15 @@ class CascadePanelProvider {
       <input type="file" id="imgFile" accept="image/*" multiple style="display:none">
       <div class="row">
         <button id="plusBtn" title="附加上下文">＋</button>
+        <span class="pill" id="modeWrap" title="Session Mode (Ctrl+.)">&lt;&gt;<button id="modeBtn" type="button"></button></span>
+        <span class="pill" id="modelWrap" title="Model"><button id="modelBtn" type="button"></button></span>
         <button id="imgBtn" title="附加图片（支持粘贴）">🖼</button>
         <button id="arenaBtn" title="Arena 模式：同题双轨候选，择优续行（新会话/会话中途均可）">⚔</button>
         <button id="wtBtn" title="Worktree 模式：新会话在隔离 git worktree 中运行，改动不直接落入主工作区，可随后合并">⎇</button>
-        <span class="pill" id="modeWrap" title="Session Mode">&lt;&gt;<button id="modeBtn" type="button"></button></span>
-        <span class="pill" id="modelWrap" title="Model"><button id="modelBtn" type="button"></button></span>
         <span class="spacer"></span>
         <span id="tokCount" title="输入 token / 上限 (GetMessageTokenCount)" style="font-size:10.5px;color:var(--dim);"></span>
         <span class="pill" id="agentWrap" title="切换 agent (Ctrl+')"><span id="agentIcon">⬡</span><button id="agentBtn" type="button"></button><span class="badge" id="badge"></span></span>
+        <button id="micBtn" title="语音输入 (Web Speech)">🎙</button>
         <button class="send" id="send" title="发送 (Enter)">↑</button>
       </div>
     </div>
@@ -2579,8 +2589,11 @@ class CascadePanelProvider {
   authcode.addEventListener("keydown",(e)=>{ if(e.key==="Enter") authsubmit.onclick(); });
   // 官方式模式下拉(同 R100 模型弹层): 行=名称 + description 副行
   let modeOpts=[], modeVal=null;
+  const emptyTtl=document.getElementById("emptyTtl");
   function modeBtnSync(){ const o=modeOpts.find(x=>x.value===modeVal);
-    modeBtn.textContent=o?(o.name||o.value):(modeVal||"模式"); modeBtn.title=o&&o.description?o.description:"Session Mode"; }
+    modeBtn.textContent=o?(o.name||o.value):(modeVal||"模式"); modeBtn.title=o&&o.description?o.description:"Session Mode";
+    // 官方式空态标题随模式同步: "Cascade Code" / "Cascade Ask" / "Cascade Plan"
+    if(emptyTtl&&agent==="cascade"&&o) emptyTtl.firstChild.textContent="Cascade "+(o.name||"")+" "; }
   function modeSet(opts,cur){ modeOpts=opts; modeVal=cur; modeBtnSync(); }
   function modeMenuClose(){ modeMenu.classList.remove("show"); }
   function modeMenuRender(){ modeList.innerHTML="";
@@ -2590,7 +2603,11 @@ class CascadePanelProvider {
       it.onclick=()=>{ modeMenuClose(); modeVal=o.value; modeBtnSync();
         vscode.postMessage({type:"set-mode", modeId:o.value});
         const grp=curGroup(); if(cfgStore[grp]&&cfgStore[grp].mode) cfgStore[grp].mode.currentValue=o.value; };
-      modeList.appendChild(it); } }
+      modeList.appendChild(it); }
+    // 官方菜单尾行提示 1:1: Use Ctrl+. to switch modes
+    const h=document.createElement("div"); h.className="mhint";
+    h.innerHTML='Use <span class="kbd">Ctrl</span><span class="kbd">.</span> to switch modes';
+    modeList.appendChild(h); }
   modeBtn.onclick=(e)=>{ e.stopPropagation(); modelMenuClose();
     if(modeMenu.classList.contains("show")) return modeMenuClose();
     modeMenuRender(); modeMenu.classList.add("show"); };
@@ -2664,6 +2681,22 @@ class CascadePanelProvider {
     items[i].classList.add("kbd"); items[i].scrollIntoView({block:"nearest"});
   });
 
+  // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
+  const tryCloudBtn=document.getElementById("tryCloud");
+  if(tryCloudBtn) tryCloudBtn.onclick=()=>{ agent="devin-cloud"; onAgentChange(); inputEl.focus(); };
+  // 官方式麦克风: Web Speech 可用则听写入 composer, 不可用则隐藏(不留死按钮)
+  const micBtn=document.getElementById("micBtn");
+  (function(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){ if(micBtn) micBtn.style.display="none"; return; }
+    let rec=null, on=false;
+    micBtn.onclick=()=>{ if(on){ try{rec.stop();}catch(_){} return; }
+      rec=new SR(); rec.continuous=false; rec.interimResults=false;
+      rec.onresult=(ev)=>{ const t=Array.from(ev.results).map(r=>r[0].transcript).join(" ");
+        if(t){ inputEl.value=(inputEl.value?inputEl.value+" ":"")+t; inputEl.dispatchEvent(new Event("input")); } };
+      rec.onend=()=>{ on=false; micBtn.style.opacity=""; };
+      rec.onerror=()=>{ on=false; micBtn.style.opacity=""; };
+      try{ rec.start(); on=true; micBtn.style.opacity="0.5"; }catch(_){ on=false; } };
+  })();
   // 官方式轮换占位文案
   const HINTS=["Type @ to bring in another conversation",
     "Try typing 'megaplan' to plan deeply before building",
@@ -2857,7 +2890,9 @@ class CascadePanelProvider {
     const t=inputEl.value;
     if(!t.trim()){ tokEl.textContent=""; return; }
     tokTimer=setTimeout(()=>vscode.postMessage({type:"token-query", reqId:++tokReq, text:t}),500); }
-  inputEl.addEventListener("input",()=>{ autoGrow(); slashSel=0; slashFilter(); atSel=0; atFilter(); tokQuery(); });
+  inputEl.addEventListener("input",()=>{ autoGrow(); slashSel=0; slashFilter(); atSel=0; atFilter(); tokQuery();
+    sendEl.classList.toggle("idle", !inputEl.value.trim()); });
+  sendEl.classList.add("idle");
   inputEl.addEventListener("blur",()=>setTimeout(()=>{ slashMenu.classList.remove("show"); atClose(); },150));
   inputEl.addEventListener("keydown",(e)=>{
     if(slashItems.length&&slashMenu.classList.contains("show")){
