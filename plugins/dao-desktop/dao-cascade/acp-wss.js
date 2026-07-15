@@ -29,6 +29,14 @@ function readCredentials() {
   return { apiKey, apiUrl: apiUrl || "https://api.devin.ai" };
 }
 
+// 官方同源(windsurf 扩展 _buildAuthenticatedUrl): CLI 登录落盘的 key 形如
+// "devin-session-token$<raw>", /acp/live?token= 只认去前缀的 raw 值(带前缀即 403)。
+const DEVIN_SESSION_TOKEN_PREFIX = "devin-session-token$";
+function acpToken(apiKey) {
+  return apiKey.startsWith(DEVIN_SESSION_TOKEN_PREFIX)
+    ? apiKey.slice(DEVIN_SESSION_TOKEN_PREFIX.length) : apiKey;
+}
+
 class AcpWssClient {
   constructor(opts) {
     this._log = (opts && opts.log) || (() => {});
@@ -46,7 +54,7 @@ class AcpWssClient {
     const cred = readCredentials();
     if (!cred || !cred.apiKey) throw new Error("未找到 Devin 凭据,请先登录(credentials.toml)");
     const url = cred.apiUrl.replace(/^http/, "ws").replace(/\/$/, "") +
-      "/acp/live?token=" + encodeURIComponent(cred.apiKey);
+      "/acp/live?token=" + encodeURIComponent(acpToken(cred.apiKey));
     this._log("[cloud] connecting " + url.replace(/token=[^&]+/, "token=***"));
     await new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
@@ -137,4 +145,4 @@ class AcpWssClient {
   stop() { if (this._ws) { try { this._ws.close(); } catch (_) {} this._ws = null; } this.sessionId = null; }
 }
 
-module.exports = { AcpWssClient, readCredentials };
+module.exports = { AcpWssClient, readCredentials, acpToken };

@@ -83,8 +83,9 @@ function detectIde() {
 //   定制: MCP / Rules / Workflows / Skills / 记忆
 //   引擎: user_settings.pb(偏好·模型) / codemaps / implicit / brain / cascade / database /
 //         code_tracker / context_state / installation_id
-//   IDE 层: settings.json / keybindings.json / snippets / globalStorage(state.vscdb) / argv.json / 扩展
-//   账户: ACP 注册表 / credentials / Devin CLI
+//   IDE 层: settings.json / keybindings.json / snippets / globalStorage(state.vscdb) / argv.json / 扩展 /
+//           本地文件历史 History / 工作区状态 workspaceStorage / 热退出 Backups / 对话模型 chatLanguageModels.json
+//   账户: ACP 注册表 / credentials / Devin CLI / CLI MCP 状态
 //   插件: 对话备份(~/.wam)
 // 注: Cascade 对话轨迹正文随账号云端同步(本地无 pb 正文), 本地仅缓存目录 —— 换机/重装
 //     由登录态带回; 本插件的 ~/.wam 备份提供额外本地留存。
@@ -110,12 +111,18 @@ function detect() {
   const tracker = path.join(ws, "code_tracker");
   const ctxState = path.join(ws, "context_state");
   const instId = path.join(ws, "installation_id");
+  const ideRoot = path.dirname(userDir);
   const settings = path.join(userDir, "settings.json");
   const keybinds = path.join(userDir, "keybindings.json");
   const snippets = path.join(userDir, "snippets");
   const stateDb = path.join(userDir, "globalStorage", "state.vscdb");
   const argv = path.join(h, ".devin", "argv.json");
   const exts = path.join(h, ".devin", "extensions");
+  const hist = path.join(userDir, "History");
+  const wsStorage = path.join(userDir, "workspaceStorage");
+  const backups = path.join(ideRoot, "Backups");
+  const chatModels = path.join(userDir, "chatLanguageModels.json");
+  const cliMcp = path.join(h, ".local", "share", "devin", "mcp");
   const wam = path.join(h, ".wam", "conversation_backups");
   const S = (key, group, label, p, count) => {
     const s = { key, group, label, path: p, exists: exists(p) };
@@ -144,9 +151,14 @@ function detect() {
     S("idestate", "IDE层", "界面状态 state.vscdb", stateDb),
     S("ideargv", "IDE层", "启动参数 argv.json", argv),
     S("ideexts", "IDE层", "扩展 ~/.devin/extensions", exts, countEntries(exts)),
+    S("idehistory", "IDE层", "本地文件历史 History", hist, countEntries(hist)),
+    S("idewsstorage", "IDE层", "工作区状态 workspaceStorage", wsStorage, countEntries(wsStorage)),
+    S("idebackups", "IDE层", "热退出未保存 Backups", backups, countEntries(backups)),
+    S("idechatmodels", "IDE层", "对话模型 chatLanguageModels.json", chatModels),
     S("acp", "账户", "ACP 本地注册表", acp, countAcpAgents(acp)),
     S("cred", "账户", "登录凭据 credentials.toml", cred),
     S("cli", "账户", "Devin CLI 状态", cli, countEntries(cli)),
+    S("climcp", "账户", "CLI MCP 状态(~/.local/share/devin/mcp)", cliMcp, countEntries(cliMcp)),
     S("wam", "插件", "对话备份(~/.wam)", wam, countEntries(wam)),
   ];
   return { ide: detectIde(), configRoot: ws, configRootExists: exists(ws), ideUserDir: userDir, sources };

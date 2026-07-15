@@ -401,6 +401,46 @@ test("R65 桥接 /api/cascade: 本机会话·记忆水位可经本地 API 暴露
   assert.ok(!JSON.stringify(c).match(/apiKey|token|pat/i), "水位视图不得含凭据字段");
 });
 
+test("R128 本地 API 后端调度端点: /api/env 直取环境共生检测; POST 未知路由 404; send 缺 text 报错", async () => {
+  const api = require(path.join(CASCADE, "local-api.js"));
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), "dao-api-env-"));
+  process.env.DAO_ENV_SYNC_HOME = h;
+  try {
+    const env = api.routes("/api/env");
+    assert.strictEqual(env.sources.length, 30);
+    assert.ok(env.sources.every((s) => s.path.startsWith(h)));
+    assert.strictEqual(await api.postRoutes("/api/nope", {}), null);
+    await assert.rejects(() => api.postRoutes("/api/cascade/send", {}), /text required/);
+    assert.throws(() => api.routes("/api/cascade/steps"), /cascadeId required/);
+    await assert.rejects(() => api.postRoutes("/api/cloud/send", {}), /text required/);
+  } finally { delete process.env.DAO_ENV_SYNC_HOME; }
+});
+
+test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/delete/cancel 缺 cascadeId; settings 缺 patch; memory 缺 id", async () => {
+  const api = require(path.join(CASCADE, "local-api.js"));
+  await assert.rejects(() => api.postRoutes("/api/cascade/rename", {}), /cascadeId and name required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/archive", {}), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/delete", {}), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/cancel", {}), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/settings", {}), /patch required/);
+  await assert.rejects(() => api.postRoutes("/api/memory/update", {}), /memoryId and content required/);
+  await assert.rejects(() => api.postRoutes("/api/memory/delete", {}), /memoryId required/);
+  assert.throws(() => api.routes("/api/cascade/transcript"), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/queue", {}), /cascadeId and text required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/branch", {}), /cascadeId, stepIndex and text required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/revert", {}), /cascadeId and stepIndex required/);
+  await assert.rejects(() => api.postRoutes("/api/auth/code", {}), /code required/);
+  await assert.rejects(() => api.postRoutes("/api/auth/code", { code: "x" }), /no pending login/);
+  assert.deepStrictEqual(await api.postRoutes("/api/auth/cancel", {}), { ok: true });
+  await assert.rejects(() => api.postRoutes("/api/cloud/cancel", {}), /sessionId required/);
+});
+
+test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {
+  const { acpToken } = require(path.join(CASCADE, "acp-wss.js"));
+  assert.strictEqual(acpToken("devin-session-token$abc123"), "abc123");
+  assert.strictEqual(acpToken("plain-key"), "plain-key");
+});
+
 test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ghi-"));
   process.env.DAO_GITHUB_FLEET_FILE = path.join(dir, "fleet.json");
@@ -609,7 +649,7 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.installed, false);
     assert.strictEqual(d.ide.engineTraces, false);
     assert.strictEqual(d.configRootExists, false);
-    assert.strictEqual(d.sources.length, 25, "官方落盘全清单(定制/引擎/IDE层/账户/插件)");
+    assert.strictEqual(d.sources.length, 30, "官方落盘全清单(定制/引擎/IDE层/账户/插件)");
     for (const s of d.sources) { assert.strictEqual(s.exists, false); assert.ok(s.path.startsWith(h)); assert.ok(s.group); }
     // 2) 官方式落盘后: 条目数与官方文件结构一致
     const ws = path.join(h, ".codeium", "windsurf");
@@ -640,12 +680,22 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     fs.writeFileSync(path.join(h, ".config", "Devin", "User", "settings.json"), "{}");
     fs.mkdirSync(path.join(h, ".devin", "extensions", "ext-a"), { recursive: true });
     fs.mkdirSync(path.join(h, ".wam", "conversation_backups", "x"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".config", "Devin", "User", "History", "h1"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".config", "Devin", "User", "workspaceStorage", "w1"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".config", "Devin", "Backups", "b1"), { recursive: true });
+    fs.writeFileSync(path.join(h, ".config", "Devin", "User", "chatLanguageModels.json"), "[]");
+    fs.mkdirSync(path.join(h, ".local", "share", "devin", "mcp", "m1"), { recursive: true });
     d = es.detect();
     const by2 = Object.fromEntries(d.sources.map((s) => [s.key, s]));
     if (process.platform === "linux") {
       assert.ok(d.ideUserDir.startsWith(h));
       assert.strictEqual(by2.idesettings.exists, true);
+      assert.strictEqual(by2.idehistory.count, 1);
+      assert.strictEqual(by2.idewsstorage.count, 1);
+      assert.strictEqual(by2.idebackups.count, 1);
+      assert.strictEqual(by2.idechatmodels.exists, true);
     }
+    assert.strictEqual(by2.climcp.count, 1);
     assert.ok(by2.usersettings.sizeKb >= 2);
     assert.strictEqual(by2.memories.count, 1);
     assert.strictEqual(by2.grulesmd.exists, true);

@@ -1812,6 +1812,15 @@ class CascadePanelProvider {
           rules.push({ name, trigger: "global", path: p });
         }
       } catch (_) {}
+      // 官方设置页「+ Global」写入 ~/.codeium/windsurf/memories/global_rules.md, GetAllRules 不含, 直读补显
+      try {
+        const fs = require("fs");
+        const gp = path.join(os.homedir(), ".codeium", "windsurf", "memories", "global_rules.md");
+        if (!rules.some((x) => x.path === gp) && fs.statSync(gp).size > 0) {
+          const first = (fs.readFileSync(gp, "utf8").split(/\r?\n/).find((l) => l.trim()) || "").replace(/^#\s*/, "").slice(0, 80);
+          rules.push({ name: first || "global_rules.md", trigger: "global", path: gp });
+        }
+      } catch (_) {}
       const skills = (sk.skills || r.skills || []).map((s) => ({
         name: s.name || s.skillName || "", description: s.description || "", path: fromUri(s.path) }));
       const workflows = (wf.workflows || []).map((w) => ({
@@ -2626,6 +2635,20 @@ class CascadePanelProvider {
   // Ctrl+' 循环切换 agent(复刻官方快捷键)
   document.addEventListener("keydown",(e)=>{ if(e.ctrlKey && e.key==="'"){ e.preventDefault();
     const i=AGENTS.findIndex(x=>x.id===agent); agent=AGENTS[(i+1)%AGENTS.length].id; onAgentChange(); }});
+  // 官方快捷键组: Ctrl+/ 开模型选择器 · Ctrl+Shift+/ 切下一模型 · Ctrl+. 切会话模式
+  document.addEventListener("keydown",(e)=>{
+    if(!e.ctrlKey) return;
+    if(e.key==="/"&&!e.shiftKey){ e.preventDefault(); modelBtn.click(); return; }
+    if((e.key==="?"||(e.key==="/"&&e.shiftKey))){ e.preventDefault();
+      const s=modelCur; if(!s) return;
+      const opts=(s.options||[]).filter(o=>!o.disabled); if(!opts.length) return;
+      const i=opts.findIndex(o=>o.value===s.currentValue); const o=opts[(i+1)%opts.length];
+      vscode.postMessage({type:"set-config", configId:"model", value:o.value, agent});
+      modelCur=Object.assign({},s,{currentValue:o.value}); modelBtnSync(modelCur);
+      const grp=curGroup(); if(cfgStore[grp]&&cfgStore[grp].model) cfgStore[grp].model.currentValue=o.value;
+      return; }
+    if(e.key==="."&&!e.shiftKey){ e.preventDefault(); modeBtn.click(); }
+  });
   // mode/agent 弹层键盘导航(同 R101): ↑↓ 循环 .kbd 高亮, Enter 选中, Escape 关闭
   document.addEventListener("keydown",(e)=>{
     const open=[[modeMenu,modeList],[agentMenu,agentList]].find(([m])=>m.classList.contains("show"));
@@ -3511,6 +3534,38 @@ function register(context, log, opts) {
       await vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {});
       provider._post({ type: "insert-input", text });
     }),
+    // 官方命令面同源: Log in / Log Out(复用面板登录编排与 CLI logout)
+    vscode.commands.registerCommand(viewId + ".login", async () => {
+      await vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {});
+      provider._handleLogin();
+    }),
+    vscode.commands.registerCommand(viewId + ".logout", async () => {
+      try {
+        const provision = require("./devin-provision");
+        const bin = provision.resolveEngine(context.extensionPath, null);
+        if (!bin) throw new Error("未找到 devin 二进制");
+        const { execFile } = require("child_process");
+        await new Promise((res) => execFile(bin, ["auth", "logout"], { timeout: 20000 }, () => res()));
+        vscode.window.setStatusBarMessage("已登出 Devin 账号", 4000);
+      } catch (e) { vscode.window.showWarningMessage("登出失败: " + e.message); }
+    }),
+    // 官方 Add Current File to Cascade: 当前文件 @mention 塗入 composer
+    vscode.commands.registerCommand(viewId + ".addFile", async () => {
+      const ed = vscode.window.activeTextEditor;
+      if (!ed) return void vscode.window.showInformationMessage("没有活动编辑器");
+      const rel = vscode.workspace.asRelativePath(ed.document.uri);
+      await vscode.commands.executeCommand(viewId + ".focus").then(undefined, () => {});
+      provider._post({ type: "insert-input", text: "@" + rel + " " });
+    }),
+    // 官方 Create New Rule / Workflow / Global Workflow(CreateCustomizationFile 同源)
+    vscode.commands.registerCommand(viewId + ".createRule", () => provider._handleCustomizationCreate("rule")),
+    vscode.commands.registerCommand(viewId + ".createWorkflow", () => provider._handleCustomizationCreate("workflow")),
+    vscode.commands.registerCommand(viewId + ".createGlobalWorkflow", () => provider._handleCustomizationCreate("gworkflow")),
+    // 官方 View Account / Open Changelog
+    vscode.commands.registerCommand(viewId + ".openProfile", () =>
+      vscode.env.openExternal(vscode.Uri.parse("https://app.devin.ai/settings/profile"))),
+    vscode.commands.registerCommand(viewId + ".openChangelog", () =>
+      vscode.env.openExternal(vscode.Uri.parse("https://docs.devin.ai/release-notes/overview"))),
     // 官方式提交信息生成: GenerateCommitMessage{repoRootUri} → 写入 SCM 输入框(官方 SCM ✨ 同款)
     vscode.commands.registerCommand(viewId + ".genCommit", async () => {
       try {

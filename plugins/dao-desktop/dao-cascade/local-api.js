@@ -14,6 +14,11 @@ const os = require("os");
 const path = require("path");
 const hostStateMod = require("./host-state");
 const backup = require("./backup");
+const envSync = require("./env-sync");
+const ls = require("./ls-bridge");
+const { AcpWssClient } = require("./acp-wss");
+const provision = require("./devin-provision");
+const { execFile } = require("child_process");
 
 function statePath() { return process.env.DAO_LOCAL_API_FILE || path.join(os.homedir(), ".dao", "local-api.json"); }
 
@@ -52,9 +57,73 @@ function cascadeView() {
   return { sessions: f.cascadeLocal || null, memories: f.memories || null };
 }
 
-// 路由表(全只读): 路径 → () => 数据。绝不暴露凭据/token 本身。
+// 路由表(GET 只读): 路径 → 数据(可返 Promise)。绝不暴露凭据/token 本身。
 function routes(reqUrl) {
   const u = reqUrl.split("?")[0];
+  const q = new URLSearchParams(reqUrl.split("?")[1] || "");
+  if (u === "/api/env") return envSync.detect();
+  if (u === "/api/models") return ls.listModels();
+  if (u === "/api/cascade/trajectories") return ls.call("GetAllCascadeTrajectories", {}).then((r) => r.trajectorySummaries || {});
+  if (u === "/api/cascade/steps") {
+    const cid = q.get("cascadeId") || "";
+    if (!cid) throw new Error("cascadeId required");
+    return ls.call("GetCascadeTrajectorySteps", { cascadeId: cid });
+  }
+  if (u === "/api/cloud/sessions") {
+    return withCloud(async (c) => {
+      const l = await c.listSessions();
+      const ss = (l && l.sessions) || [];
+      return ss.map((s) => ({ sessionId: s.sessionId || s.id, title: s.title || "" }));
+    });
+  }
+  if (u === "/api/status") {
+    return ls.call("GetUserStatus", {}).then((r) => {
+      const s = (r && r.userStatus) || r || {};
+      return { name: s.name || "", email: s.email || "", plan: (s.planStatus || {}).planName || s.plan || "", loggedIn: !!(s.email || s.name) };
+    });
+  }
+  if (u === "/api/rules") {
+    // 与面板同源: GetAllRules 只返工作区规则, 直读补显全局规则(~/.devin/rules + 官方设置页 global_rules.md)
+    return ls.call("GetAllRules", {}).catch(() => ({})).then((r) => {
+      const fromUri = (x) => (x || "").replace(/^file:\/\//, "");
+      const rules = (r.memories || []).map((m) => {
+        const ps = (m.scope && m.scope.projectScope) || {};
+        return { name: m.title || m.memoryId || "", trigger: (ps.trigger || "").replace("CORTEX_MEMORY_TRIGGER_", "").toLowerCase(), path: fromUri(ps.absoluteFilePath) };
+      });
+      const seen = new Set(rules.map((x) => x.path));
+      try {
+        const gdir = path.join(os.homedir(), ".devin", "rules");
+        for (const f of fs.readdirSync(gdir)) {
+          if (!f.endsWith(".md")) continue;
+          const p = path.join(gdir, f);
+          if (!seen.has(p)) rules.push({ name: f.replace(/\.md$/, ""), trigger: "global", path: p });
+        }
+      } catch (_) {}
+      try {
+        const gp = path.join(os.homedir(), ".codeium", "windsurf", "memories", "global_rules.md");
+        if (!seen.has(gp) && fs.statSync(gp).size > 0) rules.push({ name: "global_rules.md", trigger: "global", path: gp });
+      } catch (_) {}
+      return { rules };
+    });
+  }
+  if (u === "/api/skills") return ls.call("GetAllSkills", {});
+  if (u === "/api/workflows") return ls.call("GetAllWorkflows", {});
+  if (u === "/api/memories") return ls.call("GetCascadeMemories", {});
+  if (u === "/api/settings") return ls.call("GetUserSettings", {}).then((r) => r.userSettings || {});
+  if (u === "/api/mcp/states") return ls.call("GetMcpServerStates", {});
+  if (u === "/api/cascade/transcript") {
+    const cid = q.get("cascadeId") || "";
+    if (!cid) throw new Error("cascadeId required");
+    return ls.call("GetCascadeTranscriptForTrajectoryId", { cascadeId: cid });
+  }
+  if (u === "/api/auth") {
+    const bin = provision.resolveEngine(null, null);
+    return provision.authStatus(bin, { force: q.get("force") === "1" }).then((r) => ({ loggedIn: r.loggedIn, name: r.name || "", login: _login ? { pending: true, url: _login.url || "" } : null }));
+  }
+  if (u === "/api/workspaces") return ls.call("GetWorkspaceInfos", {});
+  if (u === "/api/workspace/edit-state") return ls.call("GetWorkspaceEditState", {});
+  if (u === "/api/models/statuses") return ls.call("GetModelStatuses", {});
+  if (u === "/api/processes") return ls.call("GetProcesses", {});
   if (u === "/api/account") return accountView();
   if (u === "/api/mcp") return mcpView();
   if (u === "/api/host") return hostView();
@@ -67,6 +136,182 @@ function routes(reqUrl) {
     const l = backup.listBackups();
     return { account: accountView(), host: hostView(), mcp: mcpView(), cascade: cascadeView(),
       backups: { accounts: l.accounts.length, conversations: l.accounts.reduce((s, x) => s + x.convCount, 0) } };
+  }
+  return null;
+}
+
+// 登录体感后端流: 官方 CLI manual-token 登录由插件编排(devin-provision 同源), 状态单飞。
+let _login = null; // { url, ctl, done }
+
+// Devin Cloud 一次性连接(官方 /acp/live 同源): 用完即断, 不常驻。
+async function withCloud(fn) {
+  const c = new AcpWssClient({ log: () => {}, onUpdate: () => {} });
+  try {
+    await c.connect();
+    return await fn(c);
+  } finally { try { c.stop(); } catch (_) {} }
+}
+
+// POST 路由(后端原生调度): AI/脚本可直接驱动 Cascade 会话, 与面板同源(ls-bridge 同一真源)。
+async function postRoutes(u, body) {
+  if (u === "/api/cascade/send") {
+    const text = String((body || {}).text || "").trim();
+    if (!text) throw new Error("text required");
+    let cid = (body || {}).cascadeId || "";
+    if (!cid) cid = (await ls.call("StartCascade", {})).cascadeId;
+    let uid = (body || {}).modelUid || "";
+    if (!uid) {
+      const ms = await ls.listModels();
+      const pick = ms.find((m) => m.recommended && !m.disabled) || ms.find((m) => !m.disabled) || ms[0];
+      uid = pick && pick.uid;
+    }
+    const drive = ls.driveStream(cid, null);
+    try {
+      await ls.call("SendUserCascadeMessage", {
+        cascadeId: cid, items: [{ text }],
+        cascadeConfig: { plannerConfig: { requestedModelUid: uid, toolConfig: { askUserQuestion: { enabled: true } } } },
+      });
+    } finally { setTimeout(() => { try { drive.close(); } catch (_) {} }, 120000).unref(); }
+    return { ok: true, cascadeId: cid, modelUid: uid };
+  }
+  if (u === "/api/cloud/send") {
+    const text = String((body || {}).text || "").trim();
+    if (!text) throw new Error("text required");
+    return withCloud(async (c) => {
+      let out = "";
+      c._onUpdate = (u2) => {
+        try {
+          const s = u2.update || u2;
+          if ((s.sessionUpdate || s.kind) === "agent_message_chunk") out += ((s.content || {}).text) || "";
+        } catch (_) {}
+      };
+      if ((body || {}).sessionId) await c.loadSession(body.sessionId);
+      else await c.newSession("/");
+      const r = await c.prompt(text);
+      return { ok: true, sessionId: c.sessionId, stopReason: (r || {}).stopReason || "", reply: out };
+    });
+  }
+  if (u === "/api/cloud/cancel") {
+    const sid = String((body || {}).sessionId || "");
+    if (!sid) throw new Error("sessionId required");
+    return withCloud(async (c) => {
+      await c.loadSession(sid);
+      await c.cancel();
+      return { ok: true, sessionId: sid };
+    });
+  }
+  if (u === "/api/backup/run") {
+    return backup.backupAll(ls, body || {});
+  }
+  if (u === "/api/auth/login") {
+    if (_login) return { ok: true, pending: true, url: _login.url || "" };
+    const bin = provision.resolveEngine(null, null);
+    if (!bin) throw new Error("devin binary not found");
+    return new Promise((resolve, reject) => {
+      const st = { url: "", ctl: null, done: null };
+      _login = st;
+      const t = setTimeout(() => { if (!st.url) { _login = null; try { st.ctl.cancel(); } catch (_) {} reject(new Error("login url timeout")); } }, 30000);
+      st.ctl = provision.startLogin(bin, {
+        onUrl: (url) => { st.url = url; clearTimeout(t); resolve({ ok: true, pending: true, url }); },
+        onDone: (r) => { st.done = r; _login = null; if (!st.url) { clearTimeout(t); (r.ok ? resolve({ ok: true, pending: false }) : reject(new Error(r.message || "login failed"))); } },
+      });
+    });
+  }
+  if (u === "/api/auth/code") {
+    const code = String((body || {}).code || "").trim();
+    if (!code) throw new Error("code required");
+    if (!_login) throw new Error("no pending login");
+    const st = _login;
+    st.ctl.submitCode(code);
+    for (let i = 0; i < 60; i++) {
+      if (st.done) return { ok: !!st.done.ok, message: st.done.ok ? "Login successful" : (st.done.message || "").slice(0, 200) };
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    throw new Error("login result timeout");
+  }
+  if (u === "/api/auth/cancel") {
+    if (_login) { try { _login.ctl.cancel(); } catch (_) {} _login = null; }
+    return { ok: true };
+  }
+  if (u === "/api/auth/logout") {
+    const bin = provision.resolveEngine(null, null);
+    if (!bin) throw new Error("devin binary not found");
+    return new Promise((resolve) => {
+      execFile(bin, ["auth", "logout"], { timeout: 20000 }, (err, so, se) => {
+        resolve({ ok: !err, message: String(so || se || "").trim().slice(0, 200) });
+      });
+    });
+  }
+  const cid = String((body || {}).cascadeId || "");
+  if (u === "/api/cascade/rename") {
+    const name = String((body || {}).name || "").trim();
+    if (!cid || !name) throw new Error("cascadeId and name required");
+    await ls.call("RenameCascadeTrajectory", { cascadeId: cid, name });
+    return { ok: true, cascadeId: cid, name };
+  }
+  if (u === "/api/cascade/archive") {
+    if (!cid) throw new Error("cascadeId required");
+    await ls.call("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived: (body || {}).isArchived !== false });
+    return { ok: true, cascadeId: cid };
+  }
+  if (u === "/api/cascade/delete") {
+    if (!cid) throw new Error("cascadeId required");
+    await ls.call("DeleteCascadeTrajectory", { cascadeId: cid });
+    return { ok: true, cascadeId: cid };
+  }
+  if (u === "/api/cascade/cancel") {
+    if (!cid) throw new Error("cascadeId required");
+    await ls.call("CancelCascadeInvocationAndWait", { cascadeId: cid })
+      .catch(() => ls.call("CancelCascadeInvocation", { cascadeId: cid }));
+    return { ok: true, cascadeId: cid };
+  }
+  if (u === "/api/settings") {
+    const patch = (body || {}).patch;
+    if (!patch || typeof patch !== "object") throw new Error("patch required");
+    const s = (await ls.call("GetUserSettings", {})).userSettings || {};
+    await ls.call("SetUserSettings", { userSettings: Object.assign(s, patch) });
+    return { ok: true, keys: Object.keys(patch) };
+  }
+  if (u === "/api/memory/update") {
+    const id = String((body || {}).memoryId || "");
+    const content = String((body || {}).content || "");
+    if (!id || !content) throw new Error("memoryId and content required");
+    await ls.call("UpdateCascadeMemory", { memoryId: id, title: (body || {}).title || "", content, tags: (body || {}).tags || [] });
+    return { ok: true, memoryId: id };
+  }
+  if (u === "/api/cascade/queue") {
+    const text = String((body || {}).text || "").trim();
+    if (!cid || !text) throw new Error("cascadeId and text required");
+    const r = await ls.call("QueueCascadeMessage", { cascadeId: cid, items: [{ text }] });
+    return { ok: true, cascadeId: cid, queueId: (r || {}).queueId || "" };
+  }
+  if (u === "/api/cascade/branch") {
+    const text = String((body || {}).text || "").trim();
+    const si = (body || {}).stepIndex;
+    if (!cid || !text || typeof si !== "number") throw new Error("cascadeId, stepIndex and text required");
+    let uid = (body || {}).modelUid || "";
+    if (!uid) {
+      const ms = await ls.listModels();
+      const pick = ms.find((m) => m.recommended && !m.disabled) || ms.find((m) => !m.disabled) || ms[0];
+      uid = pick && pick.uid;
+    }
+    const r = await ls.call("BranchCascade", { baseCascadeId: cid, branchFromStepIndex: si, items: [{ text }],
+      cascadeConfig: { plannerConfig: { requestedModelUid: uid } } });
+    return { ok: true, baseCascadeId: cid, newCascadeId: (r || {}).newCascadeId || (r || {}).cascadeId || "" };
+  }
+  if (u === "/api/cascade/revert") {
+    const si = (body || {}).stepIndex;
+    if (!cid || typeof si !== "number") throw new Error("cascadeId and stepIndex required");
+    const pv = await ls.call("GetRevertPreview", { cascadeId: cid, stepIndex: si }).catch(() => ({}));
+    if ((body || {}).previewOnly) return { ok: true, cascadeId: cid, preview: (pv || {}).codeEditPreviews || [] };
+    await ls.call("RevertToCascadeStep", { cascadeId: cid, stepIndex: si });
+    return { ok: true, cascadeId: cid, stepIndex: si, reverted: ((pv || {}).codeEditPreviews || []).length };
+  }
+  if (u === "/api/memory/delete") {
+    const id = String((body || {}).memoryId || "");
+    if (!id) throw new Error("memoryId required");
+    await ls.call("DeleteCascadeMemory", { memoryId: id });
+    return { ok: true, memoryId: id };
   }
   return null;
 }
@@ -97,10 +342,23 @@ function start(preferredPort) {
       if (u === "/api/health") return send(200, { ok: true, service: "dao-desktop-local-api", port: _port });
       const auth = req.headers["authorization"] || "";
       if (auth !== "Bearer " + _token) return send(401, { error: "unauthorized" });
-      let data;
-      try { data = routes(req.url || ""); } catch (e) { return send(500, { error: e.message }); }
-      if (data === null) return send(404, { error: "not found" });
-      send(200, data);
+      if (req.method === "POST") {
+        let raw = "";
+        req.on("data", (c) => { raw += c; if (raw.length > 1e6) req.destroy(); });
+        req.on("end", () => {
+          let body = {};
+          try { body = raw ? JSON.parse(raw) : {}; } catch (_) { return send(400, { error: "invalid json" }); }
+          Promise.resolve()
+            .then(() => postRoutes(u, body))
+            .then((d) => (d === null ? send(404, { error: "not found" }) : send(200, d)))
+            .catch((e) => send(500, { error: e.message }));
+        });
+        return;
+      }
+      Promise.resolve()
+        .then(() => routes(req.url || ""))
+        .then((d) => (d === null || d === undefined ? send(404, { error: "not found" }) : send(200, d)))
+        .catch((e) => send(500, { error: e.message }));
     });
     _server.on("error", (e) => { _server = null; reject(e); });
     _server.listen(preferredPort || 0, "127.0.0.1", () => {
@@ -118,4 +376,4 @@ function stop() {
   });
 }
 
-module.exports = { start, stop, running, token, port, statePath, accountView, mcpView, hostView, cascadeView, routes };
+module.exports = { start, stop, running, token, port, statePath, accountView, mcpView, hostView, cascadeView, routes, postRoutes };
