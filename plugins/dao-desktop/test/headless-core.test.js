@@ -609,7 +609,7 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.installed, false);
     assert.strictEqual(d.ide.engineTraces, false);
     assert.strictEqual(d.configRootExists, false);
-    assert.strictEqual(d.sources.length, 25, "官方落盘全清单(定制/引擎/IDE层/账户/插件)");
+    assert.strictEqual(d.sources.length, 30, "官方落盘全清单(定制/引擎/IDE层/账户/插件)");
     for (const s of d.sources) { assert.strictEqual(s.exists, false); assert.ok(s.path.startsWith(h)); assert.ok(s.group); }
     // 2) 官方式落盘后: 条目数与官方文件结构一致
     const ws = path.join(h, ".codeium", "windsurf");
@@ -640,12 +640,22 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     fs.writeFileSync(path.join(h, ".config", "Devin", "User", "settings.json"), "{}");
     fs.mkdirSync(path.join(h, ".devin", "extensions", "ext-a"), { recursive: true });
     fs.mkdirSync(path.join(h, ".wam", "conversation_backups", "x"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".config", "Devin", "User", "History", "h1"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".config", "Devin", "User", "workspaceStorage", "w1"), { recursive: true });
+    fs.mkdirSync(path.join(h, ".config", "Devin", "Backups", "b1"), { recursive: true });
+    fs.writeFileSync(path.join(h, ".config", "Devin", "User", "chatLanguageModels.json"), "[]");
+    fs.mkdirSync(path.join(h, ".local", "share", "devin", "mcp", "m1"), { recursive: true });
     d = es.detect();
     const by2 = Object.fromEntries(d.sources.map((s) => [s.key, s]));
     if (process.platform === "linux") {
       assert.ok(d.ideUserDir.startsWith(h));
       assert.strictEqual(by2.idesettings.exists, true);
+      assert.strictEqual(by2.idehistory.count, 1);
+      assert.strictEqual(by2.idewsstorage.count, 1);
+      assert.strictEqual(by2.idebackups.count, 1);
+      assert.strictEqual(by2.idechatmodels.exists, true);
     }
+    assert.strictEqual(by2.climcp.count, 1);
     assert.ok(by2.usersettings.sizeKb >= 2);
     assert.strictEqual(by2.memories.count, 1);
     assert.strictEqual(by2.grulesmd.exists, true);
