@@ -63,6 +63,15 @@ function switchTo(email) {
   return { email: a.email };
 }
 
+// 归还官方原登录态: 以首次切号前备份的 credentials.toml.bak 覆写回官方原始内容。
+function restoreOriginal() {
+  const p = credPath();
+  const bak = p + ".bak";
+  if (!fs.existsSync(bak)) throw new Error("无原始备份(credentials.toml.bak): 尚未经本插件切号, 官方登录态未被触碰");
+  fs.writeFileSync(p, fs.readFileSync(bak, "utf8"), { mode: 0o600 });
+  return { restored: true };
+}
+
 function remove(email) {
   const list = loadPool();
   const next = list.filter((a) => a.email !== email);
@@ -85,4 +94,4 @@ function listView(activeKey) {
   }));
 }
 
-module.exports = { poolPath, credPath, loadPool, captureCurrent, switchTo, remove, listView, currentCredKey };
+module.exports = { poolPath, credPath, loadPool, captureCurrent, switchTo, restoreOriginal, remove, listView, currentCredKey };

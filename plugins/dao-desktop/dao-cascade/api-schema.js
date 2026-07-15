@@ -67,8 +67,10 @@ const ROUTES = [
   { path: "/api/proxy/chat", method: "post", summary: "路由生效层: 按官方 UID 真正投递到第三方渠道/模型(消费路由, 不伪造)", b: [{ name: "uid", req: true }, { name: "messages", desc: "[{role,content}]; 或用 text" }, { name: "text" }, { name: "temperature" }, { name: "maxTokens" }] },
   // ── 账号池切号(Devin; 严禁回退, 无 key 报错) ──
   { path: "/api/pool", method: "get", summary: "Cascade 账号池视图(脱敏: hasKey/keyTail/active)" },
+  { path: "/api/boundary", method: "get", summary: "同步/隔离边界自描述: 插件自持面(~/.dao/*)与官方共享面(IDE 数据 1:1)的机器可读矩阵" },
   { path: "/api/pool/capture", method: "post", summary: "收录当前登录号入池", b: [{ name: "account", desc: "缺省取 /api/account 视图" }] },
-  { path: "/api/pool/switch", method: "post", summary: "切换到池内账号(写 credentials.toml)", b: [{ name: "email", req: true }] },
+  { path: "/api/pool/switch", method: "post", summary: "切换到池内账号(写 credentials.toml, 首次自动备份官方原态)", b: [{ name: "email", req: true }] },
+  { path: "/api/pool/restore", method: "post", summary: "归还官方原登录态(以首次切号前备份的 credentials.toml.bak 覆写回)" },
   { path: "/api/pool/remove", method: "post", summary: "移除池内账号", b: [{ name: "email", req: true }] },
   // ── 反向注入(全账号; secret 值绝不出后端) ──
   { path: "/api/inject", method: "get", summary: "注入档视图(脱敏: secret 仅回 hasValue/valueTail)" },
