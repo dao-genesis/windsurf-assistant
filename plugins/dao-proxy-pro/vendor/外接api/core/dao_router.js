@@ -273,7 +273,12 @@ function _getDaoEnhanceText() {
     const canonHeader = _spInvert.getCanonHeader
       ? _spInvert.getCanonHeader()
       : "";
-    return canonHeader + canonText;
+    // ★ 工具轴正交叠加 · 工具模式契约(windows/freecad/kicad)与经藏并行注入
+    const toolSuffix =
+      typeof _spInvert.getToolContractSuffix === "function"
+        ? _spInvert.getToolContractSuffix()
+        : "";
+    return canonHeader + canonText + toolSuffix;
   } catch {
     return null;
   }

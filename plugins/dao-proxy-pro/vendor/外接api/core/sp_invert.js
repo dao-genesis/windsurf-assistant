@@ -837,6 +837,10 @@ module.exports = {
   getToolMode,
   setToolMode,
   TOOLMODE_MAP,
+  getToolContractSuffix: () => {
+    _maybeHotReloadToolMode();
+    return _toolContractSuffix();
+  },
 
   // 常量
   INVERTED_PREFIX,
