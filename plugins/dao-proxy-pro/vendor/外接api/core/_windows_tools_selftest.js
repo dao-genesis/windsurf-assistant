@@ -21,7 +21,7 @@ function t(name, cond) {
 async function main() {
   // 1. 工具定义与官方同格
   const defs = wt.defs();
-  t("defs: 11 个工具", defs.length === 11);
+  t("defs: 18 个工具", defs.length === 18);
   t(
     "defs: 全部 windows_ 前缀",
     defs.every((d) => d.name.startsWith("windows_")),
@@ -51,6 +51,24 @@ async function main() {
       if (req.url === "/api/health") return res.end(JSON.stringify({ ok: true }));
       if (req.url === "/api/apps")
         return res.end(JSON.stringify({ apps: ["freecad", "kicad"] }));
+      if (req.url === "/api/session.list")
+        return res.end(JSON.stringify({ sessions: [{ session_id: "vm_1", apps: ["freecad"] }] }));
+      if (req.url === "/api/capabilities")
+        return res.end(JSON.stringify({ universal: [], domain: [], mode: "primary" }));
+      if (req.url === "/api/mode.list")
+        return res.end(JSON.stringify({ modes: [{ mode_id: "primary" }, { mode_id: "coding" }], current: "primary" }));
+      if (req.url === "/api/mode.set") {
+        const b = JSON.parse(body || "{}");
+        return res.end(JSON.stringify({ current: { mode_id: b.mode }, allowed_apps: [] }));
+      }
+      if (req.url === "/api/route") {
+        const b = JSON.parse(body || "{}");
+        return res.end(JSON.stringify({ targets: ["freecad"], layer: "domain", clean_text: b.text }));
+      }
+      if (req.url === "/api/account.list")
+        return res.end(JSON.stringify({ ok: true, accounts: [{ name: "dao" }] }));
+      if (req.url === "/api/account.sessions")
+        return res.end(JSON.stringify({ ok: true, sessions: [] }));
       if (req.url === "/api/clone.plan") {
         const b = JSON.parse(body || "{}");
         return res.end(
@@ -74,6 +92,27 @@ async function main() {
     ),
   );
   t("execute: clone_plan 透传参数", plan.app_id === "kicad" && plan.clone_id === "c1");
+
+  const sl = JSON.parse(await wt.execute("windows_session_list", "{}"));
+  t("execute: session_list 列会话", Array.isArray(sl.sessions) && sl.sessions[0].session_id === "vm_1");
+
+  const cap = JSON.parse(await wt.execute("windows_capabilities", "{}"));
+  t("execute: capabilities 返回清单", cap.mode === "primary");
+
+  const ml = JSON.parse(await wt.execute("windows_mode_list", "{}"));
+  t("execute: mode_list 列模式", ml.current === "primary" && ml.modes.length === 2);
+
+  const ms = JSON.parse(await wt.execute("windows_mode_set", '{"mode":"coding"}'));
+  t("execute: mode_set 切模式", ms.current.mode_id === "coding");
+
+  const rt = JSON.parse(await wt.execute("windows_route", '{"text":"@freecad 建模"}'));
+  t("execute: route @调度", rt.targets[0] === "freecad" && rt.layer === "domain");
+
+  const al = JSON.parse(await wt.execute("windows_account_list", "{}"));
+  t("execute: account_list 列账号", al.ok === true && al.accounts[0].name === "dao");
+
+  const as = JSON.parse(await wt.execute("windows_account_sessions", "{}"));
+  t("execute: account_sessions 列会话", as.ok === true && Array.isArray(as.sessions));
 
   const unk = JSON.parse(await wt.execute("windows_nope", "{}"));
   t("execute: 未知工具返回 error", unk.status === "error");
@@ -125,6 +164,63 @@ async function main() {
   tun.close();
 
   srv.close();
+
+  // 5. 正交双轴: 经藏(提示) × 工具模式 — 提示换提示的·工具换工具的·两者叠加
+  delete process.env.DAO_WINDOWS_TOOLS;
+  const spInvert = require("./sp_invert");
+
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600)); // 越过 500ms 门缓存
+  t("正交: 工具模式 windows → 工具门开(不依赖经藏)", wt.enabled());
+  process.env.DAO_TOOLS_MODE = "freecad";
+  await new Promise((r) => setTimeout(r, 600));
+  t("正交: 工具模式 freecad → 工具门开", wt.enabled());
+
+  const OFFICIAL_SP =
+    "You are Cascade, a powerful agentic AI coding assistant designed by the Codeium engineering team.\n" +
+    "<communication_style>x</communication_style>\n<tool_calling>use tools</tool_calling>";
+
+  spInvert.setCanon("laozi");
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600)); // 越过 500ms 热读节流
+  const inv1 = spInvert.invertSP(OFFICIAL_SP);
+  t("正交: canon=laozi × tools=windows → 经文+Windows 工具契约叠加", !!inv1 && /Windows Agent 工具契約/.test(inv1));
+
+  process.env.DAO_TOOLS_MODE = "kicad";
+  await new Promise((r) => setTimeout(r, 600));
+  const inv2 = spInvert.invertSP(OFFICIAL_SP);
+  t("正交: canon=laozi × tools=kicad → KiCad 域契约", !!inv2 && /KiCad 域工具契約/.test(inv2));
+
+  process.env.DAO_TOOLS_MODE = "official";
+  await new Promise((r) => setTimeout(r, 600));
+  const inv3 = spInvert.invertSP(OFFICIAL_SP);
+  t("正交: tools=official → 无附加契约(纯经文)", !!inv3 && !/工具契約/.test(inv3));
+
+  spInvert.setCanon("windows-agent");
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600));
+  const inv4 = spInvert.invertSP(OFFICIAL_SP);
+  t(
+    "正交: 旧 canon=windows-agent × tools=windows → 契约不重复叠加",
+    !!inv4 && (inv4.match(/Windows Agent 工具契約/g) || []).length === 1,
+  );
+
+  spInvert.setCanon("laozi");
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600));
+  const sfx = spInvert.getToolContractSuffix ? spInvert.getToolContractSuffix() : null;
+  t(
+    "正交: getToolContractSuffix 导出(dao_router 增强SP同源叠加)",
+    typeof sfx === "string" && /Windows Agent 工具契約/.test(sfx),
+  );
+
+  t("正交: TOOLMODE_MAP 四模齐(official/windows/freecad/kicad)",
+    ["official", "windows", "freecad", "kicad"].every((k) => spInvert.TOOLMODE_MAP[k]));
+  t("正交: setToolMode 非法值拒绝", spInvert.setToolMode("bogus") === false);
+
+  spInvert.setCanon("laozi+yinfu");
+  delete process.env.DAO_TOOLS_MODE;
+
   console.log(`\n  通过 ${pass} · 失败 ${fail}`);
   process.exit(fail > 0 ? 1 : 0);
 }

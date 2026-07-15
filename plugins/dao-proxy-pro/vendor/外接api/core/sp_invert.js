@@ -82,6 +82,70 @@ const _CANON_MAP = {
 const _CANON_FILE = path.join(_BUNDLED_DIR, "_origin_canon.txt");
 const _MODE_FILE = path.join(_BUNDLED_DIR, "_origin_mode.txt");
 
+// ── 工具模式轴（与经藏轴正交：提示换提示的·工具换工具的·两者叠加）──
+//   经藏(laozi/yinfu/laozi+yinfu) × 工具(official/windows/freecad/kicad) 自由组合。
+//   工具契约文本作为后缀追加在经文之后；旧 canon=windows-agent 保留兼容（已含契约，不叠加）。
+const _TOOLMODE_FILE = path.join(_BUNDLED_DIR, "_origin_tools.txt");
+const TOOLMODE_MAP = {
+  official: { contract: null, name: "官方原生（无附加工具契约）" },
+  windows: { contract: "_windows_agent.txt", name: "Windows Agent 工具契约" },
+  freecad: { contract: "_freecad_agent.txt", name: "FreeCAD 域工具契约" },
+  kicad: { contract: "_kicad_agent.txt", name: "KiCad 域工具契约" },
+};
+
+function _readToolModeFile() {
+  const envMode = (process.env.DAO_TOOLS_MODE || "").trim().toLowerCase();
+  if (envMode && TOOLMODE_MAP[envMode]) return envMode;
+  try {
+    if (fs.existsSync(_TOOLMODE_FILE)) {
+      const v = fs.readFileSync(_TOOLMODE_FILE, "utf8").trim().toLowerCase();
+      if (v && TOOLMODE_MAP[v]) return v;
+    }
+  } catch {}
+  return "official";
+}
+
+let _activeToolMode = _readToolModeFile();
+let _lastToolModeCheck = 0;
+
+function getToolMode() {
+  return _activeToolMode;
+}
+
+function setToolMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  if (!TOOLMODE_MAP[m]) return false;
+  _activeToolMode = m;
+  try {
+    fs.writeFileSync(_TOOLMODE_FILE, m, "utf8");
+  } catch {}
+  return true;
+}
+
+function _maybeHotReloadToolMode() {
+  const now = Date.now();
+  if (now - _lastToolModeCheck < 500) return;
+  _lastToolModeCheck = now;
+  try {
+    _activeToolMode = _readToolModeFile();
+  } catch {}
+}
+
+// 工具契约后缀：canon=windows-agent 已自带契约文本，不重复叠加。
+function _toolContractSuffix() {
+  const entry = TOOLMODE_MAP[_activeToolMode];
+  if (!entry || !entry.contract) return "";
+  if (_activeCanon === "windows-agent" && entry.contract === "_windows_agent.txt") return "";
+  try {
+    const fp = path.join(_BUNDLED_DIR, entry.contract);
+    if (fs.existsSync(fp)) {
+      const t = fs.readFileSync(fp, "utf8").trim();
+      if (t) return "\n\n" + t;
+    }
+  } catch {}
+  return "";
+}
+
 function _readCanonFile() {
   try {
     if (fs.existsSync(_CANON_FILE)) {
@@ -612,7 +676,8 @@ function invertAnySP(spText) {
     //   有则保 · 无则简 · 名随实变
     // v9.9.60 · 损之又损 · 副路亦去嘱 · 经文自足 · 无末锚
     const keeps = extractKeepBlocks(s);
-    const base = _canonHeader(_activeCanon) + _activeCanonText + TAO_FOOTER;
+    _maybeHotReloadToolMode();
+    const base = _canonHeader(_activeCanon) + _activeCanonText + _toolContractSuffix() + TAO_FOOTER;
     return keeps ? base + TAO_TRAILER + keeps : base;
   } catch (e) {
     return null;
@@ -637,7 +702,8 @@ function invertSP(spText) {
     // 默认: 道法自然 · 无为而无不为
     if (!_activeCanonText) return null;
     const keeps = extractKeepBlocks(s);
-    const base = _canonHeader(_activeCanon) + _activeCanonText + TAO_FOOTER;
+    _maybeHotReloadToolMode();
+    const base = _canonHeader(_activeCanon) + _activeCanonText + _toolContractSuffix() + TAO_FOOTER;
     // v9.9.60 · 损之又损 · 去嘱留经 · 经文自足 · 无末锚
     return keeps ? base + TAO_TRAILER + keeps : base;
   } catch (e) {
@@ -768,6 +834,13 @@ module.exports = {
   // ★ v9.9.94 · 经藏热同步 · 让 source.js 能同步 sp_invert 的 _activeCanon
   setCanon,
   hotReloadCanon,
+  getToolMode,
+  setToolMode,
+  TOOLMODE_MAP,
+  getToolContractSuffix: () => {
+    _maybeHotReloadToolMode();
+    return _toolContractSuffix();
+  },
 
   // 常量
   INVERTED_PREFIX,
