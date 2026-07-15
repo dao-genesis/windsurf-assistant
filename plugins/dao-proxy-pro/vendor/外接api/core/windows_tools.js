@@ -62,9 +62,13 @@ function _httpJson(method, base, p, body, timeoutMs) {
       return reject(e);
     }
     const mod = u.protocol === "https:" ? https : http;
-    const payload = body != null ? JSON.stringify(body) : null;
+    const payload = body != null ? Buffer.from(JSON.stringify(body), "utf8") : null;
     const headers = { Accept: "application/json" };
-    if (payload) headers["Content-Type"] = "application/json";
+    if (payload) {
+      headers["Content-Type"] = "application/json";
+      // 显式 Content-Length：桥为 python http.server，不支持 chunked 编码(否则读到空体)。
+      headers["Content-Length"] = String(payload.length);
+    }
     const tok = process.env.DAO_WIN_TOKEN;
     if (tok) headers["Authorization"] = "Bearer " + tok;
     const req = mod.request(
