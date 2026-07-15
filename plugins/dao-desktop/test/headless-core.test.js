@@ -755,3 +755,17 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.binPath, bin);
   } finally { delete process.env.DAO_ENV_SYNC_HOME; }
 });
+
+test("R138 协议自描述: /api/openapi 路由清单与 local-api 源码路由字面量对账(漏登即红)", () => {
+  const schema = require(path.join(CASCADE, "api-schema.js"));
+  const src = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  const inSource = new Set((src.match(/"\/api\/[a-z/-]+"/g) || []).map((s) => s.slice(1, -1)));
+  const inSchema = new Set(schema.ROUTES.map((r) => r.path));
+  for (const p of inSource) assert.ok(inSchema.has(p), "源码路由未登记进 api-schema: " + p);
+  for (const p of inSchema) assert.ok(inSource.has(p), "api-schema 幽灵路由(源码不存在): " + p);
+  const doc = schema.openapi({ port: 1234 });
+  assert.strictEqual(doc.openapi, "3.1.0");
+  assert.ok(doc.paths["/api/cascade/send"].post.requestBody.content["application/json"].schema.required.includes("text"));
+  assert.deepStrictEqual(doc.paths["/api/health"].get.security, []);
+  assert.ok(doc.servers[0].url.endsWith(":1234"));
+});

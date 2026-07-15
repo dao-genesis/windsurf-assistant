@@ -104,6 +104,7 @@ function configView() {
 function routes(reqUrl) {
   const u = reqUrl.split("?")[0];
   const q = new URLSearchParams(reqUrl.split("?")[1] || "");
+  if (u === "/api/openapi") return require("./api-schema").openapi({ port: _port });
   if (u === "/api/env") return envSync.detect();
   if (u === "/api/models") return ls.listModels();
   if (u === "/api/cascade/trajectories") return ls.call("GetAllCascadeTrajectories", {}).then((r) => r.trajectorySummaries || {});
@@ -448,6 +449,36 @@ async function postRoutes(u, body) {
     await ls.call("DeleteCascadeMemory", { memoryId: id });
     return { ok: true, memoryId: id };
   }
+  // 官方 RPC 补齐(选择性·本源价值): 工作区动态纳管 / 补全配置写回 / 补全能力
+  if (u === "/api/workspaces/add") {
+    const ws = String((body || {}).workspace || "").trim();
+    if (!ws) throw new Error("workspace required");
+    const uri = /^[a-z]+:\/\//i.test(ws) ? ws : "file://" + ws; // 官方要 file:// URI
+    await ls.call("AddTrackedWorkspace", { workspace: uri });
+    return { ok: true, workspace: uri };
+  }
+  if (u === "/api/workspaces/remove") {
+    const ws = String((body || {}).workspace || "").trim();
+    if (!ws) throw new Error("workspace required");
+    const uri = /^[a-z]+:\/\//i.test(ws) ? ws : "file://" + ws;
+    await ls.call("RemoveTrackedWorkspace", { workspace: uri });
+    return { ok: true, workspace: uri };
+  }
+  if (u === "/api/config/edit") {
+    const cfg = (body || {}).completionConfiguration;
+    if (!cfg || typeof cfg !== "object") throw new Error("completionConfiguration required");
+    await ls.call("EditConfiguration", { completionConfiguration: cfg });
+    return { ok: true, keys: Object.keys(cfg) };
+  }
+  if (u === "/api/completions") {
+    const doc = (body || {}).document;
+    if (!doc || typeof doc !== "object") throw new Error("document required(需含 text/editorLanguage/cursorOffset 等官方字段)");
+    const req = { document: doc, editorOptions: (body || {}).editorOptions || { tabSize: 4, insertSpaces: true } };
+    if ((body || {}).modelName) req.modelName = (body || {}).modelName;
+    const r = await ls.call("GetCompletions", req);
+    const items = (r && (r.completionItems || r.completions)) || [];
+    return { ok: true, count: items.length, completionItems: items };
+  }
   return null;
 }
 
@@ -475,6 +506,8 @@ function start(preferredPort) {
       };
       const u = (req.url || "").split("?")[0];
       if (u === "/api/health") return send(200, { ok: true, service: "dao-desktop-local-api", port: _port });
+      // 协议自描述免鉴权: 任意 AI/Agent 先自发现协议, 再持 token 调用(文档本身不含凭据)
+      if (u === "/api/openapi" && req.method !== "POST") return send(200, require("./api-schema").openapi({ port: _port }));
       const auth = req.headers["authorization"] || "";
       if (auth !== "Bearer " + _token) return send(401, { error: "unauthorized" });
       if (req.method === "POST") {
