@@ -1812,6 +1812,15 @@ class CascadePanelProvider {
           rules.push({ name, trigger: "global", path: p });
         }
       } catch (_) {}
+      // 官方设置页「+ Global」写入 ~/.codeium/windsurf/memories/global_rules.md, GetAllRules 不含, 直读补显
+      try {
+        const fs = require("fs");
+        const gp = path.join(os.homedir(), ".codeium", "windsurf", "memories", "global_rules.md");
+        if (!rules.some((x) => x.path === gp) && fs.statSync(gp).size > 0) {
+          const first = (fs.readFileSync(gp, "utf8").split(/\r?\n/).find((l) => l.trim()) || "").replace(/^#\s*/, "").slice(0, 80);
+          rules.push({ name: first || "global_rules.md", trigger: "global", path: gp });
+        }
+      } catch (_) {}
       const skills = (sk.skills || r.skills || []).map((s) => ({
         name: s.name || s.skillName || "", description: s.description || "", path: fromUri(s.path) }));
       const workflows = (wf.workflows || []).map((w) => ({
