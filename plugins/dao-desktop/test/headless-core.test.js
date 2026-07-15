@@ -401,6 +401,20 @@ test("R65 桥接 /api/cascade: 本机会话·记忆水位可经本地 API 暴露
   assert.ok(!JSON.stringify(c).match(/apiKey|token|pat/i), "水位视图不得含凭据字段");
 });
 
+test("R128 本地 API 后端调度端点: /api/env 直取环境共生检测; POST 未知路由 404; send 缺 text 报错", async () => {
+  const api = require(path.join(CASCADE, "local-api.js"));
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), "dao-api-env-"));
+  process.env.DAO_ENV_SYNC_HOME = h;
+  try {
+    const env = api.routes("/api/env");
+    assert.strictEqual(env.sources.length, 30);
+    assert.ok(env.sources.every((s) => s.path.startsWith(h)));
+    assert.strictEqual(await api.postRoutes("/api/nope", {}), null);
+    await assert.rejects(() => api.postRoutes("/api/cascade/send", {}), /text required/);
+    assert.throws(() => api.routes("/api/cascade/steps"), /cascadeId required/);
+  } finally { delete process.env.DAO_ENV_SYNC_HOME; }
+});
+
 test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ghi-"));
   process.env.DAO_GITHUB_FLEET_FILE = path.join(dir, "fleet.json");
