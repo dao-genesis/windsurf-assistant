@@ -23,6 +23,18 @@ test("panel.js UI 与官方 composer 1:1 护栏", () => {
   assert.ok(src.includes('id="micBtn"'));
 });
 
+// R144 · UI 1:1 护栏: Recent sessions 头行仅官方双元素(标题+View all), 扩展入口独立成可换行 xrow,
+// 窄面板不再互相挤压截断; 视图名与官方一致为 "Cascade"。
+test("panel.js Recent sessions 头行与扩展入口分行护栏", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(src.includes('<div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>'));
+  assert.ok(src.includes('class="xrow"'));
+  assert.ok(src.includes("flex-wrap:wrap"));
+  const pkg = JSON.parse(fs.readFileSync(path.join(CASCADE, "..", "package.json"), "utf8"));
+  const v = pkg.contributes.views["dao-cascade"].find((x) => x.id === "dao.cascade");
+  assert.strictEqual(v.name, "Cascade");
+});
+
 // 隔离落盘路径, 不碰真机 ~/.dao/windsurf-host.json
 const HOST_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "dao-hs-")), "windsurf-host.json");
 process.env.DAO_WINDSURF_HOST_FILE = HOST_FILE;

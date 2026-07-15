@@ -2265,6 +2265,8 @@ class CascadePanelProvider {
   #recent.show { display:block; }
   #recent .rhead { display:flex; align-items:center; color:var(--dim); margin-bottom:4px; }
   #recent .rhead .va { margin-left:auto; color:var(--vscode-textLink-foreground); cursor:pointer; }
+  #recent .xrow { display:flex; flex-wrap:wrap; gap:2px 10px; color:var(--dim); margin-bottom:4px; }
+  #recent .xrow .xa { color:var(--vscode-textLink-foreground); cursor:pointer; font-size:11px; }
   #recent .item { display:flex; gap:6px; align-items:center; padding:5px 8px; border-radius:6px; cursor:pointer; }
   #recent .item:hover { background:var(--pill-hover); }
   #recent .item .when { margin-left:auto; color:var(--dim); font-size:11px; white-space:nowrap; }
@@ -2433,7 +2435,8 @@ class CascadePanelProvider {
       <div class="sub">Kick off a new project. Make changes across your entire codebase.</div>
       <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent">☁ Try Devin Cloud</button>
       <div id="recent">
-        <div class="rhead"><span>Recent sessions</span><span class="va" id="agBtn">Agents</span><span class="va" id="cmBtn">Maps</span><span class="va" id="cusBtn">Rules</span><span class="va" id="mcpBtn">MCP</span><span class="va" id="memsBtn">Memories</span><span class="va" id="olBtn">Outline</span><span class="va" id="plBtn">Plans</span><span class="va" id="stBtn">Status</span><span class="va" id="tlBtn">Timeline</span><span class="va" id="viewAll">View all</span></div>
+        <div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>
+        <div class="xrow"><span class="xa" id="agBtn">Agents</span><span class="xa" id="cmBtn">Maps</span><span class="xa" id="cusBtn">Rules</span><span class="xa" id="mcpBtn">MCP</span><span class="xa" id="memsBtn">Memories</span><span class="xa" id="olBtn">Outline</span><span class="xa" id="plBtn">Plans</span><span class="xa" id="stBtn">Status</span><span class="xa" id="tlBtn">Timeline</span></div>
         <div id="recentList"></div>
         <div id="memList" style="display:none"></div>
         <div id="stList" style="display:none"></div>
