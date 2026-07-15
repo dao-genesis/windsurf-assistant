@@ -466,6 +466,23 @@ test("R135 Cloud 客户端公开订阅面: onUpdate 多监听器分发(替代覆
   assert.strictEqual(seen[0][1].kind, "x");
 });
 
+test("R137 onUpdate 返回幂等 unsubscribe(调用方免伸手进私有 _subs)", () => {
+  const { AcpWssClient } = require(path.join(CASCADE, "acp-wss.js"));
+  const seen = [];
+  const c = new AcpWssClient({});
+  const unsub = c.onUpdate((u) => seen.push(u));
+  assert.strictEqual(typeof unsub, "function");
+  assert.strictEqual(c._subs.length, 1);
+  c._onUpdate({ n: 1 });
+  unsub();
+  assert.strictEqual(c._subs.length, 0);
+  unsub(); // 幂等: 再调不抛、不误删他人
+  c._onUpdate({ n: 2 }); // 已退订不再收
+  assert.deepStrictEqual(seen, [{ n: 1 }]);
+  // 非函数返回 no-op unsubscribe
+  assert.strictEqual(typeof c.onUpdate(null), "function");
+});
+
 test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ghi-"));
   process.env.DAO_GITHUB_FLEET_FILE = path.join(dir, "fleet.json");
