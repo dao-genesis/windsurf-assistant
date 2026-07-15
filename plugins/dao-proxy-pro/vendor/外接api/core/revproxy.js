@@ -1107,6 +1107,15 @@ function _classifyUpstreamError(msg) {
       retryAfter,
     };
   }
+  // 会话失活 / 客户端版本过旧: 非瞬时网关故障(502 会诱导客户端对同一陈旧帧狂重试),
+  //   而是「先决条件缺失」——需重采新鲜捕获帧或升级编辑器。以 424 Failed Dependency +
+  //   明确 code=stale_session 如实表达, 客户端据此停重试并按指引重采, 而非盲目退避。
+  const stale = /please update your editor|Cascade session|session (?:has )?expired|invalid session|失活|重采|版本过旧/i.test(
+    s,
+  );
+  if (stale) {
+    return { status: 424, type: "upstream_error", code: "stale_session", retryAfter: 0 };
+  }
   return { status: 502, type: "upstream_error", code: "upstream_error", retryAfter: 0 };
 }
 
