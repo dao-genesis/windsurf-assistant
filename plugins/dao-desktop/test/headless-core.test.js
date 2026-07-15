@@ -433,6 +433,15 @@ test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/dele
   await assert.rejects(() => api.postRoutes("/api/auth/code", { code: "x" }), /no pending login/);
   assert.deepStrictEqual(await api.postRoutes("/api/auth/cancel", {}), { ok: true });
   await assert.rejects(() => api.postRoutes("/api/cloud/cancel", {}), /sessionId required/);
+  // R136 官方 configuration 生效视图: 默认值+用户覆写归一(官方清单缺失时也回同构空集)
+  const conf = await api.routes("/api/config");
+  assert.strictEqual(typeof conf.defaultCount, "number");
+  assert.ok(conf.effective && typeof conf.effective === "object");
+  assert.ok(conf.sources && typeof conf.sources === "object");
+  // R136 Cloud 长连接: 未开启时状态/增量取均为离线同构结果(不抛)
+  assert.deepStrictEqual(await api.routes("/api/cloud/live"), { on: false });
+  assert.deepStrictEqual(await api.routes("/api/cloud/updates?since=0"), { on: false, updates: [], next: 0 });
+  assert.deepStrictEqual(await api.postRoutes("/api/cloud/live", { on: false }), { on: false });
   // R135 统一任务视图: LS/Cloud 均不可达时也归一为空集同构结果(不抛)
   const tasks = await api.routes("/api/tasks");
   assert.ok(Array.isArray(tasks.tasks));
