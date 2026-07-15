@@ -820,3 +820,59 @@ test("Windows Agent 接入官方工具层: local/remote 注册直写 mcp_config.
     assert.ok(p.includes("list_apps") && p.includes("clone_plan") && p.includes("道并行而不相悖"));
   } finally { delete process.env.DAO_MCP_CONFIG_FILE; }
 });
+
+test("Windows 分身面板核(headless): 桥+隧道+矩阵一次聚合探活, 逐源不可达不拖垮整体", async () => {
+  const httpMod = require("http");
+  const wc = require(path.join(CASCADE, "windows-panel-core.js"));
+  // mock 桥: /api/health + /api/clone.matrix
+  const br = httpMod.createServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === "/api/health") return res.end(JSON.stringify({ ok: true, apps: ["freecad", "kicad"], sessions: ["s1"] }));
+    if (req.url === "/api/clone.matrix") return res.end(JSON.stringify({ matrix: { freecad: { tier: "appdata", min_tier: "appdata", isolated: true } } }));
+    res.statusCode = 404; res.end("{}");
+  });
+  // mock 隧道: GET /input 列持有者; POST /input?op=release 释放
+  let released = null;
+  const tun = httpMod.createServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    const u = new URL(req.url, "http://x");
+    if (u.pathname !== "/input") { res.statusCode = 404; return res.end("{}"); }
+    if (req.method === "POST" && u.searchParams.get("op") === "release") {
+      released = { key: u.searchParams.get("key"), owner: u.searchParams.get("owner") };
+      return res.end(JSON.stringify({ ok: true, released: true }));
+    }
+    res.end(JSON.stringify({ ok: true, holders: [{ key: "account:dao#1", ownerId: "human:u", kind: "human", priority: 100, ttlLeft: 3000 }] }));
+  });
+  await new Promise((r) => br.listen(0, "127.0.0.1", r));
+  await new Promise((r) => tun.listen(0, "127.0.0.1", r));
+  process.env.DAO_WIN_BRIDGE_URL = "http://127.0.0.1:" + br.address().port;
+  process.env.DAO_WIN_TUNNEL_URL = "http://127.0.0.1:" + tun.address().port;
+  try {
+    const d = await wc.probe();
+    assert.strictEqual(d.bridge.ok, true);
+    assert.deepStrictEqual(d.bridge.apps, ["freecad", "kicad"]);
+    assert.strictEqual(d.bridge.sessions.length, 1);
+    assert.strictEqual(d.tunnel.ok, true);
+    assert.strictEqual(d.tunnel.holders[0].kind, "human");
+    assert.strictEqual(d.matrix.freecad.isolated, true);
+    // 释放租约
+    const rl = await wc.releaseLease("account:dao#1", "human:u");
+    assert.strictEqual(rl.released, true);
+    assert.deepStrictEqual(released, { key: "account:dao#1", owner: "human:u" });
+    assert.deepStrictEqual(await wc.releaseLease("", ""), { ok: false, error: "需 key 与 owner" });
+    // 桥/隧道皆断 → 仍整体返回, 逐源 error
+    br.close(); tun.close();
+    process.env.DAO_WIN_BRIDGE_URL = "http://127.0.0.1:1";
+    process.env.DAO_WIN_TUNNEL_URL = "http://127.0.0.1:1";
+    const d2 = await wc.probe();
+    assert.strictEqual(d2.bridge.ok, false);
+    assert.ok(d2.bridge.error);
+    assert.strictEqual(d2.tunnel.ok, false);
+    assert.strictEqual(d2.matrix, null);
+  } finally {
+    try { br.close(); } catch (_) {}
+    try { tun.close(); } catch (_) {}
+    delete process.env.DAO_WIN_BRIDGE_URL;
+    delete process.env.DAO_WIN_TUNNEL_URL;
+  }
+});

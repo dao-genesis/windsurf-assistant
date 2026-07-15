@@ -306,6 +306,9 @@ async function execute(name, argsJson) {
     args = JSON.parse(argsJson || "{}");
   } catch {}
   try {
+    if (name.startsWith("windows_input_") && (!args.clone_key || !args.owner)) {
+      return JSON.stringify({ error: "需 clone_key 与 owner(如 clone_key='account:dao#1', owner='agent:cascade')", status: "error" });
+    }
     const base = name.startsWith("windows_input_") ? null : await _base();
     let out;
     switch (name) {
