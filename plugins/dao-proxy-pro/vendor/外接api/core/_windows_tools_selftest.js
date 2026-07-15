@@ -205,6 +205,15 @@ async function main() {
     !!inv4 && (inv4.match(/Windows Agent 工具契約/g) || []).length === 1,
   );
 
+  spInvert.setCanon("laozi");
+  process.env.DAO_TOOLS_MODE = "windows";
+  await new Promise((r) => setTimeout(r, 600));
+  const sfx = spInvert.getToolContractSuffix ? spInvert.getToolContractSuffix() : null;
+  t(
+    "正交: getToolContractSuffix 导出(dao_router 增强SP同源叠加)",
+    typeof sfx === "string" && /Windows Agent 工具契約/.test(sfx),
+  );
+
   t("正交: TOOLMODE_MAP 四模齐(official/windows/freecad/kicad)",
     ["official", "windows", "freecad", "kicad"].every((k) => spInvert.TOOLMODE_MAP[k]));
   t("正交: setToolMode 非法值拒绝", spInvert.setToolMode("bogus") === false);
