@@ -74,6 +74,46 @@ function routes(reqUrl) {
       return ss.map((s) => ({ sessionId: s.sessionId || s.id, title: s.title || "" }));
     });
   }
+  if (u === "/api/status") {
+    return ls.call("GetUserStatus", {}).then((r) => {
+      const s = (r && r.userStatus) || r || {};
+      return { name: s.name || "", email: s.email || "", plan: (s.planStatus || {}).planName || s.plan || "", loggedIn: !!(s.email || s.name) };
+    });
+  }
+  if (u === "/api/rules") {
+    // 与面板同源: GetAllRules 只返工作区规则, 直读补显全局规则(~/.devin/rules + 官方设置页 global_rules.md)
+    return ls.call("GetAllRules", {}).catch(() => ({})).then((r) => {
+      const fromUri = (x) => (x || "").replace(/^file:\/\//, "");
+      const rules = (r.memories || []).map((m) => {
+        const ps = (m.scope && m.scope.projectScope) || {};
+        return { name: m.title || m.memoryId || "", trigger: (ps.trigger || "").replace("CORTEX_MEMORY_TRIGGER_", "").toLowerCase(), path: fromUri(ps.absoluteFilePath) };
+      });
+      const seen = new Set(rules.map((x) => x.path));
+      try {
+        const gdir = path.join(os.homedir(), ".devin", "rules");
+        for (const f of fs.readdirSync(gdir)) {
+          if (!f.endsWith(".md")) continue;
+          const p = path.join(gdir, f);
+          if (!seen.has(p)) rules.push({ name: f.replace(/\.md$/, ""), trigger: "global", path: p });
+        }
+      } catch (_) {}
+      try {
+        const gp = path.join(os.homedir(), ".codeium", "windsurf", "memories", "global_rules.md");
+        if (!seen.has(gp) && fs.statSync(gp).size > 0) rules.push({ name: "global_rules.md", trigger: "global", path: gp });
+      } catch (_) {}
+      return { rules };
+    });
+  }
+  if (u === "/api/skills") return ls.call("GetAllSkills", {});
+  if (u === "/api/workflows") return ls.call("GetAllWorkflows", {});
+  if (u === "/api/memories") return ls.call("GetCascadeMemories", {});
+  if (u === "/api/settings") return ls.call("GetUserSettings", {}).then((r) => r.userSettings || {});
+  if (u === "/api/mcp/states") return ls.call("GetMcpServerStates", {});
+  if (u === "/api/cascade/transcript") {
+    const cid = q.get("cascadeId") || "";
+    if (!cid) throw new Error("cascadeId required");
+    return ls.call("GetCascadeTranscriptForTrajectoryId", { cascadeId: cid });
+  }
   if (u === "/api/account") return accountView();
   if (u === "/api/mcp") return mcpView();
   if (u === "/api/host") return hostView();
@@ -140,6 +180,49 @@ async function postRoutes(u, body) {
   }
   if (u === "/api/backup/run") {
     return backup.backupAll(ls, body || {});
+  }
+  const cid = String((body || {}).cascadeId || "");
+  if (u === "/api/cascade/rename") {
+    const name = String((body || {}).name || "").trim();
+    if (!cid || !name) throw new Error("cascadeId and name required");
+    await ls.call("RenameCascadeTrajectory", { cascadeId: cid, name });
+    return { ok: true, cascadeId: cid, name };
+  }
+  if (u === "/api/cascade/archive") {
+    if (!cid) throw new Error("cascadeId required");
+    await ls.call("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived: (body || {}).isArchived !== false });
+    return { ok: true, cascadeId: cid };
+  }
+  if (u === "/api/cascade/delete") {
+    if (!cid) throw new Error("cascadeId required");
+    await ls.call("DeleteCascadeTrajectory", { cascadeId: cid });
+    return { ok: true, cascadeId: cid };
+  }
+  if (u === "/api/cascade/cancel") {
+    if (!cid) throw new Error("cascadeId required");
+    await ls.call("CancelCascadeInvocationAndWait", { cascadeId: cid })
+      .catch(() => ls.call("CancelCascadeInvocation", { cascadeId: cid }));
+    return { ok: true, cascadeId: cid };
+  }
+  if (u === "/api/settings") {
+    const patch = (body || {}).patch;
+    if (!patch || typeof patch !== "object") throw new Error("patch required");
+    const s = (await ls.call("GetUserSettings", {})).userSettings || {};
+    await ls.call("SetUserSettings", { userSettings: Object.assign(s, patch) });
+    return { ok: true, keys: Object.keys(patch) };
+  }
+  if (u === "/api/memory/update") {
+    const id = String((body || {}).memoryId || "");
+    const content = String((body || {}).content || "");
+    if (!id || !content) throw new Error("memoryId and content required");
+    await ls.call("UpdateCascadeMemory", { memoryId: id, title: (body || {}).title || "", content, tags: (body || {}).tags || [] });
+    return { ok: true, memoryId: id };
+  }
+  if (u === "/api/memory/delete") {
+    const id = String((body || {}).memoryId || "");
+    if (!id) throw new Error("memoryId required");
+    await ls.call("DeleteCascadeMemory", { memoryId: id });
+    return { ok: true, memoryId: id };
   }
   return null;
 }

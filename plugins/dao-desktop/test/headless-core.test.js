@@ -416,6 +416,18 @@ test("R128 本地 API 后端调度端点: /api/env 直取环境共生检测; POS
   } finally { delete process.env.DAO_ENV_SYNC_HOME; }
 });
 
+test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/delete/cancel 缺 cascadeId; settings 缺 patch; memory 缺 id", async () => {
+  const api = require(path.join(CASCADE, "local-api.js"));
+  await assert.rejects(() => api.postRoutes("/api/cascade/rename", {}), /cascadeId and name required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/archive", {}), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/delete", {}), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/cascade/cancel", {}), /cascadeId required/);
+  await assert.rejects(() => api.postRoutes("/api/settings", {}), /patch required/);
+  await assert.rejects(() => api.postRoutes("/api/memory/update", {}), /memoryId and content required/);
+  await assert.rejects(() => api.postRoutes("/api/memory/delete", {}), /memoryId required/);
+  assert.throws(() => api.routes("/api/cascade/transcript"), /cascadeId required/);
+});
+
 test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {
   const { acpToken } = require(path.join(CASCADE, "acp-wss.js"));
   assert.strictEqual(acpToken("devin-session-token$abc123"), "abc123");
