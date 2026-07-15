@@ -21,7 +21,7 @@ function t(name, cond) {
 async function main() {
   // 1. 工具定义与官方同格
   const defs = wt.defs();
-  t("defs: 9 个工具", defs.length === 9);
+  t("defs: 11 个工具", defs.length === 11);
   t(
     "defs: 全部 windows_ 前缀",
     defs.every((d) => d.name.startsWith("windows_")),
@@ -80,6 +80,46 @@ async function main() {
 
   const nf = JSON.parse(await wt.execute("windows_search_verbs", '{"query":"x"}'));
   t("execute: 桥 4xx → error 不抛", nf.status === "error");
+
+  // 4. mock 隧道 → 输入租约(人先于 Agent · 动手即抢占)
+  const arb = { holder: null };
+  const tun = http.createServer((req, res) => {
+    const u = new URL(req.url, "http://x");
+    res.setHeader("content-type", "application/json");
+    if (u.pathname !== "/input") { res.statusCode = 404; return res.end("{}"); }
+    const op = u.searchParams.get("op");
+    const owner = u.searchParams.get("owner");
+    const kind = u.searchParams.get("kind") || "agent";
+    if (op === "acquire") {
+      if (arb.holder && arb.holder.owner !== owner && arb.holder.kind === "human" && kind === "agent")
+        return res.end(JSON.stringify({ ok: true, granted: false, holder: arb.holder }));
+      arb.holder = { owner, kind };
+      return res.end(JSON.stringify({ ok: true, granted: true, holder: arb.holder }));
+    }
+    if (op === "release") {
+      if (arb.holder && arb.holder.owner === owner) arb.holder = null;
+      return res.end(JSON.stringify({ ok: true, released: true }));
+    }
+    res.end("{}");
+  });
+  await new Promise((r) => tun.listen(0, "127.0.0.1", r));
+  process.env.DAO_WIN_TUNNEL_URL = "http://127.0.0.1:" + tun.address().port;
+
+  const g1 = JSON.parse(
+    await wt.execute("windows_input_acquire", JSON.stringify({ clone_key: "account:dao#1", owner: "agent:cascade" })),
+  );
+  t("input: agent 取得租约", g1.granted === true);
+  arb.holder = { owner: "human:u", kind: "human" };
+  const g2 = JSON.parse(
+    await wt.execute("windows_input_acquire", JSON.stringify({ clone_key: "account:dao#1", owner: "agent:cascade" })),
+  );
+  t("input: 人手持有时 agent 不得(让位)", g2.granted === false && g2.holder.kind === "human");
+  arb.holder = { owner: "agent:cascade", kind: "agent" };
+  const rl = JSON.parse(
+    await wt.execute("windows_input_release", JSON.stringify({ clone_key: "account:dao#1", owner: "agent:cascade" })),
+  );
+  t("input: 释放归还", rl.released === true && arb.holder === null);
+  tun.close();
 
   srv.close();
   console.log(`\n  通过 ${pass} · 失败 ${fail}`);

@@ -12,6 +12,7 @@
  *   · env DAO_WINDOWS_TOOLS=1
  *
  * 桥地址解析: env DAO_WIN_BRIDGE_URL → 127.0.0.1:9930 → 127.0.0.1:9920
+ * 隧道地址(输入租约): env DAO_WIN_TUNNEL_URL → 127.0.0.1:4824
  * 鉴权: env DAO_WIN_TOKEN → Authorization: Bearer <token>(不落日志)
  *
  * 道义: 樸散則為器 · 新软件=桥侧薄 profile · 本层零改动即见新动词
@@ -106,6 +107,11 @@ async function _base() {
   throw new Error(
     "Windows Agent bridge unreachable (set DAO_WIN_BRIDGE_URL or start bridge on 127.0.0.1:9930/9920)",
   );
+}
+
+// 桌面路由隧道(输入租约仲裁面)：与桥不同进程，默认本机 4824。
+function _tunnelBase() {
+  return (process.env.DAO_WIN_TUNNEL_URL || "http://127.0.0.1:4824").trim();
 }
 
 // ── 工具定义(与官方 _serverToolDefs 同格) ──────────────────
@@ -231,6 +237,37 @@ function defs() {
       },
     },
     {
+      name: "windows_input_acquire",
+      description:
+        "Acquire (or renew) the agent input lease for one desktop clone before operating it. Clone keys look like 'account:<name>#<slot>'. If granted=false the HUMAN currently holds the input — stop operating that clone and wait, the user always preempts you. Re-acquire periodically while operating (lease TTL ~4s).",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {
+          clone_key: { type: "string", description: "Desktop clone lease key, e.g. 'account:dao#1'" },
+          owner: { type: "string", description: "Stable agent owner id, e.g. 'agent:cascade'" },
+          ttl_ms: { type: "integer", description: "Lease TTL in ms (default 4000)" },
+        },
+        required: ["clone_key", "owner"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "windows_input_release",
+      description:
+        "Release the agent input lease of a desktop clone when done operating it, returning input priority to the user immediately.",
+      parameters: {
+        $schema: _SCHEMA,
+        type: "object",
+        properties: {
+          clone_key: { type: "string" },
+          owner: { type: "string" },
+        },
+        required: ["clone_key", "owner"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "windows_clone_matrix",
       description:
         "Batch isolation planning for multiple applications at once. Returns per-app minimum viable isolation tier and the plan under the available tiers.",
@@ -265,7 +302,7 @@ async function execute(name, argsJson) {
     args = JSON.parse(argsJson || "{}");
   } catch {}
   try {
-    const base = await _base();
+    const base = name.startsWith("windows_input_") ? null : await _base();
     let out;
     switch (name) {
       case "windows_list_apps":
@@ -312,6 +349,21 @@ async function execute(name, argsJson) {
           prefer_strongest: !!args.prefer_strongest,
         });
         break;
+      case "windows_input_acquire": {
+        const q =
+          "/input?op=acquire&key=" + encodeURIComponent(String(args.clone_key || "")) +
+          "&owner=" + encodeURIComponent(String(args.owner || "agent")) +
+          "&kind=agent" + (args.ttl_ms ? "&ttl=" + parseInt(args.ttl_ms, 10) : "");
+        out = await _httpJson("POST", _tunnelBase(), q, null, 5000);
+        break;
+      }
+      case "windows_input_release": {
+        const q =
+          "/input?op=release&key=" + encodeURIComponent(String(args.clone_key || "")) +
+          "&owner=" + encodeURIComponent(String(args.owner || "agent"));
+        out = await _httpJson("POST", _tunnelBase(), q, null, 5000);
+        break;
+      }
       case "windows_clone_matrix":
         out = await _httpJson("POST", base, "/api/clone.matrix", {
           app_ids: args.app_ids,
