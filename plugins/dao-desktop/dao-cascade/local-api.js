@@ -57,6 +57,49 @@ function cascadeView() {
   return { sessions: f.cascadeLocal || null, memories: f.memories || null };
 }
 
+// 官方 configuration 生效视图: 官方扩展清单 52 项默认值 + 各 IDE 用户 settings.json 覆写归一。
+// 单一真源直接读官方持久层, 插件不复制第二份配置模型。
+function configView() {
+  const home = os.homedir();
+  const manifests = [
+    path.join(home, "devin-desktop", "Devin", "resources", "app", "extensions", "windsurf", "package.json"),
+    "/usr/share/windsurf/resources/app/extensions/windsurf/package.json",
+  ];
+  const defaults = {};
+  for (const m of manifests) {
+    try {
+      const pj = JSON.parse(fs.readFileSync(m, "utf8"));
+      let conf = ((pj.contributes || {}).configuration) || [];
+      if (!Array.isArray(conf)) conf = [conf];
+      for (const c of conf) for (const [k, v] of Object.entries(c.properties || {})) {
+        defaults[k] = v.default === undefined ? null : v.default;
+      }
+      if (Object.keys(defaults).length) break;
+    } catch (_) {}
+  }
+  const userFiles = [
+    ["devin-desktop", path.join(home, ".config", "Devin", "User", "settings.json")],
+    ["vscode", path.join(home, ".config", "Code", "User", "settings.json")],
+    ["windsurf", path.join(home, ".config", "Windsurf", "User", "settings.json")],
+  ];
+  const effective = {}; const sources = {};
+  for (const [k, v] of Object.entries(defaults)) { effective[k] = v; sources[k] = "default"; }
+  const overrides = {};
+  for (const [name, f] of userFiles) {
+    try {
+      const j = JSON.parse(fs.readFileSync(f, "utf8").replace(/\/\/[^\n"]*$/gm, ""));
+      overrides[name] = {};
+      for (const [k, v] of Object.entries(j)) {
+        if (k.startsWith("windsurf.") || k.startsWith("devin.") || k.startsWith("dao.")) {
+          overrides[name][k] = v;
+          effective[k] = v; sources[k] = name;
+        }
+      }
+    } catch (_) {}
+  }
+  return { defaultCount: Object.keys(defaults).length, effective, sources, overrides };
+}
+
 // 路由表(GET 只读): 路径 → 数据(可返 Promise)。绝不暴露凭据/token 本身。
 function routes(reqUrl) {
   const u = reqUrl.split("?")[0];
@@ -76,6 +119,29 @@ function routes(reqUrl) {
       return ss.map((s) => ({ sessionId: s.sessionId || s.id, title: s.title || "" }));
     });
   }
+  if (u === "/api/config") return configView();
+  if (u === "/api/cloud/live") return liveState();
+  if (u === "/api/cloud/updates") {
+    if (!_live) return { on: false, updates: [], next: 0 };
+    const since = Number(q.get("since") || 0);
+    const updates = _live.buf.filter((x) => x.seq > since);
+    return { on: true, updates, next: _live.seq };
+  }
+  if (u === "/api/tasks") return (async () => {
+    // 统一任务视图: 本地 Cascade 轨迹 + Devin Cloud 会话归一为同构条目(云端不可达时仅回本地)
+    const local = await ls.call("GetAllCascadeTrajectories", {}).then((r) =>
+      Object.entries(r.trajectorySummaries || {}).map(([id, s]) => ({
+        id, kind: "local", title: s.summary || "", status: s.status || "",
+        stepCount: s.stepCount || 0, updatedAt: s.lastModifiedTime || "",
+      }))).catch(() => []);
+    const cloud = await withCloud(async (c) => {
+      const l = await c.listSessions();
+      return ((l && l.sessions) || []).map((s) => ({
+        id: s.sessionId || s.id, kind: "cloud", title: s.title || "", status: s.status || "", updatedAt: s.updatedAt || "",
+      }));
+    }).catch(() => []);
+    return { tasks: local.concat(cloud), localCount: local.length, cloudCount: cloud.length };
+  })();
   if (u === "/api/status") {
     return ls.call("GetUserStatus", {}).then((r) => {
       const s = (r && r.userStatus) || r || {};
@@ -152,8 +218,37 @@ async function withCloud(fn) {
   } finally { try { c.stop(); } catch (_) {} }
 }
 
+// Devin Cloud 常驻长连接: /api/cloud/live 开关, 实时更新入环形缓冲(/api/cloud/updates 增量取)。
+let _live = null; // { client, seq, buf: [{seq,ts,update}] }
+const LIVE_BUF_MAX = 500;
+function liveState() {
+  if (!_live) return { on: false };
+  const ws = _live.client && _live.client._ws;
+  return { on: true, connected: !!(ws && ws.readyState === 1), buffered: _live.buf.length, seq: _live.seq };
+}
+async function liveOn() {
+  if (_live && _live.client._ws && _live.client._ws.readyState === 1) return liveState();
+  if (_live) { try { _live.client.stop(); } catch (_) {} }
+  const st = { client: null, seq: 0, buf: _live ? _live.buf : [] };
+  st.client = new AcpWssClient({ log: () => {}, onUpdate: (u) => {
+    st.seq += 1;
+    st.buf.push({ seq: st.seq, ts: new Date().toISOString(), update: u });
+    if (st.buf.length > LIVE_BUF_MAX) st.buf.splice(0, st.buf.length - LIVE_BUF_MAX);
+  } });
+  _live = st;
+  await st.client.connect();
+  return liveState();
+}
+function liveOff() {
+  if (_live) { try { _live.client.stop(); } catch (_) {} _live = null; }
+  return { on: false };
+}
+
 // POST 路由(后端原生调度): AI/脚本可直接驱动 Cascade 会话, 与面板同源(ls-bridge 同一真源)。
 async function postRoutes(u, body) {
+  if (u === "/api/cloud/live") {
+    return (body || {}).on === false ? liveOff() : liveOn();
+  }
   if (u === "/api/cascade/send") {
     const text = String((body || {}).text || "").trim();
     if (!text) throw new Error("text required");
@@ -165,26 +260,64 @@ async function postRoutes(u, body) {
       const pick = ms.find((m) => m.recommended && !m.disabled) || ms.find((m) => !m.disabled) || ms[0];
       uid = pick && pick.uid;
     }
+    const wait = !!(body || {}).wait;
     const drive = ls.driveStream(cid, null);
     try {
       await ls.call("SendUserCascadeMessage", {
         cascadeId: cid, items: [{ text }],
         cascadeConfig: { plannerConfig: { requestedModelUid: uid, toolConfig: { askUserQuestion: { enabled: true } } } },
       });
+      if (wait) {
+        // wait:true 与 /api/cloud/send 对等: 轮询至运行态归 IDLE, 拿回本轮回复正文
+        const timeoutMs = Math.min(Number((body || {}).timeoutMs) || 120000, 300000);
+        const t0 = Date.now();
+        let reply = "", idleSeen = 0;
+        while (Date.now() - t0 < timeoutMs) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const [tr, st] = await Promise.all([
+            ls.call("GetAllCascadeTrajectories", {}),
+            ls.call("GetCascadeTrajectorySteps", { cascadeId: cid }),
+          ]);
+          const sum = ((tr || {}).trajectorySummaries || {})[cid] || {};
+          reply = (st.steps || [])
+            .map((s) => (s.plannerResponse && s.plannerResponse.response) || "")
+            .filter(Boolean).pop() || "";
+          if (sum.status === "CASCADE_RUN_STATUS_IDLE" && ++idleSeen >= 2 && reply) break;
+        }
+        return { ok: true, cascadeId: cid, modelUid: uid, reply };
+      }
     } finally { setTimeout(() => { try { drive.close(); } catch (_) {} }, 120000).unref(); }
     return { ok: true, cascadeId: cid, modelUid: uid };
   }
   if (u === "/api/cloud/send") {
     const text = String((body || {}).text || "").trim();
     if (!text) throw new Error("text required");
-    return withCloud(async (c) => {
+    // 长连接在线时直接复用常驻客户端(更新同时入 live 缓冲), 否则一次性连接
+    if (_live && _live.client._ws && _live.client._ws.readyState === 1) {
+      const c = _live.client;
       let out = "";
-      c._onUpdate = (u2) => {
+      const tap = (u2) => {
         try {
           const s = u2.update || u2;
           if ((s.sessionUpdate || s.kind) === "agent_message_chunk") out += ((s.content || {}).text) || "";
         } catch (_) {}
       };
+      c.onUpdate(tap);
+      try {
+        if ((body || {}).sessionId) await c.loadSession(body.sessionId);
+        else if (!c.sessionId) await c.newSession("/");
+        const r = await c.prompt(text);
+        return { ok: true, live: true, sessionId: c.sessionId, stopReason: (r || {}).stopReason || "", reply: out };
+      } finally { const i = c._subs.indexOf(tap); if (i >= 0) c._subs.splice(i, 1); }
+    }
+    return withCloud(async (c) => {
+      let out = "";
+      c.onUpdate((u2) => {
+        try {
+          const s = u2.update || u2;
+          if ((s.sessionUpdate || s.kind) === "agent_message_chunk") out += ((s.content || {}).text) || "";
+        } catch (_) {}
+      });
       if ((body || {}).sessionId) await c.loadSession(body.sessionId);
       else await c.newSession("/");
       const r = await c.prompt(text);
@@ -211,6 +344,8 @@ async function postRoutes(u, body) {
       const st = { url: "", ctl: null, done: null };
       _login = st;
       const t = setTimeout(() => { if (!st.url) { _login = null; try { st.ctl.cancel(); } catch (_) {} reject(new Error("login url timeout")); } }, 30000);
+      // 全程兼平: 领 URL 后若 10 分钟内未完成(未提交 code), 自动收尾释放单飞锁, 避免永久 pending
+      setTimeout(() => { if (_login === st && !st.done) { try { st.ctl.cancel(); } catch (_) {} _login = null; } }, 600000).unref();
       st.ctl = provision.startLogin(bin, {
         onUrl: (url) => { st.url = url; clearTimeout(t); resolve({ ok: true, pending: true, url }); },
         onDone: (r) => { st.done = r; _login = null; if (!st.url) { clearTimeout(t); (r.ok ? resolve({ ok: true, pending: false }) : reject(new Error(r.message || "login failed"))); } },

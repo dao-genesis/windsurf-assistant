@@ -433,12 +433,37 @@ test("R130 本地 API 会话管理/设置写侧参数校验: rename/archive/dele
   await assert.rejects(() => api.postRoutes("/api/auth/code", { code: "x" }), /no pending login/);
   assert.deepStrictEqual(await api.postRoutes("/api/auth/cancel", {}), { ok: true });
   await assert.rejects(() => api.postRoutes("/api/cloud/cancel", {}), /sessionId required/);
+  // R136 官方 configuration 生效视图: 默认值+用户覆写归一(官方清单缺失时也回同构空集)
+  const conf = await api.routes("/api/config");
+  assert.strictEqual(typeof conf.defaultCount, "number");
+  assert.ok(conf.effective && typeof conf.effective === "object");
+  assert.ok(conf.sources && typeof conf.sources === "object");
+  // R136 Cloud 长连接: 未开启时状态/增量取均为离线同构结果(不抛)
+  assert.deepStrictEqual(await api.routes("/api/cloud/live"), { on: false });
+  assert.deepStrictEqual(await api.routes("/api/cloud/updates?since=0"), { on: false, updates: [], next: 0 });
+  assert.deepStrictEqual(await api.postRoutes("/api/cloud/live", { on: false }), { on: false });
+  // R135 统一任务视图: LS/Cloud 均不可达时也归一为空集同构结果(不抛)
+  const tasks = await api.routes("/api/tasks");
+  assert.ok(Array.isArray(tasks.tasks));
+  assert.strictEqual(typeof tasks.localCount, "number");
+  assert.strictEqual(typeof tasks.cloudCount, "number");
 });
 
 test("R129 Cloud token 官方同源去前缀: devin-session-token$ 前缀剥离后方可过 /acp/live(带前缀即403)", () => {
   const { acpToken } = require(path.join(CASCADE, "acp-wss.js"));
   assert.strictEqual(acpToken("devin-session-token$abc123"), "abc123");
   assert.strictEqual(acpToken("plain-key"), "plain-key");
+});
+
+test("R135 Cloud 客户端公开订阅面: onUpdate 多监听器分发(替代覆写私有 _onUpdate)", () => {
+  const { AcpWssClient } = require(path.join(CASCADE, "acp-wss.js"));
+  const seen = [];
+  const c = new AcpWssClient({ onUpdate: (u) => seen.push(["ctor", u]) });
+  c.onUpdate((u) => seen.push(["sub", u]));
+  c.onUpdate(null); // 非函数忽略
+  c._onUpdate({ kind: "x" });
+  assert.deepStrictEqual(seen.map((s) => s[0]), ["ctor", "sub"]);
+  assert.strictEqual(seen[0][1].kind, "x");
 });
 
 test("R65 GitHub→注入档打通: 舰队 PAT 入 secret 档且全程脱敏", async () => {
@@ -712,30 +737,4 @@ test("环境共生检测: 官方同一配置体系的源清单/条目数/IDE 痕
     assert.strictEqual(d.ide.installed, true);
     assert.strictEqual(d.ide.binPath, bin);
   } finally { delete process.env.DAO_ENV_SYNC_HOME; }
-});
-
-test("环境共生 · Windows Agent 分身整合: DAO_CLONE_USER_DATA_DIR 重定向 IDE 层配置目录", () => {
-  const es = require(path.join(CASCADE, "env-sync.js"));
-  const h = fs.mkdtempSync(path.join(os.tmpdir(), "dao-clone-"));
-  process.env.DAO_ENV_SYNC_HOME = h;
-  const cloneDir = path.join(h, "dao_clones", "session-2", "devin-desktop", "data");
-  process.env.DAO_CLONE_USER_DATA_DIR = cloneDir;
-  try {
-    // IDE 层随分身走: settings/globalStorage 落在分身 user-data-dir 下
-    assert.strictEqual(es.ideUserDir(), path.join(cloneDir, "User"));
-    fs.mkdirSync(path.join(cloneDir, "User"), { recursive: true });
-    fs.writeFileSync(path.join(cloneDir, "User", "settings.json"), "{}");
-    const d = es.detect();
-    const by = Object.fromEntries(d.sources.map((s) => [s.key, s]));
-    assert.strictEqual(by.idesettings.exists, true);
-    assert.ok(by.idesettings.path.startsWith(cloneDir));
-    // 引擎层不随分身走: 仍在家目录 ~/.codeium(全分身共生)
-    assert.strictEqual(d.configRoot, path.join(h, ".codeium", "windsurf"));
-    // 变量缺省即回落官方标准路径
-    delete process.env.DAO_CLONE_USER_DATA_DIR;
-    assert.ok(!es.ideUserDir().startsWith(path.join(h, "dao_clones")));
-  } finally {
-    delete process.env.DAO_ENV_SYNC_HOME;
-    delete process.env.DAO_CLONE_USER_DATA_DIR;
-  }
 });

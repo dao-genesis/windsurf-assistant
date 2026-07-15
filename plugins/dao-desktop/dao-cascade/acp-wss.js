@@ -40,12 +40,17 @@ function acpToken(apiKey) {
 class AcpWssClient {
   constructor(opts) {
     this._log = (opts && opts.log) || (() => {});
-    this._onUpdate = (opts && opts.onUpdate) || (() => {});
+    this._subs = [];
+    if (opts && opts.onUpdate) this._subs.push(opts.onUpdate);
+    this._onUpdate = (u) => { for (const fn of this._subs) { try { fn(u); } catch (_) {} } };
     this._ws = null;
     this._id = 0;
     this._pending = new Map();
     this.sessionId = null;
   }
+
+  // 公开订阅面: 外部可挂多个 session/update 监听器(替代覆写私有 _onUpdate)
+  onUpdate(fn) { if (typeof fn === "function") this._subs.push(fn); return this; }
 
   async connect() {
     if (this._ws && this._ws.readyState === 1) return;
