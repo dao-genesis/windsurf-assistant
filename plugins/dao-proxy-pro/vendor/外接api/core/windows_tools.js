@@ -7,8 +7,10 @@
  * 注入上游请求并在代理侧拦截执行(内部重试环)——LSP/Cascade 太上不知有之，
  * 模型原生调用，效果与官方工具一致，非 MCP 层。
  *
- * 启用之门(热生效):
- *   · 经藏 _origin_canon.txt === "windows-agent"，或
+ * 启用之门(热生效·提示轴与工具轴正交):
+ *   · 工具模式 _origin_tools.txt ∈ {windows, freecad, kicad}（与经藏自由叠加），或
+ *   · env DAO_TOOLS_MODE ∈ {windows, freecad, kicad}，或
+ *   · 经藏 _origin_canon.txt === "windows-agent"（旧单轴兼容），或
  *   · env DAO_WINDOWS_TOOLS=1
  *
  * 桥地址解析: env DAO_WIN_BRIDGE_URL → 127.0.0.1:9930 → 127.0.0.1:9920
@@ -26,6 +28,8 @@ const https = require("https");
 const TOOL_PREFIX = "windows_";
 const _BUNDLED_DIR = path.resolve(__dirname, "..", "..", "bundled-origin");
 const _CANON_FILE = path.join(_BUNDLED_DIR, "_origin_canon.txt");
+const _TOOLMODE_FILE = path.join(_BUNDLED_DIR, "_origin_tools.txt");
+const _TOOL_MODES = new Set(["windows", "freecad", "kicad"]);
 
 // ── 启用之门(热读·500ms 节流) ─────────────────────────────
 let _lastGateCheck = 0;
@@ -38,6 +42,20 @@ function enabled() {
     _gateCached = true;
     return true;
   }
+  const envMode = (process.env.DAO_TOOLS_MODE || "").trim().toLowerCase();
+  if (_TOOL_MODES.has(envMode)) {
+    _gateCached = true;
+    return true;
+  }
+  try {
+    if (fs.existsSync(_TOOLMODE_FILE)) {
+      const tm = fs.readFileSync(_TOOLMODE_FILE, "utf8").trim().toLowerCase();
+      if (_TOOL_MODES.has(tm)) {
+        _gateCached = true;
+        return true;
+      }
+    }
+  } catch {}
   try {
     if (fs.existsSync(_CANON_FILE)) {
       _gateCached = fs.readFileSync(_CANON_FILE, "utf8").trim() === "windows-agent";
