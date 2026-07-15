@@ -29,6 +29,8 @@ const proxyPro = require("./proxy-pro");
 const webSearch = require("./web-search");
 const inject = require("./inject");
 const mcpConfig = require("./mcp-config");
+const windowsAgent = require("./windows-agent");
+const winCore = require("./windows-panel-core");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -174,6 +176,11 @@ class UnifiedPanel {
       case "acp-registry": return this._acpRegistry();
       case "acp-reload": return this._acpReload();
       case "env-open": return this._envOpen(String(msg.path || ""));
+      case "win-state": return this._winState();
+      case "win-reg-local": return this._winRegLocal();
+      case "win-reg-remote": return this._winRegRemote();
+      case "win-unreg": return this._winUnreg();
+      case "win-release": return this._winRelease(String(msg.key || ""), String(msg.owner || ""));
       default: return;
     }
   }
@@ -206,6 +213,40 @@ class UnifiedPanel {
   }
 
   _pushState() { this._post({ type: "state", data: this._snapshot() }); }
+
+  // ── 🪟 Windows 分身板块(数据核在 windows-panel-core.js, headless 可测) ──
+  async _winState() {
+    try { this._post({ type: "win-state", data: await winCore.probe() }); }
+    catch (e) { this._post({ type: "win-state", error: e.message }); }
+  }
+
+  async _winRegLocal() {
+    const r = windowsAgent.registerLocal({});
+    if (!r.ok) vscode.window.showWarningMessage("Windows Agent 注册失败: " + r.error);
+    else vscode.window.showInformationMessage("已注册 dao-windows-agent(local) → " + r.configPath);
+    return this._winState();
+  }
+
+  async _winRegRemote() {
+    const url = await vscode.window.showInputBox({ prompt: "DAO Bridge 穿透公网地址(自动补 /mcp)", placeHolder: "https://…" });
+    if (!url) return;
+    const token = await vscode.window.showInputBox({ prompt: "Bearer token(可空)", password: true });
+    const r = windowsAgent.registerRemote({ url, token });
+    if (!r.ok) vscode.window.showWarningMessage("注册失败: " + r.error);
+    else vscode.window.showInformationMessage("已注册 dao-windows-agent(remote)");
+    return this._winState();
+  }
+
+  async _winUnreg() {
+    windowsAgent.unregister();
+    return this._winState();
+  }
+
+  async _winRelease(key, owner) {
+    const r = await winCore.releaseLease(key, owner);
+    if (r && r.error) vscode.window.showWarningMessage("释放失败: " + r.error);
+    return this._winState();
+  }
 
   _openConversation(dir, folder) {
     try {
@@ -828,7 +869,7 @@ h2{font-size:15px;margin:0 0 4px}
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["bridge","🌐 桥接"],["github","🐙 GitHub"],["proxy","🔌 Proxy Pro"],["search","🔎 搜索"],["inject","💉 反向注入"],["settings","⚙ 设置"]];
+const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["windows","🪟 Windows 分身"],["bridge","🌐 桥接"],["github","🐙 GitHub"],["proxy","🔌 Proxy Pro"],["search","🔎 搜索"],["inject","💉 反向注入"],["settings","⚙ 设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
   '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
@@ -1087,6 +1128,56 @@ function renderSearch(){
   }
   return h;
 }
+let WIN=null;
+function renderWindows(){
+  let h='<div class="row"><h2 style="flex:1">Windows 分身 · 统一多分身面板</h2>'+
+    '<button class="btn sec" id="winRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">Dao-Windows-Agent 真源直连: 桥(软件画像/会话)·隧道(分身输入租约)·隔离矩阵(每软件最低可行档)。人手持有租约时 Agent 自动让位。</div>';
+  if(WIN===null){h+='<div class="card muted">探活中…</div>';return h;}
+  if(WIN.error){h+='<div class="card">⚠ '+E(WIN.error)+'</div>';return h;}
+  const d=WIN;
+  const m=d.mcp||{};
+  h+='<div class="st">官方工具层接入(dao-windows-agent MCP)</div><div class="card">'+
+    cr('注册',m.registered?('✓ 已注册 · '+E(m.transport||'')+(m.disabled?' · 已禁用':'')):'○ 未注册')+
+    (m.serverUrl?cr('远端',E(m.serverUrl)):'')+
+    (m.cwd?cr('本机检出',E(m.cwd)):(d.checkout?cr('本机检出(可注册)',E(d.checkout)):''))+
+    '<div class="cr"><span class="l"></span><span class="v">'+
+    (m.registered?'<button class="btn sec" id="winUnreg">移除注册</button>':
+      '<button class="btn" id="winRegL">注册 local</button> <button class="btn sec" id="winRegR">注册 remote</button>')+
+    '</span></div></div>';
+  const b=d.bridge||{};
+  h+='<div class="st">桥(软件画像控制面)</div><div class="card">'+
+    cr('地址',E(b.url||''))+
+    cr('状态',b.ok?'⚡在线':'○ 不可达'+(b.error?' · '+E(b.error):''))+
+    (b.ok?cr('软件画像',(b.apps||[]).map(E).join('、')):'')+
+    (b.ok?cr('活跃会话',String((b.sessions||[]).length)+' 个'):'')+'</div>';
+  const t=d.tunnel||{};
+  h+='<div class="st">分身输入租约(隧道 /input)</div>';
+  if(!t.ok)h+='<div class="card muted">隧道不可达'+(t.error?' · '+E(t.error):'')+'</div>';
+  else if(!(t.holders||[]).length)h+='<div class="card muted">当前无任何分身被持有输入权(空闲)。</div>';
+  else{
+    for(const x of t.holders){
+      const kind=x.kind==='human'?'👤 人手':'🤖 Agent';
+      h+='<div class="acc"><div class="hd"><span>'+E(x.key)+'<span class="badge'+(x.kind==='human'?'':' cloud')+'">'+kind+'</span></span>'+
+        '<button class="btn sec" data-winrel="'+E(x.key)+'|'+E(x.ownerId)+'">释放</button></div>'+
+        '<div class="conv" style="cursor:default"><span class="muted">'+E(x.ownerId)+' · 优先级 '+E(x.priority)+' · TTL 剩 '+E(x.ttlLeft)+'ms</span></div></div>';
+    }
+  }
+  const mx=d.matrix;
+  h+='<div class="st">分身隔离矩阵(每软件最低可行档)</div>';
+  if(!mx)h+='<div class="card muted">桥不可达时无矩阵。</div>';
+  else if(mx.error)h+='<div class="card">⚠ '+E(mx.error)+'</div>';
+  else{
+    h+='<div class="card">';
+    for(const app of Object.keys(mx)){
+      const p=mx[app]||{};
+      h+=cr(E(app),(p.isolated?'✓':'⚠')+' '+E(p.tier||'?')+' (最低需 '+E(p.min_tier||'?')+')'+(p.isolated?'':' · 有缺口'));
+    }
+    h+='</div>';
+  }
+  if(d.probedAt)h+='<div class="muted">探活于 '+E(String(d.probedAt).replace('T',' ').slice(0,19))+'</div>';
+  return h;
+}
 let SET=null;
 function tierName(t){return String(t||'').replace('TEAMS_TIER_','').replace(/_/g,' ')||'—';}
 function resetAt(u){return u?new Date(u*1000).toISOString().replace('T',' ').slice(0,16)+' UTC':'—';}
@@ -1184,6 +1275,7 @@ function render(){
   else if(S.board==='switch')h=renderSwitch();
   else if(S.board==='backups')h=renderBackups();
   else if(S.board==='mcp')h=renderMcp();
+  else if(S.board==='windows')h=renderWindows();
   else if(S.board==='bridge')h=renderBridge();
   else if(S.board==='github')h=renderGithub();
   else if(S.board==='proxy')h=renderProxy();
@@ -1216,6 +1308,12 @@ function render(){
   document.querySelectorAll('[data-mcptoggle]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-toggle',name:el.dataset.mcptoggle}));
   document.querySelectorAll('[data-mcptool]').forEach(el=>el.onclick=()=>{const [sv,tl]=el.dataset.mcptool.split('|');vscode.postMessage({type:'mcp-tool-toggle',server:sv,tool:tl});});
   if(S.board==='mcp'&&MCPD===null)vscode.postMessage({type:'mcp-detail'});
+  const wrf=document.getElementById('winRf'); if(wrf)wrf.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-state'});};
+  const wrl=document.getElementById('winRegL'); if(wrl)wrl.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-reg-local'});};
+  const wrr=document.getElementById('winRegR'); if(wrr)wrr.onclick=()=>vscode.postMessage({type:'win-reg-remote'});
+  const wur=document.getElementById('winUnreg'); if(wur)wur.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-unreg'});};
+  document.querySelectorAll('[data-winrel]').forEach(el=>el.onclick=()=>{const [k,o]=el.dataset.winrel.split('|');vscode.postMessage({type:'win-release',key:k,owner:o});});
+  if(S.board==='windows'&&WIN===null)vscode.postMessage({type:'win-state'});
   const pc=document.getElementById('poolCap'); if(pc)pc.onclick=()=>vscode.postMessage({type:'pool-capture'});
   const pr=document.getElementById('poolRf'); if(pr)pr.onclick=()=>{POOL=null;render();vscode.postMessage({type:'pool-list'});};
   document.querySelectorAll('[data-poolswitch]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-switch',email:el.dataset.poolswitch}));
@@ -1268,6 +1366,7 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='mem-list'){MEM=m.memories?{memories:m.memories}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
+  else if(m.type==='win-state'){WIN=m.data?m.data:{error:m.error||'探活失败'};if(S&&S.board==='windows')render();}
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
   else if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};if(S&&S.board==='proxy')render();}
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
