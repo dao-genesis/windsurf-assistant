@@ -49,7 +49,11 @@ function sizeKb(p) {
 }
 
 // 官方 IDE(Electron/VS Code 层)用户配置目录: settings.json/keybindings/globalStorage 所在。
+// Windows Agent 单账号多分身体系里, IDE 以 per-clone --user-data-dir 启动(dao-clone-open.ps1),
+// 启动器同时注入 DAO_CLONE_USER_DATA_DIR —— IDE 层配置随分身走, 引擎层(~/.codeium)仍全分身共生。
 function ideUserDir() {
+  const cloneDir = process.env.DAO_CLONE_USER_DATA_DIR;
+  if (cloneDir) return path.join(cloneDir, "User");
   const h = home();
   if (process.platform === "darwin") return path.join(h, "Library", "Application Support", "Devin", "User");
   if (process.platform === "win32") return path.join(process.env.APPDATA || path.join(h, "AppData", "Roaming"), "Devin", "User");
