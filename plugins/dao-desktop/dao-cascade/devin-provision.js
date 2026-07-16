@@ -58,7 +58,9 @@ function resolveEngine(extRoot, storageDir) {
 function authStatusRaw(bin) {
   return new Promise((resolve) => {
     if (!bin) return resolve({ loggedIn: false, name: null, raw: "no-bin" });
-    execFile(bin, ["auth", "status"], { timeout: 15000 }, (err, stdout, stderr) => {
+    // Windows 上 CLI 常为 .cmd/.bat 垫片, Node 20+ 直接 execFile 报 EINVAL, 须经 shell
+    const shell = process.platform === "win32" && /\.(cmd|bat)$/i.test(bin);
+    execFile(bin, ["auth", "status"], { timeout: 15000, shell }, (err, stdout, stderr) => {
       const raw = String(stdout || "") + String(stderr || "");
       const loggedIn = /Logged in/i.test(raw) && !/Not logged in/i.test(raw);
       const m = raw.match(/Name:\s*(.+)/);

@@ -10,6 +10,13 @@ const path = require("path");
 
 const CASCADE = path.join(__dirname, "..", "dao-cascade");
 
+// 私密落盘断言: POSIX 上严格 0o600; Windows 无 POSIX 权限位(仅只读位, mode 恒为 0o666),
+// 改断存在性 —— 不弱化 POSIX 约束, 也不在 Windows 上断言平台无法表达的语义。
+function assertOwnerOnly(p) {
+  if (process.platform === "win32") { assert.ok(fs.existsSync(p)); return; }
+  assert.strictEqual((fs.statSync(p).mode & 0o777), 0o600);
+}
+
 // R143 · UI 1:1 护栏: composer 模式三元组与官方实机菜单一致(Code/Ask/Plan + 官方文案),
 // 空态含 Try Devin Cloud, 模式菜单含 Ctrl+. 提示, 发送钮具备空闲灰态。
 test("panel.js UI 与官方 composer 1:1 护栏", () => {
@@ -340,7 +347,7 @@ test("插件自持本地 API: 健康免鉴权/无 token 401/带 token 读插件�
   const nf = await get("/api/nope", { Authorization: "Bearer " + token });
   assert.strictEqual(nf.code, 404);
   // 状态文件 600
-  assert.strictEqual((fs.statSync(process.env.DAO_LOCAL_API_FILE).mode & 0o777), 0o600);
+  assertOwnerOnly(process.env.DAO_LOCAL_API_FILE);
   await api.stop();
   assert.strictEqual(api.running(), false);
   delete process.env.DAO_LOCAL_API_FILE;
@@ -370,7 +377,7 @@ test("插件自持 GitHub 舰队: 池文件 600/视图脱敏/首号 admin/角色
   assert.strictEqual(gh.loadFleet().length, 1);
   // 落盘权限
   gh.setRole("beta", "member");
-  assert.strictEqual((fs.statSync(process.env.DAO_GITHUB_FLEET_FILE).mode & 0o777), 0o600);
+  assertOwnerOnly(process.env.DAO_GITHUB_FLEET_FILE);
   delete process.env.DAO_GITHUB_FLEET_FILE;
 });
 
@@ -395,7 +402,7 @@ test("插件自持 Proxy Pro: 渠道文件 600/视图脱敏 apiKey/路由增删/
   assert.strictEqual(px.removeChannel("DeepSeek").removed, true);
   assert.strictEqual(px.listView().routes.length, 0);
   // 落盘 600
-  assert.strictEqual((fs.statSync(process.env.DAO_PROXY_CHANNELS_FILE).mode & 0o777), 0o600);
+  assertOwnerOnly(process.env.DAO_PROXY_CHANNELS_FILE);
   assert.ok(Array.isArray(px.PRESETS) && px.PRESETS.length > 5, "内置预设渠道");
   delete process.env.DAO_PROXY_CHANNELS_FILE;
 });
@@ -417,7 +424,7 @@ test("插件自持浏览器搜索: DDG 结果解析 + 历史落盘 600(仅查询
   fsmod.mkdirSync(path.dirname(process.env.DAO_WEB_SEARCH_FILE), { recursive: true });
   fsmod.writeFileSync(process.env.DAO_WEB_SEARCH_FILE, JSON.stringify({ history: [{ query: "hello", engine: "duckduckgo", at: "2026-07-12T00:00:00Z", n: 3 }] }), { mode: 0o600 });
   assert.strictEqual(ws.historyView()[0].query, "hello");
-  assert.strictEqual((fsmod.statSync(process.env.DAO_WEB_SEARCH_FILE).mode & 0o777), 0o600);
+  assertOwnerOnly(process.env.DAO_WEB_SEARCH_FILE);
   ws.clearHistory();
   assert.strictEqual(ws.historyView().length, 0);
   delete process.env.DAO_WEB_SEARCH_FILE;
@@ -445,7 +452,7 @@ test("插件自持反向注入: 档案 600/secret 脱敏/计划=池×档 交叉"
   // 移除
   assert.strictEqual(inj.removeItem("secret", "GH_PAT").removed, true);
   assert.strictEqual(inj.listView().length, 2);
-  assert.strictEqual((fs.statSync(process.env.DAO_INJECT_PROFILE_FILE).mode & 0o777), 0o600);
+  assertOwnerOnly(process.env.DAO_INJECT_PROFILE_FILE);
   delete process.env.DAO_INJECT_PROFILE_FILE;
 });
 
@@ -724,9 +731,13 @@ test("authStatus 去抖: 单飞合并 + TTL 缓存 + force 绕过(根治子进�
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-auth-"));
   const cnt = path.join(dir, "cnt");
   fs.writeFileSync(cnt, "");
-  const fake = path.join(dir, "fake-devin");
-  fs.writeFileSync(fake, '#!/bin/sh\necho x >> "' + cnt + '"\necho "Logged in"\necho "Name: dao"\n');
-  fs.chmodSync(fake, 0o755);
+  const fake = process.platform === "win32" ? path.join(dir, "fake-devin.cmd") : path.join(dir, "fake-devin");
+  if (process.platform === "win32") {
+    fs.writeFileSync(fake, '@echo x>> "' + cnt + '"\r\n@echo Logged in\r\n@echo Name: dao\r\n');
+  } else {
+    fs.writeFileSync(fake, '#!/bin/sh\necho x >> "' + cnt + '"\necho "Logged in"\necho "Name: dao"\n');
+    fs.chmodSync(fake, 0o755);
+  }
   const calls = () => fs.readFileSync(cnt, "utf8").split("\n").filter(Boolean).length;
   // 1) 并发 5 连发 → 单飞合并为 1 次 spawn
   const rs = await Promise.all([1, 2, 3, 4, 5].map(() => prov.authStatus(fake)));
