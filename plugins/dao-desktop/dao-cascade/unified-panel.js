@@ -105,13 +105,11 @@ class UnifiedPanel {
       const bin = resolveDevinBin(this._extRoot, this._storageDir);
       const auth = await authStatus(bin);
       const hs = hostStateMod.loadPersisted() || hostStateMod.hostState();
-      const acct = (hs.fused && hs.fused.account) || {};
       const ls = require("./ls-bridge");
-      const signedIn = !!((hs.auth && (hs.auth.loggedIn === true || hs.auth.state === "signed-in" || hs.auth.apiKey || hs.auth.userName || hs.auth.name)) ||
-        acct.email || acct.name || ls.apiKey());
+      const ca = ls.cascadeAuth();
       hostStateMod.publishFused("engines", {
-        cascade: { ready: !!(hs.lsPort && hs.csrfToken), lsPort: hs.lsPort || 0, signedIn,
-          name: (hs.auth && (hs.auth.userName || hs.auth.name || hs.auth.email)) || acct.name || acct.email || "" },
+        cascade: { ready: !!(hs.lsPort && hs.csrfToken), lsPort: hs.lsPort || 0,
+          signedIn: ca.signedIn, name: ca.name },
         devinLocal: { bin: !!bin, signedIn: !!auth.loggedIn, name: auth.name || "" },
         devinCloud: { signedIn: !!auth.loggedIn, name: auth.name || "",
           endpoint: "wss://app.devin.ai/api/acp/live" },

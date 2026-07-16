@@ -124,6 +124,26 @@ function setApiKey(k) {
   if (k && typeof k === "string") _keyCache = { key: k, at: Date.now() };
 }
 
+// Cascade(官方轨)登录态单一裁决 —— 复用官方唯一登录, 不另立插件账号:
+//   官方 windsurf_api_key(credentials.toml / state.vscdb) 在即已登录; 兼收 shim 灌入的
+//   hostState.auth 与已拉取的 fused.account(GetUserStatus)。panel.js 与 unified-panel.js
+//   两处发布 fused.engines.cascade 皆经此裁决, 消除"谁后写谁覆盖"的登录态竞态。
+function cascadeAuth() {
+  let key = ""; try { key = apiKey() || ""; } catch (_) {}
+  let acct = {}, auth = null;
+  try {
+    const hs = require("./host-state");
+    const h = hs.loadPersisted() || hs.hostState();
+    acct = (h.fused && h.fused.account) || {};
+    auth = h.auth;
+  } catch (_) {}
+  const authSignedIn = !!(auth && (auth.loggedIn === true || auth.state === "signed-in"
+    || auth.apiKey || auth.userName || auth.name));
+  const signedIn = !!(key || acct.email || acct.name || authSignedIn);
+  const name = (auth && (auth.userName || auth.name || auth.email)) || acct.name || acct.email || "";
+  return { signedIn, name };
+}
+
 // 与官方扩展本体一致的调用方元数据(LS 端按此鉴权/归因)
 function metadata() {
   return {
@@ -288,4 +308,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, stateDbCandidates, driveStream, listModels };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, cascadeAuth, stateDbCandidates, driveStream, listModels };
