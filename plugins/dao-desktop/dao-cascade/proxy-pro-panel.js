@@ -51,8 +51,13 @@ class ProxyProPanel {
 
   async _mfSet(layer, id) {
     try {
-      if (layer === "prompt") modeFusion.setPromptMode(id);
-      else if (layer === "tool") {
+      if (layer === "prompt") {
+        modeFusion.setPromptMode(id);
+        // 本源反代在跑则即刻热切(/origin/mode); 不在跑不算失败(_origin_mode.txt 读盘生效)。
+        modeFusion.syncOrigin(id).then((r) => {
+          if (r.synced) vscode.window.showInformationMessage("提示词层模式已热切在跑反代: " + id);
+        });
+      } else if (layer === "tool") {
         modeFusion.setToolMode(id);
         // 桥在跑则即刻联动; 不在跑不算失败(契约文件已是真源)。
         modeFusion.syncBridge(id).then((r) => {

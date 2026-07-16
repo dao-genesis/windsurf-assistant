@@ -853,7 +853,7 @@ test("Windows Agent 接入官方工具层: local/remote 注册直写 mcp_config.
     assert.strictEqual(r1.transport, "local");
     const cfg1 = JSON.parse(fs.readFileSync(process.env.DAO_MCP_CONFIG_FILE, "utf8"));
     const spec1 = cfg1.mcpServers[wa.SERVER_NAME];
-    assert.strictEqual(spec1.command, "python3");
+    assert.strictEqual(spec1.command, process.platform === "win32" ? "python" : "python3");
     assert.deepStrictEqual(spec1.args, ["-m", "bridge.mcp"]);
     assert.strictEqual(spec1.cwd, co);
     assert.strictEqual(spec1.env.DAO_WIN_BRIDGE_URL, "http://127.0.0.1:9930");

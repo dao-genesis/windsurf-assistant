@@ -81,6 +81,33 @@ function setToolMode(id) {
   return state();
 }
 
+// 提示词层真生效: 在跑本源反代(source.js 控制面)即刻 POST /origin/mode 热切,
+// 不在跑不算失败(_origin_mode.txt 由反代自持, 下次起跑读盘生效)。
+function syncOrigin(id, opts) {
+  opts = opts || {};
+  const base = String(opts.originUrl || process.env.DAO_ORIGIN_URL ||
+    "http://127.0.0.1:" + (process.env.ORIGIN_PORT || "8889")).replace(/\/+$/, "");
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(base + "/origin/mode"); } catch (_) { return resolve({ synced: false, error: "无效反代地址" }); }
+    const mod = u.protocol === "https:" ? https : http;
+    const data = Buffer.from(JSON.stringify({ mode: id }), "utf8");
+    const req = mod.request({
+      method: "POST", hostname: u.hostname, port: u.port, path: u.pathname,
+      headers: { "Content-Type": "application/json", "Content-Length": data.length },
+      timeout: opts.timeoutMs || 3000,
+    }, (res) => {
+      let out = "";
+      res.on("data", (c) => (out += c));
+      res.on("end", () => resolve({ synced: res.statusCode === 200, status: res.statusCode, body: out.slice(0, 200) }));
+    });
+    req.on("timeout", () => { req.destroy(); resolve({ synced: false, error: "反代超时" }); });
+    req.on("error", (e) => resolve({ synced: false, error: e.message }));
+    req.write(data);
+    req.end();
+  });
+}
+
 // 桥在跑则即刻联动(/api/mode.set); 不在跑不算失败(契约文件已是真源)。
 function syncBridge(id, opts) {
   opts = opts || {};
@@ -136,6 +163,6 @@ function state() {
 
 module.exports = {
   PROMPT_MODES, TOOL_MODES,
-  promptMode, toolMode, setPromptMode, setToolMode, syncBridge,
+  promptMode, toolMode, setPromptMode, setToolMode, syncBridge, syncOrigin,
   matrix, state, fusionPath, contractPath,
 };

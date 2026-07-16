@@ -180,6 +180,7 @@ class UnifiedPanel {
       case "win-release": return this._winRelease(String(msg.key || ""), String(msg.owner || ""));
       case "win-acct-create": return this._winAcctCreate();
       case "win-acct-destroy": return this._winAcctDestroy(String(msg.name || ""));
+      case "win-acct-clone": return this._winAcctClone(String(msg.base || ""));
       case "win-open-desktop": return this._winOpenDesktop(String(msg.account || ""));
       default: return;
     }
@@ -273,6 +274,17 @@ class UnifiedPanel {
     const r = await winCore.accountCreate(name);
     if (r && r.ok) vscode.window.showInformationMessage("Windows 账号已建: " + name);
     else vscode.window.showErrorMessage("建号失败: " + ((r && r.error) || "未知"));
+    return this._winState();
+  }
+
+  // 复制分身: 以既有账号为基底再建一路独立桌面账号(同源 /api/account.create)。
+  async _winAcctClone(base) {
+    if (!base) return;
+    const name = await vscode.window.showInputBox({ prompt: "复制分身: 新账号名(与 " + base + " 各自独立桌面会话, 互不相扰)", value: base + "-2", validateInput: (v) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,19}$/.test(v || "") ? null : "限字母数字与 . _ -，≤ 20" });
+    if (!name) return;
+    const r = await winCore.accountCreate(name);
+    if (r && r.ok) vscode.window.showInformationMessage("分身已复制: " + base + " → " + name);
+    else vscode.window.showErrorMessage("复制失败: " + ((r && r.error) || "未知"));
     return this._winState();
   }
 
@@ -1098,6 +1110,10 @@ function renderWinControl(){
   const md=d.mode;
   h+='<div class="st">工具层模式(桥 /api/mode.*)</div><div class="card">'+
     (md?cr('当前模式',E(md.name||md.mode_id||'')+(md.summary?' · '+E(md.summary):'')):'<div class="cr muted">桥不在跑时无模式态(契约文件 ~/.dao/mode.json 仍为真源)</div>')+'</div>';
+  h+='<div class="st">快速连接(远程桌面连接同式)</div><div class="card"><div class="cr"><span class="l">账号</span><span class="v">'+
+    '<select id="winQcAcct"><option value="">本窗口(当前账号)</option>'+
+    ((d.accounts||[]).map(a=>'<option value="'+E(a.name)+'">'+E(a.name)+'</option>').join(''))+
+    '</select> <button class="btn" id="winQcGo">连接</button></span></div></div>';
   h+='<div class="st">Windows 账号分身(每账号 = 一路独立桌面会话)</div>';
   if(d.accounts===null||d.accounts===undefined)h+='<div class="card muted">隧道不可达时无账号清单。</div>';
   else{
@@ -1105,6 +1121,7 @@ function renderWinControl(){
     for(const ac of d.accounts){
       h+='<div class="acc"><div class="hd"><span>🪟 '+E(ac.name)+'</span><span>'+
         '<button class="btn" data-winopen="'+E(ac.name)+'">开桌面</button> '+
+        '<button class="btn sec" data-winclone="'+E(ac.name)+'">复制分身</button> '+
         '<button class="btn sec" data-winacctdel="'+E(ac.name)+'">销毁</button></span></div>'+
         '<div class="conv" style="cursor:default"><span class="muted">'+E(ac.hostname||'')+(ac.port?':'+E(ac.port):'')+'</span></div></div>';
     }
@@ -1289,6 +1306,8 @@ function render(){
   const wan=document.getElementById('winAcctNew'); if(wan)wan.onclick=()=>vscode.postMessage({type:'win-acct-create'});
   document.querySelectorAll('[data-winopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-open-desktop',account:el.dataset.winopen}));
   document.querySelectorAll('[data-winacctdel]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-destroy',name:el.dataset.winacctdel}));
+  document.querySelectorAll('[data-winclone]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-clone',base:el.dataset.winclone}));
+  const wqc=document.getElementById('winQcGo'); if(wqc)wqc.onclick=()=>{const s=document.getElementById('winQcAcct');vscode.postMessage({type:'win-open-desktop',account:(s&&s.value)||''});};
   if(S.board==='overview'&&WIN===null)vscode.postMessage({type:'win-state'});
   const pc=document.getElementById('poolCap'); if(pc)pc.onclick=()=>vscode.postMessage({type:'pool-capture'});
   const pr=document.getElementById('poolRf'); if(pr)pr.onclick=()=>{POOL=null;render();vscode.postMessage({type:'pool-list'});};
