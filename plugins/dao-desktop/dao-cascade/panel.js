@@ -233,7 +233,7 @@ class CascadePanelProvider {
         id: "model", category: "model", currentValue: this._cascadeModel,
         options: models.map((m) => ({
           value: m.uid,
-          name: m.label + (m.credit != null ? "  ·  " + m.credit + "x" : ""),
+          name: m.label + (m.credit != null ? " · " + m.credit + "x" : ""),
           disabled: !!m.disabled,
           description: [
             (mStatus[m.uid] && (mStatus[m.uid].message || mStatus[m.uid].status)) || "",
@@ -2536,8 +2536,8 @@ class CascadePanelProvider {
   function modelLabel(o){ return (o.recommended?"⭐ ":"")+(o.disabled?"🔒 ":"")+(o.name||o.value)+(o.images?" 🖼":""); }
   function modelBtnSync(s){
     const o=(s.options||[]).find(x=>x.value===s.currentValue);
-    // 官方 1:1: composer 按钮只显素模型名(徽标仅留在下拉列表行)
-    modelCur=s; modelBtn.textContent=o?String(o.name||o.value).replace(/\s*·\s*[\d.]+x\s*$/,""):(s.currentValue||"模型");
+    // 官方 1:1: composer 按钮显模型名+倍率(与官方右栏实机一致, 徽标仅留下拉列表行)
+    modelCur=s; modelBtn.textContent=o?(o.name||o.value):(s.currentValue||"模型");
     modelBtn.title=o&&o.description?o.description:"Model";
   }
   function modelMenuRender(q){
