@@ -1564,3 +1564,12 @@ test("unified-panel: webview 下发脚本求值后语法合法 + 浏览器板块
   // 浏览器板块解耦: render() 对已建 iframe 必须短路, 不得整树重建
   assert.ok(m[1].includes("webFrame") && /board==='browser'[^\n]*webFrame[^\n]*\)return/.test(m[1]), "browser 板块应与 state 推送解耦(iframe 只建一次)");
 });
+
+// R148 · 设置板块「团队/组织控制」卡: GetTeamOrganizationalControls 活体接线(本 VM 实证可达)。
+test("unified-panel: 团队/组织控制卡(GetTeamOrganizationalControls)接线在位", () => {
+  const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  assert.ok(uni.includes("GetTeamOrganizationalControls"), "宿主应活体拉取 GetTeamOrganizationalControls");
+  assert.ok(uni.includes("orgControls"), "set-detail 应透出 orgControls");
+  assert.ok(uni.includes("团队/组织控制"), "设置板块应渲染团队/组织控制卡");
+  assert.ok(uni.includes("extensionModelLabels") && uni.includes("subagentDefaultModelUid"), "已知字段显式呈现, 未知字段兜底遍历");
+});

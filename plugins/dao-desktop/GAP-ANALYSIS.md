@@ -1,4 +1,4 @@
-# 官方 Devin Desktop IDE ↔ dao-desktop 插件 · 全模块差距矩阵(R146)
+# 官方 Devin Desktop IDE ↔ dao-desktop 插件 · 全模块差距矩阵(R148)
 
 > 方法: 反查官方 `windsurf` 扩展 bundle(3.4.27)——64 contributes 命令、5 个 gRPC 服务
 > (LanguageServer/ExtensionServer/SeatManagement/Dev/ProductAnalytics)、122 个查询类 RPC,
@@ -25,8 +25,13 @@
 | 云端 Profile 数据 | SeatManagement GetProfileData/GetUserSubscription/GetUserNotifications/GetCurrentUser/GetEligibleDevinOrganizations | ⛔ | 活体实证: Devin 账号下 api-key/session-token 鉴权均 401/403(`API key requires token authentication`/`permission denied`)——服务端限官方 Windsurf 团队客户端, 不伪造 |
 | GetCascadeModelConfigs | 独立 RPC | ⛔ | 服务端 `unimplemented; use GetUserStatus instead`(官方亦不可用) |
 | 补全(GetCompletions) | Tab 补全 | ⛔ | LS 自身返回 deprecated(R138 判定) |
-| 内置浏览器 | openBrowser(IDE 宿主) | ❌ | Electron 宿主能力, VS Code 扩展面无法对等; 外链替代 |
+| 内置浏览器 | openBrowser(IDE 宿主) | ✅(R147) | web-embed 站内代理内嵌(剥 XFO/CSP + base/拦截注入) + 🌍 板块; P0×2 已修(#69) |
+| 官方账号/Cascade 菜单 | Devin Settings/Sign Out/Changelog/Configure Rules·Skills·Workflows/MCP 配置 | ✅(R147) | _setCmd 白名单直通, devin.* 优先 windsurf.* 回退 |
+| 团队/组织控制 | GetTeamOrganizationalControls(teamId/扩展模型/子代理默认模型) | ✅(R148) | 冷启动新 VM 活体实证 200; 设置板块卡呈现 |
 | 语音录音 | StartAudioRecording(ExtensionServer 宿主) | ◐ | composer 🎙 走 Web Speech(R143), 宿主级录音不可达 |
 | 登录/登出 | login/loginWithAuthToken/logout | ✅ | cascadeAuth + CLI 编排(R132/R138) |
 | 提交信息 | generateCommitMessage | ✅ | GenerateCommitMessage → SCM 输入框 |
 | Lifeguard/Dev 服务 | 内部 dev 工具 | ❌(不做) | 官方内部调试面, 非用户功能 |
+| GetSystemPromptAndTools | 系统提示词/工具清单查看 | ⛔ | R148 活体实证: plannerConfig 各字段变体均报 "planner config not set", cascadeConfig 包裹变体致 LS panic(socket hang up) — 服务端请求面不可解, 判官方内部调试 RPC |
+| SetPinnedContext/Guideline | 固定上下文/准则 | ⛔ | R148 复测仍 not implemented |
+| GetUnleashData | feature flags | ❌(不做) | R148 活体 200, 但为官方实验开关面, 非用户功能 |
