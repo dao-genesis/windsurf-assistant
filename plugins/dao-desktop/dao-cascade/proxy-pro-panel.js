@@ -8,6 +8,7 @@
 const vscode = require("vscode");
 const proxyPro = require("./proxy-pro");
 const proxyRuntime = require("./proxy-runtime");
+const modeFusion = require("./mode-fusion");
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -38,8 +39,57 @@ class ProxyProPanel {
       case "px-refresh": return this._pxRefresh(String(msg.name || ""));
       case "px-route": return this._pxRoute();
       case "px-test": return this._pxTest(String(msg.uid || ""));
+      case "mf-state": return this._mfState();
+      case "mf-set": return this._mfSet(String(msg.layer || ""), String(msg.id || ""));
+      case "mf-custom": return this._mfCustom();
       default: return;
     }
+  }
+
+  // 模式融合(提示词层×工具层 = 3×4 = 12): 真源在 mode-fusion.js(headless)。
+  _mfState() {
+    try { this._post({ type: "mf-state", data: modeFusion.state() }); }
+    catch (e) { this._post({ type: "mf-state", error: e.message }); }
+  }
+
+  async _mfSet(layer, id) {
+    try {
+      if (layer === "prompt") {
+        modeFusion.setPromptMode(id);
+        // 本源反代在跑则即刻热切(/origin/mode); 不在跑不算失败(_origin_mode.txt 读盘生效)。
+        modeFusion.syncOrigin(id).then((r) => {
+          if (r.synced) vscode.window.showInformationMessage("提示词层模式已热切在跑反代: " + id);
+        });
+        if (id === "custom") return this._mfCustom();
+      } else if (layer === "tool") {
+        modeFusion.setToolMode(id);
+        // 桥在跑则即刻联动; 不在跑不算失败(契约文件已是真源)。
+        modeFusion.syncBridge(id).then((r) => {
+          if (r.synced) vscode.window.showInformationMessage("工具层模式已同步在跑桥: " + id);
+        });
+      } else throw new Error("未知模式层: " + layer);
+    } catch (e) { vscode.window.showErrorMessage("切模式失败: " + e.message); }
+    this._mfState();
+  }
+
+  // 自定经文: 编辑并热切在跑反代(/origin/custom_sp), 空文本则清除回本源。
+  async _mfCustom() {
+    try {
+      const text = await vscode.window.showInputBox({
+        prompt: "自定经文(替换官方系统提示词; 留空=清除回帛书本源)",
+        placeHolder: "在此粘贴自定义提示词全文…",
+        ignoreFocusOut: true,
+      });
+      if (text === undefined) return; // 用户取消
+      if (!text.trim()) {
+        const r = await modeFusion.clearCustomText();
+        vscode.window.showInformationMessage(r.synced ? "自定经文已清除, 回归本源" : "反代未在跑, 已记录(下次起跑生效)");
+      } else {
+        const r = await modeFusion.setCustomText(text);
+        vscode.window.showInformationMessage(r.synced ? "自定经文已热切在跑反代(" + text.length + " 字)" : "反代未在跑, 待起跑生效");
+      }
+    } catch (e) { vscode.window.showErrorMessage("自定经文失败: " + e.message); }
+    this._mfState();
   }
 
   // Proxy Pro 板块(插件自持模型渠道+路由): apiKey 永不出后端, 只回尾4位。
@@ -149,7 +199,21 @@ h2{font-size:15px;margin:0 0 4px}
 const vscode=acquireVsCodeApi();
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function cr(l,v){return '<div class="cr"><span class="l">'+E(l)+'</span><span class="v">'+v+'</span></div>';}
-let PX=null;let PXRS=[];
+let PX=null;let PXRS=[];let MF=null;
+function renderModes(){
+  let h='<div class="st">模式矩阵 · 提示词层 × 工具层 = 3×4 = 12</div>';
+  if(MF===null)return h+'<div class="card muted">加载模式…</div>';
+  if(MF.error)return h+'<div class="card">⚠ '+E(MF.error)+'</div>';
+  const d=MF;
+  h+='<div class="card">'+cr('当前组合',E(d.combinedName)+' <span class="badge">'+E(d.combined)+'</span>')+'</div>';
+  h+='<div class="card"><div class="cr"><span class="l">提示词层(经藏契约)</span><span class="v">'+
+    d.promptModes.map(m=>'<button class="btn'+(m.id===d.prompt?'':' sec')+'" data-mfp="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.prompt?'✓ ':'')+E(m.name)+'</button>').join(' ')+
+    (d.prompt==='custom'?' <button class="btn sec" id="mfCustomEdit" title="编辑自定义提示词全文, 热切在跑反代">编辑经文…</button>':'')+'</span></div>'+
+    '<div class="cr"><span class="l">工具层(~/.dao/mode.json 契约)</span><span class="v">'+
+    d.toolModes.map(m=>'<button class="btn'+(m.id===d.tool?'':' sec')+'" data-mft="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.tool?'✓ ':'')+E(m.name)+'</button>').join(' ')+'</span></div></div>';
+  h+='<div class="muted" style="margin-bottom:10px">提示词层与 Proxy Pro 经藏契约同源(invert/passthrough/custom); 工具层与 Dao-Windows-Agent ModeManager 同一契约文件, 桥在跑即刻联动。</div>';
+  return h;
+}
 function renderProxy(){
   let h='<div class="row"><h2 style="flex:1">Proxy Pro · 插件自持模型路由</h2>'+
     '<button class="btn" id="pxAdd">添加渠道</button>'+
@@ -178,6 +242,7 @@ function renderProxy(){
   h+='<div class="st">模型路由(生效层)</div>';
   if(!rt.length)h+='<div class="card muted">暂无路由。点「配路由」把官方模型 UID 指向某渠道模型。</div>';
   else{h+='<div class="card">';for(const r of rt){const s=rsMap[r.uid]||{};const eff=s.effective?'<span class="badge">可投递✓</span>':'<span class="badge cloud">不可投递</span>';h+=cr(E(r.uid),'→ '+E(r.channel)+' / '+E(r.model)+' '+eff+' <span class="back" data-pxtest="'+E(r.uid)+'">试跑</span> <span class="back" data-pxunroute="'+E(r.uid)+'">解除</span>');}h+='</div>';}
+  h+=renderModes();
   return h;
 }
 function render(){
@@ -189,12 +254,17 @@ function render(){
   document.querySelectorAll('[data-pxrm]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-remove',name:el.dataset.pxrm}));
   document.querySelectorAll('[data-pxunroute]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-route',uid:el.dataset.pxunroute}));
   document.querySelectorAll('[data-pxtest]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-test',uid:el.dataset.pxtest}));
+  document.querySelectorAll('[data-mfp]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'prompt',id:el.dataset.mfp}));
+  document.querySelectorAll('[data-mft]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'tool',id:el.dataset.mft}));
+  const mfce=document.getElementById('mfCustomEdit'); if(mfce)mfce.onclick=()=>vscode.postMessage({type:'mf-custom'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};PXRS=m.routeStatus||[];render();}
+  else if(m.type==='mf-state'){MF=m.data?m.data:{error:m.error||'拉取失败'};render();}
 });
 render();
 vscode.postMessage({type:'px-list'});
+vscode.postMessage({type:'mf-state'});
 </script></body></html>`;
   }
 }

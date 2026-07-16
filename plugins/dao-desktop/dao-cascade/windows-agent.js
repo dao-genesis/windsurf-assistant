@@ -44,7 +44,7 @@ function registerLocal(opts) {
   if (opts.bridgeUrl) env.DAO_WIN_BRIDGE_URL = String(opts.bridgeUrl);
   if (opts.token) env.DAO_WIN_TOKEN = String(opts.token);
   const spec = {
-    command: "python3",
+    command: process.platform === "win32" ? "python" : "python3",
     args: ["-m", "bridge.mcp"],
     cwd: dir,
   };
