@@ -233,7 +233,7 @@ class CascadePanelProvider {
         id: "model", category: "model", currentValue: this._cascadeModel,
         options: models.map((m) => ({
           value: m.uid,
-          name: m.label + (m.credit != null ? "  ·  " + m.credit + "x" : ""),
+          name: m.label + (m.credit != null ? " · " + m.credit + "x" : ""),
           disabled: !!m.disabled,
           description: [
             (mStatus[m.uid] && (mStatus[m.uid].message || mStatus[m.uid].status)) || "",
@@ -2278,7 +2278,7 @@ class CascadePanelProvider {
   #log > * { flex-shrink:0; }
   /* 空态 = 官方 New session 首页:居中 logo + 近期会话 */
   .empty { margin:auto auto 0; text-align:center; max-width:320px; width:100%; }
-  .empty .logo { font-size:26px; opacity:.85; margin-bottom:10px; }
+  .empty .logo { opacity:.10; margin-bottom:10px; color:var(--vscode-foreground); }
   .empty .ttl { font-size:15px; font-weight:600; margin-bottom:4px; }
   .empty .sub { font-size:12px; color:var(--dim); line-height:1.5; }
   .empty .kbd, .mhint .kbd { display:inline-block; font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:4px; vertical-align:2px; }
@@ -2349,7 +2349,11 @@ class CascadePanelProvider {
   .pill:hover { background:var(--pill-hover); color:var(--vscode-foreground); }
   .pill select { appearance:none; -webkit-appearance:none; background:transparent; color:inherit; border:none; font:inherit; cursor:pointer; outline:none; max-width:110px; text-overflow:ellipsis; }
   .pill select option { background:var(--vscode-dropdown-background); color:var(--vscode-dropdown-foreground); }
-  #plusBtn, #imgBtn, #arenaBtn, #wtBtn { width:24px; height:24px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--dim); cursor:pointer; font-size:14px; line-height:1; }
+  /* 官方真源: ＋钮 radius 6px · bg rgba(255,255,255,.05) */
+  #plusBtn, #imgBtn, #arenaBtn, #wtBtn { width:24px; height:24px; border-radius:6px; border:none; background:rgba(255,255,255,.05); color:var(--dim); cursor:pointer; font-size:14px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  #imgBtn, #arenaBtn, #wtBtn { background:transparent; }
+  #micBtn.bare { width:24px; height:24px; border:none; background:transparent; color:var(--dim); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
+  #micBtn.bare:hover { background:var(--pill-hover); }
   #plusBtn:hover, #imgBtn:hover, #arenaBtn:hover, #wtBtn:hover { background:var(--pill-hover); }
   /* 官方 1:1: 默认行只有 ＋ / Code / 模型 / agent / 🎙 / ↑ —— 增强钮(图/竞技场/worktree)悬停或聚焦时才现身, 静态外观与官方一致 */
   #imgBtn, #arenaBtn, #wtBtn, #tokCount { display:none; }
@@ -2379,7 +2383,8 @@ class CascadePanelProvider {
   .msg .imgthumb img { height:auto; }
   .badge { font-size:9px; padding:0 4px; border-radius:6px; border:1px solid var(--line); color:var(--dim); }
   .spacer { flex:1; }
-  button.send { width:26px; height:26px; border-radius:999px; background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; cursor:pointer; font-size:13px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  /* 官方真源: 发送钮白底圆(rgb 255,255,255 · radius 9999px), 箭头深色 */
+  button.send { width:26px; height:26px; border-radius:999px; background:#fff; color:#1e1e1e; border:none; cursor:pointer; font-size:13px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
   button.send:disabled { opacity:.4; cursor:default; }
   /* 官方式发送钮: 空输入灰圆, 有内容才亮主题色 */
   button.send.idle { background:var(--pill-hover); color:var(--dim); }
@@ -2458,7 +2463,7 @@ class CascadePanelProvider {
 </style></head><body>
   <div id="log">
     <div class="empty" id="empty">
-      <div class="logo">⬡</div>
+      <div class="logo"><svg width="64" height="64" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.5847 20.1289L18.5847 20.1321C19.2629 19.7407 20.0334 19.5339 20.8136 19.5339L20.8709 19.5339L20.9521 19.5355C21.0062 19.537 21.0587 19.5386 21.1129 19.5434L21.1527 19.5466C21.7959 19.5943 22.4072 19.7757 22.9772 20.0892C23.0345 20.121 23.0902 20.1528 23.1459 20.1862C23.1889 20.2133 23.2319 20.2403 23.2765 20.269L23.3179 20.296C23.6697 20.5331 23.9865 20.8211 24.2667 21.1584C24.3049 21.2045 24.3415 21.2507 24.3861 21.3095L24.4084 21.3382C24.4371 21.3764 24.4657 21.4161 24.4928 21.4559L24.5421 21.5275C24.5644 21.5609 24.5851 21.5943 24.6058 21.6278C24.6233 21.6564 24.6408 21.685 24.6584 21.7137L24.6886 21.7646C25.0802 22.4408 25.2872 23.2141 25.2872 23.9969L25.2856 23.9969C25.2856 24.7813 25.0787 25.553 24.687 26.2292L24.6186 26.3454C24.5899 26.3915 24.5612 26.4361 24.5326 26.4806L24.5103 26.5141C24.1473 27.0471 23.6856 27.4846 23.1268 27.8219C23.0711 27.8554 23.0154 27.8872 22.958 27.919C22.9135 27.9445 22.8673 27.9667 22.8211 27.9906L22.7766 28.0129C22.3945 28.199 21.9869 28.3295 21.5554 28.4027C21.4965 28.4122 21.4376 28.4202 21.3787 28.4282L21.3294 28.4345C21.2816 28.4393 21.2339 28.4441 21.1845 28.4488C21.1558 28.4504 21.1272 28.4536 21.0985 28.4552C21.0587 28.4584 21.0205 28.46 20.9807 28.46C20.9473 28.46 20.9139 28.4616 20.8804 28.4632L20.8199 28.4632L20.8167 28.4632C20.035 28.4632 19.2645 28.2563 18.5863 27.8649L14.4533 25.4814L6.18421 30.2611L6.18102 39.7998L14.4501 44.5715L22.7224 39.7982L22.7224 35.0265C22.7224 34.2421 22.9294 33.4704 23.321 32.7942L23.3895 32.678C23.4181 32.6319 23.4468 32.5873 23.4755 32.5428L23.4977 32.5093C23.8607 31.9763 24.3224 31.5388 24.8812 31.2015C24.937 31.168 24.9927 31.1362 25.05 31.1044C25.0946 31.0805 25.1392 31.0567 25.1869 31.0328L25.2315 31.0105C25.6136 30.8244 26.0212 30.6939 26.4526 30.6207C26.5115 30.6112 26.5704 30.6032 26.6293 30.5952L26.6787 30.5889C26.7264 30.5841 26.7742 30.5793 26.8251 30.5746L26.9095 30.5682C26.9493 30.565 26.9875 30.5634 27.0273 30.5634C27.0608 30.5634 27.0942 30.5618 27.1276 30.5602L27.1881 30.5602L27.1913 30.5602C27.973 30.5602 28.7436 30.7671 29.4218 31.1585L33.5563 33.542L41.8286 28.7687L41.8254 19.2268L33.5579 14.4535L29.4234 16.8433L29.4202 16.8369C28.7404 17.2283 27.9714 17.4304 27.1849 17.4352L27.1324 17.4352L27.0496 17.4336C26.9955 17.432 26.9429 17.4304 26.8888 17.4256L26.849 17.4225C26.2058 17.3747 25.5945 17.1933 25.0245 16.8799C24.9672 16.8481 24.9115 16.8163 24.8558 16.7828C24.8112 16.7558 24.7682 16.7271 24.7252 16.7001L24.6838 16.6731C24.332 16.436 24.0152 16.148 23.735 15.8107C23.6968 15.7645 23.6601 15.7184 23.6156 15.6595L23.5933 15.6309C23.5646 15.5927 23.536 15.5529 23.5089 15.5131L23.4595 15.4415C23.4373 15.4081 23.4166 15.3747 23.3959 15.3413C23.3783 15.3127 23.3592 15.284 23.3417 15.2538L23.3131 15.2045C22.9214 14.5282 22.7145 13.755 22.7145 12.9721L22.7129 12.9721L22.7129 8.202L14.4836 3.45095L14.4438 3.42867L6.17466 8.20836L6.17147 17.747L14.4406 22.5188L18.5767 20.1321L18.5847 20.1289Z" fill="currentColor"></path></svg></div>
       <div class="ttl" id="emptyTtl">Cascade Code <span class="kbd">Ctrl</span><span class="kbd">.</span></div>
       <div class="sub">Kick off a new project. Make changes across your entire codebase.</div>
       <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent">☁ Try Devin Cloud</button>
@@ -2488,8 +2493,8 @@ class CascadePanelProvider {
       <textarea id="input" rows="1" placeholder="Type @ to bring in another conversation"></textarea>
       <input type="file" id="imgFile" accept="image/*" multiple style="display:none">
       <div class="row">
-        <button id="plusBtn" title="附加上下文">＋</button>
-        <span class="pill" id="modeWrap" title="Session Mode (Ctrl+.)">&lt;&gt;<button id="modeBtn" type="button"></button></span>
+        <button id="plusBtn" title="附加上下文"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+        <span class="pill" id="modeWrap" title="Session Mode (Ctrl+.)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg><button id="modeBtn" type="button"></button></span>
         <span class="pill" id="modelWrap" title="Model"><button id="modelBtn" type="button"></button></span>
         <button id="imgBtn" title="附加图片（支持粘贴）">🖼</button>
         <button id="arenaBtn" title="Arena 模式：同题双轨候选，择优续行（新会话/会话中途均可）">⚔</button>
@@ -2497,8 +2502,8 @@ class CascadePanelProvider {
         <span class="spacer"></span>
         <span id="tokCount" title="输入 token / 上限 (GetMessageTokenCount)" style="font-size:10.5px;color:var(--dim);"></span>
         <span class="pill" id="agentWrap" title="切换 agent (Ctrl+')"><span id="agentIcon">⬡</span><button id="agentBtn" type="button"></button><span class="badge" id="badge"></span></span>
-        <button id="micBtn" title="语音输入 (Web Speech)">🎙</button>
-        <button class="send" id="send" title="发送 (Enter)">↑</button>
+        <button id="micBtn" class="bare" title="语音输入 (Web Speech)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></button>
+        <button class="send" id="send" title="发送 (Enter)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.7 3.08 C 11.59 3.13,10.52 4.17,8.29 6.41 C 5.22 9.49,5.05 9.67,5.02 9.83 C 4.98 10.08,5.03 10.29,5.17 10.46 C 5.30 10.62,5.56 10.76,5.72 10.76 C 6.06 10.76,6.01 10.80,8.69 8.13 L 11.24 5.58 11.24 12.98 L 11.24 20.38 11.33 20.56 C 11.38 20.66,11.49 20.79,11.57 20.86 C 11.71 20.97,11.76 20.98,12.00 20.98 C 12.24 20.98,12.29 20.97,12.43 20.86 C 12.51 20.79,12.62 20.66,12.67 20.56 L 12.76 20.38 12.76 12.98 L 12.76 5.58 15.31 8.13 C 17.99 10.80,17.94 10.76,18.28 10.76 C 18.45 10.76,18.70 10.62,18.83 10.46 C 18.97 10.29,19.02 10.08,18.98 9.83 C 18.95 9.67,18.78 9.49,15.71 6.41 C 13.48 4.17,12.41 3.13,12.30 3.08 C 12.21 3.04,12.08 3.00,12.00 3.00 C 11.92 3.00,11.79 3.04,11.70 3.08"/></svg></button>
       </div>
     </div>
     <div class="target">
@@ -2531,7 +2536,7 @@ class CascadePanelProvider {
   function modelLabel(o){ return (o.recommended?"⭐ ":"")+(o.disabled?"🔒 ":"")+(o.name||o.value)+(o.images?" 🖼":""); }
   function modelBtnSync(s){
     const o=(s.options||[]).find(x=>x.value===s.currentValue);
-    // 官方 1:1: composer 按钮只显素模型名(徽标仅留在下拉列表行)
+    // 官方 1:1: composer 按钮显模型名+倍率(与官方右栏实机一致, 徽标仅留下拉列表行)
     modelCur=s; modelBtn.textContent=o?(o.name||o.value):(s.currentValue||"模型");
     modelBtn.title=o&&o.description?o.description:"Model";
   }
@@ -2584,7 +2589,8 @@ class CascadePanelProvider {
     if(!agentMenu.contains(e.target)&&e.target!==agentBtn) agentMenuClose(); });
   // 发送钮在回合进行中变为停止钮(官方式)
   let busy=false;
-  function setBusy(b){ busy=b; sendEl.textContent=b?"■":"↑"; sendEl.title=b?"中断当前回合":"发送 (Enter)"; }
+  const SEND_SVG=sendEl.innerHTML;
+  function setBusy(b){ busy=b; sendEl.innerHTML=b?'<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>':SEND_SVG; sendEl.title=b?"中断当前回合":"发送 (Enter)"; }
 
   loginBtn.onclick=()=>{ authmsg.textContent="正在拉起登录…"; vscode.postMessage({type:"login"}); };
   authsubmit.onclick=()=>{ if(authcode.value.trim()){ vscode.postMessage({type:"login-code", code:authcode.value.trim()}); authmsg.textContent="校验中…"; } };
@@ -2616,8 +2622,8 @@ class CascadePanelProvider {
 
   function renderAgents(){ onAgentChange(); }
   // 官方式 agent 图标:Cascade=波形,Devin Local/Cloud=Devin 六边形(cloud 带云标)
-  // 官方 1:1: cascade agent 用 Windsurf W 标(内联 SVG), 其余用字符图标
-  const W_SVG='<svg width="13" height="10" viewBox="0 0 24 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1c4 0 6 3 6 8s2 8 2 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M9 1c4 0 6 3 6 8s2 8 2 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M17 1c4 0 5.5 2.5 6 6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+  // 反者道之动·官方真源 W 标(自官方本体 workbench DOM 逆流提取, viewBox 512x297)
+  const W_SVG='<svg width="14" height="9" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg>';
   const AGENT_ICONS={cascade:"","devin-local":"⬢","devin-cloud":"☁"};
   const agentIcon=$("agentIcon");
   // 每 agent 轨各存一份 model/mode 配置; cascade=LS 本地轨, acp=Devin Local/Cloud 云端轨。
