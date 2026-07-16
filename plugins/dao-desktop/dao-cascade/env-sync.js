@@ -56,7 +56,13 @@ function ideUserDir() {
   if (cloneDir) return path.join(cloneDir, "User");
   const h = home();
   if (process.platform === "darwin") return path.join(h, "Library", "Application Support", "Devin", "User");
-  if (process.platform === "win32") return path.join(process.env.APPDATA || path.join(h, "AppData", "Roaming"), "Devin", "User");
+  if (process.platform === "win32") {
+    // DAO_ENV_SYNC_HOME 重定向时须整树随行(隔离契约), 不得漏引真实 APPDATA
+    const roaming = process.env.DAO_ENV_SYNC_HOME
+      ? path.join(h, "AppData", "Roaming")
+      : (process.env.APPDATA || path.join(h, "AppData", "Roaming"));
+    return path.join(roaming, "Devin", "User");
+  }
   return path.join(h, ".config", "Devin", "User");
 }
 
