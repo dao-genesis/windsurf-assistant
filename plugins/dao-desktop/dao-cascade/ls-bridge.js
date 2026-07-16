@@ -125,6 +125,22 @@ function setApiKey(k) {
   if (k && typeof k === "string") _keyCache = { key: k, at: Date.now() };
 }
 
+// 鉴权类错误判据: 会话令牌轮换(另一 IDE 并发登录 / LS 刷新凭据)后, 缓存旧 key 失效,
+// LS 回 "Invalid token" / "failed to get primary API key" / 权限拒绝 —— 据此触发重解析。
+function isAuthError(msg) {
+  return /invalid token|primary api key|permission denied|unauthenticated|\bhttp 401\b|\bhttp 403\b/i.test(String(msg || ""));
+}
+
+// 令牌轮换自愈: 作废缓存 key → 重新发现(host-discover 逐个探测最新 credentials.toml/state.vscdb
+// 候选, 命中即经 setApiKey 回灌官方 LS 现接受的那把)。返回是否解析到可用 key。
+async function refreshAuth() {
+  _keyCache = { key: "", at: 0 };
+  try {
+    const found = await require("./host-discover").discover();
+    return !!found;
+  } catch (_) { return false; }
+}
+
 // Cascade(官方轨)登录态单一裁决 —— 复用官方唯一登录, 不另立插件账号:
 //   官方 windsurf_api_key(credentials.toml / state.vscdb) 在即已登录; 兼收 shim 灌入的
 //   hostState.auth 与已拉取的 fused.account(GetUserStatus)。panel.js 与 unified-panel.js
@@ -185,7 +201,8 @@ function aliveSync() {
   return _alive.ok;
 }
 
-function call(method, body, timeoutMs) {
+// 单次 RPC(无自愈): call 的底层实现。
+function _callOnce(method, body, timeoutMs) {
   return new Promise((resolve, reject) => {
     const h = ready();
     if (!h) return reject(new Error("官方 language_server 未就绪(端口/CSRF 未捕获)"));
@@ -213,6 +230,20 @@ function call(method, body, timeoutMs) {
     req.on("error", reject);
     req.end(data);
   });
+}
+
+// RPC(令牌轮换自愈): 首发遇鉴权类错误 → refreshAuth(作废缓存+重发现最新 key) → 单次重试。
+// 官方前端每调即取现行令牌, 故并发多 IDE 登录令牌轮换时不失效; 本桥以此对齐(消除
+// "首条成功、后续 Invalid token / failed to get primary API key" 的跨 IDE 送信缺口)。
+async function call(method, body, timeoutMs) {
+  try {
+    return await _callOnce(method, body, timeoutMs);
+  } catch (e) {
+    if (isAuthError(e && e.message) && await refreshAuth()) {
+      return await _callOnce(method, body, timeoutMs);
+    }
+    throw e;
+  }
 }
 
 // 生成驱动流: 官方 UI 靠此 server-streaming 连接推动 Cascade 执行(不挂即停摆)。
@@ -338,4 +369,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels };
