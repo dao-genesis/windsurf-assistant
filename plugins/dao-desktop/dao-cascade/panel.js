@@ -313,16 +313,19 @@ class CascadePanelProvider {
     this._post({ type: "env", devinBin: bin || null, agents: AGENTS,
       loggedIn, userName: auth.name, windsurf: ws, folder });
     // 三模式引擎态归一发布(fused.engines): 归一面板主页/桥接 API 直接消费, 与本面板 env 同源。
+    // Cascade 登录态经 ls-bridge.cascadeAuth 单一裁决(复用官方唯一登录, 与归一面板同判据)。
+    let ca = { signedIn: !!(ws && ws.authSignedIn), name: (ws && ws.authName) || "" };
+    try { ca = require("./ls-bridge").cascadeAuth(); } catch (_) {}
     try {
       require("./host-state").publishFused("engines", {
         cascade: { ready: !!(ws && ws.lsPort), lsPort: (ws && ws.lsPort) || 0,
-          signedIn: !!(ws && ws.authSignedIn), name: (ws && ws.authName) || "" },
+          signedIn: ca.signedIn, name: ca.name },
         devinLocal: { bin: !!bin, signedIn: !!auth.loggedIn, name: auth.name || "" },
         devinCloud: { signedIn: !!auth.loggedIn, name: auth.name || "",
           endpoint: "wss://app.devin.ai/api/acp/live" },
       });
     } catch (_) {}
-    this._sbSet({ lsReady: !!(ws && ws.lsPort), user: (ws && ws.authName) || auth.name || null });
+    this._sbSet({ lsReady: !!(ws && ws.lsPort), user: (ws && ws.authName) || (ca && ca.name) || auth.name || null });
     this._cxPushWorkflows();
   }
 
