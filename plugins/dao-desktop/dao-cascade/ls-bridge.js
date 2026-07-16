@@ -128,7 +128,13 @@ function setApiKey(k) {
 // 鉴权类错误判据: 会话令牌轮换(另一 IDE 并发登录 / LS 刷新凭据)后, 缓存旧 key 失效,
 // LS 回 "Invalid token" / "failed to get primary API key" / 权限拒绝 —— 据此触发重解析。
 function isAuthError(msg) {
-  return /invalid token|primary api key|permission denied|unauthenticated|\bhttp 401\b|\bhttp 403\b/i.test(String(msg || ""));
+  return /invalid token|invalid[ _]?api[ _]?key|primary api key|permission denied|unauthenticated|\bhttp 401\b|\bhttp 403\b/i.test(String(msg || ""));
+}
+
+// 端口陈旧类错误判据: 宿主 IDE reload 后 LS 重启换端口, 落盘/进程内旧端口连拒 ——
+// 据此触发重发现(discover 同时回灌最新 lsPort/CSRF/key)。
+function isStaleEndpointError(msg) {
+  return /econnrefused|econnreset|socket hang up|epipe/i.test(String(msg || ""));
 }
 
 // 令牌轮换自愈: 作废缓存 key → 重新发现(host-discover 逐个探测最新 credentials.toml/state.vscdb
@@ -239,7 +245,8 @@ async function call(method, body, timeoutMs) {
   try {
     return await _callOnce(method, body, timeoutMs);
   } catch (e) {
-    if (isAuthError(e && e.message) && await refreshAuth()) {
+    const m = e && e.message;
+    if ((isAuthError(m) || isStaleEndpointError(m)) && await refreshAuth()) {
       return await _callOnce(method, body, timeoutMs);
     }
     throw e;
@@ -369,4 +376,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels };

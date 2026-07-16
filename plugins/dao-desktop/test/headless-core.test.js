@@ -349,7 +349,10 @@ test("令牌轮换自愈: RPC 遇鉴权错 → refreshAuth 重发现 key → 单
     const bridge = require(lsPath);
     assert.ok(bridge.isAuthError("failed to get primary API key: Invalid token"));
     assert.ok(bridge.isAuthError("SendUserCascadeMessage: Invalid token"));
+    assert.ok(bridge.isAuthError("invalid api key (trace ID: 624b96aed7f15dd67833f7aa7d490305)"));
     assert.ok(!bridge.isAuthError("SendUserCascadeMessage: 超时"));
+    assert.ok(bridge.isStaleEndpointError("connect ECONNREFUSED 127.0.0.1:43959"));
+    assert.ok(!bridge.isStaleEndpointError("SendUserCascadeMessage: 超时"));
     const out = await bridge.call("SendUserCascadeMessage", {});
     assert.deepStrictEqual(out, { ok: true }, "自愈重试后应返成功体");
     assert.strictEqual(discovered, 1, "应恰好触发一次重发现");
