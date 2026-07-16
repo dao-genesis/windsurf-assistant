@@ -1265,3 +1265,48 @@ test("proxy-pro 面板含 3×4 模式切换且 Cascade 不含", () => {
   const cascade = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
   assert.ok(!cascade.includes("mf-set"), "Cascade 对话面板不得含模式管理入口");
 });
+
+// v1.2.4 · LS 端口活性裁决护栏: 宿主 IDE 退出后落盘 host 态仍留旧端口/CSRF ——
+// probeAlive TCP 探活为唯一「就绪」裁决, 三处消费(归一 engines/快照 lsReady/面板 env)皆经之。
+test("LS 活性探测: 死端口不得呈「陈旧就绪」", async () => {
+  const ls = require(path.join(CASCADE, "ls-bridge.js"));
+  assert.strictEqual(typeof ls.probeAlive, "function");
+  assert.strictEqual(typeof ls.aliveSync, "function");
+  const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  assert.ok(uni.includes("probeAlive"), "归一 engines 就绪应经探活裁决");
+  assert.ok(uni.includes("aliveSync"), "快照 lsReady 应经探活裁决");
+  const pan = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(pan.includes("probeAlive"), "面板 env 就绪应经探活裁决");
+  // 真探测: 起一个临时 TCP 服务 → 活; 关掉 → 死(经 DAO_WINDSURF_HOST_FILE 指向临时 host 态)
+  const net = require("net");
+  const os = require("os");
+  const tmp = path.join(os.tmpdir(), "dao-alive-test-" + process.pid + ".json");
+  const srv = net.createServer(() => {});
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const port = srv.address().port;
+  fs.writeFileSync(tmp, JSON.stringify({ lsPort: port, csrfToken: "t", at: Date.now() }));
+  const prev = process.env.DAO_WINDSURF_HOST_FILE;
+  process.env.DAO_WINDSURF_HOST_FILE = tmp;
+  const prevHost = globalThis.__daoWindsurfHost; // 全进程单例可能被前序测试污染, 暂换
+  delete globalThis.__daoWindsurfHost;
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "ls-bridge.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "host-state.js"))];
+    const ls2 = require(path.join(CASCADE, "ls-bridge.js"));
+    if (ls2.ready()) {
+      assert.strictEqual(await ls2.probeAlive(), true, "活端口应判活");
+      await new Promise((r) => srv.close(r));
+      assert.strictEqual(await ls2.probeAlive(1000), true, "5s 短缓存内仍判活(设计如此)");
+      await new Promise((r) => setTimeout(r, 5100));
+      assert.strictEqual(await ls2.probeAlive(1000), false, "缓存过期后死端口必须判死");
+    } else {
+      await new Promise((r) => srv.close(r));
+    }
+  } finally {
+    if (prev === undefined) delete process.env.DAO_WINDSURF_HOST_FILE; else process.env.DAO_WINDSURF_HOST_FILE = prev;
+    if (prevHost === undefined) delete globalThis.__daoWindsurfHost; else globalThis.__daoWindsurfHost = prevHost;
+    try { fs.unlinkSync(tmp); } catch (_) {}
+    delete require.cache[require.resolve(path.join(CASCADE, "ls-bridge.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "host-state.js"))];
+  }
+});

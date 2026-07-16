@@ -105,13 +105,14 @@ class UnifiedPanel {
       const bin = resolveDevinBin(this._extRoot, this._storageDir);
       const auth = await authStatus(bin);
       const hs = hostStateMod.loadPersisted() || hostStateMod.hostState();
-      const acct = (hs.fused && hs.fused.account) || {};
       const ls = require("./ls-bridge");
-      const signedIn = !!((hs.auth && (hs.auth.loggedIn === true || hs.auth.state === "signed-in" || hs.auth.apiKey || hs.auth.userName || hs.auth.name)) ||
-        acct.email || acct.name || ls.apiKey());
+      const ca = ls.cascadeAuth();
+      // 端口活性裁决: 宿主退出后落盘态仍留旧端口, TCP 探活防「陈旧就绪」假象。
+      let alive = false;
+      try { alive = await ls.probeAlive(); } catch (_) {}
       hostStateMod.publishFused("engines", {
-        cascade: { ready: !!(hs.lsPort && hs.csrfToken), lsPort: hs.lsPort || 0, signedIn,
-          name: (hs.auth && (hs.auth.userName || hs.auth.name || hs.auth.email)) || acct.name || acct.email || "" },
+        cascade: { ready: !!(hs.lsPort && hs.csrfToken && alive), lsPort: hs.lsPort || 0,
+          signedIn: ca.signedIn, name: ca.name },
         devinLocal: { bin: !!bin, signedIn: !!auth.loggedIn, name: auth.name || "" },
         devinCloud: { signedIn: !!auth.loggedIn, name: auth.name || "",
           endpoint: "wss://app.devin.ai/api/acp/live" },
@@ -209,7 +210,9 @@ class UnifiedPanel {
     let hs = {};
     try { hs = hostStateMod.loadPersisted() || hostStateMod.hostState(); } catch (_) { hs = {}; }
     const fused = (hs && hs.fused) || {};
-    const lsReady = !!(hs && hs.lsPort && hs.csrfToken);
+    let alive = null;
+    try { alive = require("./ls-bridge").aliveSync(); } catch (_) {}
+    const lsReady = !!(hs && hs.lsPort && hs.csrfToken) && alive !== false;
     let backups = { root: "", accounts: [] };
     try { backups = backup.listBackups(); } catch (e) { this._log("[unified] listBackups: " + e.message); }
     let github = null, proxy = null;

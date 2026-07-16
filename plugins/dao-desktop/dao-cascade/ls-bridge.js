@@ -14,6 +14,7 @@
 //     驱动 —— 不挂流则轨迹停在 CHECKPOINT;挂流期间轮询 GetCascadeTrajectorySteps
 //     取 plannerResponse 文本。
 const http = require("http");
+const net = require("net");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -124,6 +125,26 @@ function setApiKey(k) {
   if (k && typeof k === "string") _keyCache = { key: k, at: Date.now() };
 }
 
+// Cascade(官方轨)登录态单一裁决 —— 复用官方唯一登录, 不另立插件账号:
+//   官方 windsurf_api_key(credentials.toml / state.vscdb) 在即已登录; 兼收 shim 灌入的
+//   hostState.auth 与已拉取的 fused.account(GetUserStatus)。panel.js 与 unified-panel.js
+//   两处发布 fused.engines.cascade 皆经此裁决, 消除"谁后写谁覆盖"的登录态竞态。
+function cascadeAuth() {
+  let key = ""; try { key = apiKey() || ""; } catch (_) {}
+  let acct = {}, auth = null;
+  try {
+    const hs = require("./host-state");
+    const h = hs.loadPersisted() || hs.hostState();
+    acct = (h.fused && h.fused.account) || {};
+    auth = h.auth;
+  } catch (_) {}
+  const authSignedIn = !!(auth && (auth.loggedIn === true || auth.state === "signed-in"
+    || auth.apiKey || auth.userName || auth.name));
+  const signedIn = !!(key || acct.email || acct.name || authSignedIn);
+  const name = (auth && (auth.userName || auth.name || auth.email)) || acct.name || acct.email || "";
+  return { signedIn, name };
+}
+
 // 与官方扩展本体一致的调用方元数据(LS 端按此鉴权/归因)
 function metadata() {
   return {
@@ -133,6 +154,35 @@ function metadata() {
     extensionVersion: "1.63.9250",
     apiKey: apiKey(),
   };
+}
+
+// LS 端口活性探测: 宿主 IDE 退出后 language_server 随之消亡, 但落盘的
+// windsurf-host.json 仍留旧端口/CSRF —— 单看 ready() 会呈「陈旧就绪」假象。
+// 以 TCP 快连(默认 1.2s 超时)裁决端口真活, 结果短缓存(5s)供同步消费方读取。
+let _alive = { ok: null, port: 0, at: 0 };
+function probeAlive(timeoutMs) {
+  return new Promise((resolve) => {
+    const h = resolveHost();
+    const done = (ok, port) => { _alive = { ok, port: port || 0, at: Date.now() }; resolve(ok); };
+    if (!h || !h.lsPort) return done(false, 0);
+    if (_alive.ok !== null && _alive.port === h.lsPort && Date.now() - _alive.at < 5000) return resolve(_alive.ok);
+    const s = net.connect({ host: "127.0.0.1", port: h.lsPort });
+    s.setTimeout(timeoutMs || 1200);
+    s.once("connect", () => { s.destroy(); done(true, h.lsPort); });
+    s.once("timeout", () => { s.destroy(); done(false, h.lsPort); });
+    s.once("error", () => { done(false, h.lsPort); });
+  });
+}
+
+// 同步读探活结论(未探测过时返 null=未知): 同步路径(快照/推送)消费, 并顺手触发后台补测。
+function aliveSync() {
+  const h = resolveHost();
+  if (!h || !h.lsPort) return false;
+  if (_alive.ok === null || _alive.port !== h.lsPort || Date.now() - _alive.at > 5000) {
+    probeAlive().catch(() => {});
+    if (_alive.ok === null || _alive.port !== h.lsPort) return null;
+  }
+  return _alive.ok;
 }
 
 function call(method, body, timeoutMs) {
@@ -288,4 +338,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, stateDbCandidates, driveStream, listModels };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels };

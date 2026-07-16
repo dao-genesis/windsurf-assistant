@@ -25,6 +25,8 @@ class ProxyProPanel {
     w.onDidReceiveMessage((m) => this._onMessage(m || {}));
     w.html = this._html();
     this._pxList();
+    // retainContextWhenHidden 下重新可见时刷新: 渠道/路由可能已在面板外(headless/切号)变更。
+    view.onDidChangeVisibility(() => { if (view.visible) this._pxList(); });
   }
 
   _post(m) { if (this._view) try { this._view.webview.postMessage(m); } catch (_) {} }
