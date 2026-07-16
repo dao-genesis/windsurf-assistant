@@ -253,6 +253,44 @@ async function call(method, body, timeoutMs) {
   }
 }
 
+// 云端 SeatManagement 直连(官方 fetchSelfDevinSessionToken 同源): server.codeium.com
+// Connect-JSON + X-Api-Key。Devin 账号下多数 seat RPC 需 token 级鉴权(403), 唯
+// GetSelfDevinSessionToken 以 api key 即可换取 Devin Session Token(打通 Devin Cloud API)。
+const SEAT_HOST = "server.codeium.com";
+function seatCall(method, body, headers, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const https = require("https");
+    const key = apiKey();
+    if (!key) return reject(new Error("未登录(无 windsurf_api_key)"));
+    const data = Buffer.from(JSON.stringify(Object.assign({ metadata: metadata() }, body || {})), "utf8");
+    const req = https.request({
+      host: SEAT_HOST, path: "/exa.seat_management_pb.SeatManagementService/" + method, method: "POST",
+      headers: Object.assign({ "Content-Type": "application/json", "X-Api-Key": key, "Content-Length": data.length }, headers || {}),
+    }, (r) => {
+      let b = "";
+      r.on("data", (c) => { b += c; });
+      r.on("end", () => {
+        try {
+          const j = b ? JSON.parse(b) : {};
+          if (r.statusCode !== 200) reject(new Error(method + ": " + (j.message || j.code || ("HTTP " + r.statusCode))));
+          else resolve(j);
+        } catch (e) { reject(new Error(method + ": 响应解析失败 " + e.message)); }
+      });
+    });
+    req.setTimeout(timeoutMs || 20000, () => { req.destroy(new Error(method + ": 超时")); });
+    req.on("error", reject);
+    req.end(data);
+  });
+}
+
+// Devin Session Token(官方 getSelfDevinSessionToken 同源): 换取 devin-session-token$…
+async function devinSessionToken() {
+  const r = await seatCall("GetSelfDevinSessionToken", {});
+  const t = (r && r.sessionToken) || "";
+  if (!t) throw new Error("服务端未返回 sessionToken");
+  return t;
+}
+
 // 生成驱动流: 官方 UI 靠此 server-streaming 连接推动 Cascade 执行(不挂即停摆)。
 // 返回 { close() } —— 消息发完/收完后调用 close 释放连接。
 // onFrame(可选): 每收到一个反应式帧(轨迹变更信号)即回调 —— 以之唤醒轮询, 帧到立即拉增量
@@ -404,4 +442,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels, seatCall, devinSessionToken };

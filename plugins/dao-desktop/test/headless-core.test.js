@@ -1474,3 +1474,44 @@ test("LS 活性探测: 死端口不得呈「陈旧就绪」", async () => {
     delete require.cache[require.resolve(path.join(CASCADE, "host-state.js"))];
   }
 });
+
+// R146 · 导入同步纯核(官方 import 系列对等): JSONC 宽容解析 + 并入不覆盖 + 扩展清单过滤。
+test("import-sync: mergeSettings 并入不覆盖 + vscodeExtensionIds 过滤内建", () => {
+  const imp = require(path.join(CASCADE, "import-sync.js"));
+  // JSONC: 注释与尾逗号
+  const src = `{
+    // 注释
+    "editor.fontSize": 15,
+    "a.b": true, /* 块注释 */
+  }`;
+  const { merged, added } = imp.mergeSettings(src, '{"editor.fontSize": 12}');
+  assert.strictEqual(merged["editor.fontSize"], 12, "目标已有键不得被覆盖");
+  assert.strictEqual(merged["a.b"], true);
+  assert.deepStrictEqual(added, ["a.b"]);
+  // 空目标全并入
+  const r2 = imp.mergeSettings('{"x":1}', "");
+  assert.deepStrictEqual(r2.merged, { x: 1 });
+  // 扩展清单: 去重 + 排除 codeium/windsurf/devin 内建冲突
+  const ids = imp.vscodeExtensionIds(JSON.stringify([
+    { identifier: { id: "ms-python.python" } },
+    { identifier: { id: "Codeium.codeium" } },
+    { identifier: { id: "devin.dao-one" } },
+    { identifier: { id: "ms-python.python" } },
+    { identifier: { id: "esbenp.prettier-vscode" } },
+  ]));
+  assert.deepStrictEqual(ids, ["ms-python.python", "esbenp.prettier-vscode"]);
+  // 坏输入不抛
+  assert.deepStrictEqual(imp.vscodeExtensionIds("not json"), []);
+});
+
+// R146 · seat 桥契约: ls-bridge 暴露 seatCall/devinSessionToken(云端 SeatManagement 直连)。
+test("ls-bridge: seatCall/devinSessionToken 契约在位", () => {
+  const ls = require(path.join(CASCADE, "ls-bridge.js"));
+  assert.strictEqual(typeof ls.seatCall, "function");
+  assert.strictEqual(typeof ls.devinSessionToken, "function");
+  const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  for (const k of ["set-copy-key", "set-devin-token", "set-restart-ls", "set-diag", "set-import"]) {
+    assert.ok(uni.includes('"' + k + '"'), "设置板块应挂载 " + k);
+  }
+  assert.ok(uni.includes("import-sync"), "导入应走 import-sync 纯核");
+});
