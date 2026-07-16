@@ -1516,3 +1516,35 @@ test("ls-bridge: seatCall/devinSessionToken 契约在位", () => {
   assert.ok(uni.includes("import-sync"), "导入应走 import-sync 纯核");
   assert.ok(uni.includes("sourcePath"), "ImportFromCursor 必须携带官方必填 sourcePath");
 });
+
+// R147 · 内置浏览器站内代理纯核: HTML 剥封锁头 + 注入 base/拦截 + token/URL 校验。
+test("web-embed: 站内代理注入与校验契约", async () => {
+  const we = require(path.join(CASCADE, "web-embed.js"));
+  assert.strictEqual(typeof we.handle, "function");
+  assert.strictEqual(we.isHttpUrl("https://x.y/z"), true);
+  assert.strictEqual(we.isHttpUrl("javascript:alert(1)"), false);
+  assert.strictEqual(we.isHttpUrl("ftp://a"), false);
+  const s = we.interceptScript("/web?t=TT&u=");
+  assert.ok(s.includes("/web?t=TT&u=") && s.includes("addEventListener"));
+  // 起真服务器: 缺 token → 401, 坏 u → 400
+  const http = require("http");
+  const srv = http.createServer((req, res) => { if (!we.handle(req, res, "SEK")) { res.writeHead(404); res.end(); } });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const port = srv.address().port;
+  const get = (p) => new Promise((rs) => http.get({ host: "127.0.0.1", port, path: p }, (r) => { r.resume(); rs(r.statusCode); }));
+  assert.strictEqual(await get("/web?u=https%3A%2F%2Fx.y"), 401);
+  assert.strictEqual(await get("/web?t=SEK&u=javascript:1"), 400);
+  await new Promise((r) => srv.close(r));
+});
+
+// R147 · unified panel: 内置浏览器板块 + 官方菜单命令对等接线在位。
+test("unified-panel: 浏览器板块与官方菜单命令对等在位", () => {
+  const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  assert.ok(uni.includes('"browser"') && uni.includes("web-state") && uni.includes("_webState"), "内置浏览器板块应接线");
+  const lapi = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(lapi.includes("web-embed"), "local-api 应挂载 web-embed 站内代理");
+  for (const k of ["set-cmd", "devin-settings", "sign-out", "open-cascade", "create-skill", "create-workflow", "mcp-config"]) {
+    assert.ok(uni.includes(k), "官方菜单对等应含 " + k);
+  }
+  assert.ok(uni.includes("devin.openQuickSettingsPanel") && uni.includes("windsurf.openQuickSettingsPanel"), "命令应 devin.* 优先 windsurf.* 回退");
+});

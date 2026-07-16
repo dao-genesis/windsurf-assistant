@@ -662,6 +662,8 @@ function start(preferredPort) {
         res.end(b);
       };
       const u = (req.url || "").split("?")[0];
+      // 内置浏览器站内代理(iframe 无法带 header, token 走 query 校验)
+      if (u === "/web") { try { if (require("./web-embed").handle(req, res, _token)) return; } catch (e) { return send(500, { error: e.message }); } }
       if (u === "/api/health") return send(200, { ok: true, service: "dao-desktop-local-api", port: _port });
       // 协议自描述免鉴权: 任意 AI/Agent 先自发现协议, 再持 token 调用(文档本身不含凭据)
       if (u === "/api/openapi" && req.method !== "POST") return send(200, require("./api-schema").openapi({ port: _port }));
