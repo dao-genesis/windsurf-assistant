@@ -144,6 +144,7 @@ class UnifiedPanel {
       case "mcp-toggle": return this._mcpToggle(String(msg.name || ""));
       case "mcp-tool-toggle": return this._mcpToolToggle(String(msg.server || ""), String(msg.tool || ""));
       case "mcp-add": return this._mcpAdd();
+      case "mcp-install": return this._mcpInstall(String(msg.name || ""));
       case "mcp-config": return this._mcpConfigOpen();
       case "pool-list": return this._poolList();
       case "pool-capture": return this._poolCapture();
@@ -440,7 +441,10 @@ class UnifiedPanel {
   async _mcpDetail() {
     try {
       const ls = require("./ls-bridge");
-      const r = await ls.call("GetMcpServerStates", {});
+      const [r, reg] = await Promise.all([
+        ls.call("GetMcpServerStates", {}),
+        ls.call("GetMcpRegistryServers", {}).catch(() => null),
+      ]);
       const servers = ((r && r.states) || []).map((s) => {
         const off = new Set((s.spec || {}).disabledTools || []);
         return {
@@ -452,7 +456,15 @@ class UnifiedPanel {
           prompts: (s.prompts || []).map((p) => ({ name: p.name })),
         };
       });
-      this._post({ type: "mcp-detail", servers });
+      const installed = new Set(servers.map((s) => s.name));
+      this._mcpRegistry = ((reg && reg.servers) || []);
+      const registry = this._mcpRegistry.map((s) => {
+        const id = (s.name || "").replace(/^devin\//, "") || s.title || "";
+        return { id, title: s.title || id, description: s.description || "",
+          installed: installed.has(id),
+          how: (s.packages || []).length ? "pkg" : ((s.remotes || []).length ? "remote" : "") };
+      });
+      this._post({ type: "mcp-detail", servers, registry });
       hostStateMod.publishFused("mcp", { servers: servers.map((s) => ({ name: s.name, status: s.status, disabled: s.disabled, toolCount: s.tools.length })) });
     } catch (e) { this._post({ type: "mcp-detail", servers: null, error: e.message }); }
   }
@@ -477,22 +489,7 @@ class UnifiedPanel {
       if (!pick) return;
       let id, tplObj;
       if (pick.srv) {
-        const s = pick.srv;
-        id = (s.name || "").replace(/^devin\//, "") || s.title;
-        const pkg = (s.packages || [])[0];
-        const remote = (s.remotes || [])[0];
-        if (pkg) {
-          tplObj = { command: pkg.runtimeHint || "npx", args: pkg.runtimeHint === "npx" ? ["-y", pkg.identifier] : [pkg.identifier], env: {} };
-          for (const ev of pkg.environmentVariables || []) {
-            if (!ev.isRequired) continue;
-            const v = await vscode.window.showInputBox({ prompt: id + " 需要 " + ev.name + "(" + (ev.description || "") + ")", password: !!ev.isSecret, ignoreFocusOut: true });
-            if (v === undefined) return;
-            tplObj.env[ev.name] = v;
-          }
-          if (!Object.keys(tplObj.env).length) delete tplObj.env;
-        } else if (remote) {
-          tplObj = { serverUrl: remote.url };
-        } else { vscode.window.showErrorMessage("该注册表项无可用安装方式"); return; }
+        return this._mcpInstallSrv(pick.srv);
       } else {
         id = await vscode.window.showInputBox({ prompt: "MCP server 名称(写入 mcp_config.json 的键)" });
         if (!id) return;
@@ -506,6 +503,46 @@ class UnifiedPanel {
       await ls.call("RefreshMcpServers", {});
       setTimeout(() => this._mcpDetail(), 1500);
     } catch (e) { vscode.window.showErrorMessage("添加 MCP 失败: " + e.message); }
+  }
+
+  // Marketplace 一键安装(官方注册表同源): packages → 命令模板(必填 env 逐项询问), remotes → serverUrl。
+  async _mcpInstall(name) {
+    let srv = (this._mcpRegistry || []).find((s) => ((s.name || "").replace(/^devin\//, "") || s.title) === name);
+    if (!srv) {
+      try {
+        const ls = require("./ls-bridge");
+        const reg = await ls.call("GetMcpRegistryServers", {});
+        this._mcpRegistry = ((reg && reg.servers) || []);
+        srv = this._mcpRegistry.find((s) => ((s.name || "").replace(/^devin\//, "") || s.title) === name);
+      } catch (_) {}
+    }
+    if (!srv) { vscode.window.showErrorMessage("注册表中无此 server: " + name); return; }
+    return this._mcpInstallSrv(srv);
+  }
+
+  async _mcpInstallSrv(s) {
+    try {
+      const ls = require("./ls-bridge");
+      const id = (s.name || "").replace(/^devin\//, "") || s.title;
+      const pkg = (s.packages || [])[0];
+      const remote = (s.remotes || [])[0];
+      let tplObj;
+      if (pkg) {
+        tplObj = { command: pkg.runtimeHint || "npx", args: pkg.runtimeHint === "npx" ? ["-y", pkg.identifier] : [pkg.identifier], env: {} };
+        for (const ev of pkg.environmentVariables || []) {
+          if (!ev.isRequired) continue;
+          const v = await vscode.window.showInputBox({ prompt: id + " 需要 " + ev.name + "(" + (ev.description || "") + ")", password: !!ev.isSecret, ignoreFocusOut: true });
+          if (v === undefined) return;
+          tplObj.env[ev.name] = v;
+        }
+        if (!Object.keys(tplObj.env).length) delete tplObj.env;
+      } else if (remote) {
+        tplObj = { serverUrl: remote.url };
+      } else { vscode.window.showErrorMessage("该注册表项无可用安装方式"); return; }
+      await ls.call("SaveMcpServerToConfigFile", { serverId: id, templateJson: JSON.stringify(tplObj) });
+      await ls.call("RefreshMcpServers", {});
+      setTimeout(() => this._mcpDetail(), 1500);
+    } catch (e) { vscode.window.showErrorMessage("安装 MCP 失败: " + e.message); }
   }
 
   _mcpConfigOpen() {
@@ -1059,8 +1096,10 @@ function renderMcp(){
     '<button class="btn sec" id="mcpRefresh">重载</button></div>';
   if(MCPD===null){h+='<div class="card muted">正在经 LS 拉取 MCP 明细…</div>';return h;}
   if(MCPD.error){h+='<div class="card">⚠ '+E(MCPD.error)+'</div>';return h;}
-  const mb=MCPD.servers||[];
-  if(!mb.length){h+='<div class="card muted">无已配置的 MCP 服务器。点「添加」或「配置文件」写入 server 后重载。</div>';return h;}
+  const mb=MCPD.servers||[], reg=MCPD.registry||[];
+  if(!mb.length&&!reg.length){h+='<div class="card muted">暂无 MCP 服务器与注册表条目。</div>';return h;}
+  if(mb.length) h+='<div class="st">已安装</div>';
+  if(!mb.length) h+='<div class="card muted">无已配置的 MCP 服务器。点「添加」或从注册表一键安装。</div>';
   for(const s of mb){
     const running=String(s.status||'').toUpperCase().indexOf('READY')>=0||String(s.status||'').toUpperCase().indexOf('RUN')>=0;
     h+='<div class="acc"><div class="hd"><span>'+E(s.name)+
@@ -1074,6 +1113,15 @@ function renderMcp(){
     }
     if(s.prompts&&s.prompts.length)h+='<div class="conv" style="cursor:default"><span class="muted">prompts: '+s.prompts.map(p=>E(p.name)).join(', ')+'</span></div>';
     h+='</div>';
+  }
+  if(reg.length){
+    h+='<div class="st">注册表可安装</div>';
+    for(const s of reg){
+      h+='<div class="acc"><div class="hd"><span>'+E(s.title||s.id)+
+        '<span class="badge cloud">'+(s.installed?'已安装':(s.how==='remote'?'远程':'包安装'))+'</span></span>'+
+        '<button class="btn sec" data-mcpinstall="'+E(s.id)+'">'+(s.installed?'重装':'安装')+'</button></div>'+
+        '<div class="conv" style="cursor:default"><span class="muted">'+E(s.description||'')+'</span></div></div>';
+    }
   }
   return h;
 }
@@ -1299,6 +1347,7 @@ function render(){
   const mr=document.getElementById('mcpRefresh'); if(mr)mr.onclick=()=>{MCPD=null;render();vscode.postMessage({type:'mcp-refresh'});};
   document.querySelectorAll('[data-mcptoggle]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-toggle',name:el.dataset.mcptoggle}));
   document.querySelectorAll('[data-mcptool]').forEach(el=>el.onclick=()=>{const [sv,tl]=el.dataset.mcptool.split('|');vscode.postMessage({type:'mcp-tool-toggle',server:sv,tool:tl});});
+  document.querySelectorAll('[data-mcpinstall]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-install',name:el.dataset.mcpinstall}));
   if(S.board==='mcp'&&MCPD===null)cmd('loadTabData',{tab:'mcp'});
   const wrf=document.getElementById('winRf'); if(wrf)wrf.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-state'});};
   const wrl=document.getElementById('winRegL'); if(wrl)wrl.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-reg-local'});};
@@ -1353,7 +1402,7 @@ function render(){
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
   else if(m.type==='tabData'){/* dao-vsix /shell 同构信封: 板块载荷紧随其后 */}
-  else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
+  else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers,registry:m.registry||[]}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
   else if(m.type==='cx-list'){CX=m.sessions?{sessions:m.sessions}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='mem-list'){MEM=m.memories?{memories:m.memories}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
