@@ -171,12 +171,14 @@ class UnifiedPanel {
       case "set-detail": return this._setDetail();
       case "set-toggle": return this._setToggle(String(msg.key || ""), !!msg.on);
       case "set-changelog": return this._setChangelog();
+      case "web-state": return this._webState();
       case "set-copy-key": return this._setCopyKey();
       case "set-devin-token": return this._setDevinToken();
       case "set-restart-ls": return this._setRestartLs();
       case "set-diag": return this._setDiag();
       case "set-import": return this._setImport(String(msg.what || ""));
       case "set-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
+      case "set-cmd": return this._setCmd(String(msg.key || ""));
       case "acp-registry": return this._acpRegistry();
       case "acp-reload": return this._acpReload();
       case "env-open": return this._envOpen(String(msg.path || ""));
@@ -207,6 +209,7 @@ class UnifiedPanel {
       case "overview": this._winState(); return this._pushState();
       case "windows": return this._winState();
       case "settings": return this._setDetail();
+      case "browser": return this._webState();
       default: return this._pushState();
     }
   }
@@ -838,6 +841,47 @@ class UnifiedPanel {
     } catch (e) { vscode.window.showErrorMessage("导入失败: " + e.message); }
   }
 
+  // 官方菜单对等: 白名单 key → 候选命令序列(devin.* 优先, windsurf.*/workbench 回退), 逐个尝试至成功。
+  async _setCmd(key) {
+    const MENU = {
+      "devin-settings": ["devin.openQuickSettingsPanel", "windsurf.openQuickSettingsPanel"],
+      "sign-out": ["devin.logout", "windsurf.logout"],
+      "editor-settings": ["workbench.action.openSettings"],
+      "keyboard": ["workbench.action.openGlobalKeybindings"],
+      "extensions": ["workbench.view.extensions"],
+      "snippets": ["workbench.action.openSnippets"],
+      "tasks": ["workbench.action.tasks.runTask"],
+      "themes": ["workbench.action.selectTheme"],
+      "docs": ["devin.openDocs", "windsurf.openDocs"],
+      "community": ["devin.openCommunity", "windsurf.openCommunity"],
+      "changelog": ["devin.openChangeLog", "windsurf.openChangeLog"],
+      "open-cascade": ["devin.openCascade", "windsurf.openCascade"],
+      "rules": ["devin.openGlobalRules", "windsurf.openGlobalRules"],
+      "create-rule": ["devin.createRule", "windsurf.createRule"],
+      "create-skill": ["devin.createGlobalSkill", "windsurf.createGlobalSkill"],
+      "create-workflow": ["devin.createGlobalWorkflow", "windsurf.createGlobalWorkflow"],
+      "mcp-config": ["devin.openCascadeMcpConfigFile", "windsurf.openCascadeMcpConfigFile"],
+    };
+    const cands = MENU[key];
+    if (!cands) return;
+    if (key === "sign-out") {
+      const ok = await vscode.window.showWarningMessage("确认退出登录(官方 Sign Out)?", { modal: true }, "退出");
+      if (ok !== "退出") return;
+    }
+    for (const c of cands) {
+      try { await vscode.commands.executeCommand(c); return; } catch (_) {}
+    }
+    vscode.window.showWarningMessage("命令不可用(官方 IDE 未注册): " + cands.join(" / "));
+  }
+
+  // 内置浏览器: 懒启本地 API(同 bridge 板块同一实例), 下发站内代理前缀供 iframe 内嵌。
+  async _webState() {
+    try {
+      if (!localApi.running()) await localApi.start(0);
+      this._post({ type: "web-state", base: "http://127.0.0.1:" + localApi.port() + "/web?t=" + encodeURIComponent(localApi.token()) + "&u=" });
+    } catch (e) { this._post({ type: "web-state", error: e.message }); }
+  }
+
   _acpRegistryPath() {
     const os = require("os"); const path = require("path");
     return path.join(os.homedir(), ".windsurf", "acp", "registry.json");
@@ -939,6 +983,7 @@ class UnifiedPanel {
       "default-src 'none'",
       "style-src 'unsafe-inline'",
       "script-src 'nonce-" + n + "'",
+      "frame-src http://127.0.0.1:* http://localhost:*",
     ].join("; ");
     return `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -988,7 +1033,7 @@ h2{font-size:15px;margin:0 0 4px}
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
 // 七大板块顺序/图标/标题与 dao-vsix /shell 1:1; 其后为插件版延伸板块。
-const BOARDS=[["overview","🏠","主页 · Windows 总控"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["settings","⚙","设置"]];
+const BOARDS=[["overview","🏠","主页 · Windows 总控"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["browser","🌍","内置浏览器"],["settings","⚙","设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function cmd(c,d){vscode.postMessage(Object.assign({command:c},d||{}))}
 function sw(t){CONV=null;vscode.postMessage({type:'nav',board:t});cmd('loadTabData',{tab:t});}
@@ -1373,12 +1418,41 @@ function renderSettings(){
     cr('VS Code 扩展(勾选逐装)','<span class="back" data-setimport="vscode-extensions">导入</span>')+
     cr('Cursor 规则/记忆(官方 RPC)','<span class="back" data-setimport="cursor">导入</span>')+'</div>';
   }
+  h+='<div class="st">官方账号菜单对等(同源命令直通)</div><div class="card">'+
+    cr('Devin Settings(快捷设置面板)','<span class="back" data-setcmd="devin-settings">打开</span>')+
+    cr('Editor Settings','<span class="back" data-setcmd="editor-settings">打开</span>')+
+    cr('Keyboard Shortcuts','<span class="back" data-setcmd="keyboard">打开</span>')+
+    cr('Extensions','<span class="back" data-setcmd="extensions">打开</span>')+
+    cr('Configure Snippets','<span class="back" data-setcmd="snippets">打开</span>')+
+    cr('Tasks','<span class="back" data-setcmd="tasks">运行</span>')+
+    cr('Themes','<span class="back" data-setcmd="themes">选择</span>')+
+    cr('Docs / Community / Changelog','<span class="back" data-setcmd="docs">Docs</span> · <span class="back" data-setcmd="community">社区</span> · <span class="back" data-setcmd="changelog">日志</span>')+
+    cr('Sign Out','<span class="back" data-setcmd="sign-out">退出登录</span>')+'</div>';
+  h+='<div class="st">Cascade 「···」菜单对等</div><div class="card">'+
+    cr('打开 Cascade','<span class="back" data-setcmd="open-cascade">打开</span>')+
+    cr('Cascade Usage','<span class="back" data-seturl="https://windsurf.com/subscription/usage">打开↗</span>')+
+    cr('Configure Rules','<span class="back" data-setcmd="rules">全局规则</span> · <span class="back" data-setcmd="create-rule">新建</span>')+
+    cr('Configure Skills','<span class="back" data-setcmd="create-skill">新建全局 Skill</span>')+
+    cr('Configure Workflows','<span class="back" data-setcmd="create-workflow">新建全局 Workflow</span>')+
+    cr('MCP 配置文件','<span class="back" data-setcmd="mcp-config">打开</span>')+
+    cr('Edit Memories','见「对话备份」板块(插件自持记忆视图)')+'</div>';
   h+='<div class="st">官方门户(外链)</div><div class="card">'+
     cr('Devin 控制台','<span class="back" data-seturl="https://app.devin.ai">打开↗</span>')+
     cr('Devin 用量(View Usage 对等)','<span class="back" data-seturl="https://app.devin.ai/settings/usage">打开↗</span>')+
     cr('Devin 套餐与账单(openBillingPage 对等)','<span class="back" data-seturl="https://app.devin.ai/settings/plans">打开↗</span>')+
     cr('用量与订阅(Windsurf 门户)','<span class="back" data-seturl="https://windsurf.com/subscription/usage">打开↗</span>')+
     cr('个人资料','<span class="back" data-seturl="https://windsurf.com/subscription/profile">打开↗</span>')+'</div>';
+  return h;
+}
+let WEB=null,WEBURL='https://docs.devin.ai';
+function renderBrowser(){
+  let h='<div class="row"><h2 style="flex:1">内置浏览器 · 站内代理内嵌</h2>'+
+    '<button class="btn sec" id="webExt">系统浏览器打开↗</button></div>';
+  h+='<div class="muted" style="margin-bottom:8px">归一插件 /__web 同技术自持: 本地站内代理剥 X-Frame-Options/CSP 直出内嵌, 链接/表单自动续走代理。个别强校验/登录态站点可用右上外开回退。</div>';
+  h+='<div class="row" style="margin-bottom:8px"><input id="webUrl" style="flex:1;padding:5px 8px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-panel-border,#3334);border-radius:5px" value="'+E(WEBURL)+'" placeholder="https://…"><button class="btn" id="webGo">打开</button></div>';
+  if(WEB===null)h+='<div class="card muted">本地代理启动中…</div>';
+  else if(WEB.error)h+='<div class="card">⚠ '+E(WEB.error)+'</div>';
+  else h+='<iframe id="webFrame" src="'+E(WEB.base+encodeURIComponent(WEBURL))+'" style="width:100%;height:calc(100vh - 150px);border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;background:#fff" allow="clipboard-read; clipboard-write"></iframe>';
   return h;
 }
 let INJ=null;
@@ -1422,6 +1496,7 @@ function render(){
   else if(S.board==='github')h=renderGithub();
   else if(S.board==='search')h=renderSearch();
   else if(S.board==='inject')h=renderInject();
+  else if(S.board==='browser')h=renderBrowser();
   else if(S.board==='settings')h=renderSettings();
   main.innerHTML=h;
   const bk=document.getElementById('bk'); if(bk)bk.onclick=()=>vscode.postMessage({type:'backup-now'});
@@ -1504,6 +1579,11 @@ function render(){
   const srl=document.getElementById('setRls'); if(srl)srl.onclick=()=>{SET=null;render();vscode.postMessage({type:'set-restart-ls'});};
   const sdg=document.getElementById('setDg'); if(sdg)sdg.onclick=()=>vscode.postMessage({type:'set-diag'});
   document.querySelectorAll('[data-setimport]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-import',what:el.dataset.setimport}));
+  document.querySelectorAll('[data-setcmd]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-cmd',key:el.dataset.setcmd}));
+  const wg=document.getElementById('webGo'); if(wg)wg.onclick=()=>{const v=document.getElementById('webUrl').value.trim();if(v){WEBURL=/^https?:\/\//i.test(v)?v:'https://'+v;render();}};
+  const wu=document.getElementById('webUrl'); if(wu)wu.onkeydown=e=>{if(e.key==='Enter')document.getElementById('webGo').click();};
+  const wx=document.getElementById('webExt'); if(wx)wx.onclick=()=>vscode.postMessage({type:'set-open',url:WEBURL});
+  if(S.board==='browser'&&WEB===null)cmd('loadTabData',{tab:'browser'});
   if(S.board==='settings'&&SET===null)cmd('loadTabData',{tab:'settings'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
@@ -1519,6 +1599,7 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
   else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}
   else if(m.type==='inj-list'){INJ={items:m.items||[],plan:m.plan||{}};if(S&&S.board==='inject')render();}
+  else if(m.type==='web-state'){WEB=m.error?{error:m.error}:{base:m.base};if(S&&S.board==='browser')render();}
   else if(m.type==='set-detail'){SET=m.data?m.data:{error:m.error||'拉取失败'};if(S&&S.board==='settings')render();}
   else if(m.type==='conv'){CONV=m;render();}
   else if(m.type==='conv-error'){CONV={meta:{},md:'读取失败: '+m.error,folder:''};render();}
