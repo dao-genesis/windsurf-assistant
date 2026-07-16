@@ -1,0 +1,68 @@
+name: DAO PR Flow
+
+# 道法自然 · 无为而无不为 —— 统一的自动化 PR 流程:
+# 每个 PR 自动做轻量自检、按规模/范围自动打标、并对带 `dao-auto` 标签且检查通过的 PR 自动合并。
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: dao-pr-flow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sanity:
+    name: 自检 (sanity)
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Python 语法自检 (非阻断)
+        shell: bash
+        run: |
+          mapfile -t pys < <(git ls-files '*.py' || true)
+          if [ ${#pys[@]} -gt 0 ]; then
+            echo "compileall ${#pys[@]} python files"
+            python -m compileall -q "${pys[@]}" || echo "::warning::Python 语法自检发现问题(非阻断)"
+          else
+            echo "无 Python 文件,跳过。"
+          fi
+
+  triage:
+    name: 自动打标 (auto-label)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label by size & area
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const add = pr.additions + pr.deletions;
+            const size = add < 30 ? 'size/XS' : add < 120 ? 'size/S' : add < 500 ? 'size/M' : add < 1500 ? 'size/L' : 'size/XL';
+            const labels = new Set([size]);
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number, per_page: 100,
+            });
+            const has = (re) => files.some(f => re.test(f.filename));
+            if (has(/\.py$/)) labels.add('lang/python');
+            if (has(/\.(ts|tsx|js|jsx)$/)) labels.add('lang/js');
+            if (has(/\.(md|rst|txt)$/)) labels.add('area/docs');
+            if (has(/(^|\/)tests?\//)) labels.add('area/tests');
+            if (has(/\.github\/workflows\//)) labels.add('area/ci');
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: pr.number, labels: [...labels],
+              });
+            } catch (e) { core.warning('label failed: ' + e.message); }
+
+  # 合并统一由 dao-automerge.yml 执行（唯一合并者·squash·CI 全绿·限速），本流程只做自检与打标。
