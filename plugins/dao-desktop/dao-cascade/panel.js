@@ -20,6 +20,7 @@ const path = require("path");
 const { AcpClient, resolveDevinBin } = require("./acp-client");
 const { AcpWssClient } = require("./acp-wss");
 const { authStatus, startLogin } = require("./devin-provision");
+const proxyRuntime = require("./proxy-runtime");
 let hostState = null;
 try { ({ hostState } = require("../windsurf-shim")); } catch (_) {}
 
@@ -2007,6 +2008,24 @@ class CascadePanelProvider {
     }
   }
 
+  // Proxy Pro 路由轨: 周流一轮对话到路由渠道, 维持面板内多轮上下文。
+  async _pxChatTurn(msg, uid) {
+    this._pxHistory = this._pxHistory || [];
+    this._pxHistory.push({ role: "user", content: String(msg.text || "") });
+    try {
+      const r = await proxyRuntime.chat(uid, { messages: this._pxHistory.slice(-40), maxTokens: 4096, timeoutMs: 120000 });
+      if (!r.ok) throw new Error(r.error || ("HTTP " + r.httpCode));
+      this._pxHistory.push({ role: "assistant", content: r.content });
+      this._post({ type: "px-route-info", uid, channel: r.channel, model: r.model });
+      this._log("cascade: 路由生效 " + uid + " → " + r.channel + "/" + r.model);
+      return this._post({ type: "assistant-done", id: msg.id, text: r.content });
+    } catch (e) {
+      this._pxHistory.pop();
+      return this._post({ type: "assistant-done", id: msg.id,
+        text: "⚠ Proxy Pro 路由投递失败(" + uid + "): " + (e && e.message || e) });
+    }
+  }
+
   async _handleChat(msg) {
     const agent = msg.agent || "devin-local";
     if (agent === "devin-local") {
@@ -2047,6 +2066,11 @@ class CascadePanelProvider {
           await this._pushCascadeConfigOptions();
           if (!this._cascadeModel) this._cascadeModel = "swe-1-6-slow";
           this._log("cascade: 可用模型 → " + this._cascadeModel);
+        }
+        // 格利替换·路由生效层: 选中官方模型 UID 命中 Proxy Pro 路由 → 本轮对话
+        // 整体改投第三方渠道(含面板内多轮上下文), 官方 LS 不再收到该消息。
+        if (proxyRuntime.resolve(this._cascadeModel)) {
+          return await this._pxChatTurn(msg, this._cascadeModel);
         }
         // 图像附件(官方 ImageData{base64Data,mimeType,caption} · 顶层 images[]): 仅当模型支持
         const imgs = this._cxImages(msg.images);
