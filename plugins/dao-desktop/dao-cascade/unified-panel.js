@@ -178,6 +178,9 @@ class UnifiedPanel {
       case "win-reg-remote": return this._winRegRemote();
       case "win-unreg": return this._winUnreg();
       case "win-release": return this._winRelease(String(msg.key || ""), String(msg.owner || ""));
+      case "win-acct-create": return this._winAcctCreate();
+      case "win-acct-destroy": return this._winAcctDestroy(String(msg.name || ""));
+      case "win-open-desktop": return this._winOpenDesktop(String(msg.account || ""));
       default: return;
     }
   }
@@ -193,6 +196,7 @@ class UnifiedPanel {
       case "inject": return this._injList();
       case "mcp": return this._mcpDetail();
       case "github": return this._ghList();
+      case "overview": this._winState(); return this._pushState();
       case "windows": return this._winState();
       case "settings": return this._setDetail();
       default: return this._pushState();
@@ -260,6 +264,35 @@ class UnifiedPanel {
     const r = await winCore.releaseLease(key, owner);
     if (r && r.error) vscode.window.showWarningMessage("释放失败: " + r.error);
     return this._winState();
+  }
+
+  // Windows 总控 · 账号建/销(桥 /api/account.* 同一真源)与开桌面(委派 dao-windows-agent 插件)。
+  async _winAcctCreate() {
+    const name = await vscode.window.showInputBox({ prompt: "新建 Windows 账号名", validateInput: (v) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,19}$/.test(v || "") ? null : "限字母数字与 . _ -，≤ 20" });
+    if (!name) return;
+    const r = await winCore.accountCreate(name);
+    if (r && r.ok) vscode.window.showInformationMessage("Windows 账号已建: " + name);
+    else vscode.window.showErrorMessage("建号失败: " + ((r && r.error) || "未知"));
+    return this._winState();
+  }
+
+  async _winAcctDestroy(name) {
+    if (!name) return;
+    const pick = await vscode.window.showWarningMessage("销毁 Windows 账号 " + name + "? 其独立桌面会话与 profile 一并清除", { modal: true }, "销毁");
+    if (pick !== "销毁") return;
+    const r = await winCore.accountDestroy(name);
+    if (r && r.ok) vscode.window.showInformationMessage("Windows 账号已销毁: " + name);
+    else vscode.window.showErrorMessage("销号失败: " + ((r && r.error) || "未知"));
+    return this._winState();
+  }
+
+  async _winOpenDesktop(account) {
+    // 桌面渲染(RDP/guacamole canvas)由 dao-windows-agent 插件承载; 归一主页只做总控入口。
+    try {
+      await vscode.commands.executeCommand(account ? "daoWin.openAccountDesktop" : "daoWin.openDesktop");
+    } catch (e) {
+      vscode.window.showWarningMessage("打开桌面需安装 dao-windows-agent 插件(桌面级路由): " + e.message);
+    }
   }
 
   _openConversation(dir, folder) {
@@ -819,7 +852,7 @@ h2{font-size:15px;margin:0 0 4px}
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
 // 七大板块顺序/图标/标题与 dao-vsix /shell 1:1; 其后为插件版延伸板块。
-const BOARDS=[["overview","🏠","主页 Home"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["windows","🪟","Windows 分身"],["search","🔎","搜索"],["settings","⚙","设置"]];
+const BOARDS=[["overview","🏠","主页 · Windows 总控"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["settings","⚙","设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function cmd(c,d){vscode.postMessage(Object.assign({command:c},d||{}))}
 function sw(t){CONV=null;vscode.postMessage({type:'nav',board:t});cmd('loadTabData',{tab:t});}
@@ -832,7 +865,11 @@ function q(x){return (x===0||x)?(x+'%'):'—';}
 function renderOverview(){
   const a=S.account||{}, mb=S.mcp&&S.mcp.servers, cb=S.cascadeBackup, eg=S.engines;
   const run=mb?mb.filter(s=>String(s.status||'').toUpperCase().indexOf('RUN')>=0).length:0;
-  let h='<h2>归一主页 · 插件自持真源</h2><div class="muted" style="margin-bottom:10px">数据源: 本插件 host-state(fused)+ 本机备份树, 不依赖 IDE 宿主。</div>';
+  let h='<div class="row"><h2 style="flex:1">主页 · Windows 总控</h2>'+
+    '<button class="btn" id="winOpen">开本窗口桌面</button>'+
+    '<button class="btn sec" id="winRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">主页即 Windows 统一管理: 账号分身/桌面会话/模式/工具层一目了然(Dao-Windows-Agent 真源直连); 其余板块各司其职。</div>';
+  h+=renderWinControl();
   h+='<div class="st">三模式引擎</div><div class="card">';
   if(eg){
     const cx=eg.cascade||{}, dl=eg.devinLocal||{}, dc=eg.devinCloud||{};
@@ -1053,13 +1090,25 @@ function renderSearch(){
   return h;
 }
 let WIN=null;
-function renderWindows(){
-  let h='<div class="row"><h2 style="flex:1">Windows 分身 · 统一多分身面板</h2>'+
-    '<button class="btn sec" id="winRf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">Dao-Windows-Agent 真源直连: 桥(软件画像/会话)·隧道(分身输入租约)·隔离矩阵(每软件最低可行档)。人手持有租约时 Agent 自动让位。</div>';
-  if(WIN===null){h+='<div class="card muted">探活中…</div>';return h;}
-  if(WIN.error){h+='<div class="card">⚠ '+E(WIN.error)+'</div>';return h;}
+function renderWinControl(){
+  if(WIN===null)return '<div class="card muted">Windows 总控探活中…</div>';
+  if(WIN.error)return '<div class="card">⚠ '+E(WIN.error)+'</div>';
   const d=WIN;
+  let h='';
+  const md=d.mode;
+  h+='<div class="st">工具层模式(桥 /api/mode.*)</div><div class="card">'+
+    (md?cr('当前模式',E(md.name||md.mode_id||'')+(md.summary?' · '+E(md.summary):'')):'<div class="cr muted">桥不在跑时无模式态(契约文件 ~/.dao/mode.json 仍为真源)</div>')+'</div>';
+  h+='<div class="st">Windows 账号分身(每账号 = 一路独立桌面会话)</div>';
+  if(d.accounts===null||d.accounts===undefined)h+='<div class="card muted">隧道不可达时无账号清单。</div>';
+  else{
+    h+='<div class="card"><div class="cr"><span class="l">账号 '+(d.accounts.length)+' 个</span><span class="v"><button class="btn" id="winAcctNew">新建账号</button></span></div></div>';
+    for(const ac of d.accounts){
+      h+='<div class="acc"><div class="hd"><span>🪟 '+E(ac.name)+'</span><span>'+
+        '<button class="btn" data-winopen="'+E(ac.name)+'">开桌面</button> '+
+        '<button class="btn sec" data-winacctdel="'+E(ac.name)+'">销毁</button></span></div>'+
+        '<div class="conv" style="cursor:default"><span class="muted">'+E(ac.hostname||'')+(ac.port?':'+E(ac.port):'')+'</span></div></div>';
+    }
+  }
   const m=d.mcp||{};
   h+='<div class="st">官方工具层接入(dao-windows-agent MCP)</div><div class="card">'+
     cr('注册',m.registered?('✓ 已注册 · '+E(m.transport||'')+(m.disabled?' · 已禁用':'')):'○ 未注册')+
@@ -1199,7 +1248,6 @@ function render(){
   else if(S.board==='switch')h=renderSwitch();
   else if(S.board==='backups')h=renderBackups();
   else if(S.board==='mcp')h=renderMcp();
-  else if(S.board==='windows')h=renderWindows();
   else if(S.board==='bridge')h=renderBridge();
   else if(S.board==='github')h=renderGithub();
   else if(S.board==='search')h=renderSearch();
@@ -1237,7 +1285,11 @@ function render(){
   const wrr=document.getElementById('winRegR'); if(wrr)wrr.onclick=()=>vscode.postMessage({type:'win-reg-remote'});
   const wur=document.getElementById('winUnreg'); if(wur)wur.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-unreg'});};
   document.querySelectorAll('[data-winrel]').forEach(el=>el.onclick=()=>{const [k,o]=el.dataset.winrel.split('|');vscode.postMessage({type:'win-release',key:k,owner:o});});
-  if(S.board==='windows'&&WIN===null)cmd('loadTabData',{tab:'windows'});
+  const wo=document.getElementById('winOpen'); if(wo)wo.onclick=()=>vscode.postMessage({type:'win-open-desktop',account:''});
+  const wan=document.getElementById('winAcctNew'); if(wan)wan.onclick=()=>vscode.postMessage({type:'win-acct-create'});
+  document.querySelectorAll('[data-winopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-open-desktop',account:el.dataset.winopen}));
+  document.querySelectorAll('[data-winacctdel]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-destroy',name:el.dataset.winacctdel}));
+  if(S.board==='overview'&&WIN===null)vscode.postMessage({type:'win-state'});
   const pc=document.getElementById('poolCap'); if(pc)pc.onclick=()=>vscode.postMessage({type:'pool-capture'});
   const pr=document.getElementById('poolRf'); if(pr)pr.onclick=()=>{POOL=null;render();vscode.postMessage({type:'pool-list'});};
   document.querySelectorAll('[data-poolswitch]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-switch',email:el.dataset.poolswitch}));
@@ -1284,7 +1336,7 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='mem-list'){MEM=m.memories?{memories:m.memories}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
-  else if(m.type==='win-state'){WIN=m.data?m.data:{error:m.error||'探活失败'};if(S&&S.board==='windows')render();}
+  else if(m.type==='win-state'){WIN=m.data?m.data:{error:m.error||'探活失败'};if(S&&(S.board==='overview'||S.board==='windows'))render();}
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
   else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}
