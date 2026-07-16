@@ -715,7 +715,11 @@ class UnifiedPanel {
   async _setDetail() {
     try {
       const ls = require("./ls-bridge");
-      const [ru, rs] = await Promise.all([ls.call("GetUserStatus", {}), ls.call("GetUserSettings", {})]);
+      const [ru, rs, rc] = await Promise.all([
+        ls.call("GetUserStatus", {}),
+        ls.call("GetUserSettings", {}),
+        ls.call("GetTeamOrganizationalControls", {}).catch(() => null),
+      ]);
       const u = (ru && ru.userStatus) || {};
       const ps = u.planStatus || {};
       const pi = ps.planInfo || {};
@@ -729,6 +733,7 @@ class UnifiedPanel {
           maxChatInputTokens: pi.maxNumChatInputTokens, maxPinnedContext: pi.maxNumPinnedContextItems,
         },
         teamConfig: u.teamConfig || {},
+        orgControls: (rc && rc.controls) || null,
         settings: { openRecent: (((rs || {}).userSettings) || {}).openMostRecentChatConversation === true },
         apiKeyTail: (ls.apiKey() || "").slice(-4),
         models: await ls.listModels().then((m) => ({ total: m.length, enabled: m.filter((x) => !x.disabled).length,
@@ -1385,6 +1390,19 @@ function renderSettings(){
   h+=cr('CodeMap 分享',onoff(tc.allowCodemapSharing));
   if(tc.maxCascadeAutoExecutionLevel)h+=cr('自动执行上限',E(String(tc.maxCascadeAutoExecutionLevel).replace('CASCADE_COMMANDS_AUTO_EXECUTION_','')));
   h+='</div>';
+  const oc=SET.orgControls;
+  if(oc){
+    h+='<div class="st">团队/组织控制(GetTeamOrganizationalControls 活体)</div><div class="card">';
+    if(oc.teamId)h+=cr('Team ID',E(oc.teamId));
+    if(Array.isArray(oc.extensionModelLabels)&&oc.extensionModelLabels.length)h+=cr('扩展模型',E(oc.extensionModelLabels.join(' · ')));
+    if(oc.subagentDefaultModelUid)h+=cr('子代理默认模型',E(oc.subagentDefaultModelUid));
+    for(const k of Object.keys(oc)){
+      if(k==='teamId'||k==='extensionModelLabels'||k==='subagentDefaultModelUid')continue;
+      const v=oc[k];
+      h+=cr(E(k),typeof v==='boolean'?onoff(v):E(typeof v==='object'?JSON.stringify(v):String(v)));
+    }
+    h+='</div>';
+  }
   const acp=SET.acp||{};
   h+='<div class="st">ACP 连接(官方同源控制)</div><div class="card">'+
     cr('Devin Local 连接',acp.running?'● 已连接':'○ 未连接(按需懒启动)')+
