@@ -86,3 +86,11 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - toast 长错误会截断：点 toast 右侧 ∧ 展开可读全文（如 RPC validation error）。
 - Cursor 导入走官方同款流程: 先弹 InputBox 索取以 `.cursor/rules` 结尾的目录, 再 `ImportFromCursor{sourcePath}`; 测试时可先建临时 `.cursor/rules/x.mdc` 再填其路径。
 - 本机通常无 ~/.config/Code/User/settings.json 和 ~/.vscode/extensions/extensions.json → VS Code 导入应报"未检出"明确错误。
+
+## 统一面板 webview 排坑 (v1.3.6 实测教训)
+- 面板卡死"加载中…"且所有板块不可用: 先开 workbench DevTools(命令面板 Open Webview Developer Tools 实际打开主窗 DevTools), Console 找 `SyntaxError ... document.write` —— 多半是 webview 内联脚本坏了。
+- **模板字面量转义坑**: webview 脚本写在 unified-panel.js 的反引号模板里, 正则中 `\/` 会被求值成 `/`, `:\/\//` 变 `://` + 行注释, 整段脚本语法错误。凡在该模板里写正则须用 `\\/` 或避免斜杠正则。离线 `node --check` 抽出的原始源码验不出此坑(未经过模板求值), 要用"求值后的 HTML"验证。
+- 面板高频重渲染: 扩展 ~3 次/秒推 `state` 消息, 每次 render() 整树 innerHTML 重建 → 板块里的 iframe 会反复重载、input 无法输入焦点被夺。验证法: 面板 frame 里挂 MutationObserver 数 #main 重建次数 + message 计数器。
+- 二分定位法: 直接改 ~/.devin/extensions/dao-agi.dao-desktop-<ver>/ 下已安装副本 + Reload Window, 无需重打包; 先与上一版 unified-panel.js 整文件互换确认文件级归因, 再逐块回退。
+- /web 站内代理可 curl 直测: token/port 在 ~/.dao/local-api.json, `curl "http://127.0.0.1:<port>/web?t=<token>&u=<encoded url>"`。
+- 冷启桌面app: `DISPLAY=:0 setsid nohup ~/devin-desktop/Devin/devin-desktop --password-store=basic --disable-workspace-trust <repo> &`(DISPLAY 必须 :0, 用 wmctrl -a 聚焦)。
