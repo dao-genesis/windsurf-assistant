@@ -68,34 +68,37 @@ function setPromptMode(id) {
   return state();
 }
 
+// merge 写: 只改本层字段, ModeManager 自持字段(overlay/tool_policy/replace_official 等)原样保留。
 function setToolMode(id) {
   const m = TOOL_MODES.find((x) => x.id === id);
   if (!m) throw new Error("无此工具层模式: " + id);
-  _writeJson(contractPath(), {
-    mode: m.id,
-    name: m.name,
-    summary: m.summary,
-    set_by: "dao-desktop",
-    updated: Math.floor(Date.now() / 1000),
-  });
+  const d = _readJson(contractPath()) || {};
+  d.mode = m.id;
+  d.name = m.name;
+  d.summary = m.summary;
+  d.set_by = "dao-desktop";
+  d.updated = Math.floor(Date.now() / 1000);
+  _writeJson(contractPath(), d);
   return state();
 }
 
-// 提示词层真生效: 在跑本源反代(source.js 控制面)即刻 POST /origin/mode 热切,
-// 不在跑不算失败(_origin_mode.txt 由反代自持, 下次起跑读盘生效)。
-function syncOrigin(id, opts) {
-  opts = opts || {};
-  const base = String(opts.originUrl || process.env.DAO_ORIGIN_URL ||
+function _originBase(opts) {
+  return String((opts && opts.originUrl) || process.env.DAO_ORIGIN_URL ||
     "http://127.0.0.1:" + (process.env.ORIGIN_PORT || "8889")).replace(/\/+$/, "");
+}
+
+function _originReq(method, pathname, payload, opts) {
+  opts = opts || {};
   return new Promise((resolve) => {
     let u;
-    try { u = new URL(base + "/origin/mode"); } catch (_) { return resolve({ synced: false, error: "无效反代地址" }); }
+    try { u = new URL(_originBase(opts) + pathname); } catch (_) { return resolve({ synced: false, error: "无效反代地址" }); }
     const mod = u.protocol === "https:" ? https : http;
-    const data = Buffer.from(JSON.stringify({ mode: id }), "utf8");
+    const data = payload == null ? null : Buffer.from(JSON.stringify(payload), "utf8");
+    const headers = { "Content-Type": "application/json" };
+    if (data) headers["Content-Length"] = data.length;
     const req = mod.request({
-      method: "POST", hostname: u.hostname, port: u.port, path: u.pathname,
-      headers: { "Content-Type": "application/json", "Content-Length": data.length },
-      timeout: opts.timeoutMs || 3000,
+      method, hostname: u.hostname, port: u.port, path: u.pathname,
+      headers, timeout: opts.timeoutMs || 3000,
     }, (res) => {
       let out = "";
       res.on("data", (c) => (out += c));
@@ -103,9 +106,28 @@ function syncOrigin(id, opts) {
     });
     req.on("timeout", () => { req.destroy(); resolve({ synced: false, error: "反代超时" }); });
     req.on("error", (e) => resolve({ synced: false, error: e.message }));
-    req.write(data);
+    if (data) req.write(data);
     req.end();
   });
+}
+
+// 提示词层真生效: 在跑本源反代(source.js 控制面)即刻 POST /origin/mode 热切,
+// 不在跑不算失败(_origin_mode.txt 由反代自持, 下次起跑读盘生效)。
+// custom 在反代运行时以 invert 路径承载(_customSP 一经落盘即优先接管替换文本)。
+function syncOrigin(id, opts) {
+  const rt = id === "custom" ? "invert" : id;
+  return _originReq("POST", "/origin/mode", { mode: rt }, opts);
+}
+
+// 自定经文真生效: 写反代 /origin/custom_sp(用户即道, invert 路径优先接管)。
+function setCustomText(text, opts) {
+  const sp = String(text == null ? "" : text);
+  if (!sp.trim()) return Promise.resolve({ synced: false, error: "自定经文为空" });
+  return _originReq("POST", "/origin/custom_sp", { sp, source: "dao-desktop" }, opts);
+}
+
+function clearCustomText(opts) {
+  return _originReq("DELETE", "/origin/custom_sp", null, opts);
 }
 
 // 桥在跑则即刻联动(/api/mode.set); 不在跑不算失败(契约文件已是真源)。
@@ -164,5 +186,6 @@ function state() {
 module.exports = {
   PROMPT_MODES, TOOL_MODES,
   promptMode, toolMode, setPromptMode, setToolMode, syncBridge, syncOrigin,
+  setCustomText, clearCustomText,
   matrix, state, fusionPath, contractPath,
 };

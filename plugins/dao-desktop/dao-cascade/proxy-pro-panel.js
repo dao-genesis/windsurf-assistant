@@ -41,6 +41,7 @@ class ProxyProPanel {
       case "px-test": return this._pxTest(String(msg.uid || ""));
       case "mf-state": return this._mfState();
       case "mf-set": return this._mfSet(String(msg.layer || ""), String(msg.id || ""));
+      case "mf-custom": return this._mfCustom();
       default: return;
     }
   }
@@ -59,6 +60,7 @@ class ProxyProPanel {
         modeFusion.syncOrigin(id).then((r) => {
           if (r.synced) vscode.window.showInformationMessage("提示词层模式已热切在跑反代: " + id);
         });
+        if (id === "custom") return this._mfCustom();
       } else if (layer === "tool") {
         modeFusion.setToolMode(id);
         // 桥在跑则即刻联动; 不在跑不算失败(契约文件已是真源)。
@@ -67,6 +69,26 @@ class ProxyProPanel {
         });
       } else throw new Error("未知模式层: " + layer);
     } catch (e) { vscode.window.showErrorMessage("切模式失败: " + e.message); }
+    this._mfState();
+  }
+
+  // 自定经文: 编辑并热切在跑反代(/origin/custom_sp), 空文本则清除回本源。
+  async _mfCustom() {
+    try {
+      const text = await vscode.window.showInputBox({
+        prompt: "自定经文(替换官方系统提示词; 留空=清除回帛书本源)",
+        placeHolder: "在此粘贴自定义提示词全文…",
+        ignoreFocusOut: true,
+      });
+      if (text === undefined) return; // 用户取消
+      if (!text.trim()) {
+        const r = await modeFusion.clearCustomText();
+        vscode.window.showInformationMessage(r.synced ? "自定经文已清除, 回归本源" : "反代未在跑, 已记录(下次起跑生效)");
+      } else {
+        const r = await modeFusion.setCustomText(text);
+        vscode.window.showInformationMessage(r.synced ? "自定经文已热切在跑反代(" + text.length + " 字)" : "反代未在跑, 待起跑生效");
+      }
+    } catch (e) { vscode.window.showErrorMessage("自定经文失败: " + e.message); }
     this._mfState();
   }
 
@@ -185,7 +207,8 @@ function renderModes(){
   const d=MF;
   h+='<div class="card">'+cr('当前组合',E(d.combinedName)+' <span class="badge">'+E(d.combined)+'</span>')+'</div>';
   h+='<div class="card"><div class="cr"><span class="l">提示词层(经藏契约)</span><span class="v">'+
-    d.promptModes.map(m=>'<button class="btn'+(m.id===d.prompt?'':' sec')+'" data-mfp="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.prompt?'✓ ':'')+E(m.name)+'</button>').join(' ')+'</span></div>'+
+    d.promptModes.map(m=>'<button class="btn'+(m.id===d.prompt?'':' sec')+'" data-mfp="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.prompt?'✓ ':'')+E(m.name)+'</button>').join(' ')+
+    (d.prompt==='custom'?' <button class="btn sec" id="mfCustomEdit" title="编辑自定义提示词全文, 热切在跑反代">编辑经文…</button>':'')+'</span></div>'+
     '<div class="cr"><span class="l">工具层(~/.dao/mode.json 契约)</span><span class="v">'+
     d.toolModes.map(m=>'<button class="btn'+(m.id===d.tool?'':' sec')+'" data-mft="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.tool?'✓ ':'')+E(m.name)+'</button>').join(' ')+'</span></div></div>';
   h+='<div class="muted" style="margin-bottom:10px">提示词层与 Proxy Pro 经藏契约同源(invert/passthrough/custom); 工具层与 Dao-Windows-Agent ModeManager 同一契约文件, 桥在跑即刻联动。</div>';
@@ -233,6 +256,7 @@ function render(){
   document.querySelectorAll('[data-pxtest]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-test',uid:el.dataset.pxtest}));
   document.querySelectorAll('[data-mfp]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'prompt',id:el.dataset.mfp}));
   document.querySelectorAll('[data-mft]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'tool',id:el.dataset.mft}));
+  const mfce=document.getElementById('mfCustomEdit'); if(mfce)mfce.onclick=()=>vscode.postMessage({type:'mf-custom'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};PXRS=m.routeStatus||[];render();}

@@ -1220,7 +1220,7 @@ test("windows-panel-core 账号/模式聚合", () => {
 // REARCH2 · 模式融合 3×4=12: 提示词层(sp 契约同源 invert/passthrough/custom) ×
 // 工具层(ModeManager 同源 primary/coding/windows/native), 矩阵恰 12 组合;
 // 落盘隔离于临时目录, 工具层契约与 ~/.dao/mode.json 同形(mode 字段)。
-test("mode-fusion 3×4=12 矩阵与双层落盘契约", () => {
+test("mode-fusion 3×4=12 矩阵与双层落盘契约", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mf-"));
   process.env.DAO_MODE_FUSION_FILE = path.join(tmp, "mode-fusion.json");
   process.env.DAO_MODE_CONTRACT_FILE = path.join(tmp, "mode.json");
@@ -1245,6 +1245,25 @@ test("mode-fusion 3×4=12 矩阵与双层落盘契约", () => {
     const contract = JSON.parse(fs.readFileSync(process.env.DAO_MODE_CONTRACT_FILE, "utf8"));
     assert.strictEqual(contract.mode, "windows");
     assert.strictEqual(contract.set_by, "dao-desktop");
+    // merge 写: ModeManager 自持字段(overlay/tool_policy/replace_official)不可被覆没
+    fs.writeFileSync(process.env.DAO_MODE_CONTRACT_FILE, JSON.stringify({
+      mode: "primary", overlay: "o1", tool_policy: { p: 1 }, replace_official: true,
+    }));
+    st = mf.setToolMode("coding");
+    const merged = JSON.parse(fs.readFileSync(process.env.DAO_MODE_CONTRACT_FILE, "utf8"));
+    assert.strictEqual(merged.mode, "coding");
+    assert.strictEqual(merged.overlay, "o1");
+    assert.deepStrictEqual(merged.tool_policy, { p: 1 });
+    assert.strictEqual(merged.replace_official, true);
+    // custom 运行时接线: syncOrigin 映射 custom→invert 路径; 自定经文经 /origin/custom_sp
+    assert.strictEqual(typeof mf.setCustomText, "function");
+    assert.strictEqual(typeof mf.clearCustomText, "function");
+    const mfSrc = fs.readFileSync(path.join(CASCADE, "mode-fusion.js"), "utf8");
+    assert.ok(mfSrc.includes('id === "custom" ? "invert"'), "custom 应以 invert 路径承载");
+    assert.ok(mfSrc.includes("/origin/custom_sp"), "自定经文应写反代 custom_sp 接口");
+    // 空自定经文拒绝(不打反代)
+    const rEmpty = await mf.setCustomText("   ");
+    assert.strictEqual(rEmpty.synced, false);
     // 非法模式拒绝
     assert.throws(() => mf.setPromptMode("nope"));
     assert.throws(() => mf.setToolMode("nope"));
