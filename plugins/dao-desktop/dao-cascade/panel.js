@@ -301,7 +301,10 @@ class CascadePanelProvider {
     const auth = await authStatus(bin, force ? { force: true } : undefined);
     // 官方本体上报的宿主态: language_server 端口/CSRF(Cascade 轨) + 官方登录态(1:1 同源)
     const h = hostState ? hostState() : null;
-    const ws = h ? { lsPort: h.lsPort || 0, lsCsrf: !!h.csrfToken,
+    // 端口活性裁决: 宿主退出后落盘态仍留旧端口, TCP 探活防「陈旧就绪」假象。
+    let lsAlive = false;
+    try { lsAlive = await require("./ls-bridge").probeAlive(); } catch (_) {}
+    const ws = h ? { lsPort: lsAlive ? (h.lsPort || 0) : 0, lsCsrf: !!h.csrfToken,
       authName: (h.auth && (h.auth.userName || h.auth.name || h.auth.email)) || null,
       authSignedIn: !!(h.auth && (h.auth.loggedIn === true || h.auth.state === "signed-in" || h.auth.apiKey || h.auth.userName || h.auth.name)) } : null;
     const folder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
