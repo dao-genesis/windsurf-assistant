@@ -60,6 +60,8 @@ function switchTo(email) {
     out = (old ? old.replace(/\s*$/, "\n") : "") + 'windsurf_api_key = "' + a.apiKey + '"\n';
   }
   fs.writeFileSync(p, out, { mode: 0o600 });
+  // 立即失效 ls-bridge 的 60s key 缓存: 切号即刻生效, 不留旧号身份窗口期。
+  try { require("./ls-bridge").setApiKey(a.apiKey); } catch (_) {}
   return { email: a.email };
 }
 
@@ -68,7 +70,10 @@ function restoreOriginal() {
   const p = credPath();
   const bak = p + ".bak";
   if (!fs.existsSync(bak)) throw new Error("无原始备份(credentials.toml.bak): 尚未经本插件切号, 官方登录态未被触碰");
-  fs.writeFileSync(p, fs.readFileSync(bak, "utf8"), { mode: 0o600 });
+  const orig = fs.readFileSync(bak, "utf8");
+  fs.writeFileSync(p, orig, { mode: 0o600 });
+  const m = orig.match(/windsurf_api_key\s*=\s*"([^"]+)"/);
+  if (m) { try { require("./ls-bridge").setApiKey(m[1]); } catch (_) {} }
   return { restored: true };
 }
 
