@@ -819,9 +819,21 @@ class UnifiedPanel {
         }
         vscode.window.showInformationMessage("扩展导入完成: 成功 " + okN + " · 失败 " + failN);
       } else if (what === "cursor") {
+        // 官方同款流程: 索取 Cursor 规则目录(须以 .cursor/rules 结尾) → ImportFromCursor{sourcePath}
+        const path = require("path");
+        const ws = (vscode.workspace.workspaceFolders || [])[0];
+        const suffix = path.join(".cursor", "rules");
+        const sourcePath = await vscode.window.showInputBox({
+          prompt: "输入 Cursor 规则目录路径",
+          placeHolder: "路径须以 " + suffix + " 结尾",
+          value: ws ? path.join(ws.uri.fsPath, ".cursor", "rules") : "",
+          validateInput: (v) => v.trim() ? (v.endsWith(suffix) ? null : "路径须以 " + suffix + " 结尾") : "路径不能为空",
+        });
+        if (sourcePath === undefined) return;
         const ls = require("./ls-bridge");
-        await ls.call("ImportFromCursor", {});
-        vscode.window.showInformationMessage("已触发官方 ImportFromCursor(规则/记忆导入)");
+        const r = await ls.call("ImportFromCursor", { sourcePath });
+        const c = (r.copiedFiles || []).length, d = (r.duplicateFiles || []).length, p = (r.problemFiles || []).length;
+        vscode.window.showInformationMessage("Cursor 规则导入完成: 复制 " + c + " · 重复 " + d + " · 问题 " + p);
       } else throw new Error("未知导入项: " + what);
     } catch (e) { vscode.window.showErrorMessage("导入失败: " + e.message); }
   }
