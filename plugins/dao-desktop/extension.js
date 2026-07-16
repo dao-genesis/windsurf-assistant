@@ -61,6 +61,14 @@ async function activate(context) {
     log("✓ 归一面板就位 (dao.unified)");
   } catch (e) { log("✗ 归一面板注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②c Proxy Pro 独立面板(dao.proxyPro): 与 dao-proxy-pro 独立插件面板对位,
+  // 插件自持渠道/路由(~/.dao/proxy-channels.json), 与 dao-vsix 的 ~/.codeium/dao-byok 隔离。
+  try {
+    const proxyProPanel = require("./dao-cascade/proxy-pro-panel");
+    proxyProPanel.register(context, (m) => log("[proxy-pro] " + m));
+    log("✓ Proxy Pro 独立面板就位 (dao.proxyPro)");
+  } catch (e) { log("✗ Proxy Pro 面板注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ③ 宿主已内建官方本体(codeium.windsurf) → 共生模式, 面板接宿主 LS, 不重复激活。
   const hostCore = vscode.extensions.getExtension("codeium.windsurf");
   const selfId = context.extension && context.extension.id;

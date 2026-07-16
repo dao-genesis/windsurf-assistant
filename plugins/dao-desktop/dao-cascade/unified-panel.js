@@ -9,7 +9,6 @@
 //   🔀 切号    — 插件自持账号池(~/.dao/cascade-pool.json): 收录当前号/切换/移除, 无回退铁律
 //   🌐 桥接    — 插件自持本地 HTTP API(local-api.js): 只绑 127.0.0.1 + Bearer, 暴露插件真源
 //   🐙 GitHub  — 插件自持 GitHub 舰队(github-fleet.js): PAT 池/角色/在线核验, 与 Devin 池分离
-//   🔌 Proxy Pro — 插件自持第三方模型渠道 + 模型路由(proxy-pro.js): 填 Key 即全量识别模型, 与官方模型并存
 //   🔎 搜索    — 插件自持站内网页搜索(web-search.js): DuckDuckGo/Bing 直出结果, 不弹外部浏览器
 //   💉 反向注入 — 插件自持注入档案(inject.js): MCP/Secret/Knowledge 批量注入账号池(账号池同真源)
 // 归一竟功: dao-one 六大板块 + GitHub 纵向 + Proxy Pro 三面板皆已并入插件本源。
@@ -26,7 +25,6 @@ const acctPool = require("./account-pool");
 const localApi = require("./local-api");
 const ghFleet = require("./github-fleet");
 const proxyPro = require("./proxy-pro");
-const proxyRuntime = require("./proxy-runtime");
 const webSearch = require("./web-search");
 const inject = require("./inject");
 const mcpConfig = require("./mcp-config");
@@ -124,6 +122,9 @@ class UnifiedPanel {
   _post(m) { if (this._view) try { this._view.webview.postMessage(m); } catch (_) {} }
 
   _onMessage(msg) {
+    // dao-vsix /shell 同构协议: 前端 cmd('loadTabData',{tab}) → 板块懒加载 → 回 {type:'tabData',tab}。
+    if (msg.command === "loadTabData") return this._loadTabData(String(msg.tab || ""));
+    if (msg.command === "refresh") { this._refreshFused(); return this._pushState(); }
     switch (msg.type) {
       case "nav": this._board = String(msg.board || "overview"); return this._pushState();
       case "refresh": this._refreshFused(); return this._pushState();
@@ -157,12 +158,6 @@ class UnifiedPanel {
       case "gh-role": return this._ghRole(String(msg.login || ""), String(msg.role || "member"));
       case "gh-verify": return this._ghVerify();
       case "gh-inject": return this._ghInject(String(msg.login || ""));
-      case "px-list": return this._pxList();
-      case "px-add": return this._pxAdd();
-      case "px-remove": return this._pxRemove(String(msg.name || ""));
-      case "px-refresh": return this._pxRefresh(String(msg.name || ""));
-      case "px-route": return this._pxRoute();
-      case "px-test": return this._pxTest(String(msg.uid || ""));
       case "ws-search": return this._wsSearch(String(msg.query || ""), String(msg.engine || ""));
       case "ws-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
       case "ws-clear": return this._wsClear();
@@ -184,6 +179,23 @@ class UnifiedPanel {
       case "win-unreg": return this._winUnreg();
       case "win-release": return this._winRelease(String(msg.key || ""), String(msg.owner || ""));
       default: return;
+    }
+  }
+
+  // 板块懒加载统一调度(与 dao-vsix /shell 的 loadTabData/tabData 同构):
+  // 先回 tabData 信封声明所载板块, 载荷由各板块既有同构消息紧随其后。
+  _loadTabData(tab) {
+    this._post({ type: "tabData", tab });
+    switch (tab) {
+      case "switch": return this._poolList();
+      case "bridge": return this._bridgeState();
+      case "backups": this._cxList(); return this._memList();
+      case "inject": return this._injList();
+      case "mcp": return this._mcpDetail();
+      case "github": return this._ghList();
+      case "windows": return this._winState();
+      case "settings": return this._setDetail();
+      default: return this._pushState();
     }
   }
 
@@ -517,83 +529,6 @@ class UnifiedPanel {
     this._ghList();
   }
 
-  // Proxy Pro 板块(插件自持模型渠道+路由): apiKey 永不出后端, 只回尾4位。
-  _pxList() {
-    let routeStatus = [];
-    try { routeStatus = proxyRuntime.routeStatus(); } catch (_) {}
-    this._post({ type: "px-list", data: proxyPro.listView(), routeStatus, file: proxyPro.cfgPath() });
-  }
-
-  // 路由试跑(生效层): 经 proxy-runtime 真正投递到该 UID 路由的第三方渠道, 与 local-api /api/proxy/chat 同源。
-  async _pxTest(uid) {
-    uid = String(uid || "").trim();
-    if (!uid) { vscode.window.showWarningMessage("先选一个已配路由的官方模型 UID"); return; }
-    const prompt = await vscode.window.showInputBox({ prompt: "试跑提示词(经路由投递到第三方渠道)", value: "你好, 用一句话自我介绍" });
-    if (prompt === undefined) return;
-    try {
-      const r = await proxyRuntime.chat(uid, { messages: [{ role: "user", content: prompt }] });
-      if (r.ok) vscode.window.showInformationMessage("路由生效 ✓ " + r.channel + "/" + r.model + " → " + String(r.content).slice(0, 120));
-      else vscode.window.showErrorMessage("路由投递失败: " + (r.error || "未知"));
-    } catch (e) { vscode.window.showErrorMessage("路由试跑失败: " + e.message); }
-  }
-
-  async _pxAdd() {
-    try {
-      const presets = proxyPro.PRESETS.map((p) => ({ label: p.n, description: p.u, detail: "拿 Key: " + p.r, _p: p }));
-      presets.push({ label: "＋ 自定义渠道", description: "手填名称/类型/base URL", _p: null });
-      const pick = await vscode.window.showQuickPick(presets, { placeHolder: "选择模型渠道预设(或自定义)" });
-      if (!pick) return;
-      let name = pick._p ? pick._p.n : await vscode.window.showInputBox({ prompt: "渠道名称" });
-      if (!name) return;
-      const type = pick._p ? pick._p.t : ((await vscode.window.showQuickPick(["openai", "anthropic"], { placeHolder: "渠道类型" })) || "openai");
-      const baseURL = pick._p ? pick._p.u : await vscode.window.showInputBox({ prompt: "base URL(如 https://api.deepseek.com/v1)" });
-      if (!baseURL) return;
-      const apiKey = await vscode.window.showInputBox({ prompt: "API Key(留空=保留原 Key)", password: true, ignoreFocusOut: true });
-      const r = await proxyPro.addChannel(name, type, baseURL, apiKey || "");
-      vscode.window.showInformationMessage("渠道 " + r.name + " 已配置 · 识别 " + r.models + " 模型 · " + (r.verify === "ok" ? "在线✓" : r.verify === "bad" ? "Key 无效" : "待核"));
-    } catch (e) { vscode.window.showErrorMessage("配置渠道失败: " + e.message); }
-    this._pxList();
-  }
-
-  _pxRemove(name) { try { proxyPro.removeChannel(name); } catch (e) { vscode.window.showErrorMessage(e.message); } this._pxList(); }
-
-  async _pxRefresh(name) {
-    try { const r = await proxyPro.refreshModels(name); vscode.window.showInformationMessage("渠道 " + name + " 识别 " + r.models + " 模型 · " + (r.verify === "ok" ? "在线✓" : r.verify)); }
-    catch (e) { vscode.window.showErrorMessage("刷新模型失败: " + e.message); }
-    this._pxList();
-  }
-
-  // 配路由适配整合版: 官方模型 UID 直选自 LS 模型清单(listModels 真源, 含标签/倍率),
-  // LS 未就绪或选择手填时兑底输入框。
-  async _pxRoute() {
-    try {
-      const view = proxyPro.listView();
-      const withModels = view.channels.filter((c) => c.modelCount > 0);
-      if (!withModels.length) { vscode.window.showWarningMessage("先添加带 Key 的渠道并识别模型, 再配路由"); return; }
-      let uid;
-      let official = [];
-      try { const ls = require("./ls-bridge"); if (ls.ready() && ls.apiKey()) official = await ls.listModels(); } catch (_) {}
-      if (official.length) {
-        const up = await vscode.window.showQuickPick(
-          official.map((m) => ({ label: m.label + (m.credit != null ? "  ·  " + m.credit + "x" : ""), description: m.uid, _uid: m.uid }))
-            .concat([{ label: "＋ 手填官方模型 UID", description: "", _uid: null }]),
-          { placeHolder: "选要接管的官方模型(路由到第三方渠道)", matchOnDescription: true });
-        if (!up) return;
-        uid = up._uid !== null ? up._uid : await vscode.window.showInputBox({ prompt: "官方模型 UID(留空则解除某路由)" });
-      } else {
-        uid = await vscode.window.showInputBox({ prompt: "官方模型 UID(留空则解除某路由)" });
-      }
-      if (uid === undefined) return;
-      const cPick = await vscode.window.showQuickPick(withModels.map((c) => ({ label: c.name, description: c.modelCount + " 模型", _c: c })), { placeHolder: "路由到哪个渠道(取消=解除该 UID 路由)" });
-      if (!cPick) { proxyPro.setRoute(uid, "", ""); this._pxList(); return; }
-      const mPick = await vscode.window.showQuickPick(cPick._c.models, { placeHolder: "选择目标模型" });
-      if (!mPick) return;
-      proxyPro.setRoute(uid, cPick._c.name, mPick);
-      vscode.window.showInformationMessage("路由 " + uid + " → " + cPick._c.name + "/" + mPick);
-    } catch (e) { vscode.window.showErrorMessage("配置路由失败: " + e.message); }
-    this._pxList();
-  }
-
   // 搜索板块(插件自持站内网页搜索)。
   async _wsSearch(query, engine) {
     this._post({ type: "ws-progress", running: true });
@@ -843,18 +778,13 @@ class UnifiedPanel {
 *{box-sizing:border-box}
 body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vscode-foreground)}
 .wrap{display:flex;height:100vh}
-.nav{width:132px;flex:0 0 132px;border-right:1px solid var(--vscode-panel-border,#3334);padding:6px 0;overflow:auto}
-.nav button{display:block;width:100%;text-align:left;background:none;border:none;color:inherit;padding:8px 12px;cursor:pointer;font:inherit;opacity:.75}
-.nav button:hover{background:var(--vscode-list-hoverBackground,#8881)}
-.nav button.on{opacity:1;background:var(--vscode-list-activeSelectionBackground,#0a5);color:var(--vscode-list-activeSelectionForeground,#fff);border-radius:0 6px 6px 0}
+/* dao-vsix /shell 左侧图标栏 1:1(.sb/.ni), 颜色映射到 IDE 主题变量 */
+.sb{width:48px;background:var(--vscode-sideBar-background,#1e1e1e);border-right:1px solid var(--vscode-panel-border,#3334);display:flex;flex-direction:column;align-items:center;padding:8px 0;flex-shrink:0;overflow-y:auto}
+.sb .ni{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;font-size:16px;margin:2px 0;opacity:0.6;transition:all .15s;flex-shrink:0}
+.sb .ni:hover{opacity:1;background:var(--vscode-list-hoverBackground,#8881)}
+.sb .ni.active{opacity:1;background:var(--vscode-list-activeSelectionBackground,#0a5);color:var(--vscode-list-activeSelectionForeground,#fff)}
+.sb .sp{flex:1}
 .main{flex:1;min-width:0;overflow:auto;padding:14px 16px}
-@media (max-width:420px){
-  .wrap{flex-direction:column}
-  .nav{width:auto;flex:0 0 auto;display:flex;flex-wrap:wrap;gap:2px;border-right:none;border-bottom:1px solid var(--vscode-panel-border,#3334);padding:4px 6px}
-  .nav button{display:inline-block;width:auto;padding:4px 9px;border-radius:10px}
-  .nav button.on{border-radius:10px}
-  .main{padding:10px 10px}
-}
 .st{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.6;margin:14px 0 6px}
 .st:first-child{margin-top:0}
 .card{border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;padding:10px 12px;margin-bottom:10px}
@@ -882,17 +812,22 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeB
 h2{font-size:15px;margin:0 0 4px}
 </style></head><body>
 <div class="wrap">
-  <div class="nav" id="nav"></div>
+  <nav class="sb" id="nav"></nav>
   <div class="main" id="main"><div class="muted">加载中…</div></div>
 </div>
 <script nonce="${n}">
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
-const BOARDS=[["overview","🏠 主页"],["switch","🔀 切号"],["backups","💬 对话备份"],["mcp","🧩 MCP"],["windows","🪟 Windows 分身"],["bridge","🌐 桥接"],["github","🐙 GitHub"],["proxy","🔌 Proxy Pro"],["search","🔎 搜索"],["inject","💉 反向注入"],["settings","⚙ 设置"]];
+// 七大板块顺序/图标/标题与 dao-vsix /shell 1:1; 其后为插件版延伸板块。
+const BOARDS=[["overview","🏠","主页 Home"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["windows","🪟","Windows 分身"],["search","🔎","搜索"],["settings","⚙","设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,t])=>
-  '<button data-b="'+k+'" class="'+(S&&S.board===k?'on':'')+'">'+t+'</button>').join('');
-  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{CONV=null;vscode.postMessage({type:'nav',board:b.dataset.b})});}
+function cmd(c,d){vscode.postMessage(Object.assign({command:c},d||{}))}
+function sw(t){CONV=null;vscode.postMessage({type:'nav',board:t});cmd('loadTabData',{tab:t});}
+function renderNav(){document.getElementById('nav').innerHTML=BOARDS.map(([k,ic,t])=>
+  '<div class="ni'+(S&&S.board===k?' active':'')+'" data-tab="'+k+'" title="'+t+'">'+ic+'</div>').join('')+
+  '<div class="sp"></div><div class="ni" id="navRf" title="Refresh">⟳</div>';
+  document.querySelectorAll('.sb .ni[data-tab]').forEach(n=>n.onclick=()=>sw(n.dataset.tab));
+  const nr=document.getElementById('navRf'); if(nr)nr.onclick=()=>cmd('refresh');}
 function q(x){return (x===0||x)?(x+'%'):'—';}
 function renderOverview(){
   const a=S.account||{}, mb=S.mcp&&S.mcp.servers, cb=S.cascadeBackup, eg=S.engines;
@@ -1090,37 +1025,6 @@ function renderMcp(){
   }
   return h;
 }
-let PX=null;let PXRS=[];
-function renderProxy(){
-  let h='<div class="row"><h2 style="flex:1">Proxy Pro · 插件自持模型路由</h2>'+
-    '<button class="btn" id="pxAdd">添加渠道</button>'+
-    '<button class="btn sec" id="pxRoute">配路由</button>'+
-    '<button class="btn sec" id="pxRf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">第三方模型渠道存 ~/.dao/proxy-channels.json(mode 600), 只填 Key 即经 /v1/models 全量识别; apiKey 只显尾4位。渠道模型可路由到官方模型 UID(与官方并存)。</div>';
-  if(PX===null){h+='<div class="card muted">加载渠道…</div>';return h;}
-  const ch=PX.channels||[];
-  if(!ch.length){h+='<div class="card muted">尚无渠道。点「添加渠道」选预设(OpenRouter/DeepSeek/GLM/OpenAI…)或自定义, 填 Key 即自动识别模型。</div>';}
-  for(const c of ch){
-    const st=c.verify==='ok'?'✓ 在线':(c.verify==='pending'?'⏳ 待核':'✗ Key 无效');
-    h+='<div class="acc"><div class="hd"><span>'+E(c.name)+
-      '<span class="badge cloud">'+E(c.type)+'</span>'+
-      '<span class="badge'+(c.verify==='ok'?'':' cloud')+'">'+st+'</span></span><span>'+
-      '<button class="btn sec" data-pxref="'+E(c.name)+'">识别模型</button> '+
-      '<button class="btn sec" data-pxrm="'+E(c.name)+'">移除</button></span></div>'+
-      '<div class="conv" style="cursor:default"><span class="muted">'+E(c.baseURL)+' · Key …'+E(c.keyTail||'(无)')+' · '+c.modelCount+' 模型</span></div>';
-    if(c.models&&c.models.length){
-      const show=c.models.slice(0,12).map(m=>E(m)).join('、')+(c.models.length>12?(' …等 '+c.models.length+' 个'):'');
-      h+='<div class="conv" style="cursor:default"><span class="muted">模型: '+show+'</span></div>';
-    }
-    h+='</div>';
-  }
-  const rt=PX.routes||[];
-  const rsMap={};for(const s of (PXRS||[]))rsMap[s.uid]=s;
-  h+='<div class="st">模型路由(生效层)</div>';
-  if(!rt.length)h+='<div class="card muted">暂无路由。点「配路由」把官方模型 UID 指向某渠道模型。</div>';
-  else{h+='<div class="card">';for(const r of rt){const s=rsMap[r.uid]||{};const eff=s.effective?'<span class="badge">可投递✓</span>':'<span class="badge cloud">不可投递</span>';h+=cr(E(r.uid),'→ '+E(r.channel)+' / '+E(r.model)+' '+eff+' <span class="back" data-pxtest="'+E(r.uid)+'">试跑</span> <span class="back" data-pxunroute="'+E(r.uid)+'">解除</span>');}h+='</div>';}
-  return h;
-}
 let WS={data:null,history:[],running:false};
 function renderSearch(){
   let h='<div class="row"><h2 style="flex:1">搜索 · 插件自持站内网页搜索</h2>'+
@@ -1298,7 +1202,6 @@ function render(){
   else if(S.board==='windows')h=renderWindows();
   else if(S.board==='bridge')h=renderBridge();
   else if(S.board==='github')h=renderGithub();
-  else if(S.board==='proxy')h=renderProxy();
   else if(S.board==='search')h=renderSearch();
   else if(S.board==='inject')h=renderInject();
   else if(S.board==='settings')h=renderSettings();
@@ -1320,45 +1223,38 @@ function render(){
   document.querySelectorAll('[data-cxdelete]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'cx-delete',cid:el.dataset.cxdelete}));
   document.querySelectorAll('[data-memedit]').forEach(el=>el.onclick=()=>{const m=((MEM&&MEM.memories)||[]).find(x=>x.id===el.dataset.memedit);if(m)vscode.postMessage({type:'mem-edit',mem:m});});
   document.querySelectorAll('[data-memdel]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mem-delete',id:el.dataset.memdel}));
-  if(S.board==='backups'&&!CONV&&CX===null)vscode.postMessage({type:'cx-list'});
-  if(S.board==='backups'&&!CONV&&MEM===null)vscode.postMessage({type:'mem-list'});
+  if(S.board==='backups'&&!CONV&&CX===null&&MEM===null)cmd('loadTabData',{tab:'backups'});
+  else if(S.board==='backups'&&!CONV&&CX===null)vscode.postMessage({type:'cx-list'});
+  else if(S.board==='backups'&&!CONV&&MEM===null)vscode.postMessage({type:'mem-list'});
   const ma=document.getElementById('mcpAdd'); if(ma)ma.onclick=()=>vscode.postMessage({type:'mcp-add'});
   const mc=document.getElementById('mcpCfg'); if(mc)mc.onclick=()=>vscode.postMessage({type:'mcp-config'});
   const mr=document.getElementById('mcpRefresh'); if(mr)mr.onclick=()=>{MCPD=null;render();vscode.postMessage({type:'mcp-refresh'});};
   document.querySelectorAll('[data-mcptoggle]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-toggle',name:el.dataset.mcptoggle}));
   document.querySelectorAll('[data-mcptool]').forEach(el=>el.onclick=()=>{const [sv,tl]=el.dataset.mcptool.split('|');vscode.postMessage({type:'mcp-tool-toggle',server:sv,tool:tl});});
-  if(S.board==='mcp'&&MCPD===null)vscode.postMessage({type:'mcp-detail'});
+  if(S.board==='mcp'&&MCPD===null)cmd('loadTabData',{tab:'mcp'});
   const wrf=document.getElementById('winRf'); if(wrf)wrf.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-state'});};
   const wrl=document.getElementById('winRegL'); if(wrl)wrl.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-reg-local'});};
   const wrr=document.getElementById('winRegR'); if(wrr)wrr.onclick=()=>vscode.postMessage({type:'win-reg-remote'});
   const wur=document.getElementById('winUnreg'); if(wur)wur.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-unreg'});};
   document.querySelectorAll('[data-winrel]').forEach(el=>el.onclick=()=>{const [k,o]=el.dataset.winrel.split('|');vscode.postMessage({type:'win-release',key:k,owner:o});});
-  if(S.board==='windows'&&WIN===null)vscode.postMessage({type:'win-state'});
+  if(S.board==='windows'&&WIN===null)cmd('loadTabData',{tab:'windows'});
   const pc=document.getElementById('poolCap'); if(pc)pc.onclick=()=>vscode.postMessage({type:'pool-capture'});
   const pr=document.getElementById('poolRf'); if(pr)pr.onclick=()=>{POOL=null;render();vscode.postMessage({type:'pool-list'});};
   document.querySelectorAll('[data-poolswitch]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-switch',email:el.dataset.poolswitch}));
   document.querySelectorAll('[data-poolremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-remove',email:el.dataset.poolremove}));
-  if(S.board==='switch'&&POOL===null)vscode.postMessage({type:'pool-list'});
+  if(S.board==='switch'&&POOL===null)cmd('loadTabData',{tab:'switch'});
   const bs=document.getElementById('brStart'); if(bs)bs.onclick=()=>vscode.postMessage({type:'bridge-start'});
   const bp=document.getElementById('brStop'); if(bp)bp.onclick=()=>vscode.postMessage({type:'bridge-stop'});
   const brf=document.getElementById('brRf'); if(brf)brf.onclick=()=>{BR=null;render();vscode.postMessage({type:'bridge-state'});};
   const btk=document.getElementById('brTok'); if(btk)btk.onclick=()=>vscode.postMessage({type:'bridge-copy-token'});
-  if(S.board==='bridge'&&BR===null)vscode.postMessage({type:'bridge-state'});
+  if(S.board==='bridge'&&BR===null)cmd('loadTabData',{tab:'bridge'});
   const ga=document.getElementById('ghAdd'); if(ga)ga.onclick=()=>vscode.postMessage({type:'gh-add'});
   const gv=document.getElementById('ghVerify'); if(gv)gv.onclick=()=>{GH=null;render();vscode.postMessage({type:'gh-verify'});};
   const gr=document.getElementById('ghRf'); if(gr)gr.onclick=()=>{GH=null;render();vscode.postMessage({type:'gh-list'});};
   document.querySelectorAll('[data-ghremove]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'gh-remove',login:el.dataset.ghremove}));
   document.querySelectorAll('[data-ghinject]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'gh-inject',login:el.dataset.ghinject}));
   document.querySelectorAll('[data-ghrole]').forEach(el=>el.onclick=()=>{const [lg,rl]=el.dataset.ghrole.split('|');vscode.postMessage({type:'gh-role',login:lg,role:rl});});
-  if(S.board==='github'&&GH===null)vscode.postMessage({type:'gh-list'});
-  const pxa=document.getElementById('pxAdd'); if(pxa)pxa.onclick=()=>vscode.postMessage({type:'px-add'});
-  const pxrt=document.getElementById('pxRoute'); if(pxrt)pxrt.onclick=()=>vscode.postMessage({type:'px-route'});
-  const pxrf=document.getElementById('pxRf'); if(pxrf)pxrf.onclick=()=>{PX=null;render();vscode.postMessage({type:'px-list'});};
-  document.querySelectorAll('[data-pxref]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-refresh',name:el.dataset.pxref}));
-  document.querySelectorAll('[data-pxrm]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-remove',name:el.dataset.pxrm}));
-  document.querySelectorAll('[data-pxunroute]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-route',uid:el.dataset.pxunroute}));
-  document.querySelectorAll('[data-pxtest]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-test',uid:el.dataset.pxtest}));
-  if(S.board==='proxy'&&PX===null)vscode.postMessage({type:'px-list'});
+  if(S.board==='github'&&GH===null)cmd('loadTabData',{tab:'github'});
   const wsGo=document.getElementById('wsGo'); const wsQ=document.getElementById('wsQ'); const wsE=document.getElementById('wsE');
   function doSearch(q){const query=q!==undefined?q:(wsQ?wsQ.value:'');if(!query)return;WS.running=true;render();vscode.postMessage({type:'ws-search',query:query,engine:wsE?wsE.value:'duckduckgo'});}
   if(wsGo)wsGo.onclick=()=>doSearch();
@@ -1370,7 +1266,7 @@ function render(){
   const injm=document.getElementById('injMcp'); if(injm)injm.onclick=()=>vscode.postMessage({type:'inj-apply-mcp'});
   const injrf=document.getElementById('injRf'); if(injrf)injrf.onclick=()=>{INJ=null;render();vscode.postMessage({type:'inj-list'});};
   document.querySelectorAll('[data-injrm]').forEach(el=>el.onclick=()=>{const [k,nm]=el.dataset.injrm.split('|');vscode.postMessage({type:'inj-remove',kind:k,name:nm});});
-  if(S.board==='inject'&&INJ===null)vscode.postMessage({type:'inj-list'});
+  if(S.board==='inject'&&INJ===null)cmd('loadTabData',{tab:'inject'});
   const scl=document.getElementById('setCl'); if(scl)scl.onclick=()=>vscode.postMessage({type:'set-changelog'});
   const srf=document.getElementById('setRf'); if(srf)srf.onclick=()=>{SET=null;render();vscode.postMessage({type:'set-detail'});};
   document.querySelectorAll('[data-settoggle]').forEach(el=>el.onclick=()=>{const [k,on]=el.dataset.settoggle.split('|');SET=null;render();vscode.postMessage({type:'set-toggle',key:k,on:on==='1'});});
@@ -1378,10 +1274,11 @@ function render(){
   const sar=document.getElementById('setAcpReg'); if(sar)sar.onclick=()=>vscode.postMessage({type:'acp-registry'});
   const sal=document.getElementById('setAcpRl'); if(sal)sal.onclick=()=>{SET=null;render();vscode.postMessage({type:'acp-reload'});};
   document.querySelectorAll('[data-envopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'env-open',path:el.dataset.envopen}));
-  if(S.board==='settings'&&SET===null)vscode.postMessage({type:'set-detail'});
+  if(S.board==='settings'&&SET===null)cmd('loadTabData',{tab:'settings'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='state'){S=m.data;if(CONV&&S.board!=='backups')CONV=null;render();}
+  else if(m.type==='tabData'){/* dao-vsix /shell 同构信封: 板块载荷紧随其后 */}
   else if(m.type==='mcp-detail'){MCPD=m.servers?{servers:m.servers}:{error:m.error||'拉取失败'};if(S&&S.board==='mcp')render();}
   else if(m.type==='cx-list'){CX=m.sessions?{sessions:m.sessions}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='mem-list'){MEM=m.memories?{memories:m.memories}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
@@ -1389,7 +1286,6 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
   else if(m.type==='win-state'){WIN=m.data?m.data:{error:m.error||'探活失败'};if(S&&S.board==='windows')render();}
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
-  else if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};PXRS=m.routeStatus||[];if(S&&S.board==='proxy')render();}
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
   else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}
   else if(m.type==='inj-list'){INJ={items:m.items||[],plan:m.plan||{}};if(S&&S.board==='inject')render();}

@@ -23,16 +23,54 @@ test("panel.js UI 与官方 composer 1:1 护栏", () => {
   assert.ok(src.includes('id="micBtn"'));
 });
 
-// R144 · UI 1:1 护栏: Recent sessions 头行仅官方双元素(标题+View all), 扩展入口独立成可换行 xrow,
-// 窄面板不再互相挤压截断; 视图名与官方一致为 "Cascade"。
-test("panel.js Recent sessions 头行与扩展入口分行护栏", () => {
+// REARCH · 视图① Cascade 1:1 护栏: 对话面板零管理入口 —— 官方 Recent sessions 头行
+// (标题+View all)保留, 九个管理入口(xrow)与其列表容器全数迁出(归一面板承载);
+// 视图名与官方一致为 "Cascade"。
+test("panel.js 官方 Cascade 1:1: 零管理入口", () => {
   const src = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
   assert.ok(src.includes('<div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>'));
-  assert.ok(src.includes('class="xrow"'));
-  assert.ok(src.includes("flex-wrap:wrap"));
+  assert.ok(!src.includes("xrow"), "管理入口行 xrow 应已迁出对话面板");
+  for (const id of ["agBtn", "cmBtn", "cusBtn", "mcpBtn", "memsBtn", "olBtn", "plBtn", "stBtn", "tlBtn"]) {
+    assert.ok(!src.includes(id), "管理入口 " + id + " 应已迁出对话面板");
+  }
+  for (const id of ["memList", "stList", "tlList", "olList", "plList", "mcpList", "cusList", "agList", "cmList"]) {
+    assert.ok(!src.includes(id), "管理列表容器 " + id + " 应已迁出对话面板");
+  }
+  assert.ok(!src.includes("openHomeList"));
   const pkg = JSON.parse(fs.readFileSync(path.join(CASCADE, "..", "package.json"), "utf8"));
   const v = pkg.contributes.views["dao-cascade"].find((x) => x.id === "dao.cascade");
   assert.strictEqual(v.name, "Cascade");
+});
+
+// REARCH · 视图② 归一面板 /shell 同构护栏: 左侧图标栏(.sb/.ni) + 七大板块键与
+// dao-vsix /shell 1:1(顺序含 github 纵向), 协议含 loadTabData/tabData 同构层。
+test("unified-panel.js /shell 图标栏与七大板块同构", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  assert.ok(src.includes('<nav class="sb" id="nav"></nav>'), "应为 /shell 同构图标栏");
+  assert.ok(src.includes(".sb .ni.active"), "应有激活板块高亮");
+  for (const k of ["overview", "switch", "bridge", "backups", "inject", "mcp", "github"]) {
+    assert.ok(src.includes('["' + k + '","'), "缺板块 " + k);
+  }
+  assert.ok(src.includes("loadTabData"), "应有 loadTabData 同构协议");
+  assert.ok(src.includes("tabData"), "应有 tabData 同构协议");
+  assert.ok(src.includes('title="Refresh">⟳'), "图标栏应有刷新钮");
+  assert.ok(!src.includes("renderProxy"), "Proxy Pro 应已拆出归一面板");
+});
+
+// REARCH · 视图③ Proxy Pro 独立面板护栏: dao.proxyPro 独立视图注册,
+// 插件自持命名空间 ~/.dao/proxy-channels.json(proxy-pro.js), 与 dao-vsix
+// 的 ~/.codeium/dao-byok 完全隔离(互不覆盖)。
+test("proxy-pro 独立视图与命名空间隔离", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(CASCADE, "..", "package.json"), "utf8"));
+  const v = pkg.contributes.views["dao-cascade"].find((x) => x.id === "dao.proxyPro");
+  assert.ok(v && v.type === "webview", "dao.proxyPro 应为独立 webview 视图");
+  const panel = fs.readFileSync(path.join(CASCADE, "proxy-pro-panel.js"), "utf8");
+  assert.ok(panel.includes('registerWebviewViewProvider("dao.proxyPro"'));
+  const px = fs.readFileSync(path.join(CASCADE, "proxy-pro.js"), "utf8");
+  assert.ok(px.includes("proxy-channels.json"), "插件自持渠道文件");
+  assert.ok(px.includes('".dao"'), "命名空间应在 ~/.dao 下");
+  assert.ok(!px.includes("dao-byok"), "不得触碰 dao-vsix 的 ~/.codeium/dao-byok 命名空间");
+  assert.ok(!panel.includes('".codeium"'), "独立面板不得写 dao-vsix 命名空间");
 });
 
 // 隔离落盘路径, 不碰真机 ~/.dao/windsurf-host.json
