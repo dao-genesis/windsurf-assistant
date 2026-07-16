@@ -65,6 +65,16 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - 宿主态归一：点面板底栏 LS/引擎区弹账户卡（触发 GetUserStatus）→ `~/.dao/windsurf-host.json` 应含 `fused.account`；首页链接行点 MCP → `fused.mcp`；备份后 → `fused.cascadeBackup`。
 - 注意：账户卡入口是底栏右侧（引擎/LS 区），点最左 Local 无反应。
 
+## v1.2.0+ 三视图架构断言点
+- 三视图: `dao.cascade`(官方 1:1 对话, 零管理入口)、`dao.unified`(归一 /shell 图标栏)、`dao.proxyPro`(独立 Proxy Pro)。快速定位: 命令面板 "Devin Desktop: Focus on Proxy Pro View" / "Focus on 归一 · 插件本源 View"。
+- Cascade 断言: 首页只有 composer/模式选择/Recent sessions+View all; 若出现 Agents/MCP/Memories 等管理行即回归(旧 xrow)。
+- 归一断言: 左侧 48px 图标栏 🏠🔀🌐💬💉🧩🐙(+🪟🔎⚙)+底部⟳, 点击导航图标应高亮并渲染板块; 栏内不得有 Proxy Pro 项。
+- Proxy Pro 断言: 独立视图含 添加渠道/配路由/刷新, 渠道存 `~/.dao/proxy-channels.json`; 与 dao-vsix 的 `~/.codeium/dao-byok` 路径互不写入。
+- 对照法: 同装 dao-vsix + dao-proxy-pro(devin-remote 侧打包, dao-vsix vsce 打包需加 `--baseContentUrl/--baseImagesUrl` 否则 README 相对链接报错; 先 `npm install` 而非 `npm ci`——无 lockfile), 打开 "Dao: Open Unified Browser Shell" 对照 /shell 结构与共存。
+- 打包坑: 直接 vsce package 可能报缺 `media/icon.png`; 用 `node build.js` 会自动生成占位图标并产出 `dao-desktop-<version>.vsix`。
+- GUI 窗口最大化: `DISPLAY=:0 wmctrl -r "<窗口标题>" -b add,maximized_vert,maximized_horz`(注意别把激活焦点落在 Chrome 上)。
+- git push 可能遇平台侧 403(git-manager 代理写权限故障, 读正常); 勿嵌 token 绕过, 上报并稍后重试。
+
 ## Devin Secrets Needed
 - Devin Desktop 登录账号/密码（outlook 账号）
 - GitHub PAT（push / PR / 评论）

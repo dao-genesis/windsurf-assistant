@@ -238,7 +238,7 @@ function boundaryView() {
   return {
     principle: "IDE 数据面(对话/设置/MCP/规则/记忆/登录态)与官方 1:1 同步; 插件自有板块(Proxy Pro/账号池/注入/GitHub 舰队/搜索/WinAgent)全部自持于 ~/.dao/*(mode 600), 与官方零交叉; 官方面仅经显式动作触碰且可归还",
     isolated: [
-      { module: "proxy-pro", file: proxyPro.cfgPath(), touchOfficial: "never", note: "第三方渠道/路由/反代与官方模型请求面零交叉; 仅 POST /api/proxy/chat 显式消费路由" },
+      { module: "proxy-pro", file: proxyPro.cfgPath(), touchOfficial: "never", note: "第三方渠道/路由/反代与官方模型请求面零交叉; 路由消费点=Cascade 面板对话轨(命中即整轮改投)与 POST /api/proxy/chat" },
       { module: "account-pool", file: accountPool.poolPath(), touchOfficial: "explicit", note: "池本体自持; 仅 POST /api/pool/switch 写 credentials.toml(首次自动备份 .bak), POST /api/pool/restore 一键归还官方原登录态" },
       { module: "inject", file: inject.profilePath(), touchOfficial: "explicit", note: "注入档自持; 仅 POST /api/inject/apply-mcp 显式落地官方 mcp_config.json" },
       { module: "github-fleet", file: githubFleet.fleetPath(), touchOfficial: "never", note: "GitHub 纵向, 与 Devin/Cascade 账号池完全分离" },
