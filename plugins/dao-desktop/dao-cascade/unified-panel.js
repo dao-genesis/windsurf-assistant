@@ -1487,6 +1487,8 @@ function render(){
   renderNav();
   const main=document.getElementById('main');
   if(!S){main.innerHTML='<div class="muted">加载中…</div>';return;}
+  // 浏览器板块与 state 推送解耦: iframe/地址栏只建一次, 周期性 state 不得整树重建(否则 iframe 反复重载、输入被吞)
+  if(S.board==='browser'&&WEB&&WEB.base&&document.getElementById('webFrame'))return;
   let h='';
   if(S.board==='overview')h=renderOverview();
   else if(S.board==='switch')h=renderSwitch();
@@ -1580,7 +1582,10 @@ function render(){
   const sdg=document.getElementById('setDg'); if(sdg)sdg.onclick=()=>vscode.postMessage({type:'set-diag'});
   document.querySelectorAll('[data-setimport]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-import',what:el.dataset.setimport}));
   document.querySelectorAll('[data-setcmd]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-cmd',key:el.dataset.setcmd}));
-  const wg=document.getElementById('webGo'); if(wg)wg.onclick=()=>{const v=document.getElementById('webUrl').value.trim();if(v){WEBURL=/^https?:\/\//i.test(v)?v:'https://'+v;render();}};
+  const wg=document.getElementById('webGo'); if(wg)wg.onclick=()=>{const v=document.getElementById('webUrl').value.trim();if(!v)return;
+    WEBURL=(v.indexOf('http://')===0||v.indexOf('https://')===0)?v:'https://'+v;
+    const fr=document.getElementById('webFrame');
+    if(fr&&WEB&&WEB.base)fr.src=WEB.base+encodeURIComponent(WEBURL);else render();};
   const wu=document.getElementById('webUrl'); if(wu)wu.onkeydown=e=>{if(e.key==='Enter')document.getElementById('webGo').click();};
   const wx=document.getElementById('webExt'); if(wx)wx.onclick=()=>vscode.postMessage({type:'set-open',url:WEBURL});
   if(S.board==='browser'&&WEB===null)cmd('loadTabData',{tab:'browser'});

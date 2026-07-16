@@ -1548,3 +1548,19 @@ test("unified-panel: 浏览器板块与官方菜单命令对等在位", () => {
   }
   assert.ok(uni.includes("devin.openQuickSettingsPanel") && uni.includes("windsurf.openQuickSettingsPanel"), "命令应 devin.* 优先 windsurf.* 回退");
 });
+
+// R147 · 实机 P0 回归防护: webview 脚本经模板字面量下发, 求值后必须仍是合法 JS
+// (曾因正则 \/ 在模板里被吃掉 → 下发脚本 SyntaxError → 面板永卡"加载中")。
+test("unified-panel: webview 下发脚本求值后语法合法 + 浏览器板块与 state 解耦", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  const tplStart = src.indexOf("return `<!DOCTYPE");
+  assert.ok(tplStart > 0, "应有 webview HTML 模板");
+  const tpl = src.slice(tplStart + 8, src.lastIndexOf("`;"));
+  // 按模板字面量语义求值(${n} 代入), 提取 <script> 体做真语法检查
+  const html = new Function("n", "csp", "return `" + tpl.slice(1) + "`;")("NONCE", "CSP");
+  const m = /<script[^>]*>([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(m, "应含内联脚本");
+  assert.doesNotThrow(() => new Function(m[1]), "下发脚本必须语法合法(模板转义坑防护)");
+  // 浏览器板块解耦: render() 对已建 iframe 必须短路, 不得整树重建
+  assert.ok(m[1].includes("webFrame") && /board==='browser'[^\n]*webFrame[^\n]*\)return/.test(m[1]), "browser 板块应与 state 推送解耦(iframe 只建一次)");
+});
