@@ -316,6 +316,127 @@ test("Devin Cloud 凭据链: credentials.toml 真源 → 缺失回退 ls-bridge.
   }
 });
 
+test("令牌轮换自愈: RPC 遇鉴权错 → refreshAuth 重发现 key → 单次重试成功(跨 IDE 送信缺口修复)", async () => {
+  const http = require("http");
+  const lsPath = path.join(CASCADE, "ls-bridge.js");
+  const discPath = path.join(CASCADE, "host-discover.js");
+  const savedDisc = require.cache[require.resolve(discPath)];
+  delete require.cache[require.resolve(lsPath)];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-heal-"));
+  process.env.DAO_DEVIN_CRED_FILE = path.join(dir, "credentials.toml");
+  fs.writeFileSync(process.env.DAO_DEVIN_CRED_FILE, 'windsurf_api_key = "stale-key"\n');
+
+  // 首发返鉴权错(令牌轮换), refreshAuth 后返成功。
+  let healed = false, hits = 0, discovered = 0;
+  const srv = http.createServer((req, res) => {
+    hits++;
+    res.setHeader("Content-Type", "application/json");
+    if (!healed) { res.statusCode = 401; res.end(JSON.stringify({ message: "failed to get primary API key: Invalid token" })); }
+    else { res.statusCode = 200; res.end(JSON.stringify({ ok: true })); }
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const port = srv.address().port;
+
+  // 宿主态单例指向测试服; mock host-discover.discover 模拟重发现最新 key。
+  const g = globalThis;
+  const savedHost = g.__daoWindsurfHost;
+  g.__daoWindsurfHost = { lsPort: port, csrfToken: "csrf-x", auth: null, profileUrl: "", fused: {}, listeners: new Set(), _fusedSeeded: true };
+  require.cache[require.resolve(discPath)] = {
+    id: discPath, filename: discPath, loaded: true,
+    exports: { discover: async () => { discovered++; healed = true; return { lsPort: port, csrfToken: "csrf-x" }; } },
+  };
+  try {
+    const bridge = require(lsPath);
+    assert.ok(bridge.isAuthError("failed to get primary API key: Invalid token"));
+    assert.ok(bridge.isAuthError("SendUserCascadeMessage: Invalid token"));
+    assert.ok(bridge.isAuthError("invalid api key (trace ID: 624b96aed7f15dd67833f7aa7d490305)"));
+    assert.ok(!bridge.isAuthError("SendUserCascadeMessage: 超时"));
+    assert.ok(bridge.isStaleEndpointError("connect ECONNREFUSED 127.0.0.1:43959"));
+    assert.ok(!bridge.isStaleEndpointError("SendUserCascadeMessage: 超时"));
+    const out = await bridge.call("SendUserCascadeMessage", {});
+    assert.deepStrictEqual(out, { ok: true }, "自愈重试后应返成功体");
+    assert.strictEqual(discovered, 1, "应恰好触发一次重发现");
+    assert.strictEqual(hits, 2, "首发失败 + 重试成功 = 两次命中");
+  } finally {
+    srv.close();
+    if (savedHost) g.__daoWindsurfHost = savedHost; else delete g.__daoWindsurfHost;
+    if (savedDisc) require.cache[require.resolve(discPath)] = savedDisc; else delete require.cache[require.resolve(discPath)];
+    delete require.cache[require.resolve(lsPath)];
+    delete process.env.DAO_DEVIN_CRED_FILE;
+  }
+});
+
+test("流式自愈: callStream 首发鉴权错(trailer)→重发现→单次重试收帧; driveStream 连拒→重连", async () => {
+  const http = require("http");
+  const lsPath = path.join(CASCADE, "ls-bridge.js");
+  const discPath = path.join(CASCADE, "host-discover.js");
+  const savedDisc = require.cache[require.resolve(discPath)];
+  delete require.cache[require.resolve(lsPath)];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-heal-s-"));
+  process.env.DAO_DEVIN_CRED_FILE = path.join(dir, "credentials.toml");
+  fs.writeFileSync(process.env.DAO_DEVIN_CRED_FILE, 'windsurf_api_key = "stale-key"\n');
+
+  // Connect envelope: flags(1B)+len(4B)+json
+  const frame = (flags, obj) => {
+    const j = Buffer.from(JSON.stringify(obj), "utf8");
+    const env = Buffer.concat([Buffer.from([flags, 0, 0, 0, 0]), j]);
+    env.writeUInt32BE(j.length, 1);
+    return env;
+  };
+  let healed = false, streamHits = 0, driveHits = 0, discovered = 0;
+  const srv = http.createServer((req, res) => {
+    if (req.url.endsWith("StreamCascadeReactiveUpdates")) {
+      driveHits++;
+      res.statusCode = 200;
+      res.write(frame(0, { note: "tick" }));
+      res.end(frame(2, {}));
+      return;
+    }
+    streamHits++;
+    res.statusCode = 200;
+    if (!healed) { res.end(frame(2, { error: { message: "invalid api key (trace ID: x)" } })); }
+    else { res.write(frame(0, { chunk: "ok" })); res.end(frame(2, {})); }
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const port = srv.address().port;
+
+  const g = globalThis;
+  const savedHost = g.__daoWindsurfHost;
+  g.__daoWindsurfHost = { lsPort: port, csrfToken: "csrf-x", auth: null, profileUrl: "", fused: {}, listeners: new Set(), _fusedSeeded: true };
+  require.cache[require.resolve(discPath)] = {
+    id: discPath, filename: discPath, loaded: true,
+    exports: { discover: async () => { discovered++; healed = true; g.__daoWindsurfHost.lsPort = port; return { lsPort: port, csrfToken: "csrf-x" }; } },
+  };
+  try {
+    const bridge = require(lsPath);
+    // callStream: 首发 trailer 携鉴权错 → 自愈重试后收到数据帧
+    const got = [];
+    await bridge.callStream("GetDeepWiki", {}, (j) => got.push(j));
+    assert.deepStrictEqual(got, [{ chunk: "ok" }], "自愈重试后应收到数据帧");
+    assert.strictEqual(streamHits, 2, "首发失败 + 重试成功 = 两次命中");
+    assert.strictEqual(discovered, 1, "应恰好触发一次重发现");
+    // driveStream: 指向死端口 → 连拒自愈重连到活端口
+    healed = false; discovered = 0;
+    const dead = http.createServer(() => {});
+    await new Promise((r) => dead.listen(0, "127.0.0.1", r));
+    const deadPort = dead.address().port;
+    await new Promise((r) => dead.close(r)); // 关掉 → 该端口连拒
+    g.__daoWindsurfHost.lsPort = deadPort;
+    let frames = 0;
+    const d = bridge.driveStream("cid-1", () => { frames++; });
+    await new Promise((r) => setTimeout(r, 400));
+    d.close();
+    assert.strictEqual(discovered, 1, "连拒应恰好触发一次重发现");
+    assert.ok(driveHits >= 1 && frames >= 1, "重连后应收到反应帧");
+  } finally {
+    srv.close();
+    if (savedHost) g.__daoWindsurfHost = savedHost; else delete g.__daoWindsurfHost;
+    if (savedDisc) require.cache[require.resolve(discPath)] = savedDisc; else delete require.cache[require.resolve(discPath)];
+    delete require.cache[require.resolve(lsPath)];
+    delete process.env.DAO_DEVIN_CRED_FILE;
+  }
+});
+
 test("插件自持本地 API: 健康免鉴权/无 token 401/带 token 读插件真源(脱敏)", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-api-"));
   process.env.DAO_LOCAL_API_FILE = path.join(dir, "local-api.json");
