@@ -445,17 +445,7 @@ class UnifiedPanel {
         ls.call("GetMcpServerStates", {}),
         ls.call("GetMcpRegistryServers", {}).catch(() => null),
       ]);
-      const servers = ((r && r.states) || []).map((s) => {
-        const off = new Set((s.spec || {}).disabledTools || []);
-        return {
-          name: (s.spec || {}).serverName || "",
-          status: (s.status || "").replace("MCP_SERVER_STATUS_", ""),
-          disabled: !!(s.spec || {}).disabled,
-          error: s.error || "",
-          tools: (s.tools || []).map((t) => ({ name: t.name, description: t.description || "", off: off.has(t.name) })),
-          prompts: (s.prompts || []).map((p) => ({ name: p.name })),
-        };
-      });
+      const servers = mcpConfig.mergedServers((r && r.states) || []);
       const installed = new Set(servers.map((s) => s.name));
       this._mcpRegistry = ((reg && reg.servers) || []);
       const registry = this._mcpRegistry.map((s) => {

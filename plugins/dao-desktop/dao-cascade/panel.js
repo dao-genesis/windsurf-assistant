@@ -1165,15 +1165,7 @@ class CascadePanelProvider {
     try {
       const ls = require("./ls-bridge");
       const r = await ls.call("GetMcpServerStates", {});
-      const servers = ((r && r.states) || []).map((s) => ({
-        name: (s.spec || {}).serverName || "",
-        status: (s.status || "").replace("MCP_SERVER_STATUS_", ""),
-        disabled: !!(s.spec || {}).disabled,
-        error: s.error || "",
-        tools: ((s2) => { const off = new Set((s2.spec || {}).disabledTools || []);
-          return (s2.tools || []).map((t) => ({ name: t.name, description: t.description || "", off: off.has(t.name) })); })(s),
-        prompts: (s.prompts || []).map((p) => ({ name: p.name, description: p.description || "",
-          args: (p.arguments || []).map((a) => a.name || "") })) }));
+      const servers = require("./mcp-config").mergedServers((r && r.states) || []);
       this._post({ type: "mcp", servers });
       this._fusePublish("mcp", { servers: servers.map((s) => ({ name: s.name, status: s.status,
         disabled: s.disabled, toolCount: (s.tools || []).length })) });

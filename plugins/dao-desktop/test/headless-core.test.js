@@ -773,6 +773,19 @@ test("MCP 配置真源开关: server 级 disabled 位 + 工具级 disabledTools 
   assert.strictEqual(mc.toggleTool("github", "create_issue").off, false);
   assert.deepStrictEqual(mc.readConfig().mcpServers.github.disabledTools, []);
   assert.strictEqual(mc.toggleTool("ghost", "x").ok, false);
+  // 归并视图: 停用的 server 不在 LS states 里也须保留在列表(可再启用) —— 官方管理页同构
+  mc.toggleServer("github", true);
+  const merged = mc.mergedServers([
+    { spec: { serverName: "other", disabledTools: ["t2"] }, status: "MCP_SERVER_STATUS_READY",
+      tools: [{ name: "t1" }, { name: "t2" }], prompts: [] },
+  ]);
+  const gh = merged.find((s) => s.name === "github");
+  assert.ok(gh, "停用 server 仍在归并列表");
+  assert.strictEqual(gh.disabled, true);
+  assert.strictEqual(gh.status, "DISABLED");
+  const ot = merged.find((s) => s.name === "other");
+  assert.strictEqual(ot.status, "READY");
+  assert.deepStrictEqual(ot.tools.map((t) => t.off), [false, true]);
   delete process.env.DAO_MCP_CONFIG_FILE;
 });
 

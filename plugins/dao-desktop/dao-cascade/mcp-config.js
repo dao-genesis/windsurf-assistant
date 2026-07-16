@@ -59,4 +59,41 @@ function toggleTool(name, tool, force) {
   return { ok: true, name: n, tool: t, off };
 }
 
-module.exports = { configPath, readConfig, writeConfig, toggleServer, toggleTool };
+// 归并视图: 配置文件是 server 存在性/disabled 的真源(LS 的 GetMcpServerStates 不含已停用者),
+// LS states 供 status/tools/prompts。返回官方式条目数组 —— 停用的 server 保留在列表(可再启用)。
+function mergedServers(states) {
+  const cfg = readConfig();
+  const specs = cfg.mcpServers || cfg.servers || {};
+  const byName = {};
+  for (const s of (states || [])) byName[(s.spec || {}).serverName || ""] = s;
+  const out = [];
+  const seen = new Set();
+  for (const name of Object.keys(specs)) {
+    const spec = specs[name] || {};
+    const s = byName[name];
+    const off = new Set((s && (s.spec || {}).disabledTools) || spec.disabledTools || []);
+    seen.add(name);
+    out.push({
+      name,
+      status: s ? (s.status || "").replace("MCP_SERVER_STATUS_", "") : (spec.disabled ? "DISABLED" : ""),
+      disabled: !!spec.disabled,
+      error: (s && s.error) || "",
+      tools: ((s && s.tools) || []).map((t) => ({ name: t.name, description: t.description || "", off: off.has(t.name) })),
+      prompts: ((s && s.prompts) || []).map((p) => ({ name: p.name, description: p.description || "",
+        args: (p.arguments || []).map((a) => a.name || "") })),
+    });
+  }
+  for (const s of (states || [])) { // states 独有者(如注册表远端)也列出
+    const name = (s.spec || {}).serverName || "";
+    if (!name || seen.has(name)) continue;
+    const off = new Set((s.spec || {}).disabledTools || []);
+    out.push({ name, status: (s.status || "").replace("MCP_SERVER_STATUS_", ""), disabled: !!(s.spec || {}).disabled,
+      error: s.error || "",
+      tools: (s.tools || []).map((t) => ({ name: t.name, description: t.description || "", off: off.has(t.name) })),
+      prompts: (s.prompts || []).map((p) => ({ name: p.name, description: p.description || "",
+        args: (p.arguments || []).map((a) => a.name || "") })) });
+  }
+  return out;
+}
+
+module.exports = { configPath, readConfig, writeConfig, toggleServer, toggleTool, mergedServers };
