@@ -16,6 +16,7 @@ const DEF_TUNNEL = "http://127.0.0.1:4824";
 
 function bridgeBase() { return String(process.env.DAO_WIN_BRIDGE_URL || DEF_BRIDGE).replace(/\/+$/, ""); }
 function tunnelBase() { return String(process.env.DAO_WIN_TUNNEL_URL || DEF_TUNNEL).replace(/\/+$/, ""); }
+function bridgeToken() { return process.env.DAO_WIN_TOKEN || "dao-win-lab"; }
 
 function _req(method, url, body, timeoutMs) {
   return new Promise((resolve, reject) => {
@@ -29,9 +30,10 @@ function _req(method, url, body, timeoutMs) {
         hostname: u.hostname,
         port: u.port,
         path: u.pathname + u.search,
-        headers: data
-          ? { "Content-Type": "application/json", "Content-Length": data.length }
-          : {},
+        headers: Object.assign(
+          { Authorization: "Bearer " + bridgeToken() },
+          data ? { "Content-Type": "application/json", "Content-Length": data.length } : {}
+        ),
         timeout: timeoutMs || 4000,
       },
       (res) => {
@@ -58,6 +60,7 @@ async function probe() {
     mcp: null, checkout: null,
     bridge: { url: bridgeBase(), ok: false, apps: [], sessions: [], error: "" },
     tunnel: { url: tunnelBase(), ok: false, holders: [], error: "" },
+    accounts: null, mode: null,
     matrix: null,
     probedAt: new Date().toISOString(),
   };
@@ -74,6 +77,18 @@ async function probe() {
     out.tunnel.ok = !!(l && l.ok);
     out.tunnel.holders = (l && l.holders) || [];
   } catch (e) { out.tunnel.error = e.message; }
+  if (out.tunnel.ok) {
+    try {
+      const a = await _req("GET", out.tunnel.url + "/accounts", null, 3000);
+      out.accounts = (a && a.accounts) || [];
+    } catch (_) {}
+  }
+  if (out.bridge.ok) {
+    try {
+      const m = await _req("GET", out.bridge.url + "/api/mode.get", null, 3000);
+      out.mode = (m && m.current) || null;
+    } catch (_) {}
+  }
   if (out.bridge.ok && out.bridge.apps.length) {
     try {
       const m = await _req("POST", out.bridge.url + "/api/clone.matrix", { app_ids: out.bridge.apps }, 5000);
@@ -91,4 +106,17 @@ async function releaseLease(key, owner) {
   catch (e) { return { ok: false, error: e.message }; }
 }
 
-module.exports = { probe, releaseLease, bridgeBase, tunnelBase };
+// 账号建/销(桥 /api/account.* 同一真源; Windows 账号 = 一路独立桌面会话)。
+async function accountCreate(name) {
+  if (!name) return { ok: false, error: "需账号名" };
+  try { return await _req("POST", bridgeBase() + "/api/account.create", { name }, 60000); }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function accountDestroy(name) {
+  if (!name) return { ok: false, error: "需账号名" };
+  try { return await _req("POST", bridgeBase() + "/api/account.destroy", { name }, 60000); }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
+module.exports = { probe, releaseLease, accountCreate, accountDestroy, bridgeBase, tunnelBase };
