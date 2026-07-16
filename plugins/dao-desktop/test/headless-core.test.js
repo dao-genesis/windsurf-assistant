@@ -10,6 +10,31 @@ const path = require("path");
 
 const CASCADE = path.join(__dirname, "..", "dao-cascade");
 
+// R143 · UI 1:1 护栏: composer 模式三元组与官方实机菜单一致(Code/Ask/Plan + 官方文案),
+// 空态含 Try Devin Cloud, 模式菜单含 Ctrl+. 提示, 发送钮具备空闲灰态。
+test("panel.js UI 与官方 composer 1:1 护栏", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(src.includes('{ value: "cx:write", name: "Code", description: "Can write and edit code" }'));
+  assert.ok(src.includes('{ value: "cx:readOnly", name: "Ask", description: "Reads but won\'t edit" }'));
+  assert.ok(src.includes('{ value: "cx:plan", name: "Plan", description: "Plan changes before implementing" }'));
+  assert.ok(src.includes('id="tryCloud"'));
+  assert.ok(src.includes("to switch modes"));
+  assert.ok(src.includes("button.send.idle"));
+  assert.ok(src.includes('id="micBtn"'));
+});
+
+// R144 · UI 1:1 护栏: Recent sessions 头行仅官方双元素(标题+View all), 扩展入口独立成可换行 xrow,
+// 窄面板不再互相挤压截断; 视图名与官方一致为 "Cascade"。
+test("panel.js Recent sessions 头行与扩展入口分行护栏", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(src.includes('<div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>'));
+  assert.ok(src.includes('class="xrow"'));
+  assert.ok(src.includes("flex-wrap:wrap"));
+  const pkg = JSON.parse(fs.readFileSync(path.join(CASCADE, "..", "package.json"), "utf8"));
+  const v = pkg.contributes.views["dao-cascade"].find((x) => x.id === "dao.cascade");
+  assert.strictEqual(v.name, "Cascade");
+});
+
 // 隔离落盘路径, 不碰真机 ~/.dao/windsurf-host.json
 const HOST_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "dao-hs-")), "windsurf-host.json");
 process.env.DAO_WINDSURF_HOST_FILE = HOST_FILE;
