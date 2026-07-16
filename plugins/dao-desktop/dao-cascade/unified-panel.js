@@ -171,6 +171,11 @@ class UnifiedPanel {
       case "set-detail": return this._setDetail();
       case "set-toggle": return this._setToggle(String(msg.key || ""), !!msg.on);
       case "set-changelog": return this._setChangelog();
+      case "set-copy-key": return this._setCopyKey();
+      case "set-devin-token": return this._setDevinToken();
+      case "set-restart-ls": return this._setRestartLs();
+      case "set-diag": return this._setDiag();
+      case "set-import": return this._setImport(String(msg.what || ""));
       case "set-open": return vscode.env.openExternal(vscode.Uri.parse(String(msg.url || ""))).then(undefined, () => {});
       case "acp-registry": return this._acpRegistry();
       case "acp-reload": return this._acpReload();
@@ -722,6 +727,9 @@ class UnifiedPanel {
         },
         teamConfig: u.teamConfig || {},
         settings: { openRecent: (((rs || {}).userSettings) || {}).openMostRecentChatConversation === true },
+        apiKeyTail: (ls.apiKey() || "").slice(-4),
+        models: await ls.listModels().then((m) => ({ total: m.length, enabled: m.filter((x) => !x.disabled).length,
+          top: m.filter((x) => !x.disabled).slice(0, 8).map((x) => x.label + (x.credit != null ? " ×" + x.credit : "")) })).catch(() => null),
         acp: { running: !!(this._cascade && this._cascade._acpReady && this._cascade._acp),
           registryPath: this._acpRegistryPath() },
         env: require("./env-sync").detect(),
@@ -742,6 +750,80 @@ class UnifiedPanel {
       await ls.call("SetUserSettings", { userSettings: Object.assign(s, { openMostRecentChatConversation: on }) });
     } catch (e) { vscode.window.showErrorMessage("设置失败: " + e.message); }
     this._setDetail();
+  }
+
+  // 官方 devin.copyApiKey 对等: 完整 key 只进剪贴板, UI/toast 只显尾4位。
+  async _setCopyKey() {
+    try {
+      const ls = require("./ls-bridge");
+      const k = ls.apiKey();
+      if (!k) throw new Error("未登录(无 windsurf_api_key)");
+      await vscode.env.clipboard.writeText(k);
+      vscode.window.showInformationMessage("API key 已复制(…" + k.slice(-4) + ")");
+    } catch (e) { vscode.window.showErrorMessage("复制 API key 失败: " + e.message); }
+  }
+
+  // 官方 getSelfDevinSessionToken 同源: 换取 Devin Session Token 进剪贴板(打通 Devin Cloud API)。
+  async _setDevinToken() {
+    try {
+      const ls = require("./ls-bridge");
+      const t = await ls.devinSessionToken();
+      await vscode.env.clipboard.writeText(t);
+      vscode.window.showInformationMessage("Devin Session Token 已复制(…" + t.slice(-6) + ")");
+    } catch (e) { vscode.window.showErrorMessage("获取 Devin Session Token 失败: " + e.message); }
+  }
+
+  // 官方 devin.restartLanguageServer 对等: Devin IDE 内触发官方命令; 插件侧同时作废缓存重发现。
+  async _setRestartLs() {
+    try {
+      const ls = require("./ls-bridge");
+      let official = false;
+      for (const c of ["devin.restartLanguageServer", "windsurf.restartLanguageServer"]) {
+        try { await vscode.commands.executeCommand(c); official = true; break; } catch (_) {}
+      }
+      try { await ls.refreshAuth(); } catch (_) {}
+      vscode.window.showInformationMessage(official ? "已触发官方 LS 重启 + 插件侧重发现" : "非 Devin 宿主: 已作废缓存并重发现 LS 端点");
+    } catch (e) { vscode.window.showErrorMessage("重启 LS 失败: " + e.message); }
+    setTimeout(() => this._setDetail(), 1500);
+  }
+
+  // 官方 devin.downloadDiagnostics 对等: GetDebugDiagnostics 落盘 json 并打开。
+  async _setDiag() {
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("GetDebugDiagnostics", {});
+      const os = require("os"); const path = require("path"); const fs = require("fs");
+      const p = path.join(os.tmpdir(), "dao-desktop-diagnostics-" + Date.now() + ".json");
+      fs.writeFileSync(p, JSON.stringify(r, null, 2));
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+      await vscode.window.showTextDocument(doc, { preview: false });
+    } catch (e) { vscode.window.showErrorMessage("诊断导出失败: " + e.message); }
+  }
+
+  // 官方 import 系列对等: vscode-settings(并入不覆盖) / vscode-extensions(CLI 逐装) / cursor(官方 ImportFromCursor RPC)。
+  async _setImport(what) {
+    const imp = require("./import-sync");
+    try {
+      if (what === "vscode-settings") {
+        const r = imp.applyVSCodeSettings();
+        vscode.window.showInformationMessage(r.added.length ? ("已并入 " + r.added.length + " 项 VS Code 设置(已有键不覆盖): " + r.added.slice(0, 6).join(", ") + (r.added.length > 6 ? " …" : "")) : "无可并入的新设置键(已全部存在)");
+      } else if (what === "vscode-extensions") {
+        const ids = imp.listVSCodeExtensions();
+        if (!ids.length) throw new Error("未检出 VS Code 扩展清单(~/.vscode/extensions/extensions.json)");
+        const pick = await vscode.window.showQuickPick(ids.map((id) => ({ label: id, picked: true })), { canPickMany: true, placeHolder: "选择导入的扩展(" + ids.length + " 项检出)" });
+        if (!pick || !pick.length) return;
+        let okN = 0, failN = 0;
+        for (const it of pick) {
+          try { await vscode.commands.executeCommand("workbench.extensions.installExtension", it.label); okN++; }
+          catch (_) { failN++; }
+        }
+        vscode.window.showInformationMessage("扩展导入完成: 成功 " + okN + " · 失败 " + failN);
+      } else if (what === "cursor") {
+        const ls = require("./ls-bridge");
+        await ls.call("ImportFromCursor", {});
+        vscode.window.showInformationMessage("已触发官方 ImportFromCursor(规则/记忆导入)");
+      } else throw new Error("未知导入项: " + what);
+    } catch (e) { vscode.window.showErrorMessage("导入失败: " + e.message); }
   }
 
   _acpRegistryPath() {
@@ -1263,8 +1345,26 @@ function renderSettings(){
     h+=cr(E(s.label),st+' <span class="back" data-envopen="'+E(s.path)+'">打开↗</span>');
   }
   h+='</div>';
+  if(!SET.error){
+  const mo=SET.models;
+  h+='<div class="st">模型状态(GetUserStatus 活体)</div><div class="card">';
+  if(mo&&mo.total){h+=cr('可用/总数',mo.enabled+' / '+mo.total);h+=cr('现行模型',E((mo.top||[]).join(' · ')||'—'));}
+  else h+='<div class="cr muted">模型配置未就绪(LS 在线时自动拉取)</div>';
+  h+='</div>';
+  h+='<div class="st">诊断与运维(官方命令对等)</div><div class="card">'+
+    cr('API key(copyApiKey 对等)','…'+E(SET.apiKeyTail||'')+' <span class="back" id="setCk">复制</span>')+
+    cr('Devin Session Token(云 API 直通)','<span class="back" id="setDt">换取并复制</span>')+
+    cr('重启 Language Server','<span class="back" id="setRls">重启↺</span>')+
+    cr('导出诊断(downloadDiagnostics 对等)','<span class="back" id="setDg">导出打开</span>')+'</div>';
+  h+='<div class="st">导入(官方 import 系列对等)</div><div class="card">'+
+    cr('VS Code 设置(并入不覆盖)','<span class="back" data-setimport="vscode-settings">导入</span>')+
+    cr('VS Code 扩展(勾选逐装)','<span class="back" data-setimport="vscode-extensions">导入</span>')+
+    cr('Cursor 规则/记忆(官方 RPC)','<span class="back" data-setimport="cursor">导入</span>')+'</div>';
+  }
   h+='<div class="st">官方门户(外链)</div><div class="card">'+
     cr('Devin 控制台','<span class="back" data-seturl="https://app.devin.ai">打开↗</span>')+
+    cr('Devin 用量(View Usage 对等)','<span class="back" data-seturl="https://app.devin.ai/settings/usage">打开↗</span>')+
+    cr('Devin 套餐与账单(openBillingPage 对等)','<span class="back" data-seturl="https://app.devin.ai/settings/plans">打开↗</span>')+
     cr('用量与订阅(Windsurf 门户)','<span class="back" data-seturl="https://windsurf.com/subscription/usage">打开↗</span>')+
     cr('个人资料','<span class="back" data-seturl="https://windsurf.com/subscription/profile">打开↗</span>')+'</div>';
   return h;
@@ -1387,6 +1487,11 @@ function render(){
   const sar=document.getElementById('setAcpReg'); if(sar)sar.onclick=()=>vscode.postMessage({type:'acp-registry'});
   const sal=document.getElementById('setAcpRl'); if(sal)sal.onclick=()=>{SET=null;render();vscode.postMessage({type:'acp-reload'});};
   document.querySelectorAll('[data-envopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'env-open',path:el.dataset.envopen}));
+  const sck=document.getElementById('setCk'); if(sck)sck.onclick=()=>vscode.postMessage({type:'set-copy-key'});
+  const sdt=document.getElementById('setDt'); if(sdt)sdt.onclick=()=>vscode.postMessage({type:'set-devin-token'});
+  const srl=document.getElementById('setRls'); if(srl)srl.onclick=()=>{SET=null;render();vscode.postMessage({type:'set-restart-ls'});};
+  const sdg=document.getElementById('setDg'); if(sdg)sdg.onclick=()=>vscode.postMessage({type:'set-diag'});
+  document.querySelectorAll('[data-setimport]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'set-import',what:el.dataset.setimport}));
   if(S.board==='settings'&&SET===null)cmd('loadTabData',{tab:'settings'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
