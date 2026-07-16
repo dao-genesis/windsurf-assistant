@@ -2351,6 +2351,12 @@ class CascadePanelProvider {
   .pill select option { background:var(--vscode-dropdown-background); color:var(--vscode-dropdown-foreground); }
   #plusBtn, #imgBtn, #arenaBtn, #wtBtn { width:24px; height:24px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--dim); cursor:pointer; font-size:14px; line-height:1; }
   #plusBtn:hover, #imgBtn:hover, #arenaBtn:hover, #wtBtn:hover { background:var(--pill-hover); }
+  /* 官方 1:1: 默认行只有 ＋ / Code / 模型 / agent / 🎙 / ↑ —— 增强钮(图/竞技场/worktree)悬停或聚焦时才现身, 静态外观与官方一致 */
+  #imgBtn, #arenaBtn, #wtBtn, #tokCount { display:none; }
+  .card:hover #imgBtn, .card:focus-within #imgBtn,
+  .card:hover #arenaBtn, .card:focus-within #arenaBtn,
+  .card:hover #wtBtn, .card:focus-within #wtBtn,
+  .card:focus-within #tokCount { display:inline-block; }
   #arenaBtn.on, #wtBtn.on { border-color:var(--accent,#4a9eff); color:var(--accent,#4a9eff); }
   #wtBar { display:none; align-items:center; gap:8px; font-size:11px; color:var(--dim); padding:3px 8px; border:1px dashed var(--line); border-radius:6px; margin:4px 0; }
   #wtBar button { background:transparent; border:1px solid var(--line); border-radius:6px; color:inherit; cursor:pointer; font-size:11px; padding:1px 8px; }
@@ -2525,7 +2531,8 @@ class CascadePanelProvider {
   function modelLabel(o){ return (o.recommended?"⭐ ":"")+(o.disabled?"🔒 ":"")+(o.name||o.value)+(o.images?" 🖼":""); }
   function modelBtnSync(s){
     const o=(s.options||[]).find(x=>x.value===s.currentValue);
-    modelCur=s; modelBtn.textContent=o?modelLabel(o):(s.currentValue||"模型");
+    // 官方 1:1: composer 按钮只显素模型名(徽标仅留在下拉列表行)
+    modelCur=s; modelBtn.textContent=o?(o.name||o.value):(s.currentValue||"模型");
     modelBtn.title=o&&o.description?o.description:"Model";
   }
   function modelMenuRender(q){
@@ -2609,7 +2616,9 @@ class CascadePanelProvider {
 
   function renderAgents(){ onAgentChange(); }
   // 官方式 agent 图标:Cascade=波形,Devin Local/Cloud=Devin 六边形(cloud 带云标)
-  const AGENT_ICONS={cascade:"🌊","devin-local":"⬢","devin-cloud":"☁"};
+  // 官方 1:1: cascade agent 用 Windsurf W 标(内联 SVG), 其余用字符图标
+  const W_SVG='<svg width="13" height="10" viewBox="0 0 24 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1c4 0 6 3 6 8s2 8 2 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M9 1c4 0 6 3 6 8s2 8 2 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M17 1c4 0 5.5 2.5 6 6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+  const AGENT_ICONS={cascade:"","devin-local":"⬢","devin-cloud":"☁"};
   const agentIcon=$("agentIcon");
   // 每 agent 轨各存一份 model/mode 配置; cascade=LS 本地轨, acp=Devin Local/Cloud 云端轨。
   const cfgStore={cascade:{model:null,mode:null},acp:{model:null,mode:null}};
@@ -2625,7 +2634,7 @@ class CascadePanelProvider {
     if(typeof slashSync==="function") slashSync();
     const a=AGENTS.find(x=>x.id===agent);
     badgeEl.textContent=a&&a.preview?"Preview":"";
-    agentIcon.textContent=AGENT_ICONS[agent]||"⬡";
+    if(agent==="cascade") agentIcon.innerHTML=W_SVG; else agentIcon.textContent=AGENT_ICONS[agent]||"⬡";
     agentBtn.textContent=a?a.label:agent;
     const pill=agentBtn.closest(".pill"); if(pill&&a) pill.title=a.label+" · "+a.hint+" (Ctrl+')";
     renderConfigFor(curGroup());
@@ -2635,7 +2644,7 @@ class CascadePanelProvider {
   function agentMenuRender(){ agentList.innerHTML="";
     for(const a of AGENTS){ const it=document.createElement("div"); it.className="mit"+(a.id===agent?" sel":"");
       const row=document.createElement("div"); row.className="mrow";
-      const nm=document.createElement("span"); nm.className="mnm"; nm.textContent=(AGENT_ICONS[a.id]||"⬡")+" "+a.label; row.appendChild(nm);
+      const nm=document.createElement("span"); nm.className="mnm"; if(a.id==="cascade"){ nm.innerHTML=W_SVG+" "; nm.appendChild(document.createTextNode(a.label)); } else { nm.textContent=(AGENT_ICONS[a.id]||"⬡")+" "+a.label; } row.appendChild(nm);
       if(a.preview){ const b=document.createElement("span"); b.className="bdg"; b.textContent="Preview"; row.appendChild(b); }
       it.appendChild(row);
       const ds=document.createElement("div"); ds.className="mds"; ds.textContent=a.hint; it.appendChild(ds);
