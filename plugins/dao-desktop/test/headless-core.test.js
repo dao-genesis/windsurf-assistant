@@ -1514,4 +1514,5 @@ test("ls-bridge: seatCall/devinSessionToken 契约在位", () => {
     assert.ok(uni.includes('"' + k + '"'), "设置板块应挂载 " + k);
   }
   assert.ok(uni.includes("import-sync"), "导入应走 import-sync 纯核");
+  assert.ok(uni.includes("sourcePath"), "ImportFromCursor 必须携带官方必填 sourcePath");
 });

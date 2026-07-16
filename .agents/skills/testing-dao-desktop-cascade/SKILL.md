@@ -78,3 +78,11 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 ## Devin Secrets Needed
 - Devin Desktop 登录账号/密码（outlook 账号）
 - GitHub PAT（push / PR / 评论）
+
+## 统一面板(dao.unified)设置板块测试要点 (v1.3.5+)
+- 打开: 命令面板 `>Devin Desktop: 打开归一面板`，左侧图标轨点齿轮⚙进设置。面板默认很窄，先拖宽 sidebar 分隔条再截图。
+- 图标轨易混淆：注射器=反向注入、拼图=MCP 管理、章鱼=GitHub 舰队，点错后直接点正确图标即可。
+- 诊断与运维按钮 id: setCk(复制key)/setDt(token)/setRls(重启LS)/setDg(诊断)；导入用 data-setimport 属性。
+- toast 长错误会截断：点 toast 右侧 ∧ 展开可读全文（如 RPC validation error）。
+- Cursor 导入走官方同款流程: 先弹 InputBox 索取以 `.cursor/rules` 结尾的目录, 再 `ImportFromCursor{sourcePath}`; 测试时可先建临时 `.cursor/rules/x.mdc` 再填其路径。
+- 本机通常无 ~/.config/Code/User/settings.json 和 ~/.vscode/extensions/extensions.json → VS Code 导入应报"未检出"明确错误。
