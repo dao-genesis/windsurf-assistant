@@ -257,44 +257,57 @@ async function call(method, body, timeoutMs) {
 // 返回 { close() } —— 消息发完/收完后调用 close 释放连接。
 // onFrame(可选): 每收到一个反应式帧(轨迹变更信号)即回调 —— 以之唤醒轮询, 帧到立即拉增量
 function driveStream(cascadeId, onFrame) {
-  const h = ready();
-  if (!h) return { close() {} };
-  const body = Buffer.from(JSON.stringify({ metadata: metadata(), protocolVersion: 1, id: cascadeId }), "utf8");
-  const env = Buffer.concat([Buffer.from([0, 0, 0, 0, 0]), body]);
-  env.writeUInt32BE(body.length, 1); // Connect enveloped message: flags(1B)+len(4B)+json
-  const req = http.request({
-    host: "127.0.0.1", port: h.lsPort,
-    path: SVC + "StreamCascadeReactiveUpdates", method: "POST",
-    headers: {
-      "Content-Type": "application/connect+json",
-      "connect-protocol-version": "1",
-      "x-codeium-csrf-token": h.csrfToken,
-      "Content-Length": env.length,
-    },
-  });
-  req.on("response", (r) => {
-    let buf = Buffer.alloc(0);
-    r.on("data", (c) => {
-      if (!onFrame) return;
-      buf = Buffer.concat([buf, c]);
-      while (buf.length >= 5) {
-        const len = buf.readUInt32BE(1);
-        if (buf.length < 5 + len) break;
-        buf = buf.slice(5 + len);
-        try { onFrame(); } catch (_) {}
-      }
+  const state = { req: null, closed: false, retried: false };
+  const connect = () => {
+    const h = ready();
+    if (!h || state.closed) return;
+    const body = Buffer.from(JSON.stringify({ metadata: metadata(), protocolVersion: 1, id: cascadeId }), "utf8");
+    const env = Buffer.concat([Buffer.from([0, 0, 0, 0, 0]), body]);
+    env.writeUInt32BE(body.length, 1); // Connect enveloped message: flags(1B)+len(4B)+json
+    const req = http.request({
+      host: "127.0.0.1", port: h.lsPort,
+      path: SVC + "StreamCascadeReactiveUpdates", method: "POST",
+      headers: {
+        "Content-Type": "application/connect+json",
+        "connect-protocol-version": "1",
+        "x-codeium-csrf-token": h.csrfToken,
+        "Content-Length": env.length,
+      },
     });
-    r.on("error", () => {});
-  });
-  req.on("error", () => {});
-  req.end(env);
-  return { close() { try { req.destroy(); } catch (_) {} } };
+    state.req = req;
+    // 自愈(与 call 同源): 连拒/鉴权失败时重发现最新 lsPort/CSRF/key 后单次重连。
+    const heal = (msg) => {
+      if (state.closed || state.retried) return;
+      if (!(isAuthError(msg) || isStaleEndpointError(msg))) return;
+      state.retried = true;
+      refreshAuth().then((ok) => { if (ok && !state.closed) connect(); }).catch(() => {});
+    };
+    req.on("response", (r) => {
+      if (r.statusCode === 401 || r.statusCode === 403) { r.resume(); heal("http " + r.statusCode); return; }
+      let buf = Buffer.alloc(0);
+      r.on("data", (c) => {
+        if (!onFrame) return;
+        buf = Buffer.concat([buf, c]);
+        while (buf.length >= 5) {
+          const len = buf.readUInt32BE(1);
+          if (buf.length < 5 + len) break;
+          buf = buf.slice(5 + len);
+          try { onFrame(); } catch (_) {}
+        }
+      });
+      r.on("error", () => {});
+    });
+    req.on("error", (e) => heal(e && e.message));
+    req.end(env);
+  };
+  connect();
+  return { close() { state.closed = true; try { state.req && state.req.destroy(); } catch (_) {} } };
 }
 
 // Connect server-streaming 通用调用(application/connect+json): 逐帧 JSON 回调 onMessage,
 // 末帧(flags&2)为 trailer —— 携 error 时以异常抛出。GetDeepWiki 等流式方法走此轨。
 // cancelRef(可选): 传入对象时回填 cancelRef.cancel(), 调用即主动断流(resolve, 不报错)
-function callStream(method, body, onMessage, timeoutMs, cancelRef) {
+function _callStreamOnce(method, body, onMessage, timeoutMs, cancelRef) {
   return new Promise((resolve, reject) => {
     const h = ready();
     if (!h) return reject(new Error("官方 language_server 未就绪(端口/CSRF 未捕获)"));
@@ -338,6 +351,21 @@ function callStream(method, body, onMessage, timeoutMs, cancelRef) {
     req.on("error", (e) => (cancelled ? resolve() : reject(e)));
     req.end(env);
   });
+}
+
+// 流式调用(自愈包装, 与 call 同源): 仅当尚未交付任何帧时才重试, 避免重复消费半流。
+async function callStream(method, body, onMessage, timeoutMs, cancelRef) {
+  let delivered = false;
+  const wrap = (j) => { delivered = true; onMessage(j); };
+  try {
+    return await _callStreamOnce(method, body, wrap, timeoutMs, cancelRef);
+  } catch (e) {
+    const m = e && e.message;
+    if (!delivered && (isAuthError(m) || isStaleEndpointError(m)) && await refreshAuth()) {
+      return await _callStreamOnce(method, body, onMessage, timeoutMs, cancelRef);
+    }
+    throw e;
+  }
 }
 
 // 可用模型: GetUserStatus → cascadeModelConfigData.clientModelConfigs
