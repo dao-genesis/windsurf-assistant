@@ -283,6 +283,34 @@ function seatCall(method, body, headers, timeoutMs) {
   });
 }
 
+// 云端 ApiServerService 直连(官方 RecordCortexFeedback 等同源): server.codeium.com。
+// LS 本地不暴露这些方法(404), 官方链路即 LS→api_server; 本桥以 metadata(api_key) 同构直发。
+function apiServerCall(method, body, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const https = require("https");
+    const md = metadata();
+    if (!md || !md.apiKey) return reject(new Error("未登录(无 windsurf_api_key)"));
+    const data = Buffer.from(JSON.stringify(Object.assign({ metadata: md }, body || {})), "utf8");
+    const req = https.request({
+      host: SEAT_HOST, path: "/exa.api_server_pb.ApiServerService/" + method, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": data.length },
+    }, (r) => {
+      let b = "";
+      r.on("data", (c) => { b += c; });
+      r.on("end", () => {
+        try {
+          const j = b ? JSON.parse(b) : {};
+          if (r.statusCode !== 200) reject(new Error(method + ": " + (j.message || j.code || ("HTTP " + r.statusCode))));
+          else resolve(j);
+        } catch (e) { reject(new Error(method + ": 响应解析失败 " + e.message)); }
+      });
+    });
+    req.setTimeout(timeoutMs || 20000, () => { req.destroy(new Error(method + ": 超时")); });
+    req.on("error", reject);
+    req.end(data);
+  });
+}
+
 // Devin Session Token(官方 getSelfDevinSessionToken 同源): 换取 devin-session-token$…
 async function devinSessionToken() {
   const r = await seatCall("GetSelfDevinSessionToken", {});
@@ -442,4 +470,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels, seatCall, devinSessionToken };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels, seatCall, apiServerCall, devinSessionToken };

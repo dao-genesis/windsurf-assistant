@@ -12,29 +12,33 @@ const MODE_LABELS = { write: "Write", plan: "Plan", chat: "Chat",
 function createStatusBar(context, viewId) {
   const openCmd = viewId + ".open";
 
+  // 宿主为官方 Devin Desktop/Windsurf 时, 官方本体已注册同组状态栏项(Devin/模型/套餐/Settings),
+  // 插件再注册即出现重复两份 —— 官方宿主下整组让位于官方真源, 仅独立 VS Code 轨自行补齐。
+  if (/windsurf|devin/i.test(String(vscode.env.appName || ""))) {
+    return { set() {} };
+  }
+
   const main = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 120);
   main.command = openCmd;
   const model = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 119);
   model.command = openCmd;
-  // 官方右下角另两项: 「Free - Upgrade Now」(免费套餐时) 与「Devin - Settings」。
-  const upgrade = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 118);
-  upgrade.text = "$(arrow-circle-up) Free - Upgrade Now";
-  upgrade.tooltip = "升级套餐(windsurf.com/pricing)";
-  upgrade.command = { title: "Upgrade", command: "vscode.open", arguments: [vscode.Uri.parse("https://windsurf.com/pricing")] };
+  // 官方右下角四项之三/四: 「Free - Upgrade Now」(付费套餐不显) / 「Devin - Settings」
+  const plan = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 118);
+  plan.command = { title: "Upgrade", command: "vscode.open", arguments: [vscode.Uri.parse("https://windsurf.com/subscription/upgrade")] };
   const settings = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 117);
-  settings.text = "$(gear) Devin - Settings";
+  settings.text = "Devin - Settings";
   settings.tooltip = "Devin Settings 整页";
   settings.command = "dao.cascade.openSettings";
   settings.show();
-  context.subscriptions.push(main, model, upgrade, settings);
+  context.subscriptions.push(main, model, plan, settings);
 
   const st = { user: null, plan: null, lsReady: false,
     modelLabel: null, mode: "write",
     dailyPct: null, weeklyPct: null };
 
   function render() {
-    const icon = st.lsReady ? "$(comment-discussion)" : "$(sync~spin)";
-    main.text = icon + " Devin" + (st.user ? " · " + st.user : "");
+    // 官方主项文案固定为「Devin」(账号/配额降为悬停提示)
+    main.text = st.lsReady ? "Devin" : "$(sync~spin) Devin";
     const tip = new vscode.MarkdownString();
     tip.appendMarkdown("**Devin Desktop · Cascade**\n\n");
     tip.appendMarkdown(st.user ? "账户: " + st.user + "\n\n" : "未登录 —— 点击打开面板登录\n\n");
@@ -46,14 +50,17 @@ function createStatusBar(context, viewId) {
     main.show();
 
     if (st.modelLabel) {
-      model.text = "$(sparkle) " + st.modelLabel +
+      model.text = st.modelLabel +
         (st.mode && st.mode !== "write" ? " · " + (MODE_LABELS[st.mode] || st.mode) : "");
       model.tooltip = "Cascade 当前模型/模式 —— 点击打开面板切换";
       model.show();
     } else model.hide();
 
-    // 官方同义: 仅免费套餐展示升级项。
-    if (st.plan && /free/i.test(st.plan)) upgrade.show(); else upgrade.hide();
+    if (st.plan && /free/i.test(st.plan)) {
+      plan.text = st.plan + " - Upgrade Now";
+      plan.tooltip = "升级套餐 (windsurf.com)";
+      plan.show();
+    } else plan.hide();
   }
 
   // 套餐/配额与官方账户卡同源(GetUserStatus); LS 就绪后拉一次, 之后低频刷新。
