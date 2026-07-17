@@ -1621,7 +1621,7 @@ test("pcb-agent: dao-pcb MCP 官方同构注册契约", () => {
     // modePrompt: 太上下知有之 —— 只述工具之有, 不教用法不强制流程
     const mp = pa.modePrompt();
     assert.ok(mp.includes("dao-pcb") && mp.includes("KiCad") && mp.includes("嘉立创EDA"));
-    assert.ok(mp.includes("run_drc") && mp.includes("design_pcb"));
+    assert.ok(mp.includes("pcb_check") && mp.includes("pcb_design") && mp.includes("pcb_call"));
   } finally {
     delete process.env.DAO_MCP_CONFIG_FILE;
     delete require.cache[require.resolve(path.join(CASCADE, "pcb-agent.js"))];
