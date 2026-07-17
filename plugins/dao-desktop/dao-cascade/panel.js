@@ -2739,6 +2739,8 @@ class CascadePanelProvider {
     for(let i=0;i<parts.length;i++){
       if(i%2===1){ const lm=parts[i].match(/^([a-zA-Z0-9+-]*)\\n?/); const lang=lm&&lm[1]?lm[1]:"";
         const body=parts[i].replace(/^[a-zA-Z0-9+-]*\\n?/,"");
+        if(i===parts.length-1 && !body.trim()) continue; // 末尾未闭合且为空的 fence 不产出空代码块
+
         html+='<pre>'+(lang?'<div class="cblang">'+esc(lang)+'</div>':'')+'<button class="copybtn" title="复制">Copy</button><code>'+esc(body)+"</code></pre>"; continue; }
       const lines=esc(parts[i]).split("\\n"); let inList=false;
       for(const ln of lines){
