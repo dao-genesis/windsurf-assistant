@@ -2052,3 +2052,13 @@ test("local-api: sync-rpc 路由接线在位", () => {
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/sync/rpc-roundtrip"), "openapi 应登记");
 });
+
+// R156 · 本地 API 自启(后端打动一切): 激活即开放端点, 不依赖面板按钮手点。
+test("extension: 本地 API 激活自启接线在位(dao.localApi.autoStart)", () => {
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('get("localApi.autoStart", true)'), "激活流程应读 dao.localApi.autoStart(默认开)");
+  assert.ok(/localApi\.running\(\)\)\s*await localApi\.start\(0\)/.test(ext), "未跑则 start(0) 自启");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.configuration.properties["dao.localApi.autoStart"], "配置项应登记");
+  assert.strictEqual(pkg.contributes.configuration.properties["dao.localApi.autoStart"].default, true);
+});
