@@ -1713,6 +1713,154 @@ test("PCB 面板/板块/命令接线在位", () => {
   assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.pcbAgent"));
 });
 
+// R150 · FreeCAD 工具层官方同构注册: dao-freecad 与 dao-pcb/dao-windows-agent 同一
+// mcp_config.json 真源, local(stdio cad_agent.mcp_server) / remote(serverUrl /mcp + Bearer)
+// 双通道; status 脱敏; setDisabled 开关不删注册。
+test("fc-agent: dao-freecad MCP 官方同构注册契约", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-fc-"));
+  process.env.DAO_MCP_CONFIG_FILE = path.join(tmp, "mcp_config.json");
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "fc-agent.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "mcp-config.js"))];
+    const fa = require(path.join(CASCADE, "fc-agent.js"));
+    assert.strictEqual(fa.SERVER_NAME, "dao-freecad");
+    assert.deepStrictEqual(fa.status(), { registered: false });
+    // 显式目录无效 = 权威失败, 不回退猜测(误配须可见)
+    assert.strictEqual(fa.findLocalCheckout(path.join(tmp, "nope")), null);
+    // local: 伪造检出(cad_agent/mcp_server.py)
+    const co = path.join(tmp, "Dao-3D-Modeling-Agent");
+    fs.mkdirSync(path.join(co, "cad_agent"), { recursive: true });
+    fs.writeFileSync(path.join(co, "cad_agent", "mcp_server.py"), "# mcp\n");
+    let r = fa.registerLocal({ dir: co, token: "SECRET-T", bridgePort: "18920" });
+    assert.strictEqual(r.ok, true);
+    const cfg = JSON.parse(fs.readFileSync(process.env.DAO_MCP_CONFIG_FILE, "utf8"));
+    const spec = cfg.mcpServers["dao-freecad"];
+    assert.deepStrictEqual(spec.args, ["-m", "cad_agent.mcp_server"]);
+    assert.strictEqual(spec.cwd, co);
+    assert.strictEqual(spec.env.PYTHONPATH, co);
+    assert.strictEqual(spec.env.FC_REMOTE_PORT, "18920");
+    // status 脱敏: 只报 hasAuth, 不回 token 值
+    let st = fa.status();
+    assert.strictEqual(st.registered, true);
+    assert.strictEqual(st.transport, "local");
+    assert.strictEqual(st.hasAuth, true);
+    assert.ok(!JSON.stringify(st).includes("SECRET-T"));
+    // 开关不删注册
+    assert.strictEqual(fa.setDisabled(true).ok, true);
+    st = fa.status();
+    assert.strictEqual(st.registered, true);
+    assert.strictEqual(st.disabled, true);
+    assert.strictEqual(fa.setDisabled(false).ok, true);
+    assert.strictEqual(fa.status().disabled, false);
+    // remote: 自动补 /mcp + Bearer
+    r = fa.registerRemote({ url: "https://relay.example.com/", token: "TK" });
+    assert.strictEqual(r.ok, true);
+    st = fa.status();
+    assert.strictEqual(st.transport, "remote");
+    assert.strictEqual(st.serverUrl, "https://relay.example.com/mcp");
+    assert.strictEqual(st.hasAuth, true);
+    assert.strictEqual(fa.registerRemote({ url: "ftp://bad" }).ok, false);
+    // 注销
+    assert.strictEqual(fa.unregister().removed, true);
+    assert.deepStrictEqual(fa.status(), { registered: false });
+    // modePrompt: 太上下知有之 —— 只述工具之有, 不教用法不强制流程
+    const mp = fa.modePrompt();
+    assert.ok(mp.includes("dao-freecad") && mp.includes("FreeCAD"));
+    assert.ok(mp.includes("asm.") && mp.includes("percept.") && mp.includes("18920"));
+  } finally {
+    delete process.env.DAO_MCP_CONFIG_FILE;
+    delete require.cache[require.resolve(path.join(CASCADE, "fc-agent.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "mcp-config.js"))];
+  }
+});
+
+// R150 · fc-panel-core headless: 模块目录(归一外壳网页多实例 + 本机 FreeCAD)、
+// 聚合探活字段与桥/外壳/xpra 端点约定(18920/9920/14500, 环境变量可重定向)。
+test("fc-panel-core: 模块目录与探活契约", async () => {
+  const fc = require(path.join(CASCADE, "fc-panel-core.js"));
+  const mods = fc.modules();
+  assert.ok(mods.length >= 10);
+  for (const m of mods) {
+    assert.ok(m.id && m.name && (m.kind === "web" || m.kind === "app"));
+    if (m.kind === "web") assert.ok(/^http:\/\/127\.0\.0\.1/.test(m.url), m.id + " web 模块须为归一外壳本机页");
+    else assert.ok(m.exe, m.id + " app 模块须有 exe 键");
+  }
+  // 归一外壳全板块齐备(总控/整窗/工作台 + 七大 FreeCAD 工作台网页模块 + 本机客户端)
+  const ids = mods.map((m) => m.id);
+  for (const k of ["fc-shell", "fc-window", "fc-bench", "fc-part", "fc-sketch", "fc-asm", "fc-bim", "fc-fem", "fc-draw", "fc-cam", "fc-app"]) {
+    assert.ok(ids.includes(k), "模块目录应含 " + k);
+  }
+  assert.strictEqual(fc.bridgeBase(), "http://127.0.0.1:18920");
+  assert.strictEqual(fc.shellBase(), "http://127.0.0.1:9920");
+  assert.strictEqual(fc.xpraBase(), "http://127.0.0.1:14500");
+  // probe: 任一子源不可达不拖垮整体(CI 无桥环境也得回完整快照)
+  const out = await fc.probe();
+  for (const k of ["mcp", "installs", "bridge", "shell", "xpra", "modules", "probedAt"]) {
+    assert.ok(k in out, "probe 快照应含 " + k);
+  }
+  assert.ok("freecad" in out.installs);
+});
+
+// R150 · FreeCAD 域开关正交于 3×4 模式矩阵: 与 pcb 同一 overlays 落盘, 默认关(官方原貌);
+// 开启后 overlayPrompt 并入 fc-agent modePrompt; 与 pcb 域互不干扰。
+test("mode-fusion: FreeCAD 域叠加开关正交契约", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mfo-fc-"));
+  process.env.DAO_MODE_FUSION_FILE = path.join(tmp, "mode-fusion.json");
+  process.env.DAO_MODE_CONTRACT_FILE = path.join(tmp, "mode.json");
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
+    const mf = require(path.join(CASCADE, "mode-fusion.js"));
+    // 矩阵不变: 域开关不是第四模式
+    assert.strictEqual(mf.PROMPT_MODES.length, 3);
+    assert.strictEqual(mf.TOOL_MODES.length, 4);
+    assert.strictEqual(mf.matrix().length, 12);
+    assert.ok(mf.DOMAIN_OVERLAYS.some((m) => m.id === "freecad"));
+    // 默认关(官方原貌)
+    assert.strictEqual(mf.overlayOn("freecad"), false);
+    assert.strictEqual(mf.overlayPrompt(), "");
+    // 开: overlayPrompt 即 fc-agent modePrompt
+    const st = mf.setOverlay("freecad", true);
+    assert.strictEqual(mf.overlayOn("freecad"), true);
+    assert.ok(st.overlays.find((o) => o.id === "freecad").on);
+    assert.ok(mf.overlayPrompt().includes("dao-freecad"));
+    // 与 pcb 域互不干扰
+    assert.strictEqual(mf.overlayOn("pcb"), false);
+    mf.setOverlay("pcb", true);
+    assert.ok(mf.overlayPrompt().includes("dao-pcb") && mf.overlayPrompt().includes("dao-freecad"));
+    mf.setOverlay("pcb", false);
+    // 与三模式正交: 切提示词模式不动开关
+    mf.setPromptMode("passthrough");
+    assert.strictEqual(mf.overlayOn("freecad"), true);
+    // 关: 回官方原貌
+    mf.setOverlay("freecad", false);
+    assert.strictEqual(mf.overlayOn("freecad"), false);
+  } finally {
+    delete process.env.DAO_MODE_FUSION_FILE;
+    delete process.env.DAO_MODE_CONTRACT_FILE;
+    delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
+  }
+});
+
+// R150 · 面板接线护栏: 归一面板主页 FreeCAD 环境卡 + 🧊 FreeCAD 板块 + 多实例路由;
+// Proxy Pro 面板域叠加真生效于 fc-agent; Cascade 面板 fcAgent 快速命令。
+test("FreeCAD 面板/板块/命令接线在位", () => {
+  const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  assert.ok(uni.includes('["freecad","🧊"'), "BOARDS 应含 🧊 FreeCAD 板块");
+  assert.ok(uni.includes("renderFcHomeCard"), "主页应含 FreeCAD 环境卡");
+  assert.ok(uni.includes("renderFreecad") && uni.includes("fc-state"), "FreeCAD 板块应接线");
+  for (const k of ["fc-reg-local", "fc-reg-remote", "fc-unreg", "fc-open", "fc-overlay"]) {
+    assert.ok(uni.includes(k), "unified-panel 应接线 " + k);
+  }
+  assert.ok(uni.includes('require("./fc-panel-core")') && uni.includes('require("./fc-agent")'));
+  assert.ok(uni.includes("dao.fc.module"), "web 模块应开独立 webview 实例");
+  const px = fs.readFileSync(path.join(CASCADE, "proxy-pro-panel.js"), "utf8");
+  assert.ok(px.includes("./fc-agent"), "Proxy Pro 域叠加应真生效于 dao-freecad MCP disabled");
+  const cas = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(cas.includes(".fcAgent"), "Cascade 应注册 fcAgent 快速命令");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.fcAgent"));
+});
+
 // R148 · 设置板块「团队/组织控制」卡: GetTeamOrganizationalControls 活体接线(本 VM 实证可达)。
 test("unified-panel: 团队/组织控制卡(GetTeamOrganizationalControls)接线在位", () => {
   const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");

@@ -36,6 +36,7 @@ const TOOL_MODES = [
 // 不论道德经/阴符经/官方哪种提示词模式, 叠加层都可叠加 —— 两者道并行而不相悖。
 const DOMAIN_OVERLAYS = [
   { id: "pcb", name: "KiCad/嘉立创EDA", summary: "PCB 工具层描述并入提示词(dao-pcb MCP 同源)" },
+  { id: "freecad", name: "FreeCAD 3D建模", summary: "FreeCAD 工具层描述并入提示词(dao-freecad MCP 同源)" },
 ];
 
 function fusionPath() {
@@ -88,6 +89,7 @@ function overlayPrompt() {
   for (const m of DOMAIN_OVERLAYS) {
     if (!overlayOn(m.id)) continue;
     if (m.id === "pcb") parts.push(require("./pcb-agent").modePrompt());
+    if (m.id === "freecad") parts.push(require("./fc-agent").modePrompt());
   }
   return parts.join("\n\n");
 }
