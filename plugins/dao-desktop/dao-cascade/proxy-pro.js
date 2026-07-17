@@ -7,6 +7,7 @@
 "use strict";
 const fs = require("fs");
 const os = require("os");
+const cp = require("child_process");
 const path = require("path");
 const http = require("http");
 const https = require("https");
@@ -41,6 +42,18 @@ function load() {
 function save(cfg) {
   fs.mkdirSync(path.dirname(cfgPath()), { recursive: true });
   fs.writeFileSync(cfgPath(), JSON.stringify({ channels: cfg.channels || [], routes: cfg.routes || {} }, null, 2), { mode: 0o600 });
+  hardenPrivate(cfgPath());
+}
+
+// Key 明文文件仅限本人可读: POSIX 用 mode 600; Windows 无 POSIX mode 语义(0o600 落盘后 stat 仍 666),
+// 等效保护是 NTFS ACL —— 去继承 + 只授当前用户完全控制(icacls)。失败静默(不阻断保存, 配置仍在用户目录下)。
+function hardenPrivate(p) {
+  if (process.platform !== "win32") return;
+  const user = process.env.USERNAME || (os.userInfo() && os.userInfo().username) || "";
+  if (!user) return;
+  try {
+    cp.spawnSync("icacls", [p, "/inheritance:r", "/grant:r", user + ":F"], { stdio: "ignore", timeout: 10000, windowsHide: true });
+  } catch (_) {}
 }
 
 function normBase(u) { return String(u || "").trim().replace(/\/+$/, ""); }
