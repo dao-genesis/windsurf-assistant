@@ -102,3 +102,9 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - /web 站内代理可 curl 直测: token/port 在 ~/.dao/local-api.json, `curl "http://127.0.0.1:<port>/web?t=<token>&u=<encoded url>"`。
 - 冷启桌面app: `DISPLAY=:0 setsid nohup ~/devin-desktop/Devin/devin-desktop --password-store=basic --disable-workspace-trust <repo> &`(DISPLAY 必须 :0, 用 wmctrl -a 聚焦)。
 - webview DOM 取证: 重启 IDE 加 `--remote-debugging-port=9223`, CDP 连 iframe target 后经 `document.querySelector('iframe').contentDocument` 进 active-frame(同源可直取 #log)。
+
+## v1.4.0 复验补充(R150)
+- 状态栏项判属: 插件与官方可能出现同名重复项(Free - Upgrade Now / Devin - Settings 各两份); 用 hover tooltip 区分——插件为中文(「升级套餐 (windsurf.com)」/中文账户卡), 官方为英文("Click to upgrade your plan")。
+- 归一面板左侧图标轨会随版本增删(v1.4.0 在 🏠 与切号 🔀 之间新增 ⚡PCB 图标), 不要按固定坐标点, 先 zoom 图标轨确认位次(图标间距约 26px, 首图标约 y=75)。
+- agent 菜单「+」行位于 Ctrl+提示行下方, 点击后 ACP 注册表列表渲染在同一弹层内(Featured 徽标)。
+- 反馈行取证: 回合尾 👍👎 在正文泡下方, 点击后按钮加框高亮; 失败仅打日志 "反馈上报失败"(grep ~/.config/Devin/logs 全量), 成功无正向打点。

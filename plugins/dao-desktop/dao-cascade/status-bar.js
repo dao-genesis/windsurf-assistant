@@ -12,6 +12,12 @@ const MODE_LABELS = { write: "Write", plan: "Plan", chat: "Chat",
 function createStatusBar(context, viewId) {
   const openCmd = viewId + ".open";
 
+  // 宿主为官方 Devin Desktop/Windsurf 时, 官方本体已注册同组状态栏项(Devin/模型/套餐/Settings),
+  // 插件再注册即出现重复两份 —— 官方宿主下整组让位于官方真源, 仅独立 VS Code 轨自行补齐。
+  if (/windsurf|devin/i.test(String(vscode.env.appName || ""))) {
+    return { set() {} };
+  }
+
   const main = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 120);
   main.command = openCmd;
   const model = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 119);
