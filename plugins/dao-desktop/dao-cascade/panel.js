@@ -3452,6 +3452,62 @@ function register(context, log, opts) {
       try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
       vscode.window.setStatusBarMessage("dao-pcb 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
     }),
+    // 🧊 FreeCAD 快速面板: 归一外壳各网页模块直开(每选一次 = 一个独立实例) + dao-freecad 工具层注册。
+    // web 模块为本机归一外壳网页(iframe 直嵌); app 模块拉起独立本机 FreeCAD 进程。
+    vscode.commands.registerCommand(viewId + ".fcAgent", async () => {
+      const fa = require("./fc-agent");
+      const fc = require("./fc-panel-core");
+      const st = fa.status();
+      const items = fc.modules().map((m) => ({
+        label: m.icon + " " + m.name,
+        description: m.kind === "web" ? "IDE 内网页实例" : "本机客户端实例",
+        act: "open", mod: m,
+      }));
+      items.push({ label: "$(plug) 注册 dao-freecad 工具层 · 本机检出 (stdio cad_agent.mcp_server)", act: "local" });
+      items.push({ label: "$(globe) 注册 dao-freecad 工具层 · 远端穿透 (serverUrl /mcp + Bearer)", act: "remote" });
+      if (st.registered) items.push({ label: "$(trash) 注销 dao-freecad", act: "off" });
+      const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: st.registered
+          ? "dao-freecad 已注册(" + st.transport + (st.disabled ? "·已停用" : "") + ") — 选模块直开或管理工具层"
+          : "选 FreeCAD 模块直开; 或注册 dao-freecad 工具层",
+      });
+      if (!pick) return;
+      if (pick.act === "open") {
+        const m = pick.mod;
+        if (m.kind === "app") {
+          const r = fc.openApp(m.exe);
+          if (!r.ok) vscode.window.showWarningMessage(r.error);
+          return;
+        }
+        try {
+          const p = vscode.window.createWebviewPanel("dao.fc.module", m.icon + " " + m.name,
+            vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+          p.webview.html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100vh}</style></head><body>' +
+            '<iframe src="' + String(m.url).replace(/"/g, "&quot;") + '" sandbox="allow-scripts allow-forms allow-same-origin allow-popups" allow="clipboard-read; clipboard-write"></iframe></body></html>';
+        } catch (e) { vscode.window.showWarningMessage("开模块失败: " + e.message); }
+        return;
+      }
+      let r;
+      if (pick.act === "off") r = fa.unregister();
+      else if (pick.act === "local") {
+        const found = fa.findLocalCheckout();
+        const dir = await vscode.window.showInputBox({
+          prompt: "Dao-3D-Modeling-Agent 检出目录", value: found || "", ignoreFocusOut: true });
+        if (dir === undefined) return;
+        r = fa.registerLocal({ dir: dir || undefined });
+      } else {
+        const url = await vscode.window.showInputBox({
+          prompt: "穿透公网 URL(如 https://dao-relay.example.com)", ignoreFocusOut: true });
+        if (!url) return;
+        const token = await vscode.window.showInputBox({
+          prompt: "Bearer Token(可空)", password: true, ignoreFocusOut: true });
+        if (token === undefined) return;
+        r = fa.registerRemote({ url, token: token || undefined });
+      }
+      if (r && r.ok === false) return void vscode.window.showWarningMessage("FreeCAD Agent: " + r.error);
+      try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
+      vscode.window.setStatusBarMessage("dao-freecad 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
+    }),
     // 官方 Create New Rule / Workflow / Global Workflow(CreateCustomizationFile 同源)
     vscode.commands.registerCommand(viewId + ".createRule", () => provider._handleCustomizationCreate("rule")),
     vscode.commands.registerCommand(viewId + ".createWorkflow", () => provider._handleCustomizationCreate("workflow")),

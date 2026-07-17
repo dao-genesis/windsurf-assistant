@@ -78,10 +78,11 @@ class ProxyProPanel {
   _mfOverlay(id, on) {
     try {
       modeFusion.setOverlay(id, on);
-      // pcb 域真生效: dao-pcb MCP 开/关(官方同一注入路径 —— LS 只向模型注入 enabled 服务的工具描述),
+      // 域真生效: 对应 MCP(dao-pcb/dao-freecad) 开/关(官方同一注入路径 —— LS 只向模型注入 enabled 服务的工具描述),
       // 并 best-effort 令 LS 即刻重载(不在跑不算失败, 配置文件已是真源)。
-      if (id === "pcb") {
-        const r = require("./pcb-agent").setDisabled(!on);
+      const agentMod = id === "pcb" ? "./pcb-agent" : id === "freecad" ? "./fc-agent" : null;
+      if (agentMod) {
+        const r = require(agentMod).setDisabled(!on);
         if (r.ok) {
           try {
             const ls = require("./ls-bridge");
