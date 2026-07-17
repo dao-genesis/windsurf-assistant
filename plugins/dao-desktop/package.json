@@ -91,6 +91,10 @@
         "title": "Devin Desktop: Windows Agent 接入官方工具层 (MCP 注册)"
       },
       {
+        "command": "dao.cascade.pcbAgent",
+        "title": "Devin Desktop: ⚡ PCB · KiCad/嘉立创EDA (模块直开/工具层注册)"
+      },
+      {
         "command": "dao.cascade.genCommit",
         "title": "Devin Desktop: ✨ 生成提交信息 (GenerateCommitMessage)",
         "icon": "$(sparkle)"

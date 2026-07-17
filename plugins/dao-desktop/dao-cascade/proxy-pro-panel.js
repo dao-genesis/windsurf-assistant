@@ -42,6 +42,7 @@ class ProxyProPanel {
       case "mf-state": return this._mfState();
       case "mf-set": return this._mfSet(String(msg.layer || ""), String(msg.id || ""));
       case "mf-custom": return this._mfCustom();
+      case "mf-overlay": return this._mfOverlay(String(msg.id || ""), !!msg.on);
       default: return;
     }
   }
@@ -69,6 +70,27 @@ class ProxyProPanel {
         });
       } else throw new Error("未知模式层: " + layer);
     } catch (e) { vscode.window.showErrorMessage("切模式失败: " + e.message); }
+    this._mfState();
+  }
+
+  // 域叠加开关(KiCad/嘉立创EDA 开/关): 开 = 工具描述并入提示词(太上下知有之);
+  // 关 = 官方原貌。与提示词层三模式正交, 不论道德经/阴符经/官方都可叠加。
+  _mfOverlay(id, on) {
+    try {
+      modeFusion.setOverlay(id, on);
+      // pcb 域真生效: dao-pcb MCP 开/关(官方同一注入路径 —— LS 只向模型注入 enabled 服务的工具描述),
+      // 并 best-effort 令 LS 即刻重载(不在跑不算失败, 配置文件已是真源)。
+      if (id === "pcb") {
+        const r = require("./pcb-agent").setDisabled(!on);
+        if (r.ok) {
+          try {
+            const ls = require("./ls-bridge");
+            if (ls.ready() && ls.apiKey()) ls.call("RefreshMcpServers", {}).catch(() => {});
+          } catch (_) {}
+        }
+      }
+      vscode.window.showInformationMessage("域叠加 " + id + (on ? " 已开(工具描述并入提示词)" : " 已关(官方原貌, 工具仍注册在册)"));
+    } catch (e) { vscode.window.showErrorMessage("切域叠加失败: " + e.message); }
     this._mfState();
   }
 
@@ -210,7 +232,9 @@ function renderModes(){
     d.promptModes.map(m=>'<button class="btn'+(m.id===d.prompt?'':' sec')+'" data-mfp="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.prompt?'✓ ':'')+E(m.name)+'</button>').join(' ')+
     (d.prompt==='custom'?' <button class="btn sec" id="mfCustomEdit" title="编辑自定义提示词全文, 热切在跑反代">编辑经文…</button>':'')+'</span></div>'+
     '<div class="cr"><span class="l">工具层(~/.dao/mode.json 契约)</span><span class="v">'+
-    d.toolModes.map(m=>'<button class="btn'+(m.id===d.tool?'':' sec')+'" data-mft="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.tool?'✓ ':'')+E(m.name)+'</button>').join(' ')+'</span></div></div>';
+    d.toolModes.map(m=>'<button class="btn'+(m.id===d.tool?'':' sec')+'" data-mft="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.tool?'✓ ':'')+E(m.name)+'</button>').join(' ')+'</span></div>'+
+    '<div class="cr"><span class="l">域叠加(与三模式正交可叠)</span><span class="v">'+
+    (d.overlays||[]).map(m=>'<button class="btn'+(m.on?'':' sec')+'" data-mfo="'+E(m.id)+'|'+(m.on?'0':'1')+'" title="'+E(m.summary)+'">'+(m.on?'✓ ':'◌ ')+E(m.name)+' '+(m.on?'开':'关')+'</button>').join(' ')+'</span></div></div>';
   h+='<div class="muted" style="margin-bottom:10px">提示词层与 Proxy Pro 经藏契约同源(invert/passthrough/custom); 工具层与 Dao-Windows-Agent ModeManager 同一契约文件, 桥在跑即刻联动。</div>';
   return h;
 }
@@ -256,6 +280,7 @@ function render(){
   document.querySelectorAll('[data-pxtest]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-test',uid:el.dataset.pxtest}));
   document.querySelectorAll('[data-mfp]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'prompt',id:el.dataset.mfp}));
   document.querySelectorAll('[data-mft]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'tool',id:el.dataset.mft}));
+  document.querySelectorAll('[data-mfo]').forEach(el=>el.onclick=()=>{const p=el.dataset.mfo.split('|');vscode.postMessage({type:'mf-overlay',id:p[0],on:p[1]==='1'});});
   const mfce=document.getElementById('mfCustomEdit'); if(mfce)mfce.onclick=()=>vscode.postMessage({type:'mf-custom'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
