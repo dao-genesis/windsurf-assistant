@@ -16,7 +16,17 @@ function createStatusBar(context, viewId) {
   main.command = openCmd;
   const model = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 119);
   model.command = openCmd;
-  context.subscriptions.push(main, model);
+  // 官方右下角另两项: 「Free - Upgrade Now」(免费套餐时) 与「Devin - Settings」。
+  const upgrade = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 118);
+  upgrade.text = "$(arrow-circle-up) Free - Upgrade Now";
+  upgrade.tooltip = "升级套餐(windsurf.com/pricing)";
+  upgrade.command = { title: "Upgrade", command: "vscode.open", arguments: [vscode.Uri.parse("https://windsurf.com/pricing")] };
+  const settings = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 117);
+  settings.text = "$(gear) Devin - Settings";
+  settings.tooltip = "Devin Settings 整页";
+  settings.command = "dao.cascade.openSettings";
+  settings.show();
+  context.subscriptions.push(main, model, upgrade, settings);
 
   const st = { user: null, plan: null, lsReady: false,
     modelLabel: null, mode: "write",
@@ -41,6 +51,9 @@ function createStatusBar(context, viewId) {
       model.tooltip = "Cascade 当前模型/模式 —— 点击打开面板切换";
       model.show();
     } else model.hide();
+
+    // 官方同义: 仅免费套餐展示升级项。
+    if (st.plan && /free/i.test(st.plan)) upgrade.show(); else upgrade.hide();
   }
 
   // 套餐/配额与官方账户卡同源(GetUserStatus); LS 就绪后拉一次, 之后低频刷新。
