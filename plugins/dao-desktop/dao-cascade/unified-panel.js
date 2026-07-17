@@ -1400,16 +1400,22 @@ function renderMcp(){
   if(!mb.length&&!reg.length){h+='<div class="card muted">暂无 MCP 服务器与注册表条目。</div>';return h;}
   if(mb.length) h+='<div class="st">已安装</div>';
   if(!mb.length) h+='<div class="card muted">无已配置的 MCP 服务器。点「添加」或从注册表一键安装。</div>';
+  // 官方 Plugins 商店同款富卡片: 标题+状态胶囊+描述+工具 chips(点 chip 启停单工具)
   for(const s of mb){
     const running=String(s.status||'').toUpperCase().indexOf('READY')>=0||String(s.status||'').toUpperCase().indexOf('RUN')>=0;
-    h+='<div class="acc"><div class="hd"><span>'+E(s.name)+
-      '<span class="badge'+(running?'':' cloud')+'">'+(s.disabled?'已禁用':(running?'⚡运行中':E(s.status)||'未运行'))+'</span></span>'+
+    const tools=s.tools||[], on=tools.filter(t=>!t.off).length;
+    h+='<div class="acc"><div class="hd"><span>🧩 '+E(s.name)+
+      '<span class="badge'+(running?'':' cloud')+'">'+(s.disabled?'已禁用':(running?'⚡运行中':E(s.status)||'未运行'))+'</span>'+
+      (tools.length?'<span class="badge cloud">'+on+'/'+tools.length+' 工具</span>':'')+'</span>'+
       '<button class="btn sec" data-mcptoggle="'+E(s.name)+'">'+(s.disabled?'启用':'禁用')+'</button></div>';
     if(s.error)h+='<div class="conv" style="cursor:default"><span>⚠ '+E(s.error)+'</span></div>';
-    for(const t of s.tools){
-      h+='<div class="conv" data-mcptool="'+E(s.name)+'|'+E(t.name)+'" title="'+E(t.description)+'">'+
-        '<span'+(t.off?' class="arch" style="text-decoration:line-through"':'')+'>'+(t.off?'◌ ':'● ')+E(t.name)+'</span>'+
-        '<span class="m">'+(t.off?'已禁用 · 点启':'启用中 · 点禁')+'</span></div>';
+    if(s.description)h+='<div class="conv" style="cursor:default"><span class="muted">'+E(s.description)+'</span></div>';
+    if(tools.length){
+      h+='<div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px">';
+      for(const t of tools){
+        h+='<span class="badge'+(t.off?' cloud':'')+'" data-mcptool="'+E(s.name)+'|'+E(t.name)+'" title="'+E(t.description||'')+(t.off?' · 已禁用,点启':' · 启用中,点禁')+'" style="cursor:pointer;'+(t.off?'text-decoration:line-through;opacity:.55':'')+'">'+(t.off?'◌ ':'● ')+E(t.name)+'</span>';
+      }
+      h+='</div>';
     }
     if(s.prompts&&s.prompts.length)h+='<div class="conv" style="cursor:default"><span class="muted">prompts: '+s.prompts.map(p=>E(p.name)).join(', ')+'</span></div>';
     h+='</div>';

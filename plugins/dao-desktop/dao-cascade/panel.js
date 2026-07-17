@@ -128,6 +128,7 @@ class CascadePanelProvider {
         // 顶部模式标签(官方 Agent/Editor 对位): Agent → 整窗会话看板; ⚙ → Devin Settings 整页。
         if (msg.type === "open-agent-board") return vscode.commands.executeCommand("dao.cascade.agentBoard");
         if (msg.type === "open-devin-settings") return vscode.commands.executeCommand("dao.cascade.openSettings");
+        if (msg.type === "open-customizations") return this._customizationsQuickPick();
         if (msg.type === "timeline-list") return this._handleTimelineList();
         if (msg.type === "worktree-create") return this._handleWorktreeCreate();
         if (msg.type === "outline-list") return this._handleOutlineList();
@@ -1802,6 +1803,13 @@ class CascadePanelProvider {
   // 官方式 Rules · Skills 定制面板: GetAllRules → {memories(规则), skills} —— .windsurf/rules 与 .agents/skills 同源
   async _handleCustomizationsList() {
     try {
+      const { rules, skills, workflows } = await this._collectCustomizations();
+      this._post({ type: "customizations", rules, skills, workflows });
+    } catch (e) { this._post({ type: "error", text: "读取 Rules/Skills 失败: " + e.message }); }
+  }
+
+  async _collectCustomizations() {
+    {
       const ls = require("./ls-bridge");
       const [r, sk, wf] = await Promise.all([
         ls.call("GetAllRules", {}).catch(() => ({})),
@@ -1841,8 +1849,32 @@ class CascadePanelProvider {
         name: s.name || s.skillName || "", description: s.description || "", path: fromUri(s.path) }));
       const workflows = (wf.workflows || []).map((w) => ({
         name: w.name || "", description: w.description || "", path: fromUri(w.path), builtin: !!w.isBuiltin }));
-      this._post({ type: "customizations", rules, skills, workflows });
-    } catch (e) { this._post({ type: "error", text: "读取 Rules/Skills 失败: " + e.message }); }
+      return { rules, skills, workflows };
+    }
+  }
+
+  // 官方 Customizations 页签同源: Rules / Skills / Workflows / Memories 一处总览(QuickPick)
+  async _customizationsQuickPick() {
+    let data = { rules: [], skills: [], workflows: [] };
+    try { data = await this._collectCustomizations(); } catch (_) {}
+    const items = [];
+    const sect = (label) => items.push({ label, kind: vscode.QuickPickItemKind.Separator });
+    sect("Rules");
+    for (const r of data.rules) items.push({ label: "$(law) " + r.name, description: r.trigger || "", _path: r.path });
+    items.push({ label: "$(add) 新建 Rule…", _create: "rule" });
+    sect("Workflows");
+    for (const w of data.workflows) items.push({ label: "$(run-all) " + w.name, description: (w.builtin ? "builtin · " : "") + (w.description || ""), _path: w.path });
+    items.push({ label: "$(add) 新建 Workflow…", _create: "workflow" });
+    sect("Skills");
+    for (const s of data.skills) items.push({ label: "$(book) " + s.name, description: s.description || "", _path: s.path });
+    items.push({ label: "$(add) 新建 Skill…", _create: "skill" });
+    sect("Memories");
+    items.push({ label: "$(database) 查看 Memories(面板)", _memories: true });
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Customizations · Rules / Workflows / Skills / Memories(官方同源)", matchOnDescription: true });
+    if (!pick) return;
+    if (pick._create) return this._handleCustomizationCreate(pick._create);
+    if (pick._memories) { await vscode.commands.executeCommand(this._viewId + ".open").then(undefined, () => {}); return this._handleMemoriesList(); }
+    if (pick._path) return this._handleOpenFile(pick._path);
   }
 
   // 官方式新建定制文件: CreateCustomizationFile{fileName,fileType,workspaceConfigDir:".windsurf"} → filePath 开编辑器
@@ -2497,7 +2529,8 @@ class CascadePanelProvider {
   <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
     <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
     <button id="mtEditor" title="Editor 模式(当前)" style="border:1px solid var(--line);background:var(--pill-hover);color:var(--vscode-foreground);border-radius:0 6px 6px 0;padding:2px 12px;cursor:default;margin-left:-2px;">Editor</button>
-    <button id="mtSettings" title="Devin Settings 整页" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
+    <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">📚</button>
+    <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
   </div>
   <div id="log">
     <div class="empty" id="empty">
@@ -2746,6 +2779,8 @@ class CascadePanelProvider {
   if(mtAgent) mtAgent.onclick=()=>vscode.postMessage({type:"open-agent-board"});
   const mtSettings=document.getElementById("mtSettings");
   if(mtSettings) mtSettings.onclick=()=>vscode.postMessage({type:"open-devin-settings"});
+  const mtCustom=document.getElementById("mtCustom");
+  if(mtCustom) mtCustom.onclick=()=>vscode.postMessage({type:"open-customizations"});
 
   // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
   const tryCloudBtn=document.getElementById("tryCloud");
@@ -3577,6 +3612,43 @@ function register(context, log, opts) {
       vscode.env.openExternal(vscode.Uri.parse("https://app.devin.ai/settings/profile"))),
     vscode.commands.registerCommand(viewId + ".openChangelog", () =>
       vscode.env.openExternal(vscode.Uri.parse("https://docs.devin.ai/release-notes/overview"))),
+    // 官方标题栏头像菜单同源: 账号/套餐/Usage/Billing/Changelog/Sign out 一处总览
+    vscode.commands.registerCommand(viewId + ".accountMenu", async () => {
+      let name = "", plan = "";
+      try {
+        const ls = require("./ls-bridge");
+        if (ls.ready() && ls.apiKey()) {
+          const r = await ls.call("GetUserStatus", {});
+          const u = (r && r.userStatus) || {};
+          name = u.name || u.email || "";
+          plan = ((u.planStatus || {}).planInfo || {}).planName || "";
+        }
+      } catch (_) {}
+      const sep = { label: "", kind: vscode.QuickPickItemKind.Separator };
+      const items = [
+        { label: name ? "$(account) " + name : "$(account) 未登录", description: plan, _cmd: name ? null : viewId + ".login" },
+        sep,
+        { label: "$(comment-discussion) 打开 Cascade 面板", _cmd: viewId + ".open" },
+        { label: "$(gear) Devin Settings", _cmd: viewId + ".openSettings" },
+        { label: "$(book) Customizations", _cmd: viewId + ".customizations" },
+        sep,
+        { label: "$(graph) Usage", _url: "https://windsurf.com/subscription/usage" },
+        { label: "$(credit-card) Billing", _url: "https://windsurf.com/subscription/manage-plan" },
+        { label: "$(rocket) Upgrade", _url: "https://windsurf.com/subscription/upgrade" },
+        sep,
+        { label: "$(person) View Profile", _cmd: viewId + ".openProfile" },
+        { label: "$(history) Changelog", _cmd: viewId + ".openChangelog" },
+        sep,
+        name ? { label: "$(sign-out) Sign out", _cmd: viewId + ".logout" }
+             : { label: "$(sign-in) Log in", _cmd: viewId + ".login" },
+      ];
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Devin · 账号菜单(官方头像菜单同源)" });
+      if (!pick) return;
+      if (pick._cmd) return vscode.commands.executeCommand(pick._cmd);
+      if (pick._url) return vscode.env.openExternal(vscode.Uri.parse(pick._url));
+    }),
+    // 官方 Customizations 页签同源总览
+    vscode.commands.registerCommand(viewId + ".customizations", () => provider._customizationsQuickPick()),
     // 官方式提交信息生成: GenerateCommitMessage{repoRootUri} → 写入 SCM 输入框(官方 SCM ✨ 同款)
     vscode.commands.registerCommand(viewId + ".genCommit", async () => {
       try {
