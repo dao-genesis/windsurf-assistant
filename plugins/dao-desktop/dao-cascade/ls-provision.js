@@ -42,6 +42,19 @@ function resolveBin(storageDir) {
   return null;
 }
 
+// 官方同源父管道: LS 连上后监控连接, 宿主进程死亡(即使未走 deactivate)管道断开 → LS 自杀,
+// 消彻孤儿 LS 泄漏(实机 T6 缺陷)。
+function startParentPipe() {
+  const net = require("net");
+  const p = process.platform === "win32"
+    ? "\\\\.\\pipe\\dao_ls_" + crypto.randomBytes(6).toString("hex")
+    : path.join(os.tmpdir(), "dao_ls_pipe_" + crypto.randomBytes(6).toString("hex") + ".sock");
+  return new Promise((resolve) => {
+    const srv = net.createServer(() => {});
+    srv.listen(p, () => resolve({ path: p, srv }));
+  });
+}
+
 // 极简 extension-server: LS 回连的全部 ExtensionServerService 方法一律回 {}。
 function startStubExtServer() {
   return new Promise((resolve) => {
@@ -91,7 +104,9 @@ async function provision(opts) {
   const esPort = extSrv.address().port;
   const dbDir = path.join(os.homedir(), ".codeium", "windsurf", "database", "dao-selfhost");
   try { fs.mkdirSync(dbDir, { recursive: true }); } catch (_) {}
+  const pipe = await startParentPipe();
   const args = [
+    "--parent_pipe_path", pipe.path,
     "--api_server_url", "https://server.codeium.com",
     "--run_child",
     "--enable_lsp",
@@ -105,10 +120,11 @@ async function provision(opts) {
     "--sentry_environment", "stable",
   ];
   const child = spawn(bin, args, { env: Object.assign({}, process.env, { WINDSURF_CSRF_TOKEN: csrf }), stdio: ["ignore", "ignore", "ignore"], detached: false });
-  child.unref(); // 不阻塞宿主退出(插件 deactivate 时 stop() 显式回收)
+  child.unref(); // 不阻塞宿主退出(父管道断开 → LS 自杀; deactivate 时 stop() 双保险)
   extSrv.unref();
-  _current = { child, extSrv, port: null, csrf, bin };
-  child.on("exit", () => { try { extSrv.close(); } catch (_) {} if (_current && _current.child === child) _current = null; });
+  pipe.srv.unref();
+  _current = { child, extSrv, pipe, port: null, csrf, bin };
+  child.on("exit", () => { try { extSrv.close(); } catch (_) {} try { pipe.srv.close(); } catch (_) {} if (_current && _current.child === child) _current = null; });
 
   const apiKey = (opts.apiKeyCandidates && opts.apiKeyCandidates[0]) || firstApiKey();
   const t0 = Date.now();
@@ -141,7 +157,7 @@ function firstApiKey() {
 
 function stop() {
   const cur = running();
-  if (cur) { try { cur.child.kill(); } catch (_) {} try { cur.extSrv.close(); } catch (_) {} }
+  if (cur) { try { cur.child.kill(); } catch (_) {} try { cur.extSrv.close(); } catch (_) {} try { cur.pipe && cur.pipe.srv.close(); } catch (_) {} }
   _current = null;
 }
 

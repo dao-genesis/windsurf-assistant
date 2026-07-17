@@ -1598,4 +1598,9 @@ test("R149 ls-provision: 二进制解析/极简 ext-server/发现兜底接线", 
   assert.ok(hd.includes("ls-provision") && hd.includes("lp.provision"), "discover 无宿主 LS 时应走自持兜底");
   const lb = fs.readFileSync(path.join(CASCADE, "ls-bridge.js"), "utf8");
   assert.ok(/未就绪/.test(lb.match(/function isStaleEndpointError[\s\S]{0,200}/)[0]), "LS 未就绪应触发 refreshAuth→自持");
+  // 孤儿回收(实机 T6 回修): 官方同源父管道 + deactivate 显式 stop 双保险
+  const lps = fs.readFileSync(path.join(CASCADE, "ls-provision.js"), "utf8");
+  assert.ok(lps.includes("--parent_pipe_path") && lps.includes("startParentPipe"), "spawn 应带父管道, 宿主死亡 LS 自杀");
+  const ext = fs.readFileSync(path.join(CASCADE, "..", "extension.js"), "utf8");
+  assert.ok(/deactivate[\s\S]{0,200}ls-provision"\).stop\(\)/.test(ext), "deactivate 应显式 stop 自持 LS");
 });
