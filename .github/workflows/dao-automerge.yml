@@ -140,35 +140,45 @@ jobs:
                 if (runs.length === 0 || notGreen.length > 0) { core.info(`PR #${pr.number} CI 未全绿，等待`); continue; }
               }
 
-              try {
-                await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: A.method });
-                core.info(`已合并 PR #${pr.number}（作者 ${author}）`);
-                budget--;
+              // 优先用 PAT(DAO_MERGE_TOKEN) 合并：GITHUB_TOKEN 推出的合并不会触发下游
+              // push 工作流(GitHub 防环机制),会导致 release.yml / deploy-pages / README 同步
+              // 在自动合并后全部「静默不跑」——发版与主页因此长期滞后。改用 PAT 身份合并,
+              // 合并推送即为真实用户,下游 CI/发版/同步链条正常触发。PAT 缺失时回退 GITHUB_TOKEN。
+              const fb = process.env.DAO_MERGE_TOKEN;
+              const delBranchGh = async () => {
                 if (A.delBranch && pr.head.repo && pr.head.repo.full_name === `${owner}/${repo}`) {
                   await github.rest.git.deleteRef({ owner, repo, ref: `heads/${pr.head.ref}` }).catch(()=>{});
                 }
-              } catch (e) {
-                // GITHUB_TOKEN 无法合并改动了 workflow 文件的 PR；用备援合并令牌兜底
-                const fb = process.env.DAO_MERGE_TOKEN;
-                if (fb && /workflow/i.test(e.message || '')) {
-                  const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${pr.number}/merge`, {
-                    method: 'PUT',
-                    headers: { authorization: `token ${fb}`, accept: 'application/vnd.github+json' },
-                    body: JSON.stringify({ merge_method: A.method })
-                  });
-                  if (resp.ok) {
-                    core.info(`已用备援令牌合并 PR #${pr.number}（含 workflow 改动）`);
-                    budget--;
-                    if (A.delBranch && pr.head.repo && pr.head.repo.full_name === `${owner}/${repo}`) {
-                      await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${pr.head.ref}`, {
-                        method: 'DELETE', headers: { authorization: `token ${fb}` }
-                      }).catch(()=>{});
-                    }
-                    continue;
-                  }
-                  core.warning(`PR #${pr.number} 备援合并也失败: ${resp.status} ${await resp.text()}`);
-                } else {
-                  core.warning(`PR #${pr.number} 合并失败: ${e.message}`);
+              };
+              const delBranchPat = async () => {
+                if (A.delBranch && pr.head.repo && pr.head.repo.full_name === `${owner}/${repo}`) {
+                  await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${pr.head.ref}`, {
+                    method: 'DELETE', headers: { authorization: `token ${fb}` }
+                  }).catch(()=>{});
                 }
+              };
+
+              if (fb) {
+                const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${pr.number}/merge`, {
+                  method: 'PUT',
+                  headers: { authorization: `token ${fb}`, accept: 'application/vnd.github+json' },
+                  body: JSON.stringify({ merge_method: A.method })
+                });
+                if (resp.ok) {
+                  core.info(`已用 DAO_MERGE_TOKEN 合并 PR #${pr.number}（作者 ${author}·可触发下游发版/同步）`);
+                  budget--;
+                  await delBranchPat();
+                  continue;
+                }
+                core.warning(`PR #${pr.number} PAT 合并失败(${resp.status})，回退 GITHUB_TOKEN: ${await resp.text()}`);
+              }
+
+              try {
+                await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: A.method });
+                core.info(`已用 GITHUB_TOKEN 合并 PR #${pr.number}（作者 ${author}·下游 push 工作流可能不触发）`);
+                budget--;
+                await delBranchGh();
+              } catch (e) {
+                core.warning(`PR #${pr.number} 合并失败: ${e.message}`);
               }
             }

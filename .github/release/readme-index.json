@@ -1,0 +1,34 @@
+{
+  "_doc": "README 主页模块索引表(DAO-MODULE-INDEX)的单一事实源。scripts/sync-readme-index.js 读它,按各插件当前版本重建版本列与 Release/下载列;说明列保留 README 内人工文案(按 extId 定位行,不覆盖)。版本优先取真实已发布 Release(工作流经 DAO_INDEX_VERSIONS 注入),兜底取 package.json,确保链接永不 404。",
+  "repo": "dao-genesis/windsurf-assistant",
+  "markers": {
+    "start": "<!-- DAO-MODULE-INDEX:START -->",
+    "end": "<!-- DAO-MODULE-INDEX:END -->"
+  },
+  "modules": [
+    {
+      "extId": "devaid.rt-flow",
+      "key": "rt-flow",
+      "versionFile": "plugins/rt-flow/package.json",
+      "vsix": "rt-flow-{v}.vsix"
+    },
+    {
+      "extId": "dao-agi.dao-proxy-min",
+      "key": "dao-proxy-min",
+      "versionFile": "plugins/dao-proxy-min/package.json",
+      "vsix": "dao-proxy-min-{v}.vsix"
+    },
+    {
+      "extId": "dao-agi.dao-proxy-pro",
+      "key": "dao-proxy-pro",
+      "versionFile": "plugins/dao-proxy-pro/package.json",
+      "vsix": "dao-proxy-pro-{v}.vsix"
+    },
+    {
+      "extId": "dao-agi.dao-desktop",
+      "key": "dao-desktop",
+      "versionFile": "plugins/dao-desktop/package.json",
+      "vsix": "dao-desktop-{v}.vsix"
+    }
+  ]
+}
