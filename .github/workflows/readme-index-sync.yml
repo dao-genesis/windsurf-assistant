@@ -1,0 +1,85 @@
+name: Sync README index
+
+# 道法自然 · 主页(README)模块索引自动跟随真实发布：
+# Release 每发一版,本工作流即把 README 的 DAO-MODULE-INDEX 表(版本列 + Release/VSIX 下载列)
+# 刷新为「实际已发布的最新版本」,链接按真实 tag 生成,永不 404;说明列保留人工文案。
+# 触发：发版工作流跑完之后(workflow_run) · Release 事件 · 每日兜底 · 手动。
+# 单一事实源: .github/release/readme-index.json + scripts/sync-readme-index.js
+
+on:
+  workflow_run:
+    workflows: ["Sync plugins to Release"]
+    types: [completed]
+  release:
+    types: [published, edited, released, deleted]
+  schedule:
+    - cron: "23 2 * * *" # 每日兜底,防事件丢失
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readme-index-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 取各模块真实已发布最新版本
+        id: vers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate > releases.json
+          node -e '
+            const fs = require("fs");
+            const cfg = JSON.parse(fs.readFileSync(".github/release/readme-index.json", "utf8"));
+            const rels = JSON.parse("[" + fs.readFileSync("releases.json","utf8").trim().replace(/\]\s*\[/g, ",").replace(/^\[|\]$/g, "") + "]");
+            const cmp = (a, b) => {
+              const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+              for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                const d = (pa[i] || 0) - (pb[i] || 0);
+                if (d) return d;
+              }
+              return 0;
+            };
+            const out = {};
+            for (const m of cfg.modules) {
+              const re = new RegExp("^" + m.key.replace(/[-]/g, "\\-") + "-v(\\d+(?:\\.\\d+)*)$");
+              const vs = rels.filter(r => !r.draft).map(r => (r.tag_name.match(re) || [])[1]).filter(Boolean);
+              if (vs.length) out[m.key] = vs.sort(cmp).pop();
+            }
+            fs.writeFileSync("versions.json", JSON.stringify(out));
+            console.log("released versions:", out);
+          '
+          echo "versions=$(cat versions.json)" >> "$GITHUB_OUTPUT"
+
+      - name: 重建 README 模块索引
+        env:
+          DAO_INDEX_VERSIONS: ${{ steps.vers.outputs.versions }}
+        run: node scripts/sync-readme-index.js
+
+      - name: 有变化则直推 main
+        run: |
+          set -e
+          rm -f releases.json versions.json
+          if git diff --quiet -- README.md; then
+            echo "README 已同步,无为。"
+            exit 0
+          fi
+          git config user.name "dao-readme-sync[bot]"
+          git config user.email "dao-readme-sync@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs(readme): 模块索引自动跟随最新 Release [skip ci]"
+          git push origin HEAD:main
+          echo "README 模块索引已更新并推送。"
