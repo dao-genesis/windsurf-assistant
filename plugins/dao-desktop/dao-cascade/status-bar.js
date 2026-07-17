@@ -27,8 +27,8 @@ function createStatusBar(context, viewId) {
   plan.command = { title: "Upgrade", command: "vscode.open", arguments: [vscode.Uri.parse("https://windsurf.com/subscription/upgrade")] };
   const settings = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 117);
   settings.text = "Devin - Settings";
-  settings.tooltip = "Devin Settings";
-  settings.command = "dao.unified.open";
+  settings.tooltip = "Devin Settings 整页";
+  settings.command = "dao.cascade.openSettings";
   settings.show();
   context.subscriptions.push(main, model, plan, settings);
 

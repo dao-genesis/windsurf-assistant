@@ -35,3 +35,7 @@
 | GetSystemPromptAndTools | 系统提示词/工具清单查看 | ⛔ | R148 活体实证: plannerConfig 各字段变体均报 "planner config not set", cascadeConfig 包裹变体致 LS panic(socket hang up) — 服务端请求面不可解, 判官方内部调试 RPC |
 | SetPinnedContext/Guideline | 固定上下文/准则 | ⛔ | R148 复测仍 not implemented |
 | GetUnleashData | feature flags | ❌(不做) | R148 活体 200, 但为官方实验开关面, 非用户功能 |
+| Agent 模式看板 | 整窗云会话 Board/List/Spaces/筛选/搜索/New session | ✅(R149) | agent-board.js: Devin Cloud ACP session/list(活体实证, cognition.ai/* 元数据) + 本机轨迹双源 |
+| Agent/Editor 顶部标签 | 模式标签切换 | ✅(R149) | Cascade 面板顶部标签条: Agent → 看板, ⚙ → Settings |
+| Devin Settings 整页 | General/Plan/Plugins/Agents/Devin Local/Editor/Cascade/Advanced | ✅(R149) | settings-page.js: 8 节整页, 数据/写回全走既有真源(GetUserStatus/GetUserSettings/MCP/devin-provision/import-sync) |
+| 状态栏 Upgrade/Settings 项 | Free-Upgrade Now / Devin-Settings | ✅(R149) | status-bar.js 补齐(升级项仅免费套餐显示) |

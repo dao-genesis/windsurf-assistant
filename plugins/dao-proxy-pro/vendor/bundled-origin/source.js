@@ -3221,6 +3221,16 @@ function handleControl(req, res) {
         canon_name: (_CANON_MAP[_activeCanon] || {}).name || _activeCanon,
         canon_chars: _activeCanonText ? _activeCanonText.length : 0,
         canon_valid: [..._CANON_VALID],
+        // 工具模式轴(与经藏正交) · 面板 ping 同步
+        tools:
+          _spInvertLib && _spInvertLib.getToolMode
+            ? _spInvertLib.getToolMode()
+            : "official",
+        tools_name:
+          _spInvertLib && _spInvertLib.TOOLMODE_MAP && _spInvertLib.getToolMode
+            ? (_spInvertLib.TOOLMODE_MAP[_spInvertLib.getToolMode()] || {})
+                .name || _spInvertLib.getToolMode()
+            : "official",
         self_size: _SELF_SIZE,
         self_file: __filename,
         // v9.9.263 · 真解锁 · GetUserStatus 去 Pro 锁实证计数

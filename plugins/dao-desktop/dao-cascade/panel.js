@@ -125,6 +125,9 @@ class CascadePanelProvider {
         if (msg.type === "open-file") return this._handleOpenFile(msg.path);
         if (msg.type === "memories-list") return this._handleMemoriesList();
         if (msg.type === "status-info") return this._handleStatusInfo();
+        // 顶部模式标签(官方 Agent/Editor 对位): Agent → 整窗会话看板; ⚙ → Devin Settings 整页。
+        if (msg.type === "open-agent-board") return vscode.commands.executeCommand("dao.cascade.agentBoard");
+        if (msg.type === "open-devin-settings") return vscode.commands.executeCommand("dao.cascade.openSettings");
         if (msg.type === "timeline-list") return this._handleTimelineList();
         if (msg.type === "worktree-create") return this._handleWorktreeCreate();
         if (msg.type === "outline-list") return this._handleOutlineList();
@@ -2491,6 +2494,11 @@ class CascadePanelProvider {
   #modelList .mit .mds { color:var(--dim); font-size:10.5px; margin-top:1px; line-height:1.35; }
   #modelList .empty3 { padding:8px 10px; font-size:11.5px; color:var(--dim); }
 </style></head><body>
+  <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
+    <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
+    <button id="mtEditor" title="Editor 模式(当前)" style="border:1px solid var(--line);background:var(--pill-hover);color:var(--vscode-foreground);border-radius:0 6px 6px 0;padding:2px 12px;cursor:default;margin-left:-2px;">Editor</button>
+    <button id="mtSettings" title="Devin Settings 整页" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
+  </div>
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
@@ -2732,6 +2740,12 @@ class CascadePanelProvider {
     i=e.key==="ArrowDown"?(i+1)%items.length:(i<=0?items.length-1:i-1);
     items[i].classList.add("kbd"); items[i].scrollIntoView({block:"nearest"});
   });
+
+  // 顶部模式标签(官方 Agent/Editor 对位): Agent → 整窗看板; ⚙ → Devin Settings 整页
+  const mtAgent=document.getElementById("mtAgent");
+  if(mtAgent) mtAgent.onclick=()=>vscode.postMessage({type:"open-agent-board"});
+  const mtSettings=document.getElementById("mtSettings");
+  if(mtSettings) mtSettings.onclick=()=>vscode.postMessage({type:"open-devin-settings"});
 
   // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
   const tryCloudBtn=document.getElementById("tryCloud");
@@ -3497,6 +3511,62 @@ function register(context, log, opts) {
       if (r && r.ok === false) return void vscode.window.showWarningMessage("PCB Agent: " + r.error);
       try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
       vscode.window.setStatusBarMessage("dao-pcb 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
+    }),
+    // 🧊 FreeCAD 快速面板: 归一外壳各网页模块直开(每选一次 = 一个独立实例) + dao-freecad 工具层注册。
+    // web 模块为本机归一外壳网页(iframe 直嵌); app 模块拉起独立本机 FreeCAD 进程。
+    vscode.commands.registerCommand(viewId + ".fcAgent", async () => {
+      const fa = require("./fc-agent");
+      const fc = require("./fc-panel-core");
+      const st = fa.status();
+      const items = fc.modules().map((m) => ({
+        label: m.icon + " " + m.name,
+        description: m.kind === "web" ? "IDE 内网页实例" : "本机客户端实例",
+        act: "open", mod: m,
+      }));
+      items.push({ label: "$(plug) 注册 dao-freecad 工具层 · 本机检出 (stdio cad_agent.mcp_server)", act: "local" });
+      items.push({ label: "$(globe) 注册 dao-freecad 工具层 · 远端穿透 (serverUrl /mcp + Bearer)", act: "remote" });
+      if (st.registered) items.push({ label: "$(trash) 注销 dao-freecad", act: "off" });
+      const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: st.registered
+          ? "dao-freecad 已注册(" + st.transport + (st.disabled ? "·已停用" : "") + ") — 选模块直开或管理工具层"
+          : "选 FreeCAD 模块直开; 或注册 dao-freecad 工具层",
+      });
+      if (!pick) return;
+      if (pick.act === "open") {
+        const m = pick.mod;
+        if (m.kind === "app") {
+          const r = fc.openApp(m.exe);
+          if (!r.ok) vscode.window.showWarningMessage(r.error);
+          return;
+        }
+        try {
+          const p = vscode.window.createWebviewPanel("dao.fc.module", m.icon + " " + m.name,
+            vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+          p.webview.html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100vh}</style></head><body>' +
+            '<iframe src="' + String(m.url).replace(/"/g, "&quot;") + '" sandbox="allow-scripts allow-forms allow-same-origin allow-popups" allow="clipboard-read; clipboard-write"></iframe></body></html>';
+        } catch (e) { vscode.window.showWarningMessage("开模块失败: " + e.message); }
+        return;
+      }
+      let r;
+      if (pick.act === "off") r = fa.unregister();
+      else if (pick.act === "local") {
+        const found = fa.findLocalCheckout();
+        const dir = await vscode.window.showInputBox({
+          prompt: "Dao-3D-Modeling-Agent 检出目录", value: found || "", ignoreFocusOut: true });
+        if (dir === undefined) return;
+        r = fa.registerLocal({ dir: dir || undefined });
+      } else {
+        const url = await vscode.window.showInputBox({
+          prompt: "穿透公网 URL(如 https://dao-relay.example.com)", ignoreFocusOut: true });
+        if (!url) return;
+        const token = await vscode.window.showInputBox({
+          prompt: "Bearer Token(可空)", password: true, ignoreFocusOut: true });
+        if (token === undefined) return;
+        r = fa.registerRemote({ url, token: token || undefined });
+      }
+      if (r && r.ok === false) return void vscode.window.showWarningMessage("FreeCAD Agent: " + r.error);
+      try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
+      vscode.window.setStatusBarMessage("dao-freecad 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
     }),
     // 官方 Create New Rule / Workflow / Global Workflow(CreateCustomizationFile 同源)
     vscode.commands.registerCommand(viewId + ".createRule", () => provider._handleCustomizationCreate("rule")),

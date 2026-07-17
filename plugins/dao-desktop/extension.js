@@ -55,11 +55,24 @@ async function activate(context) {
   } catch (e) { log("✗ Cascade 面板注册失败: " + (e && e.stack ? e.stack : e)); }
 
   // ②b 归一面板(dao.unified): 插件本源统一管理(主页/双源对话备份/MCP, 持续扩板块)。
+  let unifiedPanel = null;
   try {
     const unified = require("./dao-cascade/unified-panel");
-    unified.register(context, (m) => log("[unified] " + m), { ns: "dao", cascade: cascadeProvider });
+    unifiedPanel = unified.register(context, (m) => log("[unified] " + m), { ns: "dao", cascade: cascadeProvider });
     log("✓ 归一面板就位 (dao.unified)");
   } catch (e) { log("✗ 归一面板注册失败: " + (e && e.stack ? e.stack : e)); }
+
+  // ②b′ Agent 看板(dao.cascade.agentBoard): 官方「Agent 模式」整窗会话看板对位。
+  try {
+    require("./dao-cascade/agent-board").register(context, (m) => log("[agent-board] " + m));
+    log("✓ Agent 看板就位 (dao.cascade.agentBoard)");
+  } catch (e) { log("✗ Agent 看板注册失败: " + (e && e.stack ? e.stack : e)); }
+
+  // ②b″ Devin Settings 整页(dao.cascade.openSettings): 官方设置页对位。
+  try {
+    require("./dao-cascade/settings-page").register(context, (m) => log("[settings] " + m), { unified: unifiedPanel });
+    log("✓ Devin Settings 整页就位 (dao.cascade.openSettings)");
+  } catch (e) { log("✗ Devin Settings 注册失败: " + (e && e.stack ? e.stack : e)); }
 
   // ②c Proxy Pro 独立面板(dao.proxyPro): 与 dao-proxy-pro 独立插件面板对位,
   // 插件自持渠道/路由(~/.dao/proxy-channels.json), 与 dao-vsix 的 ~/.codeium/dao-byok 隔离。
