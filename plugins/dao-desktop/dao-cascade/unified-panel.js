@@ -1169,7 +1169,7 @@ body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vsco
 .st{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.6;margin:14px 0 6px}
 .st:first-child{margin-top:0}
 .card{border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;padding:10px 12px;margin-bottom:10px}
-.cr{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+.cr{display:flex;justify-content:space-between;gap:12px;padding:3px 0;flex-wrap:wrap}
 .cr .l{opacity:.65}.cr .v{text-align:right;word-break:break-all}
 .acc{border:1px solid var(--vscode-panel-border,#3334);border-radius:8px;margin-bottom:10px;overflow:hidden}
 .acc .hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px;padding:8px 12px;background:var(--vscode-list-hoverBackground,#8881);font-weight:600}
