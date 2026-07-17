@@ -83,7 +83,8 @@ function detectEasyeda() {
   return { installed: false };
 }
 
-// 注册 local 通道：stdio 起 pcb_brain/pcb_mcp.py(design_pcb/run_drc/export_gerber 等)。
+// 注册 local 通道：stdio 优先起 pcb_brain/dao_core.py(闻道日损·9 个正交核心工具,
+// 背后经 agent_tool_manifest 路由双软件 9009 全表面); 老检出无 dao_core 则回退 pcb_mcp.py。
 // opts: { dir?, token?, kicadPort?, lcedaPort?, disabled? } → { ok, name, transport, configPath } | { ok:false, error }
 function registerLocal(opts) {
   opts = opts || {};
@@ -93,9 +94,11 @@ function registerLocal(opts) {
   if (opts.token) env.DAO_PCB_TOKEN = String(opts.token);
   if (opts.kicadPort) env.DAO_KICAD_PORT = String(opts.kicadPort);
   if (opts.lcedaPort) env.LCEDA_BRIDGE_PORT = String(opts.lcedaPort);
+  const entry = fs.existsSync(path.join(dir, "pcb_brain", "dao_core.py"))
+    ? "dao_core.py" : "pcb_mcp.py";
   const spec = {
     command: process.platform === "win32" ? "python" : "python3",
-    args: [path.join("pcb_brain", "pcb_mcp.py")],
+    args: [path.join("pcb_brain", entry)],
     cwd: dir,
   };
   if (Object.keys(env).length) spec.env = env;
@@ -167,14 +170,15 @@ function modePrompt() {
   return [
     "# PCB 模式(道并行而不相悖)",
     "",
-    "你已接入 PCB 设计的官方并列工具层(dao-pcb MCP)。除写代码外，你还可用这些工具：",
+    "你已接入 PCB 设计的官方并列工具层(dao-pcb MCP·闻道日损后的 9 个正交核心工具)：",
     "",
-    "- KiCad: design_pcb(DNA→.kicad_pcb+自动布线)、run_drc、export_gerber、parse_pcb、",
-    "  search_footprint/search_symbol(153库封装/225库符号全量索引)、kicad_sense(健康报告)。",
-    "- 嘉立创EDA: 本机 LCEDA 桥暴露官方 EXTAPI 全量能力面(93 命名空间/702 方法)——",
-    "  建工程/开工程/原理图/PCB/规则引擎 DRC/保存，皆为真实客户端引擎，非模拟。",
-    "- 生产闭环: get_bom(LCSC 料号+成本)、generate_order(JLCPCB 下单包)、generate_ibom、",
-    "  run_pipeline(DNA→PCB→DRC→Gerber→iBoM→JLCPCB 全闭环)、find_alternative、estimate_cost。",
+    "- pcb_sense(环境五感) · pcb_search(搜一切: 模板/封装/符号/嘉立创器件/全表面工具)",
+    "- pcb_design(KiCad DNA 模板 或 嘉立创 spec 端到端建板: 放置/绑网/布线/DRC 收敛)",
+    "- pcb_check(DRC 两引擎归一) · pcb_read(读板) · pcb_open(嘉立创开工程/开文档)",
+    "- pcb_export(gerber/bom/ibom/order) · pcb_pipeline(DNA→PCB→DRC→Gerber→iBoM→下单包)",
+    "- pcb_call(玄牝之门: 按清单 id 直调双软件 9009 全操纵面任一工具——KiCad SWIG 7912 法/",
+    "  kicad-cli 34 命令/嘉立创 EXTAPI 749 法; 先 pcb_search kind=tool 找 id)。",
+    "- 背后皆为真实引擎(KiCad 9 与嘉立创EDA客户端), 非模拟。",
     "- 你的每步成果都落在用户 IDE 面板可见的 KiCad/嘉立创EDA 页面——用户随时观看、协助、纠偏。",
     "",
     "水善利万物而有静，唯变所适。",
