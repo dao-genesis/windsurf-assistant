@@ -115,6 +115,7 @@ class CascadePanelProvider {
         if (msg.type === "set-user-setting") return this._handleSetUserSetting(msg.patch);
         if (msg.type === "files-query") return this._handleFilesQuery(msg);
         if (msg.type === "copy") return vscode.env.clipboard.writeText(String(msg.text || "")).then(undefined, () => {});
+        if (msg.type === "transcribe") return this._handleTranscribe(msg);
         if (msg.type === "sessions-list") return this._handleSessionsList();
         if (msg.type === "session-load") return this._handleSessionLoad(msg.sessionId);
         if (msg.type === "session-new") return this._handleSessionNew();
@@ -714,6 +715,18 @@ class CascadePanelProvider {
       });
     };
     loop();
+  }
+
+  // 官方通道语音转写: webview 录音(MediaRecorder)→ 宿主经官方 LS GetTranscription(上游 whisper)。
+  // 架构自适(webview 采音)而本源同一(官方转写通道)——宿主级 StartAudioRecording 不可达的变通。
+  async _handleTranscribe(msg) {
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("GetTranscription", { audioData: String(msg.audioData || ""), mimeType: String(msg.mimeType || "audio/webm") }, 60000);
+      this._post({ type: "transcribed", text: (r && r.transcribedText) || "" });
+    } catch (e) {
+      this._post({ type: "transcribed", text: "", error: String(e && e.message ? e.message : e) });
+    }
   }
 
   async _handleSessionsList() {
@@ -2692,10 +2705,36 @@ class CascadePanelProvider {
   // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
   const tryCloudBtn=document.getElementById("tryCloud");
   if(tryCloudBtn) tryCloudBtn.onclick=()=>{ agent="devin-cloud"; onAgentChange(); inputEl.focus(); };
-  // 官方式麦克风: Web Speech 可用则听写入 composer, 不可用则隐藏(不留死按钮)
+  // 官方通道麦克风: MediaRecorder 采音 → 宿主经官方 LS GetTranscription(上游 whisper)转写入 composer;
+  // 无 getUserMedia 时回退 Web Speech; 两者皆无则隐藏(不留死按钮)。
   const micBtn=document.getElementById("micBtn");
-  (function(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){ if(micBtn) micBtn.style.display="none"; return; }
+  window.__daoOnTranscribed=(m)=>{ if(m.text){ inputEl.value=(inputEl.value?inputEl.value+" ":"")+m.text; inputEl.dispatchEvent(new Event("input")); }
+    micBtn.style.opacity=""; micBtn.title=m.error?("转写失败: "+m.error):"语音输入 (官方转写通道)"; };
+  (function(){
+    const hasMedia=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!hasMedia&&!SR){ if(micBtn) micBtn.style.display="none"; return; }
+    if(hasMedia){
+      micBtn.title="语音输入 (官方转写通道)";
+      let mr=null, on=false;
+      micBtn.onclick=async()=>{
+        if(on){ try{mr.stop();}catch(_){ } return; }
+        try{
+          const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+          const chunks=[];
+          mr=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});
+          mr.ondataavailable=(ev)=>{ if(ev.data&&ev.data.size) chunks.push(ev.data); };
+          mr.onstop=()=>{ on=false; stream.getTracks().forEach((t)=>t.stop());
+            const blob=new Blob(chunks,{type:mr.mimeType||"audio/webm"});
+            const fr=new FileReader();
+            fr.onload=()=>{ const s=String(fr.result||""); const i=s.indexOf(",");
+              vscode.postMessage({type:"transcribe",audioData:i>=0?s.slice(i+1):s,mimeType:blob.type||"audio/webm"}); };
+            fr.readAsDataURL(blob); };
+          mr.start(); on=true; micBtn.style.opacity="0.5"; micBtn.title="录音中… 再点结束并转写";
+        }catch(_){ on=false; micBtn.style.opacity=""; }
+      };
+      return;
+    }
     let rec=null, on=false;
     micBtn.onclick=()=>{ if(on){ try{rec.stop();}catch(_){} return; }
       rec=new SR(); rec.continuous=false; rec.interimResults=false;
@@ -2924,6 +2963,7 @@ class CascadePanelProvider {
     return n; }
   window.addEventListener("message",(e)=>{
     const m=e.data;
+    if(m.type==="transcribed"){ if(window.__daoOnTranscribed) window.__daoOnTranscribed(m); return; }
     if(m.type==="env"){
       envEl.textContent=(m.devinBin?"引擎 ✓":"引擎 ✗")+(m.loggedIn?" · 已登录"+(m.userName?"("+m.userName+")":""):"")
         +(m.windsurf&&m.windsurf.lsPort?" · LS:"+m.windsurf.lsPort+(m.windsurf.lsCsrf?"✓":""):"")

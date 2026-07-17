@@ -31,7 +31,7 @@
 | 内置浏览器 | openBrowser(IDE 宿主) | ✅(R147) | web-embed 站内代理内嵌(剥 XFO/CSP + base/拦截注入) + 🌍 板块; P0×2 已修(#69) |
 | 官方账号/Cascade 菜单 | Devin Settings/Sign Out/Changelog/Configure Rules·Skills·Workflows/MCP 配置 | ✅(R147) | _setCmd 白名单直通, devin.* 优先 windsurf.* 回退 |
 | 团队/组织控制 | GetTeamOrganizationalControls(teamId/扩展模型/子代理默认模型) | ✅(R148) | 冷启动新 VM 活体实证 200; 设置板块卡呈现 |
-| 语音录音 | StartAudioRecording(ExtensionServer 宿主) | ◐ | composer 🎙 走 Web Speech(R143), 宿主级录音不可达 |
+| 语音录音 | StartAudioRecording(ExtensionServer 宿主) | ✅(R150 变通) | 架构自适而本源同一: webview MediaRecorder 采音 → 宿主经官方 LS `GetTranscription{audioData,mimeType}`(上游 whisper)转写入 composer; wav/webm 活体实证返 transcribedText; Web Speech 保留为回退 |
 | 登录/登出 | login/loginWithAuthToken/logout | ✅ | cascadeAuth + CLI 编排(R132/R138) |
 | 提交信息 | generateCommitMessage | ✅ | GenerateCommitMessage → SCM 输入框 |
 | Lifeguard/Dev 服务 | 内部 dev 工具 | ❌(不做) | 官方内部调试面, 非用户功能 |

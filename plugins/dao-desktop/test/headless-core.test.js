@@ -1604,3 +1604,14 @@ test("R149 ls-provision: 二进制解析/极简 ext-server/发现兜底接线", 
   const ext = fs.readFileSync(path.join(CASCADE, "..", "extension.js"), "utf8");
   assert.ok(/deactivate[\s\S]{0,200}ls-provision"\).stop\(\)/.test(ext), "deactivate 应显式 stop 自持 LS");
 });
+
+// R150 · 官方通道语音转写: webview MediaRecorder 采音 → 宿主 GetTranscription(上游 whisper)。
+// 本 VM 活体实证: wav 与 webm/opus 均返 transcribedText。
+test("R150 官方转写通道: transcribe 消息/GetTranscription 接线/webview 录音与回填", () => {
+  const p = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(p.includes('"transcribe"') && p.includes("_handleTranscribe"), "宿主应受理 transcribe 消息");
+  assert.ok(p.includes('"GetTranscription"') && p.includes("transcribedText"), "应走官方 LS GetTranscription 转写");
+  assert.ok(p.includes("MediaRecorder") && p.includes("getUserMedia"), "webview 应以 MediaRecorder 采音");
+  assert.ok(p.includes('"transcribed"') && p.includes("__daoOnTranscribed"), "转写结果应回填 composer");
+  assert.ok(p.includes("webkitSpeechRecognition"), "无 getUserMedia 时保留 Web Speech 回退");
+});
