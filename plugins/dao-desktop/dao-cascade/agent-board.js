@@ -118,9 +118,12 @@ class AgentBoardPanel {
     } catch (e) { return { ok: false, error: e.message }; }
   }
 
-  // New session(官方看板同语义): 云端 session/new; 有首条 prompt 即发出(火后即忘,
-  // 云端后台跑), 列表刷新可见, 并直开会话页。
+  // New session(官方看板同语义): 云端 session/new + 首条 session/prompt。
+  // 实机实证: 无首条 prompt 的 ACP 空会话不落库(刷新不可见且会话页 404),
+  // 故首条任务描述为必填(与官方 New session composer 同义)。
   async _newSession(prompt) {
+    if (!prompt.trim())
+      return this._post({ type: "create-error", error: "首条任务描述必填(云端空会话不会持久化)" });
     let client = null;
     try {
       const { AcpWssClient } = require("./acp-wss");
@@ -128,11 +131,9 @@ class AgentBoardPanel {
       await client.connect();
       const r = await client.newSession("/");
       const sid = (r && r.sessionId) || "";
-      if (prompt.trim()) {
-        client.prompt(prompt.trim()).catch(() => {});
-        // prompt 送达云端后连接才可撤 — 留 3s 送信窗后释放。
-        setTimeout(() => { try { client.stop(); } catch (_) {} }, 3000);
-      } else { client.stop(); }
+      client.prompt(prompt.trim()).catch(() => {});
+      // prompt 送达云端后连接才可撤 — 留 3s 送信窗后释放。
+      setTimeout(() => { try { client.stop(); } catch (_) {} }, 3000);
       const url = "https://app.devin.ai/sessions/" + sid.replace(/^devin-/, "");
       this._post({ type: "created", id: sid, url });
       vscode.env.openExternal(vscode.Uri.parse(url)).then(undefined, () => {});
@@ -189,6 +190,7 @@ tr:hover td{background:var(--hover)}
 #modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 #modal button{border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:transparent;color:inherit}
 #modal button.pri{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none}
+#modal button.pri:disabled{opacity:.45;cursor:not-allowed}
 </style></head><body>
 <header>
   <span class="ttl">Devin</span>
@@ -212,8 +214,8 @@ tr:hover td{background:var(--hover)}
 </main>
 <div id="modal"><div class="box">
   <div style="font-weight:600;margin-bottom:8px">New Session · Devin Cloud</div>
-  <textarea id="nprompt" placeholder="首条任务描述(可留空, 仅创建空会话)…"></textarea>
-  <div class="row"><button id="ncancel">取消</button><button class="pri" id="ncreate">创建</button></div>
+  <textarea id="nprompt" placeholder="首条任务描述(必填 — 云端空会话不会持久化)…"></textarea>
+  <div class="row"><button id="ncancel">取消</button><button class="pri" id="ncreate" disabled>创建</button></div>
 </div></div>
 <script nonce="${n}">
 const vs=acquireVsCodeApi();
@@ -270,7 +272,8 @@ $("#mt-editor").addEventListener("click",()=>vs.postMessage({type:"editor-mode"}
 $("#refresh").addEventListener("click",()=>{vs.postMessage({type:"load"});});
 $("#newbtn").addEventListener("click",()=>{$("#modal").classList.add("show");$("#nprompt").focus();});
 $("#ncancel").addEventListener("click",()=>$("#modal").classList.remove("show"));
-$("#ncreate").addEventListener("click",()=>{const p=$("#nprompt").value;$("#modal").classList.remove("show");$("#nprompt").value="";vs.postMessage({type:"new-session",prompt:p});});
+$("#nprompt").addEventListener("input",e=>{$("#ncreate").disabled=!e.target.value.trim();});
+$("#ncreate").addEventListener("click",()=>{const p=$("#nprompt").value;if(!p.trim())return;$("#modal").classList.remove("show");$("#nprompt").value="";$("#ncreate").disabled=true;vs.postMessage({type:"new-session",prompt:p});});
 $("#search").addEventListener("input",e=>{q=e.target.value.trim().toLowerCase();render();});
 window.addEventListener("message",e=>{const m=e.data;
   if(m.type==="loading"){$("#content").innerHTML='<div class="muted">加载中…</div>';}

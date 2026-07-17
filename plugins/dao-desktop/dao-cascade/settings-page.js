@@ -108,6 +108,9 @@ class SettingsPagePanel {
       const auth = await prov.authStatus(bin);
       local = { bin: bin || "", loggedIn: !!(auth && auth.loggedIn), name: (auth && auth.name) || "" };
     } catch (_) {}
+    // Devin Cloud 可达性: 以凭据链实态为准(看板同源), 不依赖 team 控制位推断。
+    let cloudReady = false;
+    try { cloudReady = !!require("./acp-wss").readCredentials(); } catch (_) {}
     const cfg = vscode.workspace.getConfiguration();
     const version = (() => { try { return require("../package.json").version; } catch (_) { return ""; } })();
     let lsPort = 0; try { const h = ls.ready(); lsPort = (h && h.lsPort) || 0; } catch (_) {}
@@ -121,7 +124,7 @@ class SettingsPagePanel {
       team: team || null,
       local,
       config: { autoBackup: !!cfg.get("dao.cascade.autoBackup"), backupDir: cfg.get("dao.cascade.backupDir") || "" },
-      version, lsPort,
+      cloudReady, version, lsPort,
     });
   }
 
@@ -148,10 +151,10 @@ h2:first-child{margin-top:0}
 .row .v{color:var(--dim)}
 button,.lk{border:1px solid var(--line);background:transparent;color:var(--vscode-textLink-foreground);border-radius:6px;padding:3px 12px;font-size:12px;cursor:pointer}
 button.pri{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none}
-.sw{width:34px;height:18px;border-radius:9px;background:var(--hover);position:relative;cursor:pointer;flex-shrink:0}
-.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dim);transition:left .12s}
-.sw.on{background:var(--vscode-button-background)}
-.sw.on::after{left:18px;background:#fff}
+.sw{width:34px;height:18px;border-radius:9px;background:var(--vscode-input-background);border:1px solid var(--dim);position:relative;cursor:pointer;flex-shrink:0;box-sizing:border-box}
+.sw::after{content:"";position:absolute;top:1px;left:1px;width:14px;height:14px;border-radius:50%;background:var(--vscode-foreground);opacity:.75;transition:left .12s}
+.sw.on{background:var(--vscode-button-background);border-color:var(--vscode-button-background)}
+.sw.on::after{left:17px;background:#fff;opacity:1}
 .bar{height:6px;border-radius:3px;background:var(--hover);overflow:hidden;flex:0 0 120px}
 .bar i{display:block;height:100%;background:var(--vscode-button-background)}
 .tag{border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:10.5px;color:var(--dim)}
@@ -193,8 +196,8 @@ function render(){
   if(mcp.length>8)h+=row('<span class="muted">… 其余 '+(mcp.length-8)+' 个见归一面板</span>',"");
   h+='</div>';
   h+='<h2 id="s-agents">Agents</h2><div class="sub">团队/组织管控与代理配置(GetTeamOrganizationalControls 同源)</div><div class="card">';
-  h+=row("团队 ID",E(tc.teamId||"—"));
-  h+=row("Devin Cloud ACP",tc.devinCloudAcpEnabled?"已开通":"未开通/未知");
+  h+=row("团队 ID",E(tc.teamId||"—(个人账号)"));
+  h+=row("Devin Cloud",D.cloudReady?"凭据就绪(看板可达)":"未登录(credentials 缺失)","以凭据链实态为准, 与 Agent 看板同源");
   h+=row("Agent 看板",btn("打开 Agent 看板","cmd","dao.cascade.agentBoard"),"Devin Cloud 会话 Board/List(与官方 Agent 模式对位)");
   h+='</div>';
   h+='<h2 id="s-local">Devin Local</h2><div class="sub">本机 devin CLI 引擎(devin-provision 同源)</div><div class="card">';
