@@ -1,4 +1,7 @@
-# 官方 Devin Desktop IDE ↔ dao-desktop 插件 · 全模块差距矩阵(R148)
+# 官方 Devin Desktop IDE ↔ dao-desktop 插件 · 全模块差距矩阵(R149)
+
+> **双宿主定位(R149)**: ①装进官方 Devin Desktop —— 只做增量(右侧对话框 + 占据二合一/Proxy Pro 生态位, 数据同步官方、不重复官方已有设置/Agent 模式等)。②装进**纯 VS Code**(无官方 IDE)—— **重中之重, 插件自带一切本源**: `ls-provision.js` 自起官方 language_server, 令下表全部「LS 直连」面零宿主可用(活体实证: 杀尽 LS → 单次 call 自动 provision → GetUserStatus 200)。
+
 
 > 方法: 反查官方 `windsurf` 扩展 bundle(3.4.27)——64 contributes 命令、5 个 gRPC 服务
 > (LanguageServer/ExtensionServer/SeatManagement/Dev/ProductAnalytics)、122 个查询类 RPC,

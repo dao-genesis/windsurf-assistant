@@ -9,6 +9,7 @@ const os = require("os");
 const path = require("path");
 
 const CASCADE = path.join(__dirname, "..", "dao-cascade");
+process.env.DAO_NO_LS_PROVISION = "1"; // 测试内禁自持: 保持零副作用(R149 契约单独直测模块)
 
 // 私密落盘断言: POSIX 上严格 0o600; Windows 无 POSIX 权限位(仅只读位, mode 恒为 0o666),
 // 改断存在性 —— 不弱化 POSIX 约束, 也不在 Windows 上断言平台无法表达的语义。
@@ -1572,4 +1573,29 @@ test("unified-panel: 团队/组织控制卡(GetTeamOrganizationalControls)接线
   assert.ok(uni.includes("orgControls"), "set-detail 应透出 orgControls");
   assert.ok(uni.includes("团队/组织控制"), "设置板块应渲染团队/组织控制卡");
   assert.ok(uni.includes("extensionModelLabels") && uni.includes("subagentDefaultModelUid"), "已知字段显式呈现, 未知字段兜底遍历");
+});
+
+// R149 · LS 自持层: 纯 VS Code 宿主(无官方 IDE 运行)时自起官方 language_server。
+// 本 VM 活体实证: 杀尽 LS → 单次 ls.call 自动 provision → GetUserStatus/GetAllCascadeTrajectories 200。
+test("R149 ls-provision: 二进制解析/极简 ext-server/发现兜底接线", async () => {
+  const lp = require(path.join(CASCADE, "ls-provision.js"));
+  // DAO_LS_BIN 覆盖优先
+  const fake = path.join(os.tmpdir(), "dao-fake-ls-" + Date.now());
+  fs.writeFileSync(fake, "#!/bin/sh\n");
+  process.env.DAO_LS_BIN = fake;
+  try { assert.strictEqual(lp.resolveBin(), fs.realpathSync(fake)); } finally { delete process.env.DAO_LS_BIN; fs.unlinkSync(fake); }
+  // 极简 extension-server 一律回 {} JSON
+  const srv = await lp.startStubExtServer();
+  const port = srv.address().port;
+  const body = await new Promise((res, rej) => {
+    const rq = require("http").request({ host: "127.0.0.1", port, path: "/exa.extension_server_pb.ExtensionServerService/LanguageServerStarted", method: "POST" }, (rs) => { let d = ""; rs.on("data", (c) => (d += c)); rs.on("end", () => res(d)); });
+    rq.on("error", rej); rq.end(Buffer.from([8, 1]));
+  });
+  assert.strictEqual(body, "{}");
+  srv.close();
+  // host-discover 兜底接线 + ls-bridge 未就绪错误纳入自愈判据
+  const hd = fs.readFileSync(path.join(CASCADE, "host-discover.js"), "utf8");
+  assert.ok(hd.includes("ls-provision") && hd.includes("lp.provision"), "discover 无宿主 LS 时应走自持兜底");
+  const lb = fs.readFileSync(path.join(CASCADE, "ls-bridge.js"), "utf8");
+  assert.ok(/未就绪/.test(lb.match(/function isStaleEndpointError[\s\S]{0,200}/)[0]), "LS 未就绪应触发 refreshAuth→自持");
 });

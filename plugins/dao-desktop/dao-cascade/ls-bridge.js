@@ -134,7 +134,7 @@ function isAuthError(msg) {
 // 端口陈旧类错误判据: 宿主 IDE reload 后 LS 重启换端口, 落盘/进程内旧端口连拒 ——
 // 据此触发重发现(discover 同时回灌最新 lsPort/CSRF/key)。
 function isStaleEndpointError(msg) {
-  return /econnrefused|econnreset|socket hang up|epipe/i.test(String(msg || ""));
+  return /econnrefused|econnreset|socket hang up|epipe|未就绪/i.test(String(msg || ""));
 }
 
 // 令牌轮换自愈: 作废缓存 key → 重新发现(host-discover 逐个探测最新 credentials.toml/state.vscdb

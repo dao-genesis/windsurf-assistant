@@ -136,6 +136,23 @@ async function discover() {
       }
     }
   }
+  // R149 LS 自持兜底: 纯 VS Code 宿主(无 Devin Desktop/Windsurf 运行)时自起官方 LS。
+  // 自起子进程 env 带 WINDSURF_CSRF_TOKEN, 后续 discover 亦能自然重发现它。
+  try {
+    const lp = require("./ls-provision");
+    if (lp.resolveBin() && !lp.running()) {
+      const r = await lp.provision({ apiKeyCandidates: keys });
+      for (const key of keys) {
+        if (await probe(r.port, r.csrf, key)) {
+          const h = hostState();
+          h.lsPort = r.port; h.csrfToken = r.csrf;
+          try { require("./ls-bridge").setApiKey(key); } catch (_) {}
+          hostFire();
+          return { lsPort: r.port, csrfToken: r.csrf };
+        }
+      }
+    }
+  } catch (_) {}
   return null;
 }
 
