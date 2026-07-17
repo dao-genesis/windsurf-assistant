@@ -2000,3 +2000,55 @@ test("local-api: coexist 流通路由接线在位", () => {
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/coexist/flow") && schema.includes("/api/coexist/roundtrip"), "openapi 应登记两路由");
 });
+
+// R155 · RPC 层同步活体验证(sync-rpc): 桩 LS 验证探测逻辑(含 proto3 缺省省略语义),
+// 真 LS 串测见 GAP-ANALYSIS R155(本 VM 实机已通)。
+test("sync-rpc.settingsRoundtrip: proto3 缺省省略下仍正确判定写入与还原", async () => {
+  const rpc = require(path.join(CASCADE, "sync-rpc.js"));
+  let store = { openMostRecentChatConversation: true };
+  const stub = { call: async (m, b) => {
+    if (m === "GetUserSettings") {
+      const out = {}; // proto3: false 缺省被省略
+      for (const [k, v] of Object.entries(store)) if (v) out[k] = v;
+      return { userSettings: out };
+    }
+    if (m === "SetUserSettings") { store = Object.assign({}, (b || {}).userSettings); return { userSettings: {} }; }
+    throw new Error("unexpected " + m);
+  } };
+  const r = await rpc.settingsRoundtrip(stub);
+  assert.strictEqual(r.wrote, true, "翻转写入应被判定成功(false 被省略也不误判)");
+  assert.strictEqual(r.reverted, true, "还原应被判定成功");
+  assert.strictEqual(!!store.openMostRecentChatConversation, true, "桩内状态应还原");
+});
+
+test("sync-rpc.customizationRoundtrip: RPC 创建↔文件真源↔列表复读↔删除还原闭环", async () => {
+  const rpc = require(path.join(CASCADE, "sync-rpc.js"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-rpcwf-"));
+  const files = new Set();
+  const stub = { call: async (m, b) => {
+    if (m === "CreateCustomizationFile") {
+      const p = path.join(tmp, (b || {}).fileName || "x.md");
+      fs.writeFileSync(p, ""); files.add(p);
+      return { filePath: p };
+    }
+    if (m === "RefreshCustomization") return {};
+    if (m === "GetAllWorkflows") {
+      const names = [...files].filter((p) => fs.existsSync(p)).map((p) => path.basename(p));
+      return { workflows: names.map((n) => ({ name: n })) };
+    }
+    throw new Error("unexpected " + m);
+  } };
+  try {
+    const r = await rpc.customizationRoundtrip(stub);
+    assert.strictEqual(r.wrote, true, "RPC 创建应落盘(文件真源)");
+    assert.strictEqual(r.readBack, true, "刷新后列表应含探针");
+    assert.strictEqual(r.reverted, true, "删文件后列表应即失(不留痕)");
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test("local-api: sync-rpc 路由接线在位", () => {
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/sync/rpc-roundtrip"'), "应挂 POST /api/sync/rpc-roundtrip");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/sync/rpc-roundtrip"), "openapi 应登记");
+});

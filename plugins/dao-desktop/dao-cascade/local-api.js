@@ -396,6 +396,9 @@ async function postRoutes(u, body) {
   if (u === "/api/coexist/roundtrip") {
     return coexist.roundtrip((body || {}).only || null);
   }
+  if (u === "/api/sync/rpc-roundtrip") {
+    return require("./sync-rpc").roundtrip({});
+  }
   if (u === "/api/auth/login") {
     if (_login) return { ok: true, pending: true, url: _login.url || "" };
     const bin = provision.resolveEngine(null, null);
