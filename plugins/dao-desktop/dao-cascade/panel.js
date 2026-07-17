@@ -3372,6 +3372,65 @@ function register(context, log, opts) {
       try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
       vscode.window.setStatusBarMessage("Windows Agent 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
     }),
+    // ⚡ PCB 快速面板: KiCad/嘉立创EDA 各模块直开(每选一次 = 一个独立实例) + dao-pcb 工具层注册。
+    // web 模块经站内代理路由进 IDE 独立页(与内置浏览器同技术); app 模块拉起独立本机编辑器进程。
+    vscode.commands.registerCommand(viewId + ".pcbAgent", async () => {
+      const pa = require("./pcb-agent");
+      const pc = require("./pcb-panel-core");
+      const st = pa.status();
+      const items = pc.modules().map((m) => ({
+        label: m.icon + " " + m.name,
+        description: m.kind === "web" ? "IDE 内网页实例" : "本机编辑器实例",
+        act: "open", mod: m,
+      }));
+      items.push({ label: "$(plug) 注册 dao-pcb 工具层 · 本机检出 (stdio pcb_mcp.py)", act: "local" });
+      items.push({ label: "$(globe) 注册 dao-pcb 工具层 · 远端穿透 (serverUrl /mcp + Bearer)", act: "remote" });
+      if (st.registered) items.push({ label: "$(trash) 注销 dao-pcb", act: "off" });
+      const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: st.registered
+          ? "dao-pcb 已注册(" + st.transport + (st.disabled ? "·已停用" : "") + ") — 选模块直开或管理工具层"
+          : "选 KiCad/嘉立创EDA 模块直开; 或注册 dao-pcb 工具层",
+      });
+      if (!pick) return;
+      if (pick.act === "open") {
+        const m = pick.mod;
+        if (m.kind === "app") {
+          const r = pc.openApp(m.exe);
+          if (!r.ok) vscode.window.showWarningMessage(r.error);
+          return;
+        }
+        try {
+          const localApi = require("./local-api");
+          if (!localApi.running()) await localApi.start(0);
+          const src = "http://127.0.0.1:" + localApi.port() + "/web?t=" + encodeURIComponent(localApi.token()) + "&u=" + encodeURIComponent(m.url);
+          const p = vscode.window.createWebviewPanel("dao.pcb.module", m.icon + " " + m.name,
+            vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
+          p.webview.html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100vh}</style></head><body>' +
+            '<iframe src="' + src.replace(/"/g, "&quot;") + '" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe></body></html>';
+        } catch (e) { vscode.window.showWarningMessage("开模块失败: " + e.message); }
+        return;
+      }
+      let r;
+      if (pick.act === "off") r = pa.unregister();
+      else if (pick.act === "local") {
+        const found = pa.findLocalCheckout();
+        const dir = await vscode.window.showInputBox({
+          prompt: "Dao-PCB-Design-Agent 检出目录", value: found || "", ignoreFocusOut: true });
+        if (dir === undefined) return;
+        r = pa.registerLocal({ dir: dir || undefined });
+      } else {
+        const url = await vscode.window.showInputBox({
+          prompt: "穿透公网 URL(如 https://dao-relay.example.com)", ignoreFocusOut: true });
+        if (!url) return;
+        const token = await vscode.window.showInputBox({
+          prompt: "Bearer Token(可空)", password: true, ignoreFocusOut: true });
+        if (token === undefined) return;
+        r = pa.registerRemote({ url, token: token || undefined });
+      }
+      if (r && r.ok === false) return void vscode.window.showWarningMessage("PCB Agent: " + r.error);
+      try { const ls = require("./ls-bridge"); if (ls.ready()) await ls.call("RefreshMcpServers", {}); } catch (_) {}
+      vscode.window.setStatusBarMessage("dao-pcb 工具层已" + (pick.act === "off" ? "注销" : "注册并刷新"), 4000);
+    }),
     // 官方 Create New Rule / Workflow / Global Workflow(CreateCustomizationFile 同源)
     vscode.commands.registerCommand(viewId + ".createRule", () => provider._handleCustomizationCreate("rule")),
     vscode.commands.registerCommand(viewId + ".createWorkflow", () => provider._handleCustomizationCreate("workflow")),

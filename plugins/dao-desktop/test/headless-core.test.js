@@ -1565,6 +1565,154 @@ test("unified-panel: webview 下发脚本求值后语法合法 + 浏览器板块
   assert.ok(m[1].includes("webFrame") && /board==='browser'[^\n]*webFrame[^\n]*\)return/.test(m[1]), "browser 板块应与 state 推送解耦(iframe 只建一次)");
 });
 
+// R149 · PCB 工具层官方同构注册: dao-pcb 与 dao-windows-agent 同一 mcp_config.json 真源,
+// local(stdio pcb_mcp.py) / remote(serverUrl /mcp + Bearer) 双通道; status 脱敏不回 token;
+// setDisabled 开关不删注册(关 = 工具仍在册, LS 不注入描述)。
+test("pcb-agent: dao-pcb MCP 官方同构注册契约", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-pcb-"));
+  process.env.DAO_MCP_CONFIG_FILE = path.join(tmp, "mcp_config.json");
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "pcb-agent.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "mcp-config.js"))];
+    const pa = require(path.join(CASCADE, "pcb-agent.js"));
+    assert.strictEqual(pa.SERVER_NAME, "dao-pcb");
+    // 未注册态
+    assert.deepStrictEqual(pa.status(), { registered: false });
+    // 显式目录无效 = 权威失败, 不回退猜测(误配须可见)
+    assert.strictEqual(pa.findLocalCheckout(path.join(tmp, "nope")), null);
+    // local: 伪造检出(pcb_brain/pcb_mcp.py)
+    const co = path.join(tmp, "Dao-PCB-Design-Agent");
+    fs.mkdirSync(path.join(co, "pcb_brain"), { recursive: true });
+    fs.writeFileSync(path.join(co, "pcb_brain", "pcb_mcp.py"), "# mcp\n");
+    let r = pa.registerLocal({ dir: co, token: "SECRET-T", kicadPort: "9931", lcedaPort: "9940" });
+    assert.strictEqual(r.ok, true);
+    const cfg = JSON.parse(fs.readFileSync(process.env.DAO_MCP_CONFIG_FILE, "utf8"));
+    const spec = cfg.mcpServers["dao-pcb"];
+    assert.ok(spec.args.join("/").includes("pcb_mcp.py"));
+    assert.strictEqual(spec.cwd, co);
+    assert.strictEqual(spec.env.DAO_KICAD_PORT, "9931");
+    assert.strictEqual(spec.env.LCEDA_BRIDGE_PORT, "9940");
+    // status 脱敏: 只报 hasAuth, 不回 token 值
+    let st = pa.status();
+    assert.strictEqual(st.registered, true);
+    assert.strictEqual(st.transport, "local");
+    assert.strictEqual(st.hasAuth, true);
+    assert.ok(!JSON.stringify(st).includes("SECRET-T"));
+    // 开关不删注册
+    assert.strictEqual(pa.setDisabled(true).ok, true);
+    st = pa.status();
+    assert.strictEqual(st.registered, true);
+    assert.strictEqual(st.disabled, true);
+    assert.strictEqual(pa.setDisabled(false).ok, true);
+    assert.strictEqual(pa.status().disabled, false);
+    // remote: 自动补 /mcp + Bearer
+    r = pa.registerRemote({ url: "https://relay.example.com/", token: "TK" });
+    assert.strictEqual(r.ok, true);
+    st = pa.status();
+    assert.strictEqual(st.transport, "remote");
+    assert.strictEqual(st.serverUrl, "https://relay.example.com/mcp");
+    assert.strictEqual(st.hasAuth, true);
+    assert.strictEqual(pa.registerRemote({ url: "ftp://bad" }).ok, false);
+    // 注销
+    assert.strictEqual(pa.unregister().removed, true);
+    assert.deepStrictEqual(pa.status(), { registered: false });
+    // modePrompt: 太上下知有之 —— 只述工具之有, 不教用法不强制流程
+    const mp = pa.modePrompt();
+    assert.ok(mp.includes("dao-pcb") && mp.includes("KiCad") && mp.includes("嘉立创EDA"));
+    assert.ok(mp.includes("run_drc") && mp.includes("design_pcb"));
+  } finally {
+    delete process.env.DAO_MCP_CONFIG_FILE;
+    delete require.cache[require.resolve(path.join(CASCADE, "pcb-agent.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "mcp-config.js"))];
+  }
+});
+
+// R149 · pcb-panel-core headless: 模块目录(web 多实例路由 + app 原生编辑器)、
+// 聚合探活字段与双桥/CDP 端点约定(9931/9940/9222, 环境变量可重定向)。
+test("pcb-panel-core: 模块目录与探活契约", async () => {
+  const pc = require(path.join(CASCADE, "pcb-panel-core.js"));
+  const mods = pc.modules();
+  assert.ok(mods.length >= 10);
+  for (const m of mods) {
+    assert.ok(m.id && m.name && (m.kind === "web" || m.kind === "app"));
+    if (m.kind === "web") assert.ok(/^https:\/\//.test(m.url), m.id + " web 模块须为 https 官方页");
+    else assert.ok(m.exe, m.id + " app 模块须有 exe 键");
+  }
+  // 官方各分编辑器齐备(原理图/符号/PCB/Gerber/计算器 + 嘉立创EDA)
+  const ids = mods.map((m) => m.id);
+  for (const k of ["kicad-main", "kicad-sch", "kicad-pcb", "kicad-gerber", "kicad-calc", "eda-app", "lceda-home", "lceda-editor"]) {
+    assert.ok(ids.includes(k), "模块目录应含 " + k);
+  }
+  assert.strictEqual(pc.kicadBridgeBase(), "http://127.0.0.1:9931");
+  assert.strictEqual(pc.lcedaBridgeBase(), "http://127.0.0.1:9940");
+  assert.strictEqual(pc.edaCdpBase(), "http://127.0.0.1:9222");
+  // probe: 任一子源不可达不拖垮整体(CI 无桥环境也得回完整快照)
+  const out = await pc.probe();
+  for (const k of ["mcp", "installs", "kicadBridge", "lcedaBridge", "cdp", "modules", "probedAt"]) {
+    assert.ok(k in out, "probe 快照应含 " + k);
+  }
+  assert.ok("kicad" in out.installs && "easyeda" in out.installs);
+});
+
+// R149 · PCB 域开关正交于 3×4 模式矩阵: overlays 独立落盘, 默认全关(官方原貌);
+// 开启后 overlayPrompt 并入 pcb-agent modePrompt; 矩阵与三/四模式全然不变。
+test("mode-fusion: PCB 域叠加开关正交契约", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mfo-"));
+  process.env.DAO_MODE_FUSION_FILE = path.join(tmp, "mode-fusion.json");
+  process.env.DAO_MODE_CONTRACT_FILE = path.join(tmp, "mode.json");
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
+    const mf = require(path.join(CASCADE, "mode-fusion.js"));
+    // 矩阵不变: 域开关不是第四模式
+    assert.strictEqual(mf.PROMPT_MODES.length, 3);
+    assert.strictEqual(mf.TOOL_MODES.length, 4);
+    assert.strictEqual(mf.matrix().length, 12);
+    assert.ok(mf.DOMAIN_OVERLAYS.some((m) => m.id === "pcb"));
+    // 默认关(官方原貌)
+    assert.strictEqual(mf.overlayOn("pcb"), false);
+    assert.strictEqual(mf.overlayPrompt(), "");
+    // 开: overlayPrompt 即 pcb-agent modePrompt
+    const st = mf.setOverlay("pcb", true);
+    assert.strictEqual(mf.overlayOn("pcb"), true);
+    assert.ok(st.overlays.find((o) => o.id === "pcb").on);
+    assert.ok(mf.overlayPrompt().includes("dao-pcb"));
+    // 与三模式正交: 切提示词模式不动开关
+    mf.setPromptMode("passthrough");
+    assert.strictEqual(mf.overlayOn("pcb"), true);
+    // 关: 回官方原貌
+    mf.setOverlay("pcb", false);
+    assert.strictEqual(mf.overlayOn("pcb"), false);
+    assert.throws(() => mf.setOverlay("nope", true));
+  } finally {
+    delete process.env.DAO_MODE_FUSION_FILE;
+    delete process.env.DAO_MODE_CONTRACT_FILE;
+    delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
+  }
+});
+
+// R149 · 面板接线护栏: 归一面板主页 PCB 环境卡 + ⚡ PCB 板块 + 多实例路由;
+// Proxy Pro 面板域叠加开关按钮; Cascade 面板 pcbAgent 快速命令; 开关真生效于 MCP disabled。
+test("PCB 面板/板块/命令接线在位", () => {
+  const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");
+  assert.ok(uni.includes('["pcb","⚡"'), "BOARDS 应含 ⚡ PCB 板块");
+  assert.ok(uni.includes("renderPcbHomeCard"), "主页应含 PCB 环境卡");
+  assert.ok(uni.includes("renderPcb") && uni.includes("pcb-state"), "PCB 板块应接线");
+  for (const k of ["pcb-reg-local", "pcb-reg-remote", "pcb-unreg", "pcb-open", "pcb-overlay"]) {
+    assert.ok(uni.includes(k), "unified-panel 应接线 " + k);
+  }
+  assert.ok(uni.includes('require("./pcb-panel-core")') && uni.includes('require("./pcb-agent")'));
+  // web 模块多实例路由: 与内置浏览器同一站内代理(/web?t=&u=), 每开一次一个独立 webview
+  assert.ok(uni.includes("dao.pcb.module"), "web 模块应开独立 webview 实例");
+  const px = fs.readFileSync(path.join(CASCADE, "proxy-pro-panel.js"), "utf8");
+  assert.ok(px.includes("mf-overlay") && px.includes("setOverlay"), "Proxy Pro 面板应有域叠加开关");
+  assert.ok(px.includes("setDisabled"), "开关应真生效于 dao-pcb MCP disabled(官方注入路径)");
+  const cas = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(cas.includes(".pcbAgent"), "Cascade 应注册 pcbAgent 快速命令");
+  assert.ok(!cas.includes("mf-set"), "Cascade 对话面板仍不得含模式管理入口");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.pcbAgent"));
+});
+
 // R148 · 设置板块「团队/组织控制」卡: GetTeamOrganizationalControls 活体接线(本 VM 实证可达)。
 test("unified-panel: 团队/组织控制卡(GetTeamOrganizationalControls)接线在位", () => {
   const uni = fs.readFileSync(path.join(CASCADE, "unified-panel.js"), "utf8");

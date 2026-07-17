@@ -31,6 +31,13 @@ const TOOL_MODES = [
   { id: "native", name: "原生直通", summary: "官方字节级原貌, 无提示词注入" },
 ];
 
+// 域叠加层(与提示词层/工具层正交, 非第四模式)：开 = 把该域的工具描述并入系统提示
+// (太上下知有之：AI 只是知道有这些工具, 自主择用); 关 = 官方原貌, 工具仍注册在册。
+// 不论道德经/阴符经/官方哪种提示词模式, 叠加层都可叠加 —— 两者道并行而不相悖。
+const DOMAIN_OVERLAYS = [
+  { id: "pcb", name: "KiCad/嘉立创EDA", summary: "PCB 工具层描述并入提示词(dao-pcb MCP 同源)" },
+];
+
 function fusionPath() {
   return process.env.DAO_MODE_FUSION_FILE || path.join(os.homedir(), ".dao", "mode-fusion.json");
 }
@@ -57,6 +64,32 @@ function promptMode() {
 function toolMode() {
   const d = _readJson(contractPath()) || {};
   return TOOL_MODES.some((m) => m.id === d.mode) ? d.mode : "primary";
+}
+
+// 域叠加开关态: fusion 文件 overlays:{<id>:true} —— 默认全关(官方原貌)。
+function overlayOn(id) {
+  const d = _readJson(fusionPath()) || {};
+  return !!(d.overlays && d.overlays[id]);
+}
+
+function setOverlay(id, on) {
+  if (!DOMAIN_OVERLAYS.some((m) => m.id === id)) throw new Error("无此域叠加层: " + id);
+  const d = _readJson(fusionPath()) || {};
+  if (!d.overlays || typeof d.overlays !== "object") d.overlays = {};
+  d.overlays[id] = !!on;
+  d.updated = Math.floor(Date.now() / 1000);
+  _writeJson(fusionPath(), d);
+  return state();
+}
+
+// 叠加层提示词文本(开启者拼接)：供反代/运行期并入系统提示。
+function overlayPrompt() {
+  const parts = [];
+  for (const m of DOMAIN_OVERLAYS) {
+    if (!overlayOn(m.id)) continue;
+    if (m.id === "pcb") parts.push(require("./pcb-agent").modePrompt());
+  }
+  return parts.join("\n\n");
 }
 
 function setPromptMode(id) {
@@ -178,14 +211,16 @@ function state() {
     combined: p + "+" + t,
     combinedName: pm.name + " × " + tm.name,
     promptModes: PROMPT_MODES, toolModes: TOOL_MODES,
+    overlays: DOMAIN_OVERLAYS.map((m) => ({ id: m.id, name: m.name, summary: m.summary, on: overlayOn(m.id) })),
     total: PROMPT_MODES.length * TOOL_MODES.length,
     fusionFile: fusionPath(), contractFile: contractPath(),
   };
 }
 
 module.exports = {
-  PROMPT_MODES, TOOL_MODES,
+  PROMPT_MODES, TOOL_MODES, DOMAIN_OVERLAYS,
   promptMode, toolMode, setPromptMode, setToolMode, syncBridge, syncOrigin,
+  overlayOn, setOverlay, overlayPrompt,
   setCustomText, clearCustomText,
   matrix, state, fusionPath, contractPath,
 };
