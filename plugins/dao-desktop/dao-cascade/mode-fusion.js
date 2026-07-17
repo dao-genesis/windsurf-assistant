@@ -1,16 +1,20 @@
-// 道 · 模式融合(headless·零 vscode 依赖) —— 提示词层 × 工具层 = 3×4 = 12 模式。
+// 道 · 模式融合(headless·零 vscode 依赖) —— 提示词层 × 工具层 = 4×4 = 16 模式。
 // ─────────────────────────────────────────────────────────────────────────────
-// 两层正交, 各自独立切换, 组合即模式矩阵:
-//   · 提示词层(3): Proxy Pro 经藏契约同源(sp_invert SP_MODE_VALID) ——
-//       invert      经藏道化: 官方 SP 反转为帛书《老子》+《陰符經》纪律
-//       passthrough 官方直通: 提示词字节级原貌
-//       custom      自定经文: 用户自持替换文本
-//   · 工具层(4): Dao-Windows-Agent ModeManager 内建同源(~/.dao/mode.json 同一契约) ——
-//       primary / coding / windows / native
+// 两层正交, 各自独立切换, 组合即模式矩阵(不生产, 只搬运: 两轴皆映射既有引擎):
+//   · 提示词层(4): Proxy Pro 本源引擎同源(sp_invert SP_MODE × 经藏 canon) ——
+//       official   官方模式:       /origin/mode=passthrough(字节级原貌)
+//       daodejing  道德经模式:     /origin/mode=invert × /origin/canon=laozi
+//       yinfujing  阴符经模式:     /origin/mode=invert × /origin/canon=yinfu
+//       daoyin     道德经+阴符经:  /origin/mode=invert × /origin/canon=laozi+yinfu(本源默认)
+//   · 工具层(4): sp_invert 工具契约轴(/origin/tools) + Dao-Windows-Agent ModeManager 联动 ——
+//       default    默认模式:   tools=official(无附加工具契约) · 桥 mode=primary
+//       windows    Windows:    tools=windows(整机工具契约并入提示词) · 桥 mode=windows
+//       freecad    FreeCAD:    tools=freecad(3D 建模域契约) · 桥 mode=domain:freecad
+//       kicad      KiCad:      tools=kicad(PCB 域契约) · 桥 mode=domain:kicad
 // 真源落盘:
-//   · 提示词层态: ~/.dao/mode-fusion.json(本插件自持)
-//   · 工具层态:   ~/.dao/mode.json(与 ModeManager 同一契约文件, 互为联动真源),
-//     并 best-effort POST 桥 /api/mode.set 令在跑桥即刻生效(桥不在跑则契约文件生效)。
+//   · 双轴态: ~/.dao/mode-fusion.json(本插件自持; 旧 invert/passthrough/custom 自动迁移)
+//   · 工具层契约: ~/.dao/mode.json(与 ModeManager 同一契约文件, merge 写不覆没自持字段),
+//     并 best-effort POST 反代 /origin/tools 与桥 /api/mode.set 令在跑者即刻生效。
 "use strict";
 const fs = require("fs");
 const os = require("os");
@@ -18,20 +22,23 @@ const path = require("path");
 const http = require("http");
 const https = require("https");
 
+// origin: 本源反代(source.js 控制面)之 SP_MODE + 经藏 canon 映射。
 const PROMPT_MODES = [
-  { id: "invert", name: "经藏道化", summary: "官方 SP 反转为帛书老子+陰符經纪律(本源默认)" },
-  { id: "passthrough", name: "官方直通", summary: "提示词字节级原貌, 零注入" },
-  { id: "custom", name: "自定经文", summary: "用户自持替换文本接管提示词层" },
+  { id: "official", name: "官方模式", summary: "提示词字节级原貌, 零注入", origin: { mode: "passthrough" } },
+  { id: "daodejing", name: "道德经", summary: "官方 SP 反转为帛书《老子》", origin: { mode: "invert", canon: "laozi" } },
+  { id: "yinfujing", name: "阴符经", summary: "官方 SP 反转为道藏《陰符經》", origin: { mode: "invert", canon: "yinfu" } },
+  { id: "daoyin", name: "道德经+阴符经", summary: "帛书老子+道藏陰符經二经合一(本源默认)", origin: { mode: "invert", canon: "laozi+yinfu" } },
 ];
 
+// tools: sp_invert TOOLMODE_MAP(/origin/tools) · bridge: ModeManager(~/.dao/mode.json) 模式 id。
 const TOOL_MODES = [
-  { id: "primary", name: "主模式", summary: "帛书纪律 + 编程全集 + 整机为辅(日常默认)" },
-  { id: "coding", name: "纯编程", summary: "官方 Devin Desktop 原貌, 机控面关闭" },
-  { id: "windows", name: "Windows 全接管", summary: "整机桌面级路由为主战场, 编程面退辅" },
-  { id: "native", name: "原生直通", summary: "官方字节级原貌, 无提示词注入" },
+  { id: "default", name: "默认模式", summary: "官方工具原貌, 无附加工具契约(日常默认)", tools: "official", bridge: "primary" },
+  { id: "windows", name: "Windows 模式", summary: "整机工具契约并入提示词, 整台 Windows 为主战场", tools: "windows", bridge: "windows" },
+  { id: "freecad", name: "FreeCAD 模式", summary: "FreeCAD 3D 建模域工具契约并入提示词", tools: "freecad", bridge: "domain:freecad" },
+  { id: "kicad", name: "KiCad 模式", summary: "KiCad PCB 域工具契约并入提示词", tools: "kicad", bridge: "domain:kicad" },
 ];
 
-// 域叠加层(与提示词层/工具层正交, 非第四模式)：开 = 把该域的工具描述并入系统提示
+// 域叠加层(与提示词层/工具层正交, 非第五模式)：开 = 把该域的工具描述并入系统提示
 // (太上下知有之：AI 只是知道有这些工具, 自主择用); 关 = 官方原貌, 工具仍注册在册。
 // 不论道德经/阴符经/官方哪种提示词模式, 叠加层都可叠加 —— 两者道并行而不相悖。
 const DOMAIN_OVERLAYS = [
@@ -57,14 +64,25 @@ function _writeJson(p, obj) {
   fs.writeFileSync(p, JSON.stringify(obj, null, 2) + "\n", { mode: 0o600 });
 }
 
+// 旧提示词态迁移: invert/custom→daoyin(道化本源), passthrough→official。
+const _LEGACY_PROMPT = { invert: "daoyin", custom: "daoyin", passthrough: "official" };
+
 function promptMode() {
   const d = _readJson(fusionPath()) || {};
-  return PROMPT_MODES.some((m) => m.id === d.prompt) ? d.prompt : "invert";
+  if (PROMPT_MODES.some((m) => m.id === d.prompt)) return d.prompt;
+  if (_LEGACY_PROMPT[d.prompt]) return _LEGACY_PROMPT[d.prompt];
+  return "daoyin";
 }
 
+// 旧工具态迁移(契约文件 ModeManager id → 融合 id)。
+const _LEGACY_TOOL = { primary: "default", coding: "default", native: "default", windows: "windows", "domain:freecad": "freecad", "domain:kicad": "kicad" };
+
 function toolMode() {
-  const d = _readJson(contractPath()) || {};
-  return TOOL_MODES.some((m) => m.id === d.mode) ? d.mode : "primary";
+  const d = _readJson(fusionPath()) || {};
+  if (TOOL_MODES.some((m) => m.id === d.tool)) return d.tool;
+  const c = _readJson(contractPath()) || {};
+  if (_LEGACY_TOOL[c.mode]) return _LEGACY_TOOL[c.mode];
+  return "default";
 }
 
 // 域叠加开关态: fusion 文件 overlays:{<id>:true} —— 默认全关(官方原貌)。
@@ -103,17 +121,22 @@ function setPromptMode(id) {
   return state();
 }
 
-// merge 写: 只改本层字段, ModeManager 自持字段(overlay/tool_policy/replace_official 等)原样保留。
+// 工具层落盘: 融合文件记融合 id; 契约文件 merge 写桥模式 id ——
+// ModeManager 自持字段(overlay/tool_policy/replace_official 等)原样保留。
 function setToolMode(id) {
   const m = TOOL_MODES.find((x) => x.id === id);
   if (!m) throw new Error("无此工具层模式: " + id);
-  const d = _readJson(contractPath()) || {};
-  d.mode = m.id;
-  d.name = m.name;
-  d.summary = m.summary;
-  d.set_by = "dao-desktop";
+  const d = _readJson(fusionPath()) || {};
+  d.tool = m.id;
   d.updated = Math.floor(Date.now() / 1000);
-  _writeJson(contractPath(), d);
+  _writeJson(fusionPath(), d);
+  const c = _readJson(contractPath()) || {};
+  c.mode = m.bridge;
+  c.name = m.name;
+  c.summary = m.summary;
+  c.set_by = "dao-desktop";
+  c.updated = Math.floor(Date.now() / 1000);
+  _writeJson(contractPath(), c);
   return state();
 }
 
@@ -146,12 +169,23 @@ function _originReq(method, pathname, payload, opts) {
   });
 }
 
-// 提示词层真生效: 在跑本源反代(source.js 控制面)即刻 POST /origin/mode 热切,
-// 不在跑不算失败(_origin_mode.txt 由反代自持, 下次起跑读盘生效)。
-// custom 在反代运行时以 invert 路径承载(_customSP 一经落盘即优先接管替换文本)。
-function syncOrigin(id, opts) {
-  const rt = id === "custom" ? "invert" : id;
-  return _originReq("POST", "/origin/mode", { mode: rt }, opts);
+// 提示词层真生效: 在跑本源反代即刻 POST /origin/mode(+经藏 /origin/canon)热切,
+// 不在跑不算失败(_origin_mode.txt/_origin_canon.txt 由反代自持, 下次起跑读盘生效)。
+async function syncOrigin(id, opts) {
+  const pm = PROMPT_MODES.find((m) => m.id === id);
+  if (!pm) return { synced: false, error: "无此提示词模式: " + id };
+  const r1 = await _originReq("POST", "/origin/mode", { mode: pm.origin.mode }, opts);
+  if (!pm.origin.canon) return r1;
+  const r2 = await _originReq("POST", "/origin/canon", { canon: pm.origin.canon }, opts);
+  return { synced: r1.synced && r2.synced, mode: r1, canon: r2 };
+}
+
+// 工具层真生效(提示面): 在跑反代即刻 POST /origin/tools 热切工具契约,
+// 不在跑不算失败(_origin_tools.txt 由反代自持, 下次起跑读盘生效)。
+function syncOriginTools(id, opts) {
+  const tm = TOOL_MODES.find((m) => m.id === id);
+  if (!tm) return Promise.resolve({ synced: false, error: "无此工具层模式: " + id });
+  return _originReq("POST", "/origin/tools", { tools: tm.tools }, opts);
 }
 
 // 自定经文真生效: 写反代 /origin/custom_sp(用户即道, invert 路径优先接管)。
@@ -165,16 +199,19 @@ function clearCustomText(opts) {
   return _originReq("DELETE", "/origin/custom_sp", null, opts);
 }
 
-// 桥在跑则即刻联动(/api/mode.set); 不在跑不算失败(契约文件已是真源)。
+// 工具层真生效(机控面): 桥在跑则即刻联动(/api/mode.set 以桥模式 id);
+// 不在跑不算失败(契约文件已是真源)。
 function syncBridge(id, opts) {
   opts = opts || {};
+  const tm = TOOL_MODES.find((m) => m.id === id);
+  const bridgeMode = tm ? tm.bridge : id;
   const base = String(opts.bridgeUrl || process.env.DAO_WIN_BRIDGE_URL || "http://127.0.0.1:9930").replace(/\/+$/, "");
   const token = opts.token || process.env.DAO_WIN_TOKEN || "dao-win-lab";
   return new Promise((resolve) => {
     let u;
     try { u = new URL(base + "/api/mode.set"); } catch (_) { return resolve({ synced: false, error: "无效桥地址" }); }
     const mod = u.protocol === "https:" ? https : http;
-    const data = Buffer.from(JSON.stringify({ mode: id }), "utf8");
+    const data = Buffer.from(JSON.stringify({ mode: bridgeMode }), "utf8");
     const req = mod.request({
       method: "POST", hostname: u.hostname, port: u.port, path: u.pathname,
       headers: { "Content-Type": "application/json", "Content-Length": data.length, Authorization: "Bearer " + token },
@@ -191,7 +228,7 @@ function syncBridge(id, opts) {
   });
 }
 
-// 3×4 = 12 组合矩阵。
+// 4×4 = 16 组合矩阵。
 function matrix() {
   const out = [];
   for (const p of PROMPT_MODES) {
@@ -221,7 +258,7 @@ function state() {
 
 module.exports = {
   PROMPT_MODES, TOOL_MODES, DOMAIN_OVERLAYS,
-  promptMode, toolMode, setPromptMode, setToolMode, syncBridge, syncOrigin,
+  promptMode, toolMode, setPromptMode, setToolMode, syncBridge, syncOrigin, syncOriginTools,
   overlayOn, setOverlay, overlayPrompt,
   setCustomText, clearCustomText,
   matrix, state, fusionPath, contractPath,

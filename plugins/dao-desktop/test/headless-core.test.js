@@ -1364,49 +1364,74 @@ test("windows-panel-core 账号/模式聚合", () => {
   assert.ok(src.includes("/api/account.create") && src.includes("/api/account.destroy"));
 });
 
-// REARCH2 · 模式融合 3×4=12: 提示词层(sp 契约同源 invert/passthrough/custom) ×
-// 工具层(ModeManager 同源 primary/coding/windows/native), 矩阵恰 12 组合;
-// 落盘隔离于临时目录, 工具层契约与 ~/.dao/mode.json 同形(mode 字段)。
-test("mode-fusion 3×4=12 矩阵与双层落盘契约", async () => {
+// 模式融合 4×4=16: 提示词层(官方/道德经/阴符经/二经合 → /origin/mode × /origin/canon) ×
+// 工具层(默认/Windows/FreeCAD/KiCad → /origin/tools + ModeManager 桥模式),
+// 落盘隔离于临时目录, 工具层契约与 ~/.dao/mode.json 同形(mode 字段=桥模式 id)。
+test("mode-fusion 4×4=16 矩阵与双层落盘契约", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-mf-"));
   process.env.DAO_MODE_FUSION_FILE = path.join(tmp, "mode-fusion.json");
   process.env.DAO_MODE_CONTRACT_FILE = path.join(tmp, "mode.json");
   try {
     delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
     const mf = require(path.join(CASCADE, "mode-fusion.js"));
-    assert.strictEqual(mf.PROMPT_MODES.length, 3);
+    assert.strictEqual(mf.PROMPT_MODES.length, 4);
     assert.strictEqual(mf.TOOL_MODES.length, 4);
-    assert.strictEqual(mf.matrix().length, 12);
-    assert.deepStrictEqual(mf.PROMPT_MODES.map((m) => m.id), ["invert", "passthrough", "custom"]);
-    assert.deepStrictEqual(mf.TOOL_MODES.map((m) => m.id), ["primary", "coding", "windows", "native"]);
-    // 默认态: 本源 invert × primary
+    assert.strictEqual(mf.matrix().length, 16);
+    assert.deepStrictEqual(mf.PROMPT_MODES.map((m) => m.id), ["official", "daodejing", "yinfujing", "daoyin"]);
+    assert.deepStrictEqual(mf.TOOL_MODES.map((m) => m.id), ["default", "windows", "freecad", "kicad"]);
+    // 提示词层各模式均映射本源引擎(/origin/mode × /origin/canon)
+    assert.deepStrictEqual(mf.PROMPT_MODES.map((m) => m.origin.mode), ["passthrough", "invert", "invert", "invert"]);
+    assert.deepStrictEqual(mf.PROMPT_MODES.slice(1).map((m) => m.origin.canon), ["laozi", "yinfu", "laozi+yinfu"]);
+    // 工具层各模式均映射工具契约轴(/origin/tools) + 桥模式 id
+    assert.deepStrictEqual(mf.TOOL_MODES.map((m) => m.tools), ["official", "windows", "freecad", "kicad"]);
+    assert.deepStrictEqual(mf.TOOL_MODES.map((m) => m.bridge), ["primary", "windows", "domain:freecad", "domain:kicad"]);
+    // 默认态: 本源 二经合 × 默认
     let st = mf.state();
-    assert.strictEqual(st.combined, "invert+primary");
-    assert.strictEqual(st.total, 12);
+    assert.strictEqual(st.combined, "daoyin+default");
+    assert.strictEqual(st.total, 16);
     // 切提示词层
-    st = mf.setPromptMode("passthrough");
-    assert.strictEqual(st.prompt, "passthrough");
-    // 切工具层 → 契约文件与 ModeManager 同形(mode 字段)
+    st = mf.setPromptMode("official");
+    assert.strictEqual(st.prompt, "official");
+    st = mf.setPromptMode("yinfujing");
+    assert.strictEqual(st.prompt, "yinfujing");
+    // 切工具层 → 契约文件与 ModeManager 同形(mode 字段=桥模式 id)
     st = mf.setToolMode("windows");
     assert.strictEqual(st.tool, "windows");
     const contract = JSON.parse(fs.readFileSync(process.env.DAO_MODE_CONTRACT_FILE, "utf8"));
     assert.strictEqual(contract.mode, "windows");
     assert.strictEqual(contract.set_by, "dao-desktop");
+    // 域模式写桥 domain: id
+    st = mf.setToolMode("freecad");
+    assert.strictEqual(st.tool, "freecad");
+    assert.strictEqual(JSON.parse(fs.readFileSync(process.env.DAO_MODE_CONTRACT_FILE, "utf8")).mode, "domain:freecad");
     // merge 写: ModeManager 自持字段(overlay/tool_policy/replace_official)不可被覆没
     fs.writeFileSync(process.env.DAO_MODE_CONTRACT_FILE, JSON.stringify({
       mode: "primary", overlay: "o1", tool_policy: { p: 1 }, replace_official: true,
     }));
-    st = mf.setToolMode("coding");
+    st = mf.setToolMode("kicad");
     const merged = JSON.parse(fs.readFileSync(process.env.DAO_MODE_CONTRACT_FILE, "utf8"));
-    assert.strictEqual(merged.mode, "coding");
+    assert.strictEqual(merged.mode, "domain:kicad");
     assert.strictEqual(merged.overlay, "o1");
     assert.deepStrictEqual(merged.tool_policy, { p: 1 });
     assert.strictEqual(merged.replace_official, true);
-    // custom 运行时接线: syncOrigin 映射 custom→invert 路径; 自定经文经 /origin/custom_sp
+    // 旧态迁移: 旧提示词 id 与旧契约 mode 自动映射新轴
+    fs.writeFileSync(process.env.DAO_MODE_FUSION_FILE, JSON.stringify({ prompt: "invert" }));
+    fs.writeFileSync(process.env.DAO_MODE_CONTRACT_FILE, JSON.stringify({ mode: "coding" }));
+    st = mf.state();
+    assert.strictEqual(st.prompt, "daoyin");
+    assert.strictEqual(st.tool, "default");
+    fs.writeFileSync(process.env.DAO_MODE_FUSION_FILE, JSON.stringify({ prompt: "passthrough" }));
+    fs.writeFileSync(process.env.DAO_MODE_CONTRACT_FILE, JSON.stringify({ mode: "domain:kicad" }));
+    st = mf.state();
+    assert.strictEqual(st.prompt, "official");
+    assert.strictEqual(st.tool, "kicad");
+    // 自定经文仍在(与四模式正交, 经 /origin/custom_sp 接管替换文本)
     assert.strictEqual(typeof mf.setCustomText, "function");
     assert.strictEqual(typeof mf.clearCustomText, "function");
+    assert.strictEqual(typeof mf.syncOriginTools, "function");
     const mfSrc = fs.readFileSync(path.join(CASCADE, "mode-fusion.js"), "utf8");
-    assert.ok(mfSrc.includes('id === "custom" ? "invert"'), "custom 应以 invert 路径承载");
+    assert.ok(mfSrc.includes("/origin/canon"), "提示词层应热切反代经藏接口");
+    assert.ok(mfSrc.includes("/origin/tools"), "工具层应热切反代工具契约接口");
     assert.ok(mfSrc.includes("/origin/custom_sp"), "自定经文应写反代 custom_sp 接口");
     // 空自定经文拒绝(不打反代)
     const rEmpty = await mf.setCustomText("   ");
@@ -1423,11 +1448,12 @@ test("mode-fusion 3×4=12 矩阵与双层落盘契约", async () => {
 
 // REARCH2 · Proxy Pro 面板模式区: mf-state/mf-set 双层切换入口在独立面板,
 // 不进 Cascade 对话面板(对话面板零管理入口护栏不破)。
-test("proxy-pro 面板含 3×4 模式切换且 Cascade 不含", () => {
+test("proxy-pro 面板含 4×4 模式切换且 Cascade 不含", () => {
   const panel = fs.readFileSync(path.join(CASCADE, "proxy-pro-panel.js"), "utf8");
   assert.ok(panel.includes('require("./mode-fusion")'));
   assert.ok(panel.includes("mf-state") && panel.includes("mf-set"));
-  assert.ok(panel.includes("3×4"), "面板应标示 3×4=12 模式矩阵");
+  assert.ok(panel.includes("4×4"), "面板应标示 4×4=16 模式矩阵");
+  assert.ok(panel.includes("syncOriginTools"), "工具层切换应热切反代工具契约");
   const cascade = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
   assert.ok(!cascade.includes("mf-set"), "Cascade 对话面板不得含模式管理入口");
 });
@@ -1665,10 +1691,10 @@ test("mode-fusion: PCB 域叠加开关正交契约", () => {
   try {
     delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
     const mf = require(path.join(CASCADE, "mode-fusion.js"));
-    // 矩阵不变: 域开关不是第四模式
-    assert.strictEqual(mf.PROMPT_MODES.length, 3);
+    // 矩阵不变: 域开关不是额外模式
+    assert.strictEqual(mf.PROMPT_MODES.length, 4);
     assert.strictEqual(mf.TOOL_MODES.length, 4);
-    assert.strictEqual(mf.matrix().length, 12);
+    assert.strictEqual(mf.matrix().length, 16);
     assert.ok(mf.DOMAIN_OVERLAYS.some((m) => m.id === "pcb"));
     // 默认关(官方原貌)
     assert.strictEqual(mf.overlayOn("pcb"), false);
@@ -1678,8 +1704,8 @@ test("mode-fusion: PCB 域叠加开关正交契约", () => {
     assert.strictEqual(mf.overlayOn("pcb"), true);
     assert.ok(st.overlays.find((o) => o.id === "pcb").on);
     assert.ok(mf.overlayPrompt().includes("dao-pcb"));
-    // 与三模式正交: 切提示词模式不动开关
-    mf.setPromptMode("passthrough");
+    // 与提示词模式正交: 切提示词模式不动开关
+    mf.setPromptMode("official");
     assert.strictEqual(mf.overlayOn("pcb"), true);
     // 关: 回官方原貌
     mf.setOverlay("pcb", false);
@@ -1812,10 +1838,10 @@ test("mode-fusion: FreeCAD 域叠加开关正交契约", () => {
   try {
     delete require.cache[require.resolve(path.join(CASCADE, "mode-fusion.js"))];
     const mf = require(path.join(CASCADE, "mode-fusion.js"));
-    // 矩阵不变: 域开关不是第四模式
-    assert.strictEqual(mf.PROMPT_MODES.length, 3);
+    // 矩阵不变: 域开关不是额外模式
+    assert.strictEqual(mf.PROMPT_MODES.length, 4);
     assert.strictEqual(mf.TOOL_MODES.length, 4);
-    assert.strictEqual(mf.matrix().length, 12);
+    assert.strictEqual(mf.matrix().length, 16);
     assert.ok(mf.DOMAIN_OVERLAYS.some((m) => m.id === "freecad"));
     // 默认关(官方原貌)
     assert.strictEqual(mf.overlayOn("freecad"), false);
@@ -1830,8 +1856,8 @@ test("mode-fusion: FreeCAD 域叠加开关正交契约", () => {
     mf.setOverlay("pcb", true);
     assert.ok(mf.overlayPrompt().includes("dao-pcb") && mf.overlayPrompt().includes("dao-freecad"));
     mf.setOverlay("pcb", false);
-    // 与三模式正交: 切提示词模式不动开关
-    mf.setPromptMode("passthrough");
+    // 与提示词模式正交: 切提示词模式不动开关
+    mf.setPromptMode("official");
     assert.strictEqual(mf.overlayOn("freecad"), true);
     // 关: 回官方原貌
     mf.setOverlay("freecad", false);
