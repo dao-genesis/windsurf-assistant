@@ -273,7 +273,7 @@ function render(){
   document.getElementById('main').innerHTML=renderProxy();
   const pxa=document.getElementById('pxAdd'); if(pxa)pxa.onclick=()=>vscode.postMessage({type:'px-add'});
   const pxrt=document.getElementById('pxRoute'); if(pxrt)pxrt.onclick=()=>vscode.postMessage({type:'px-route'});
-  const pxrf=document.getElementById('pxRf'); if(pxrf)pxrf.onclick=()=>{PX=null;render();vscode.postMessage({type:'px-list'});};
+  const pxrf=document.getElementById('pxRf'); if(pxrf)pxrf.onclick=()=>{PX=null;MF=null;render();vscode.postMessage({type:'px-list'});vscode.postMessage({type:'mf-state'});};
   document.querySelectorAll('[data-pxref]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-refresh',name:el.dataset.pxref}));
   document.querySelectorAll('[data-pxrm]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-remove',name:el.dataset.pxrm}));
   document.querySelectorAll('[data-pxunroute]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-route',uid:el.dataset.pxunroute}));
