@@ -73,9 +73,12 @@ function detectEasyeda() {
     }
     return { installed: false };
   }
-  for (const n of names) {
-    const exe = "/opt/" + n.dir + "/" + n.dir;
-    if (fs.existsSync(exe)) return { installed: true, variant: n.variant, exe };
+  // Linux 官方 install.sh 落在 /opt/apps/<dir>; 手装常见 /opt/<dir> —— 两根都探。
+  for (const root of ["/opt", "/opt/apps"]) {
+    for (const n of names) {
+      const exe = root + "/" + n.dir + "/" + n.dir;
+      if (fs.existsSync(exe)) return { installed: true, variant: n.variant, exe };
+    }
   }
   return { installed: false };
 }
