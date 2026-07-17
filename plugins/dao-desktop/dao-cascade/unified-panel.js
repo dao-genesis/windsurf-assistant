@@ -1200,7 +1200,7 @@ h2{font-size:15px;margin:0 0 4px}
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
 // 七大板块顺序/图标/标题与 dao-vsix /shell 1:1; 其后为插件版延伸板块。
-const BOARDS=[["overview","🏠","主页 · Windows 总控"],["pcb","⚡","PCB · KiCad/嘉立创EDA"],["freecad","🧊","FreeCAD · 3D 建模"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["browser","🌍","内置浏览器"],["settings","⚙","设置"]];
+const BOARDS=[["overview","🏠","主页 · Windows 总控"],["windows","🪟","Windows 管理"],["pcb","⚡","PCB · KiCad/嘉立创EDA"],["freecad","🧊","FreeCAD · 3D 建模"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["browser","🌍","内置浏览器"],["settings","⚙","设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function cmd(c,d){vscode.postMessage(Object.assign({command:c},d||{}))}
 function sw(t){CONV=null;vscode.postMessage({type:'nav',board:t});cmd('loadTabData',{tab:t});}
@@ -1555,6 +1555,14 @@ function renderPcb(){
   return h;
 }
 let WIN=null;
+function renderWindows(){
+  let h='<div class="row"><h2 style="flex:1">Windows 管理</h2>'+
+    '<button class="btn" id="winOpen">开本窗口桌面</button>'+
+    '<button class="btn sec" id="winRf">刷新</button></div>';
+  h+='<div class="muted" style="margin-bottom:10px">Windows 核心内容/数据/资源统一管理: 账号分身·桌面会话·模式·工具层·隔离矩阵(Dao-Windows-Agent 真源直连，与主页同源)。</div>';
+  h+=renderWinControl();
+  return h;
+}
 function renderWinControl(){
   if(WIN===null)return '<div class="card muted">Windows 总控探活中…</div>';
   if(WIN.error)return '<div class="card">⚠ '+E(WIN.error)+'</div>';
@@ -1777,6 +1785,7 @@ function render(){
   if(S.board==='browser'&&WEB&&WEB.base&&document.getElementById('webFrame'))return;
   let h='';
   if(S.board==='overview')h=renderOverview();
+  else if(S.board==='windows')h=renderWindows();
   else if(S.board==='pcb')h=renderPcb();
   else if(S.board==='freecad')h=renderFreecad();
   else if(S.board==='switch')h=renderSwitch();
@@ -1827,7 +1836,7 @@ function render(){
   document.querySelectorAll('[data-winacctdel]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-destroy',name:el.dataset.winacctdel}));
   document.querySelectorAll('[data-winclone]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-clone',base:el.dataset.winclone}));
   const wqc=document.getElementById('winQcGo'); if(wqc)wqc.onclick=()=>{const s=document.getElementById('winQcAcct');vscode.postMessage({type:'win-open-desktop',account:(s&&s.value)||''});};
-  if(S.board==='overview'&&WIN===null)vscode.postMessage({type:'win-state'});
+  if((S.board==='overview'||S.board==='windows')&&WIN===null)vscode.postMessage({type:'win-state'});
   document.querySelectorAll('[data-tabgo]').forEach(el=>el.onclick=()=>sw(el.dataset.tabgo));
   const prf=document.getElementById('pcbRf'); if(prf)prf.onclick=()=>{PCB=null;render();vscode.postMessage({type:'pcb-state'});};
   const prl=document.getElementById('pcbRegL'); if(prl)prl.onclick=()=>{PCB=null;render();vscode.postMessage({type:'pcb-reg-local'});};

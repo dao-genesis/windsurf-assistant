@@ -2715,6 +2715,8 @@ class EssenceProvider {
           await this._handleResetCustomSP();
         else if (msg.command === "setCanon")
           await this._handleSetCanon(msg.canon);
+        else if (msg.command === "setTools")
+          await this._handleSetTools(msg.tools);
       } catch {}
     });
     // v9.4.2 · SSR 道魂直嵌 · webview 一加载就见帛书全文 · 零 fetch/postMessage 依赖
@@ -3073,6 +3075,23 @@ class EssenceProvider {
     }
   }
 
+  // 工具模式切换 · 与经藏轴正交 · webview 下拉 -> proxy /origin/tools -> 热切
+  async _handleSetTools(tools) {
+    if (!this._view) return;
+    try {
+      const r = await httpPostJson(
+        `http://127.0.0.1:${_cachedPort}/origin/tools`,
+        { tools: String(tools || "official") },
+        2000,
+      );
+      log(`tools -> ${tools} (ok=${r && r.ok}, tools=${r && r.tools})`);
+      this._lastSig = "";
+      setTimeout(() => this.forceRefresh().catch(() => {}), 300);
+    } catch (e) {
+      log(`tools set fail: ${e && e.message}`);
+    }
+  }
+
   dispose() {
     this._stopTimer();
     try {
@@ -3402,9 +3421,9 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   .edit-bar .eb.reload:hover { background: rgba(128,176,224,0.15); }
   .edit-hint { font-size: 9px; opacity: 0.55; margin-bottom: 3px; padding: 2px 4px; font-style: italic; flex: 0 0 auto; }
   .custom-badge { display: inline-block; font-size: 8px; padding: 0 4px; border-radius: 2px; background: rgba(232,160,64,0.2); color: #e8a040; border: 1px solid rgba(232,160,64,0.3); margin-left: 4px; }
-  #canonSelect { font-size: 10px; padding: 1px 2px; border: 1px solid rgba(128,128,128,0.3); background: var(--vscode-dropdown-background, rgba(0,0,0,0.2)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); border-radius: 3px; cursor: pointer; outline: none; font-family: inherit; max-width: 96px; margin-left: 4px; }
-  #canonSelect:focus { border-color: var(--vscode-focusBorder, #007fd4); }
-  #canonSelect option { background: var(--vscode-dropdown-listBackground, #252526); color: var(--vscode-dropdown-foreground, #ccc); }
+  #canonSelect, #toolsSelect { font-size: 10px; padding: 1px 2px; border: 1px solid rgba(128,128,128,0.3); background: var(--vscode-dropdown-background, rgba(0,0,0,0.2)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); border-radius: 3px; cursor: pointer; outline: none; font-family: inherit; max-width: 96px; margin-left: 4px; }
+  #canonSelect:focus, #toolsSelect:focus { border-color: var(--vscode-focusBorder, #007fd4); }
+  #canonSelect option, #toolsSelect option { background: var(--vscode-dropdown-listBackground, #252526); color: var(--vscode-dropdown-foreground, #ccc); }
 </style>
 </head>
 <body data-port="${proxyPort}">
@@ -3418,6 +3437,12 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       <option value="laozi">\u5e1b\u4e66\u300a\u8001\u5b50\u300b</option>
       <option value="yinfu">\u9053\u85cf\u300a\u9634\u7b26\u7ecf\u300b</option>
       <option value="windows-agent">\u4e8c\u7ecf\u5408+Windows Agent \u5de5\u5177\u5951\u7ea6</option>
+    </select>
+    <select id="toolsSelect" title="\u5de5\u5177\u6a21\u5f0f \u00b7 \u4e0e\u7ecf\u85cf\u6b63\u4ea4\u53e0\u52a0">
+      <option value="official">\u5b98\u65b9\u539f\u751f\u5de5\u5177</option>
+      <option value="windows">Windows \u5de5\u5177\u5951\u7ea6</option>
+      <option value="freecad">FreeCAD \u57df\u5de5\u5177</option>
+      <option value="kicad">KiCad \u57df\u5de5\u5177</option>
     </select>
     <span id="customBadge"></span>
   </div>
@@ -3492,6 +3517,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   var $editCount = document.getElementById('editCount');
   var $customBadge = document.getElementById('customBadge');
   var $canonSelect = document.getElementById('canonSelect');
+  var $toolsSelect = document.getElementById('toolsSelect');
   var lastText = '';
   var lastSP = '';
   var lastEntry = null;
@@ -3606,6 +3632,11 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     vsc.postMessage({ command: 'setCanon', canon: c });
   });
 
+  // ─── 工具模式切换 · 与经藏轴正交 · 提示换提示的 工具换工具的 ───
+  if ($toolsSelect) $toolsSelect.addEventListener('change', function() {
+    vsc.postMessage({ command: 'setTools', tools: $toolsSelect.value });
+  });
+
   // ─── 编辑模式 ───
   function _closeEditMode() {
     editMode = false;
@@ -3692,6 +3723,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       if (!p) return;
       if (p.mode) setModeUI(p.mode);
       if (p.canon && $canonSelect.value !== p.canon) $canonSelect.value = p.canon;
+      if (p.tools && $toolsSelect && $toolsSelect.value !== p.tools) $toolsSelect.value = p.tools;
       setDots(p);
       if (p.custom_sp != null) updateCustomBadge(p.custom_sp, p.custom_sp_chars);
     }).catch(function(){ setDots(null); });
@@ -3764,6 +3796,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       if (_d.ping) setDots(_d.ping);
       // 2. \u540c\u6b65\u7ecf\u85cf\u4e0b\u62c9
       if (_d.ping && _d.ping.canon && $canonSelect.value !== _d.ping.canon) $canonSelect.value = _d.ping.canon;
+      if (_d.ping && _d.ping.tools && $toolsSelect && $toolsSelect.value !== _d.ping.tools) $toolsSelect.value = _d.ping.tools;
       // 3. \u81ea\u5b9a\u4e49 badge
       if (_d.ping && _d.ping.custom_sp != null) updateCustomBadge(_d.ping.custom_sp, _d.ping.custom_sp_chars);
       // 4. \u663e\u793a SP \u5185\u5bb9 (\u4f18\u5148 proxy.after · \u5df2\u8fd0\u884c\u624d\u6709)
@@ -5063,6 +5096,12 @@ function getEaConfigHtml(port, nonce, opts) {
         <option value="laozi">帛书《老子》</option>
         <option value="yinfu">道藏《阴符经》</option>
         <option value="windows-agent">二经合+Windows Agent 工具契约</option>
+      </select>
+      <select id="e1Tools" title="工具模式·与经藏正交叠加（提示换提示的·工具换工具的）" style="font-size:11px;padding:2px 4px;border:1px solid rgba(128,128,128,0.3);border-radius:3px;background:var(--vscode-dropdown-background,rgba(0,0,0,0.2));color:var(--vscode-dropdown-foreground,var(--vscode-foreground));outline:none;font-family:inherit">
+        <option value="official">官方原生工具</option>
+        <option value="windows">Windows 工具契约</option>
+        <option value="freecad">FreeCAD 域工具</option>
+        <option value="kicad">KiCad 域工具</option>
       </select>
       <span id="e1Badge" style="font-size:10px;opacity:0.6"></span>
       <button class="btn" id="e1Open" style="margin-left:auto" title="在侧栏展开完整本源观照">↗ 侧栏</button>
@@ -6724,6 +6763,7 @@ function getEaConfigHtml(port, nonce, opts) {
   function _e1LoadState() {
     fJson('/origin/mode').then(function(d) { if (d && d.mode) _e1SetMode(d.mode); }).catch(function() {});
     fJson('/origin/canon').then(function(d) { if (d && d.canon) { var s = _e1El('e1Canon'); if (s) s.value = d.canon; } }).catch(function() {});
+    fJson('/origin/tools').then(function(d) { if (d && d.tools) { var s = _e1El('e1Tools'); if (s) s.value = d.tools; } }).catch(function() {});
     _e1LoadPreview();
   }
   // v9.9.299 · 「编」兜底稳态: 无 custom 时永以 /origin/custom_sp 的 default_sp 填 textarea
@@ -6745,7 +6785,7 @@ function getEaConfigHtml(port, nonce, opts) {
     }).catch(function() { if (st) st.textContent = '加载经文网络异常'; });
   }
   (function _e1Wire() {
-    var d = _e1El('e1Dao'), o = _e1El('e1Off'), e = _e1El('e1Edit'), c = _e1El('e1Canon');
+    var d = _e1El('e1Dao'), o = _e1El('e1Off'), e = _e1El('e1Edit'), c = _e1El('e1Canon'), tl = _e1El('e1Tools');
     var tx = _e1El('e1EditText'), st = _e1El('e1EditStatus');
     if (d) d.addEventListener('click', function() { _e1SetMode('invert'); fPost('/origin/mode', { mode: 'invert' }).then(_e1LoadPreview).catch(function() {}); });
     if (o) o.addEventListener('click', function() { _e1SetMode('passthrough'); fPost('/origin/mode', { mode: 'passthrough' }).then(_e1LoadPreview).catch(function() {}); });
@@ -6755,6 +6795,9 @@ function getEaConfigHtml(port, nonce, opts) {
         // 切经藏后 · 若正在编辑且未改自定义 · textarea 随经重填新本源 (名实相符)
         if (_e1EditOpen) _e1FillEdit(tx, st, false);
       }).catch(function() {});
+    });
+    if (tl) tl.addEventListener('change', function() {
+      fPost('/origin/tools', { tools: tl.value }).then(function() { _e1LoadPreview(); }).catch(function() {});
     });
     if (e) e.addEventListener('click', function() {
       _e1EditOpen = !_e1EditOpen;
