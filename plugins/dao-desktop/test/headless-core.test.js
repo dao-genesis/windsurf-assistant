@@ -2078,3 +2078,35 @@ test("local-api: sync-rpc 路由接线在位", () => {
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/sync/rpc-roundtrip"), "openapi 应登记");
 });
+
+// R156 · 本地 API 自启(后端打动一切): 激活即开放端点, 不依赖面板按钮手点。
+test("extension: 本地 API 激活自启接线在位(dao.localApi.autoStart)", () => {
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('get("localApi.autoStart", true)'), "激活流程应读 dao.localApi.autoStart(默认开)");
+  assert.ok(/localApi\.running\(\)\)\s*await localApi\.start\(0\)/.test(ext), "未跑则 start(0) 自启");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.configuration.properties["dao.localApi.autoStart"], "配置项应登记");
+  assert.strictEqual(pkg.contributes.configuration.properties["dao.localApi.autoStart"].default, true);
+});
+
+// R157 · 官方操作体系对位: Agent 模式一键互切 + 官方快捷命令组(模型/模式/agent 选择器)。
+test("parity: Agent 窗口互切与官方快捷命令组接线在位", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const cmds = pkg.contributes.commands.map((c) => c.command);
+  for (const c of ["dao.cascade.toggleAgentWindow", "dao.cascade.toggleModelSelector",
+    "dao.cascade.switchToNextModel", "dao.cascade.toggleWriteChatMode", "dao.cascade.openAgentPicker"])
+    assert.ok(cmds.includes(c), c + " 应登记为命令");
+  const kb = pkg.contributes.keybindings;
+  const key = (cmd) => (kb.find((k) => k.command === cmd) || {}).key;
+  assert.strictEqual(key("dao.cascade.toggleModelSelector"), "ctrl+/", "官方 Ctrl+/ 对位");
+  assert.strictEqual(key("dao.cascade.switchToNextModel"), "ctrl+shift+/", "官方 Ctrl+Shift+/ 对位");
+  assert.strictEqual(key("dao.cascade.toggleWriteChatMode"), "ctrl+.", "官方 Ctrl+. 对位");
+  assert.strictEqual(key("dao.cascade.openAgentPicker"), "ctrl+shift+.", "官方 Ctrl+Shift+. 对位");
+  const board = fs.readFileSync(path.join(CASCADE, "agent-board.js"), "utf8");
+  assert.ok(board.includes('"dao.cascade.toggleAgentWindow"'), "看板应注册 toggleAgentWindow(开↔关互切)");
+  const panel = fs.readFileSync(path.join(CASCADE, "panel.js"), "utf8");
+  assert.ok(panel.includes('m.type==="ui-action"'), "webview 应消费 ui-action");
+  assert.ok(panel.includes('".toggleModelSelector"'), "宿主应注册 toggleModelSelector");
+  const sb = fs.readFileSync(path.join(CASCADE, "status-bar.js"), "utf8");
+  assert.ok(sb.includes("dao.cascade.toggleAgentWindow"), "状态栏应有 Agent 模式一键互切项");
+});

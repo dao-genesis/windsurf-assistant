@@ -3247,6 +3247,13 @@ class CascadePanelProvider {
       modeWrap.classList.add("show");
     }
     else if(m.type==="mode-current"){ if(modeOpts.some(o=>o.value===m.modeId)){ modeVal=m.modeId; modeBtnSync(); } }
+    else if(m.type==="ui-action"){
+      // 官方全局命令对位(面板外也可触发): 模型选择器/下一模型/会话模式/agent 选择器
+      if(m.act==="toggleModel") modelBtn.click();
+      else if(m.act==="toggleMode") modeBtn.click();
+      else if(m.act==="agentPicker") agentBtn.click();
+      else if(m.act==="nextModel") document.dispatchEvent(new KeyboardEvent("keydown",{ctrlKey:true,shiftKey:true,key:"?",cancelable:true}));
+    }
     else if(m.type==="thought-delta"){
       // 官方式可折叠思考块:流式中展开计时,答复开始后自动收起为「Thought for Ns」
       const node=findNode(m.id);
@@ -3391,8 +3398,18 @@ function register(context, log, opts) {
         )
       );
   }, () => {});
+  // 聚焦面板后投递 ui-action(webview 未就绪时聚焦即会挂载, 短暂延迟后必达)
+  const _uiAction = async (act) => {
+    try { await vscode.commands.executeCommand(viewId + ".focus"); } catch (_) {}
+    setTimeout(() => provider._post({ type: "ui-action", act }), 120);
+  };
   context.subscriptions.push(
     vscode.commands.registerCommand(viewId + ".newSession", () => provider._handleSessionNew()),
+    // 官方快捷命令对位(devin.cascade.toggleModelSelector/switchToNextModel/…): 聚焦面板后投递 ui-action
+    vscode.commands.registerCommand(viewId + ".toggleModelSelector", () => _uiAction("toggleModel")),
+    vscode.commands.registerCommand(viewId + ".switchToNextModel", () => _uiAction("nextModel")),
+    vscode.commands.registerCommand(viewId + ".toggleWriteChatMode", () => _uiAction("toggleMode")),
+    vscode.commands.registerCommand(viewId + ".openAgentPicker", () => _uiAction("agentPicker")),
     vscode.commands.registerCommand(viewId + ".backupAll", () => provider._autoBackup(true)),
     vscode.commands.registerCommand(viewId + ".history", () => provider.showHistory()),
     vscode.commands.registerCommand(viewId + ".deepwiki", () => provider.deepwikiFromEditor()),

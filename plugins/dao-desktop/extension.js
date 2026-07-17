@@ -82,6 +82,17 @@ async function activate(context) {
     log("✓ Proxy Pro 独立面板就位 (dao.proxyPro)");
   } catch (e) { log("✗ Proxy Pro 面板注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②d 本地 API 自启(后端打动一切): 端点全开放是本插件本源, 不应依赖面板按钮手点。
+  // dao.localApi.autoStart=false 可关; 端口/token 落 ~/.dao/local-api.json(mode 600)。
+  try {
+    const auto = vscode.workspace.getConfiguration("dao").get("localApi.autoStart", true);
+    if (auto) {
+      const localApi = require("./dao-cascade/local-api");
+      if (!localApi.running()) await localApi.start(0);
+      log("✓ 本地 API 自启 (端口 " + localApi.port() + ", state " + localApi.statePath() + ")");
+    }
+  } catch (e) { log("✗ 本地 API 自启失败: " + (e && e.stack ? e.stack : e)); }
+
   // ③ 宿主已内建官方本体(codeium.windsurf) → 共生模式, 面板接宿主 LS, 不重复激活。
   const hostCore = vscode.extensions.getExtension("codeium.windsurf");
   const selfId = context.extension && context.extension.id;

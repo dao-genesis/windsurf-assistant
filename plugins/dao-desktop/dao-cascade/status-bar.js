@@ -31,7 +31,13 @@ function createStatusBar(context, viewId) {
   settings.tooltip = "Devin Settings 整页";
   settings.command = "dao.cascade.openSettings";
   settings.show();
-  context.subscriptions.push(main, model, plan, settings);
+  // 官方顶部「Agent 模式 ↔ 编辑器模式」切换对位(toggleWindsurfAgentWindow): 常显一键互切
+  const agentToggle = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 121);
+  agentToggle.text = "$(layout-panel) Agent 模式";
+  agentToggle.tooltip = "切换 Agent 模式(整窗会话看板) ↔ 编辑器模式 —— 官方 Toggle Agent Window 对位";
+  agentToggle.command = "dao.cascade.toggleAgentWindow";
+  agentToggle.show();
+  context.subscriptions.push(main, model, plan, settings, agentToggle);
 
   const st = { user: null, plan: null, lsReady: false,
     modelLabel: null, mode: "write",
