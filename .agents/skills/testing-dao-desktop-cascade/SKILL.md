@@ -109,6 +109,13 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - agent 菜单「+」行位于 Ctrl+提示行下方, 点击后 ACP 注册表列表渲染在同一弹层内(Featured 徽标)。
 - 反馈行取证: 回合尾 👍👎 在正文泡下方, 点击后按钮加框高亮; 失败仅打日志 "反馈上报失败"(grep ~/.config/Devin/logs 全量), 成功无正向打点。
 
+## v1.5.0 P1 验证要点(账号菜单/Customizations/MCP 富卡片)
+- 账号菜单: 命令面板 "Devin Desktop: 账号菜单"(列表尾部, 中文命令排序靠后需滚动); 未登录首行显示「未登录」, 登录后显示 GetUserStatus 的账号名+planName。独立 VS Code 宿主另有状态栏 main 项点击入口(官方宿主内状态栏整组隐让, 只能走命令面板)。
+- Customizations: Cascade 面板 modetabs 右侧 📚(⚙左边)或命令 "Devin Desktop: Customizations"; 断言分节 Rules/Workflows/Skills/Memories + 各节「新建」项, 点条目应在编辑器开文件。
+- MCP 富卡片: 归一面板图标轨 🧩(在 🐙 上一格, 约 y=303/x=855, 先 zoom 校位); 无服务器时应显示空态卡+注册表安装卡。要测工具 chips, 直接写 `~/.codeium/windsurf/mcp_config.json` 配 `{"mcpServers":{"everything":{"command":"npx","args":["-y","@modelcontextprotocol/server-everything"]}}}` 再点「重载」, ~8s 出卡; 点 chip 断言 n/m 徽标减一 + 删除线禁用态。
+- OAuth 深链 devin_code 为单次有效: 若先点了成功页 "Open xdg-open" 再手动 --open-url 会报 invalid devin_code; 需回 IDE 重点 Log in 取新 code, 一次只走 --open-url。
+- 归一面板图标轨点击 x 坐标要在图标中心(~855), 靠左(843)可能点不中。
+
 ## v1.4.1 复验补充(R150b)
 - 状态栏项归属除 tooltip 语言外, 还可用点击行为判定: 官方 Settings 打开官方设置弹层(Plan Info/Settings/AI Shortcuts), 插件 Settings 打开 dao.unified 归一面板。
 - v1.4.1 起官方宿主(appName 含 windsurf/devin)下插件整组状态栏项不注册, 右下应仅一套官方项。

@@ -127,6 +127,7 @@ function startHostDiscovery(context) {
 }
 
 async function deactivate() {
+  try { require("./dao-cascade/ls-boot").stop(); } catch (_) {}
   try { if (coreModule && typeof coreModule.deactivate === "function") await coreModule.deactivate(); }
   catch (_) {}
 }

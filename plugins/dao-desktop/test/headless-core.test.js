@@ -1871,3 +1871,22 @@ test("unified-panel: 团队/组织控制卡(GetTeamOrganizationalControls)接线
   assert.ok(uni.includes("团队/组织控制"), "设置板块应渲染团队/组织控制卡");
   assert.ok(uni.includes("extensionModelLabels") && uni.includes("subagentDefaultModelUid"), "已知字段显式呈现, 未知字段兜底遍历");
 });
+
+// R151 · LS 自持启动(独立宿主兜底): 无官方 LS 在跑时 ls-boot 自持拉起同源 LS;
+// host-discover 轮询与 ls-bridge.refreshAuth 均接线该兜底; deactivate 收尾杀子进程。
+test("ls-boot: 独立宿主自持 LS 兜底接线在位", () => {
+  const boot = fs.readFileSync(path.join(CASCADE, "ls-boot.js"), "utf8");
+  assert.ok(boot.includes("--random_port_dir"), "端口经 random_port_dir 落盘回读");
+  assert.ok(boot.includes("WINDSURF_CSRF_TOKEN"), "CSRF 经官方同源环境变量注入");
+  assert.ok(boot.includes("apiKeyCandidates"), "登录态复用 ls-bridge 同一来源(credentials.toml/state.vscdb)");
+  assert.ok(boot.includes("DAO_NO_LS_BOOT"), "应可经环境变量禁用");
+  const hd = fs.readFileSync(path.join(CASCADE, "host-discover.js"), "utf8");
+  assert.ok(hd.includes('require("./ls-boot")'), "轮询发现应接自持兜底");
+  const lb = fs.readFileSync(path.join(CASCADE, "ls-bridge.js"), "utf8");
+  assert.ok(lb.includes('require("./ls-boot")'), "refreshAuth 应接自持兜底");
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('ls-boot").stop()'), "deactivate 应停自持子进程");
+  const mod = require(path.join(CASCADE, "ls-boot.js"));
+  process.env.DAO_NO_LS_BOOT = "1";
+  return mod.boot({}).then((r) => { delete process.env.DAO_NO_LS_BOOT; assert.equal(r, null, "禁用时返回 null"); });
+});

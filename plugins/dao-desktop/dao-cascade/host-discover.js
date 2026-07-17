@@ -140,13 +140,19 @@ async function discover() {
 }
 
 // 轮询发现(冷启动时 LS 略迟于插件激活): 每 intervalMs 试一次, 命中即停; 返回停止句柄。
+// 独立宿主兜底: 连续数轮机上无任何官方 LS 进程时, 交 ls-boot 自持拉起(道并行而不相悖)。
 function startDiscovery(onFound, log, intervalMs) {
-  let stopped = false; let timer = null;
+  let stopped = false; let timer = null; let misses = 0;
   const tick = async () => {
     if (stopped) return;
     try {
       const found = await discover();
       if (found) { if (log) log("共生: 已发现宿主 LS(端口 " + found.lsPort + ", CSRF ✓)"); if (onFound) onFound(found); return; }
+      misses++;
+      if (misses >= 2 && !lsPids().length) {
+        const booted = await require("./ls-boot").boot({ log, workspaceDir: process.cwd() });
+        if (booted) { if (onFound) onFound(booted); return; }
+      }
     } catch (_) {}
     if (!stopped) timer = setTimeout(tick, intervalMs || 3000);
   };

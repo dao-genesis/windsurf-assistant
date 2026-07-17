@@ -142,8 +142,15 @@ function isStaleEndpointError(msg) {
 async function refreshAuth() {
   _keyCache = { key: "", at: 0 };
   try {
-    const found = await require("./host-discover").discover();
-    return !!found;
+    const hd = require("./host-discover");
+    const found = await hd.discover();
+    if (found) return true;
+    // 独立宿主兜底: 机上无官方 LS 在跑(如官方 IDE 已关), 自持拉起一个同源 LS。
+    if (!hd.lsPids().length) {
+      const booted = await require("./ls-boot").boot({ workspaceDir: process.cwd() });
+      return !!booted;
+    }
+    return false;
   } catch (_) { return false; }
 }
 
