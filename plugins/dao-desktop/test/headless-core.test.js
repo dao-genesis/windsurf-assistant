@@ -1958,3 +1958,45 @@ test("local-api: sync-audit 路由接线在位", () => {
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/sync/audit") && schema.includes("/api/sync/roundtrip"), "openapi 应登记两路由");
 });
+
+// R154 · 跨插件数据流通(共存·数据本源流通): 官方引擎落盘真源 = 跨插件数据总线(官方 IDE /
+// dao-vsix / dao-one / dao-desktop 源同一即流通); 各插件自持面按文件名/命名空间隔离不串写。
+test("coexist.dataFlow: 共享总线成员齐全 + 自持面全部隔离于总线", () => {
+  const co = require(path.join(CASCADE, "coexist.js"));
+  const flow = co.dataFlow();
+  assert.deepStrictEqual(flow.bus.members, ["official-ide", "dao-desktop", "dao-vsix", "dao-one"]);
+  assert.ok(flow.shared.length >= 6, "六类官方真源资源全在共享总线");
+  for (const s of flow.shared) assert.deepStrictEqual(s.sharedWith, flow.bus.members, s.resource + " 应共享给全成员");
+  assert.ok(flow.isolated.length >= 8, "自持面(dao-desktop/dao-vsix/proxy-pro/min)全列出");
+  for (const i of flow.isolated) {
+    assert.ok(!/\.codeium[\\/]windsurf|\.local[\\/]share[\\/]devin/.test(i.source),
+      i.resource + " 自持面不得落官方引擎总线根(不串写): " + i.source);
+  }
+});
+
+test("coexist.roundtrip: 共享总线写后对侧复读 + 隔离断言全通过", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-coflow-"));
+  const prevHome = process.env.DAO_ENV_SYNC_HOME;
+  const prevMcp = process.env.DAO_MCP_CONFIG_FILE;
+  process.env.DAO_ENV_SYNC_HOME = tmp;
+  process.env.DAO_MCP_CONFIG_FILE = path.join(tmp, ".codeium", "windsurf", "mcp_config.json");
+  try {
+    const co = require(path.join(CASCADE, "coexist.js"));
+    const rt = co.roundtrip();
+    assert.strictEqual(rt.ok, true, "共享面流通 + 自持面隔离均成立");
+    assert.strictEqual(rt.sharedFlow.ok, true);
+    for (const i of rt.isolation) assert.ok(i.isolatedFromBus, i.resource + " 应隔离于总线");
+  } finally {
+    prevHome == null ? delete process.env.DAO_ENV_SYNC_HOME : (process.env.DAO_ENV_SYNC_HOME = prevHome);
+    prevMcp == null ? delete process.env.DAO_MCP_CONFIG_FILE : (process.env.DAO_MCP_CONFIG_FILE = prevMcp);
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+test("local-api: coexist 流通路由接线在位", () => {
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/coexist/flow"'), "应挂 GET /api/coexist/flow");
+  assert.ok(api.includes('u === "/api/coexist/roundtrip"'), "应挂 POST /api/coexist/roundtrip");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/coexist/flow") && schema.includes("/api/coexist/roundtrip"), "openapi 应登记两路由");
+});

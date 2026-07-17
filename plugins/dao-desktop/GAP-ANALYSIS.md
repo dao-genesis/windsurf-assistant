@@ -73,3 +73,21 @@
 
 > 仍待: 真实运行官方 LS 下, Settings(GetUserSettings)/会话轨迹经 RPC 路径的写后对侧复读实机矩阵
 > (sync-audit 已覆盖文件类真源; RPC 类需官方 LS 在跑活体串测)。
+
+## R154 · 跨插件数据流通(共存·数据本源流通) coexist.dataFlow/roundtrip
+
+> 共存场景(同机: 官方 IDE + dao-one + dao-desktop, 本 VM 实机并装实证)的数据互通归一:
+> **官方引擎落盘真源(~/.codeium/windsurf + ~/.local/share/devin)本就是跨插件数据总线**——
+> 凡复用官方 LS 引擎者(官方 IDE / dao-vsix / dao-one / dao-desktop)读写同一份, 一侧写全侧见;
+> 各插件自持面(~/.dao/* 等)按文件名/命名空间隔离, 各写各真源不串写。
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| 数据流通矩阵 `/api/coexist/flow` | ✅ | 六类共享总线资源 × 四成员 + 13 项自持面隔离边界, 机器可读 |
+| 流通活体验证 `/api/coexist/roundtrip` | ✅ | 共享总线复用 sync-audit 写后对侧复读 + 自持面隔离断言; 本 VM 实机(dao-one@2.25.6 并装)六类全 wrote/readBack/reverted, 隔离 13/13 |
+| 兄弟安装探测 | ✅ | coexist.detect() 实机检出 dao.dao-one 并装 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 3 例(69/69) |
+
+> 已知限制(不伪称): 本 VM 无官方 IDE 登录态(credentials.toml)——官方 `devin auth login`
+> manual-token 流的网页侧为邮箱 OTP 验证码(无邮箱访问权), 密码登录 API(auth1 体系)不产
+> windsurf_api_key。RPC 类活体串测(GetUserSettings/轨迹)仍需一次有登录态的实机环境。

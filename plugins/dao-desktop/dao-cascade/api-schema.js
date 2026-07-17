@@ -71,6 +71,8 @@ const ROUTES = [
   { path: "/api/coexist", method: "get", summary: "共存场景边界探测: 同装独立插件(dao-vsix/dao-one/proxy-pro/min)时的共享/隔离判定矩阵 + 只读兄弟账号可见性" },
   { path: "/api/sync/audit", method: "get", summary: "官方↔插件全资源真源归一审计: 每类资源(MCP/Rules/global_rules.md/Workflows/Skills/记忆)读写同一份官方真源即双向同源" },
   { path: "/api/sync/roundtrip", method: "post", summary: "写后对侧复读活体探测: 向官方真源写唯一标记探针→经另一侧读路径复读确认→原样还原(不留痕)", b: [{ name: "only", desc: "限定资源 key 数组, 缺省全测" }] },
+  { path: "/api/coexist/flow", method: "get", summary: "跨插件数据流通矩阵: 官方引擎真源=跨插件数据总线(官方IDE/dao-vsix/dao-one/dao-desktop 源同一即流通) + 自持面命名空间隔离" },
+  { path: "/api/coexist/roundtrip", method: "post", summary: "跨插件数据流通活体验证: 共享总线写后对侧复读 + 自持面隔离断言", b: [{ name: "only", desc: "限定共享资源 key 数组, 缺省全测" }] },
   { path: "/api/pool/capture", method: "post", summary: "收录当前登录号入池", b: [{ name: "account", desc: "缺省取 /api/account 视图" }] },
   { path: "/api/pool/switch", method: "post", summary: "切换到池内账号(写 credentials.toml, 首次自动备份官方原态)", b: [{ name: "email", req: true }] },
   { path: "/api/pool/restore", method: "post", summary: "归还官方原登录态(以首次切号前备份的 credentials.toml.bak 覆写回)" },

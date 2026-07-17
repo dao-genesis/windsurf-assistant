@@ -232,6 +232,7 @@ function routes(reqUrl) {
   if (u === "/api/boundary") { return boundaryView(); }
   if (u === "/api/coexist") { return coexist.report(); }
   if (u === "/api/sync/audit") { return syncAudit.audit(); }
+  if (u === "/api/coexist/flow") { return coexist.dataFlow(); }
   return null;
 }
 
@@ -391,6 +392,9 @@ async function postRoutes(u, body) {
   }
   if (u === "/api/sync/roundtrip") {
     return syncAudit.roundtrip((body || {}).only || null);
+  }
+  if (u === "/api/coexist/roundtrip") {
+    return coexist.roundtrip((body || {}).only || null);
   }
   if (u === "/api/auth/login") {
     if (_login) return { ok: true, pending: true, url: _login.url || "" };
