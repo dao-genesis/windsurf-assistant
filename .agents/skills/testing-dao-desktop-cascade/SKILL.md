@@ -108,3 +108,7 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - 归一面板左侧图标轨会随版本增删(v1.4.0 在 🏠 与切号 🔀 之间新增 ⚡PCB 图标), 不要按固定坐标点, 先 zoom 图标轨确认位次(图标间距约 26px, 首图标约 y=75)。
 - agent 菜单「+」行位于 Ctrl+提示行下方, 点击后 ACP 注册表列表渲染在同一弹层内(Featured 徽标)。
 - 反馈行取证: 回合尾 👍👎 在正文泡下方, 点击后按钮加框高亮; 失败仅打日志 "反馈上报失败"(grep ~/.config/Devin/logs 全量), 成功无正向打点。
+
+## v1.4.1 复验补充(R150b)
+- 状态栏项归属除 tooltip 语言外, 还可用点击行为判定: 官方 Settings 打开官方设置弹层(Plan Info/Settings/AI Shortcuts), 插件 Settings 打开 dao.unified 归一面板。
+- v1.4.1 起官方宿主(appName 含 windsurf/devin)下插件整组状态栏项不注册, 右下应仅一套官方项。
