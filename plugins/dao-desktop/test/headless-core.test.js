@@ -1880,6 +1880,8 @@ test("ls-boot: 独立宿主自持 LS 兜底接线在位", () => {
   assert.ok(boot.includes("WINDSURF_CSRF_TOKEN"), "CSRF 经官方同源环境变量注入");
   assert.ok(boot.includes("apiKeyCandidates"), "登录态复用 ls-bridge 同一来源(credentials.toml/state.vscdb)");
   assert.ok(boot.includes("DAO_NO_LS_BOOT"), "应可经环境变量禁用");
+  assert.ok(boot.includes("setWorkspaceDir") && boot.includes("AddTrackedWorkspace"), "自持 LS 绑定真实工作区并注册官方跟踪工作区");
+  assert.ok(boot.includes("_portDir") && boot.includes("fs.rmdirSync"), "停止自持 LS 清理临时端口目录");
   const hd = fs.readFileSync(path.join(CASCADE, "host-discover.js"), "utf8");
   assert.ok(hd.includes('require("./ls-boot")'), "轮询发现应接自持兜底");
   const lb = fs.readFileSync(path.join(CASCADE, "ls-bridge.js"), "utf8");

@@ -46,3 +46,14 @@
 | Agent/Editor 顶部标签 | 模式标签切换 | ✅(R149) | Cascade 面板顶部标签条: Agent → 看板, ⚙ → Settings |
 | Devin Settings 整页 | General/Plan/Plugins/Agents/Devin Local/Editor/Cascade/Advanced | ✅(R149) | settings-page.js: 8 节整页, 数据/写回全走既有真源(GetUserStatus/GetUserSettings/MCP/devin-provision/import-sync) |
 | 状态栏 Upgrade/Settings 项 | Free-Upgrade Now / Devin-Settings | ✅(R149) | status-bar.js 补齐(升级项仅免费套餐显示) |
+
+## R152 · 工作区归域与交接基线
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| 第三方 IDE 工作区注入 | ✅ | extension.js 将首个 VS Code workspace 注入 ls-boot |
+| 自持 LS workspace_id | ✅ | 与官方 `file_<路径>` 归一规则一致 |
+| 官方工作区注册 | ✅(已接线) | 自持成功后调用 `AddTrackedWorkspace` |
+| 自持端口目录清理 | ✅ | deactivate/stop 清理临时端口目录 |
+| 官方↔插件双向会话同步 | ◐ | 已实证插件创建轨迹可被同源官方 LS 读取；仍需真实 UI 双向写入矩阵 |
+| 全资源双向同步 | ◐ | 读路径已同源；Settings/MCP/Rules/Skills/Workflows/Memories 仍需逐项写后对侧复读 |

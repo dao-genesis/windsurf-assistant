@@ -150,7 +150,7 @@ function startDiscovery(onFound, log, intervalMs) {
       if (found) { if (log) log("共生: 已发现宿主 LS(端口 " + found.lsPort + ", CSRF ✓)"); if (onFound) onFound(found); return; }
       misses++;
       if (misses >= 2 && !lsPids().length) {
-        const booted = await require("./ls-boot").boot({ log, workspaceDir: process.cwd() });
+        const booted = await require("./ls-boot").boot({ log });
         if (booted) { if (onFound) onFound(booted); return; }
       }
     } catch (_) {}

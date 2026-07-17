@@ -120,6 +120,12 @@ function startHostDiscovery(context) {
         registerIdeStateDb(path.join(path.dirname(gsu), "state.vscdb"));
       }
     } catch (_) {}
+    try {
+      const vscode = require("vscode");
+      const wf = vscode.workspace.workspaceFolders;
+      if (wf && wf[0] && wf[0].uri && wf[0].uri.fsPath)
+        require("./dao-cascade/ls-boot").setWorkspaceDir(wf[0].uri.fsPath);
+    } catch (_) {}
     const { startDiscovery } = require("./dao-cascade/host-discover");
     const d = startDiscovery(null, log, 3000);
     context.subscriptions.push({ dispose: () => d.stop() });

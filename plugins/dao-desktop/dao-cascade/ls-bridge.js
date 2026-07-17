@@ -147,7 +147,7 @@ async function refreshAuth() {
     if (found) return true;
     // 独立宿主兜底: 机上无官方 LS 在跑(如官方 IDE 已关), 自持拉起一个同源 LS。
     if (!hd.lsPids().length) {
-      const booted = await require("./ls-boot").boot({ workspaceDir: process.cwd() });
+      const booted = await require("./ls-boot").boot({});
       return !!booted;
     }
     return false;

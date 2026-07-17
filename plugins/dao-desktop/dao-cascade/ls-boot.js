@@ -19,6 +19,10 @@ const { hostState, hostFire } = require("./host-state");
 
 let _child = null;        // 自持子进程(单例)
 let _booting = null;      // 进行中的 boot Promise(去重)
+let _wsDir = "";          // 宿主真实工作区(extension 激活时注入; 与官方 workspace 语义对齐)
+let _portDir = "";        // 端口落盘临时目录(stop 时清理)
+
+function setWorkspaceDir(dir) { try { if (dir && fs.statSync(dir).isDirectory()) _wsDir = dir; } catch (_) {} }
 
 function _binName() {
   if (process.platform === "win32") return /language_server_windows/;
@@ -84,6 +88,23 @@ function _portFromDir(dir) {
   return 0;
 }
 
+function _rpc(port, csrf, method, body) {
+  const http = require("http");
+  return new Promise((resolve) => {
+    const payload = Buffer.from(JSON.stringify(body || {}), "utf8");
+    const req = http.request({
+      host: "127.0.0.1", port, path: "/exa.language_server_pb.LanguageServerService/" + method, method: "POST",
+      headers: { "Content-Type": "application/json", "x-codeium-csrf-token": csrf, "Content-Length": payload.length },
+    }, (r) => {
+      let b = ""; r.on("data", (c) => { b += c; });
+      r.on("end", () => { try { resolve(JSON.parse(b)); } catch (_) { resolve(null); } });
+    });
+    req.setTimeout(4000, () => { req.destroy(); resolve(null); });
+    req.on("error", () => resolve(null));
+    req.end(payload);
+  });
+}
+
 function _probe(port, csrf, key) {
   const http = require("http");
   return new Promise((resolve) => {
@@ -127,11 +148,13 @@ async function _boot({ log, workspaceDir }) {
   if (!bins.length) { say("未找到官方 language_server 二进制(需本机装有 Devin Desktop/Windsurf 或官方插件)"); return null; }
   const bin = bins[0];
   const csrf = crypto.randomUUID();
-  const ws = workspaceDir || process.cwd();
+  const ws = workspaceDir || _wsDir || process.cwd();
+  // workspace_id 与官方同构(file_<路径非词字符转下划线>): 同一目录两边同一 id, 会话列表同域可见。
   const wsId = ("file_" + ws).replace(/[^A-Za-z0-9]/g, "_");
   const dbDir = path.join(os.homedir(), ".codeium", "windsurf", "database",
     crypto.createHash("md5").update("dao-boot:" + ws).digest("hex"));
   const portDir = fs.mkdtempSync(path.join(os.tmpdir(), "dao-ls-port-"));
+  _portDir = portDir;
   fs.mkdirSync(dbDir, { recursive: true });
   const args = [
     "--run_child", "--enable_lsp", "--random_port", "--random_port_dir", portDir,
@@ -165,7 +188,10 @@ async function _boot({ log, workspaceDir }) {
         h.lsPort = port; h.csrfToken = csrf;
         try { require("./ls-bridge").setApiKey(key); } catch (_) {}
         hostFire();
-        say("就绪(端口 " + port + ", CSRF ✓, 登录态同源)");
+        // 追踪真实工作区: 会话轨迹按 workspace 归域, 官方侧同目录即可互见(1:1 同步)。
+        await _rpc(port, csrf, "AddTrackedWorkspace", { workspace: ws,
+          metadata: { ideName: "windsurf", ideVersion: "1.127.0", extensionName: "windsurf", extensionVersion: "1.63.9250", apiKey: key } });
+        say("就绪(端口 " + port + ", CSRF ✓, 登录态同源, 工作区 " + ws + ")");
         return { lsPort: port, csrfToken: csrf };
       }
     }
@@ -179,6 +205,8 @@ async function _boot({ log, workspaceDir }) {
 function stop() {
   try { if (alive()) _child.kill(); } catch (_) {}
   _child = null;
+  try { if (_portDir) { for (const f of fs.readdirSync(_portDir)) fs.unlinkSync(path.join(_portDir, f)); fs.rmdirSync(_portDir); } } catch (_) {}
+  _portDir = "";
 }
 
-module.exports = { boot, stop, alive, binaryCandidates };
+module.exports = { boot, stop, alive, binaryCandidates, setWorkspaceDir };
