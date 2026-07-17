@@ -57,3 +57,19 @@
 | 自持端口目录清理 | ✅ | deactivate/stop 清理临时端口目录 |
 | 官方↔插件双向会话同步 | ◐ | 已实证插件创建轨迹可被同源官方 LS 读取；仍需真实 UI 双向写入矩阵 |
 | 全资源双向同步 | ◐ | 读路径已同源；Settings/MCP/Rules/Skills/Workflows/Memories 仍需逐项写后对侧复读 |
+
+## R153 · 全资源双向同步「写后对侧复读」后端可验(sync-audit)
+
+> 本源: 官方 IDE 与本插件对每类可定制资源本就**读写同一份落盘真源**(env-sync 已列全清单)，
+> 故"双向同步"= 源同一，一侧写另一侧直读即见，无需拷贝迁移。R153 把这条本源做成**后端可验**
+> 的审计模块 `dao-cascade/sync-audit.js`(反者道之动·规避 GUI)：
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| 真源归一审计 `/api/sync/audit` | ✅ | 六类资源(MCP/全局 Rules/global_rules.md/Workflows/Skills/记忆)逐项给出官方真源路径+读路径+写路径, 判定归一(diverged=[]) |
+| 写后对侧复读活体探测 `/api/sync/roundtrip` | ✅ | 向官方真源写唯一标记探针→经**另一侧读路径**复读确认→原样还原(探针不留痕); 六类全 wrote/readBack/reverted 通过 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 3 例: 审计无割裂 / 复读闭环+不留痕(临时家目录隔离) / 路由接线 |
+| MCP server/tool 级开关 | ✅ | mcp-config 直写官方 mcp_config.json(官方 LS SaveMcpServerToConfigFile 同写此文件), 双端 RefreshMcpServers 同步生效 |
+
+> 仍待: 真实运行官方 LS 下, Settings(GetUserSettings)/会话轨迹经 RPC 路径的写后对侧复读实机矩阵
+> (sync-audit 已覆盖文件类真源; RPC 类需官方 LS 在跑活体串测)。
