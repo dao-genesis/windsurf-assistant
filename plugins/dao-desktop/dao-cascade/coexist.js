@@ -141,6 +141,64 @@ function siblingAccounts() {
   return out;
 }
 
+// 数据流通矩阵(数据的本源流通): 把「官方↔插件全资源真源」(sync-audit)与兄弟插件注册表合并,
+// 给出每类资源的**共享总线成员**与**隔离边界**。核心洞见: 官方引擎落盘真源(~/.codeium/windsurf
+// + ~/.local/share/devin)本就是**跨插件数据总线**——凡复用官方 LS 引擎者(官方 IDE / dao-vsix /
+// dao-one / dao-desktop)读写同一份, 一侧写全侧见(源同一即流通); 各插件自持面(~/.dao/*)按
+// 文件名/命名空间隔离, 各写各真源, 互不串写。
+function dataFlow() {
+  const sa = require("./sync-audit");
+  // 复用官方 LS 引擎的成员(共享官方真源总线): 官方 IDE + 三个 dao 插件。
+  const ENGINE_MEMBERS = ["official-ide", "dao-desktop", "dao-vsix", "dao-one"];
+  const shared = sa.surfaces().map((s) => ({
+    resource: s.key, label: s.label, source: s.path,
+    channel: "official-engine-bus",
+    sharedWith: ENGINE_MEMBERS.slice(),
+    note: "官方引擎落盘真源即跨插件数据总线; 任一成员写, 其余成员直读同一文件即见(源同一即流通)",
+  }));
+  // 各插件自持面: 按文件名/命名空间隔离(不串写)。列出本插件自持面与兄弟对应面的分流关系。
+  const isolated = [];
+  const self = selfSurfaces();
+  for (const [rel, p] of Object.entries(self)) {
+    if (rel.startsWith("credentials.toml")) continue; // 登录态属官方引擎总线(见 sync-audit/boundary)
+    isolated.push({ resource: rel, owner: "dao-desktop", source: p, channel: "plugin-namespace",
+      note: "本插件自持面(~/.dao/*, mode 600); 兄弟插件对应面文件名不同, 天然分流不串写" });
+  }
+  for (const s of registry()) {
+    for (const d of (s.data || [])) {
+      if (d.verdict === "isolated-namespace" || d.verdict === "isolated-diverged" || d.verdict === "isolated") {
+        isolated.push({ resource: d.file, owner: s.key, source: d.file, channel: "plugin-namespace",
+          relatesTo: d.relatesTo || null, note: d.note });
+      }
+    }
+  }
+  return {
+    principle: "数据本源流通 = 共享官方引擎真源(单一总线·源同一即双向) + 自持面命名空间隔离(各写各真源·不串写)。",
+    bus: { channel: "official-engine-bus", members: ENGINE_MEMBERS,
+      roots: ["~/.codeium/windsurf", "~/.local/share/devin"],
+      verify: "POST /api/coexist/roundtrip (写探针→跨成员同源复读→还原)" },
+    shared, isolated,
+  };
+}
+
+// 跨插件数据流通活体验证: 共享总线资源复用 sync-audit「写后对侧复读」(证共享面真流通),
+// 并附静态隔离断言(自持面文件名分流)。返回 { ok, sharedFlow, isolation }。
+function roundtrip(only) {
+  const sa = require("./sync-audit");
+  const sharedFlow = sa.roundtrip(only);
+  const flow = dataFlow();
+  const isolation = flow.isolated.map((i) => ({
+    resource: i.resource, owner: i.owner, channel: i.channel,
+    // 隔离成立判据: 该资源路径不落在官方引擎总线根下(即不与共享面同源) → 不串写。
+    isolatedFromBus: !/\.codeium[\\/]windsurf|\.local[\\/]share[\\/]devin/.test(i.source),
+  }));
+  return {
+    ok: sharedFlow.ok && isolation.every((i) => i.isolatedFromBus),
+    principle: flow.principle,
+    sharedFlow, isolation,
+  };
+}
+
 function report() {
   const d = detect();
   const anyPeer = d.siblings.some((s) => s.installed);
@@ -161,4 +219,4 @@ function report() {
   };
 }
 
-module.exports = { registry, selfSurfaces, extRoots, installedExtIds, detect, siblingAccounts, report };
+module.exports = { registry, selfSurfaces, extRoots, installedExtIds, detect, siblingAccounts, dataFlow, roundtrip, report };

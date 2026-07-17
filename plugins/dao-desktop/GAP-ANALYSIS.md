@@ -73,3 +73,36 @@
 
 > 仍待: 真实运行官方 LS 下, Settings(GetUserSettings)/会话轨迹经 RPC 路径的写后对侧复读实机矩阵
 > (sync-audit 已覆盖文件类真源; RPC 类需官方 LS 在跑活体串测)。
+
+## R154 · 跨插件数据流通(共存·数据本源流通) coexist.dataFlow/roundtrip
+
+> 共存场景(同机: 官方 IDE + dao-one + dao-desktop, 本 VM 实机并装实证)的数据互通归一:
+> **官方引擎落盘真源(~/.codeium/windsurf + ~/.local/share/devin)本就是跨插件数据总线**——
+> 凡复用官方 LS 引擎者(官方 IDE / dao-vsix / dao-one / dao-desktop)读写同一份, 一侧写全侧见;
+> 各插件自持面(~/.dao/* 等)按文件名/命名空间隔离, 各写各真源不串写。
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| 数据流通矩阵 `/api/coexist/flow` | ✅ | 六类共享总线资源 × 四成员 + 13 项自持面隔离边界, 机器可读 |
+| 流通活体验证 `/api/coexist/roundtrip` | ✅ | 共享总线复用 sync-audit 写后对侧复读 + 自持面隔离断言; 本 VM 实机(dao-one@2.25.6 并装)六类全 wrote/readBack/reverted, 隔离 13/13 |
+| 兄弟安装探测 | ✅ | coexist.detect() 实机检出 dao.dao-one 并装 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 3 例(69/69) |
+
+## R155 · RPC 层同步活体验证(官方 LS 运行态) sync-rpc + 后端登录链打通
+
+> 承接项目自带基础设施(rt-flow 账号体系), **全后端零 GUI**打通官方登录态并做 RPC 面活体串测:
+> 登录链 `password/login → auth1 → WindsurfPostAuth(sessionToken) → RegisterUser(api_key)`,
+> 把 api_key(= windsurf_api_key)落 `~/.local/share/devin/credentials.toml`; 经 ls-boot 自持
+> 拉起官方 language_server(同一二进制/登录态/codeium_dir), 做「写→复读→还原」RPC 往返。
+
+| 项目 | 当前状态 | 依据(本 VM 实机) |
+|---|---|---|
+| 后端登录链(零 GUI) | ✅ | 新账号 4 步链全通; GetUserStatus 200 (plan/name 真回) |
+| 官方 LS 自持拉起 | ✅ | ls-boot 拉起 language_server_linux_x64@3.4.27, 端口就绪, 登录态同源 |
+| Settings RPC 往返 | ✅ | Get/SetUserSettings 写→复读→还原(proto3 缺省省略以 !! 归一, 不误判) |
+| 定制类 RPC↔文件真源往返 | ✅ | CreateCustomizationFile 落官方 global_workflows 目录→GetAllWorkflows 列出→删文件复刷即失 |
+| `/api/sync/rpc-roundtrip` | ✅ | LS 不可用时如实返回 available:false, 不伪称 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 3 例(桩 LS · 72/72) |
+
+> 剩余(不伪称): 会话轨迹(Cascade Steps/Transcript)跨主机可见性的多机实证、
+> 官方 GUI 图形态与本插件并跑的人眼端到端录屏(可经 testing_agent 追加)。
