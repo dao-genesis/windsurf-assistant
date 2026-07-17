@@ -19,7 +19,8 @@ function createStatusBar(context, viewId) {
   }
 
   const main = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 120);
-  main.command = openCmd;
+  // 官方头像菜单对位: 主项点击弹账号菜单(QuickPick), 面板入口降为菜单首项
+  main.command = viewId + ".accountMenu";
   const model = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 119);
   model.command = openCmd;
   // 官方右下角四项之三/四: 「Free - Upgrade Now」(付费套餐不显) / 「Devin - Settings」
