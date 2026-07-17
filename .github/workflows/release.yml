@@ -1,0 +1,108 @@
+name: Sync plugins to Release
+
+# 道法自然 · 去中心化按模块发版：往 main 推代码即可。本工作流只重建并发版「真正改动的模块」，
+# 每个模块发到自己的 tag <key>-v<version>（资产仅含它自己的 VSIX），互不干扰。
+# 单一事实源 = .github/release/modules.json（detect 与 release 都读它）。鉴权用内置 GITHUB_TOKEN。
+# 触发：push 到 main（命中 plugins/** · 发版基础设施）；亦可手动 workflow_dispatch（all=true 强制全量）。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      - ".github/release/modules.json"
+      - ".github/release/detect-modules.js"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "强制全部 vsix 模块发版 (true/false)"
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-decentralized
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.d.outputs.modules }}
+      any: ${{ steps.d.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - id: d
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.all }}" = "true" ]; then
+            MODS=$(node .github/release/detect-modules.js --all)
+          else
+            BEFORE="${{ github.event.before }}"
+            ZERO="0000000000000000000000000000000000000000"
+            if [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZERO" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              git diff --name-only "$BEFORE" "${{ github.sha }}" > changed.txt
+            else
+              git diff --name-only "${{ github.sha }}^" "${{ github.sha }}" > changed.txt 2>/dev/null || git diff --name-only HEAD~1 HEAD > changed.txt
+            fi
+            echo "changed files:"; cat changed.txt || true
+            MODS=$(node .github/release/detect-modules.js --files changed.txt)
+          fi
+          echo "modules=$MODS" >> "$GITHUB_OUTPUT"
+          if [ "$MODS" = "[]" ]; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
+          echo "detected modules: $MODS"
+
+  release:
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        key: ${{ fromJson(needs.detect.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build & release ${{ matrix.key }} VSIX
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEY: ${{ matrix.key }}
+        run: |
+          set -e
+          DIR=$(node -p "require('./.github/release/modules.json').modules.find(m=>m.key===process.env.KEY).dir")
+          NAME=$(node -p "require('./.github/release/modules.json').modules.find(m=>m.key===process.env.KEY).name")
+          ARGS=$(node -p "require('./.github/release/modules.json').modules.find(m=>m.key===process.env.KEY).packageArgs||'--no-dependencies --allow-missing-repository'")
+          VER=$(node -p "require('./$DIR/package.json').version")
+          TAG="${KEY}-v${VER}"
+          echo "module=$KEY dir=$DIR args=$ARGS ver=$VER tag=$TAG"
+          # 生成构建期产物（如 dao-desktop 折入官方本体/图标），命令逐条在模块目录下的子 shell 执行
+          node -e '
+            const fs=require("fs");
+            const m=JSON.parse(fs.readFileSync(".github/release/modules.json","utf8")).modules.find(x=>x.key===process.env.KEY);
+            const sh="set -e\n"+(m.build||[]).map(c=>"( cd "+m.dir+" && "+c+" )").join("\n")+"\n";
+            fs.writeFileSync("build.sh", sh);
+          '
+          echo "----- build.sh -----"; cat build.sh; echo "--------------------"
+          bash build.sh
+          ( cd "$DIR" && rm -f ./*.vsix && npx --yes @vscode/vsce@latest package $ARGS )
+          VSIX=$(ls "$DIR"/*.vsix | head -n1)
+          echo "built $VSIX"
+          ls -lh "$VSIX"
+          TITLE="$KEY v$VER"
+          NOTES="按模块自动发版 · $TITLE (commit ${GITHUB_SHA:0:8})"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --draft=false
+            gh release upload "$TAG" "$VSIX" --clobber
+          else
+            gh release create "$TAG" "$VSIX" --title "$TITLE" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+          echo "released $TAG"
