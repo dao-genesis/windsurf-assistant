@@ -1,5 +1,12 @@
 # 官方 Devin Desktop IDE ↔ dao-desktop 插件 · 全模块差距矩阵(R148)
 
+> **本源基底(R151 纠正)**: 主战场是把本插件装进 VS Code 等**第三方 IDE**, 与官方 Devin Desktop
+> 逐项 1:1 对照; 同机共存时全套复用官方资源(登录态 credentials.toml/state.vscdb、
+> mcp_config.json、~/.devin/rules、global_rules.md、云端会话), 道并行而不相悖。
+> 独立宿主三级 LS 接入链: 共生发现在跑官方 LS → 落盘宿主态复用 → **ls-boot 自持拉起**
+> (官方二进制 + 同源登录态 + 同源 CSRF 注入, R151 后端实证: 官方 IDE 全关时 VS Code 内
+> GetUserStatus 返回同一账号)。
+
 > 方法: 反查官方 `windsurf` 扩展 bundle(3.4.27)——64 contributes 命令、5 个 gRPC 服务
 > (LanguageServer/ExtensionServer/SeatManagement/Dev/ProductAnalytics)、122 个查询类 RPC,
 > 与插件源码逐项对账; 云端 RPC 逐一**活体探测**定可达性(不臆测)。
