@@ -101,3 +101,4 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - 二分定位法: 直接改 ~/.devin/extensions/dao-agi.dao-desktop-<ver>/ 下已安装副本 + Reload Window, 无需重打包; 先与上一版 unified-panel.js 整文件互换确认文件级归因, 再逐块回退。
 - /web 站内代理可 curl 直测: token/port 在 ~/.dao/local-api.json, `curl "http://127.0.0.1:<port>/web?t=<token>&u=<encoded url>"`。
 - 冷启桌面app: `DISPLAY=:0 setsid nohup ~/devin-desktop/Devin/devin-desktop --password-store=basic --disable-workspace-trust <repo> &`(DISPLAY 必须 :0, 用 wmctrl -a 聚焦)。
+- webview DOM 取证: 重启 IDE 加 `--remote-debugging-port=9223`, CDP 连 iframe target 后经 `document.querySelector('iframe').contentDocument` 进 active-frame(同源可直取 #log)。
