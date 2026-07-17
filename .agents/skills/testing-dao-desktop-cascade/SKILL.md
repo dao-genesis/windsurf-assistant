@@ -75,6 +75,13 @@ description: 在 Devin Desktop 实机测试 dao-desktop 插件 Cascade 面板（
 - GUI 窗口最大化: `DISPLAY=:0 wmctrl -r "<窗口标题>" -b add,maximized_vert,maximized_horz`(注意别把激活焦点落在 Chrome 上)。
 - git push 可能遇平台侧 403(git-manager 代理写权限故障, 读正常); 勿嵌 token 绕过, 上报并稍后重试。
 
+## 官方 vs 插件同屏对照法（1:1 差异走查）
+- 官方原生 Cascade 侧栏视图在「Agent」模式下可能整块空白；切到顶部「Editor」标签后，官方 Cascade 出现在右侧副侧栏，插件「Devin Desktop: Cascade」可折叠展开堆在其下方 → 同屏上下对照最省事。
+- 登录回传：OAuth 成功页 HTML 抓 `devin://codeium.windsurf?devin_code=...`（browser 工具会把整页 HTML 存 /tmp/page_html_*.html，直接 grep），再 `devin-desktop --open-url "<链接>"`，IDE 弹窗点 Yes 即成，无需 CDP 脚本。
+- 插件 composer 首次点击常不获焦（面板重渲染夺焦）：要精确点中输入文本行（placeholder 那一行），输入前务必截图核对文字已落。
+- 插件模式(Code)与模型选择器是原生 `<select>`，在 X11 截图环境点击**看不到弹出层**（官方为自绘富菜单）——对照时这是已知差异点，勿误判为点击无效。
+- 账号菜单对照：标题栏右上头像即官方原生菜单；插件账号信息入口只有面板底栏（点右侧引擎/LS 区弹中文配额卡）。
+
 ## Devin Secrets Needed
 - Devin Desktop 登录账号/密码（outlook 账号）
 - GitHub PAT（push / PR / 评论）

@@ -2129,7 +2129,8 @@ class CascadePanelProvider {
         // R70: 驱动流帧即轨迹变更信号 —— 帧到立即唤醒拉增量(静默时 1s 兜底), 降出字延迟
         let wake = null, pendingFrame = false;
         drive = ls.driveStream(this._cascadeLsId, () => { if (wake) { const w = wake; wake = null; w(); } else pendingFrame = true; });
-        let out = "", grew = false, stable = 0;
+        const emitted = {}; let firstK = -1, grew = false, stable = 0;
+        const sidOf = (k) => (firstK < 0 || k === firstK) ? msg.id : msg.id + "@" + k;
         for (let i = 0; i < 200; i++) {
           await new Promise((r) => setTimeout(r, 150)); // 帧风暴限速: 两次拉取至少间隔 150ms
           if (pendingFrame) pendingFrame = false;
@@ -2138,7 +2139,7 @@ class CascadePanelProvider {
           try { r = await ls.call("GetCascadeTrajectorySteps", { cascadeId: this._cascadeLsId }); }
           catch (_) { continue; }
           const steps = ((r.trajectory || r).steps) || [];
-          let full = "", allDone = true;
+          let progress = false, allDone = true;
           for (let k = this._cascadeSeen || 0; k < steps.length; k++) {
             const st = steps[k];
             // 队列消息已续驱 → 摘除待发 chip
@@ -2147,12 +2148,21 @@ class CascadePanelProvider {
               const qi = this._cxQueue.findIndex((q) => q.text === ut);
               if (qi >= 0) { this._cxQueue.splice(qi, 1); this._post({ type: "cx-queue", queue: this._cxQueue }); }
             }
-            if (st.plannerResponse && st.plannerResponse.response) full += st.plannerResponse.response;
+            // 官方式逐步泡: 各 plannerResponse 步各自成泡, 与工具步卡按轨迹顺序内联穿插(官方渲染同序)
+            if (st.plannerResponse && st.plannerResponse.response) {
+              const resp = st.plannerResponse.response;
+              if (firstK < 0) firstK = k;
+              const prev = emitted[k] || "";
+              if (resp.length > prev.length) {
+                this._post({ type: "assistant-delta", id: sidOf(k), text: resp.slice(prev.length) });
+                emitted[k] = resp; grew = true; progress = true;
+              }
+            }
             // 官方式思考流: plannerResponse.thinking → thought 泡(与 ACP agent_thought_chunk 同渠)
             if (st.plannerResponse && st.plannerResponse.thinking && !this._cxThoughtSeen) this._cxThoughtSeen = new Set();
             if (st.plannerResponse && st.plannerResponse.thinking && !this._cxThoughtSeen.has(this._cascadeLsId + ":" + k)) {
               this._cxThoughtSeen.add(this._cascadeLsId + ":" + k);
-              this._post({ type: "thought-delta", id: msg.id, text: st.plannerResponse.thinking });
+              this._post({ type: "thought-delta", id: sidOf(k), text: st.plannerResponse.thinking });
             }
             // 官方式步卡: 工具类轨迹步以 tool-call 呈现(真实工具名+关键参数, 出自 metadata.toolCall)
             const ty = st.type || "";
@@ -2163,7 +2173,11 @@ class CascadePanelProvider {
             if (st.errorMessage && st.errorMessage.shouldShowUser !== false) {
               const em = (st.errorMessage.error && (st.errorMessage.error.userErrorMessage || st.errorMessage.error.shortError)) || "Cascade 后端错误";
               this._cascadeSeen = steps.length;
-              return this._post({ type: "assistant-done", id: msg.id, text: (full ? full + "\n\n" : "") + "⚠ " + em });
+              if (firstK >= 0) {
+                this._post({ type: "assistant-done", id: msg.id + "@e" + k, text: "⚠ " + em });
+                return this._post({ type: "assistant-done", id: msg.id });
+              }
+              return this._post({ type: "assistant-done", id: msg.id, text: "⚠ " + em });
             }
             // 官方式命令审批: RUN_COMMAND 待确认步 → Run/Skip → HandleCascadeUserInteraction
             if (ty === "CORTEX_STEP_TYPE_RUN_COMMAND" && /WAITING|HALTED/.test(st.status || "")) {
@@ -2213,10 +2227,8 @@ class CascadePanelProvider {
             }
             if (st.status && !/DONE|ERROR/.test(st.status)) allDone = false;
           }
-          if (full.length > out.length) {
-            this._post({ type: "assistant-delta", id: msg.id, text: full.slice(out.length) });
-            out = full; grew = true; stable = 0;
-          } else if (grew && allDone && ++stable >= 3) { this._cascadeSeen = steps.length; break; }
+          if (progress) stable = 0;
+          else if (grew && allDone && ++stable >= 3) { this._cascadeSeen = steps.length; break; }
         }
         this._post({ type: "assistant-done", id: msg.id, text: grew ? undefined : "(Cascade 无输出)" });
         if (grew) { try { const gs = await this._cxGenStats(this._cascadeLsId); if (gs.last) this._post({ type: "msg-stats", id: msg.id, text: gs.last }); } catch (_) {} }
@@ -2296,6 +2308,8 @@ class CascadePanelProvider {
   .msg { padding:8px 10px; border-radius:10px; word-break:break-word; max-width:100%; line-height:1.5; }
   .msg.user { white-space:pre-wrap; }
   .msg pre { position:relative; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; overflow:auto; margin:6px 0; font:12px var(--vscode-editor-font-family, monospace); }
+  .msg pre code { white-space:pre-wrap; word-break:break-word; }
+  .cblang { font-size:10px; color:var(--dim); border-bottom:1px solid var(--line); margin:-8px -10px 6px; padding:3px 10px; }
   .copybtn { position:absolute; top:4px; right:4px; font-size:10px; padding:1px 6px; border-radius:5px; border:1px solid var(--line); background:var(--vscode-sideBar-background); color:var(--dim); cursor:pointer; opacity:0; transition:opacity .12s; }
   .msg pre:hover .copybtn, .copybtn:hover { opacity:1; }
   .copybtn.done { color:var(--vscode-testing-iconPassed,#4caf50); }
@@ -2358,7 +2372,6 @@ class CascadePanelProvider {
   .card:hover #imgBtn, .card:focus-within #imgBtn,
   .card:hover #arenaBtn, .card:focus-within #arenaBtn,
   .card:hover #wtBtn, .card:focus-within #wtBtn,
-  .card:focus-within #tokCount { display:inline-block; }
   #arenaBtn.on, #wtBtn.on { border-color:var(--accent,#4a9eff); color:var(--accent,#4a9eff); }
   #wtBar { display:none; align-items:center; gap:8px; font-size:11px; color:var(--dim); padding:3px 8px; border:1px dashed var(--line); border-radius:6px; margin:4px 0; }
   #wtBar button { background:transparent; border:1px solid var(--line); border-radius:6px; color:inherit; cursor:pointer; font-size:11px; padding:1px 8px; }
@@ -2488,7 +2501,7 @@ class CascadePanelProvider {
     <div id="agentMenu"><div id="agentList"></div></div>
     <div class="card">
       <div id="imgStrip" class="imgstrip"></div>
-      <textarea id="input" rows="1" placeholder="Type @ to bring in another conversation"></textarea>
+      <textarea id="input" rows="1" placeholder="Ask anything (Ctrl+L)"></textarea>
       <input type="file" id="imgFile" accept="image/*" multiple style="display:none">
       <div class="row">
         <button id="plusBtn" title="附加上下文"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
@@ -2531,11 +2544,12 @@ class CascadePanelProvider {
 
   // 官方式富模型下拉: 自定义弹层(分族分组 + 搜索 + 徽标 + 价目副行), 替代 native select(R61 局限)
   let modelCur=null;
-  function modelLabel(o){ return (o.recommended?"⭐ ":"")+(o.disabled?"🔒 ":"")+(o.name||o.value)+(o.images?" 🖼":""); }
+  const stripCredit=(s)=>String(s||"").replace(/\\s*·\\s*[\\d.]+x\\s*$/,"");
+  function modelLabel(o){ return (o.recommended?"⭐ ":"")+(o.disabled?"🔒 ":"")+stripCredit(o.name||o.value)+(o.images?" 🖼":""); }
   function modelBtnSync(s){
     const o=(s.options||[]).find(x=>x.value===s.currentValue);
     // 官方 1:1: composer 按钮显模型名+倍率(与官方右栏实机一致, 徽标仅留下拉列表行)
-    modelCur=s; modelBtn.textContent=o?(o.name||o.value):(s.currentValue||"模型");
+    modelCur=s; modelBtn.textContent=stripCredit(o?(o.name||o.value):(s.currentValue||"模型"));
     modelBtn.title=o&&o.description?o.description:"Model";
   }
   function modelMenuRender(q){
@@ -2546,7 +2560,7 @@ class CascadePanelProvider {
       const it=document.createElement("div"); it.className="mit"+(o.disabled?" dis":"")+(o.value===s.currentValue?" sel":"");
       const row=document.createElement("div"); row.className="mrow";
       const nm=document.createElement("span"); nm.className="mnm"; nm.textContent=modelLabel(o); row.appendChild(nm);
-      const mx=(o.description||"").match(/·\\s*([\\d.]+x)/);
+      const mx=((o.name||"")+" "+(o.description||"")).match(/·\\s*([\\d.]+x)/);
       if(mx){ const x=document.createElement("span"); x.className="mx"; x.textContent=mx[1]; row.appendChild(x); }
       it.appendChild(row);
       if(o.description){ const ds=document.createElement("div"); ds.className="mds"; ds.textContent=o.description; it.appendChild(ds); }
@@ -2629,9 +2643,12 @@ class CascadePanelProvider {
   function curGroup(){ return agent==="cascade"?"cascade":"acp"; }
   function renderConfigFor(grp){
     const s=cfgStore[grp]||{};
-    if(s.model){ modelBtnSync(s.model); modelMenuClose(); modelWrap.classList.add("show"); }
+    // 配置推送不强制关闭已开弹层(否则频繁 config-options 推送会把刚点开的菜单秒关), 仅刷新内容
+    if(s.model){ modelBtnSync(s.model); modelWrap.classList.add("show");
+      if(modelMenu.classList.contains("show")) modelMenuRender(modelFilter.value); }
     else { modelWrap.classList.remove("show"); modelMenuClose(); }
-    if(s.mode){ modeSet(s.mode.options||[], s.mode.currentValue); modeMenuClose(); modeWrap.classList.add("show"); }
+    if(s.mode){ modeSet(s.mode.options||[], s.mode.currentValue); modeWrap.classList.add("show");
+      if(modeMenu.classList.contains("show")) modeMenuRender(); }
     else { modeWrap.classList.remove("show"); modeMenuClose(); }
   }
   function onAgentChange(){
@@ -2651,9 +2668,12 @@ class CascadePanelProvider {
       const nm=document.createElement("span"); nm.className="mnm"; if(a.id==="cascade"){ nm.innerHTML=W_SVG+" "; nm.appendChild(document.createTextNode(a.label)); } else { nm.textContent=(AGENT_ICONS[a.id]||"⬡")+" "+a.label; } row.appendChild(nm);
       if(a.preview){ const b=document.createElement("span"); b.className="bdg"; b.textContent="Preview"; row.appendChild(b); }
       it.appendChild(row);
-      const ds=document.createElement("div"); ds.className="mds"; ds.textContent=a.hint; it.appendChild(ds);
+      it.title=a.hint; // 官方菜单仅显名称, 技术轨道信息降为悬停提示
       it.onclick=()=>{ agentMenuClose(); agent=a.id; onAgentChange(); };
-      agentList.appendChild(it); } }
+      agentList.appendChild(it); }
+    const h=document.createElement("div"); h.className="mhint";
+    h.innerHTML='Use <span class="kbd">Ctrl</span><span class="kbd">&#39;</span> to switch agents';
+    agentList.appendChild(h); }
   agentBtn.onclick=(e)=>{ e.stopPropagation(); modelMenuClose(); modeMenuClose();
     if(agentMenu.classList.contains("show")) return agentMenuClose();
     agentMenuRender(); agentMenu.classList.add("show"); };
@@ -2705,13 +2725,6 @@ class CascadePanelProvider {
       rec.onerror=()=>{ on=false; micBtn.style.opacity=""; };
       try{ rec.start(); on=true; micBtn.style.opacity="0.5"; }catch(_){ on=false; } };
   })();
-  // 官方式轮换占位文案
-  const HINTS=["Type @ to bring in another conversation",
-    "Try typing 'megaplan' to plan deeply before building",
-    "Ask to explain, refactor or fix anything in this repo"];
-  let hintIdx=0;
-  setInterval(()=>{ if(document.activeElement!==inputEl && !inputEl.value){
-    hintIdx=(hintIdx+1)%HINTS.length; inputEl.placeholder=HINTS[hintIdx]; } }, 8000);
 
   // 极简 markdown 渲染(围栏代码块/行内码/粗斜体/链接/标题/列表)，先转义再替换
   function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -2724,8 +2737,9 @@ class CascadePanelProvider {
   function md(src){
     const parts=String(src).split(FENCE); let html="";
     for(let i=0;i<parts.length;i++){
-      if(i%2===1){ const body=parts[i].replace(/^[a-zA-Z0-9+-]*\\n?/,"");
-        html+='<pre><button class="copybtn" title="复制">Copy</button><code>'+esc(body)+"</code></pre>"; continue; }
+      if(i%2===1){ const lm=parts[i].match(/^([a-zA-Z0-9+-]*)\\n?/); const lang=lm&&lm[1]?lm[1]:"";
+        const body=parts[i].replace(/^[a-zA-Z0-9+-]*\\n?/,"");
+        html+='<pre>'+(lang?'<div class="cblang">'+esc(lang)+'</div>':'')+'<button class="copybtn" title="复制">Copy</button><code>'+esc(body)+"</code></pre>"; continue; }
       const lines=esc(parts[i]).split("\\n"); let inList=false;
       for(const ln of lines){
         const li=ln.match(/^\\s*[-*] (.*)$/), h=ln.match(/^(#{1,3}) (.*)$/);
@@ -2806,6 +2820,11 @@ class CascadePanelProvider {
   });
   // 官方式 composer 随内容增高(单行 → 最多 ~120px 后内部滚动)。
   function autoGrow(){ inputEl.style.height="auto"; inputEl.style.height=Math.min(inputEl.scrollHeight,120)+"px"; }
+  // 官方式: 点击 composer 卡片任意空白处即聚焦输入框
+  document.querySelector(".composer .card").addEventListener("mousedown",(e)=>{
+    if(e.target.closest("button,.pill,textarea,input,select,a")) return;
+    e.preventDefault(); inputEl.focus();
+  });
   function send(){
     const text=inputEl.value.trim(); const images=pendingImages.slice();
     if(!text && !images.length) return;
