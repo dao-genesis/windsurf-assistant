@@ -1,0 +1,23 @@
+{
+  "_doc": "去中心化按模块发版单一事实源。每个 kind=vsix 模块 push 到 main 命中其 trigger 前缀即重建并发到自己的 tag <key>-v<version>（资产仅含它自己的 VSIX）。detect-modules.js 与 release.yml 都读本文件。仅登记「在本仓自身即可产出 VSIX」的模块；dao-proxy-min / rt-flow 在本仓为占位壳（真正构建在别处），故不登记以免发出坏包。",
+  "modules": [
+    {
+      "key": "dao-proxy-pro",
+      "name": "dao-proxy-pro",
+      "dir": "plugins/dao-proxy-pro",
+      "kind": "vsix",
+      "trigger": ["plugins/dao-proxy-pro"],
+      "build": [],
+      "packageArgs": "--no-dependencies --allow-missing-repository"
+    },
+    {
+      "key": "dao-desktop",
+      "name": "dao-desktop",
+      "dir": "plugins/dao-desktop",
+      "kind": "vsix",
+      "trigger": ["plugins/dao-desktop"],
+      "build": ["node build.js"],
+      "packageArgs": "--allow-missing-repository --skip-license --allow-star-activation"
+    }
+  ]
+}
