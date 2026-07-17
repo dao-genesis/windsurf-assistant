@@ -99,9 +99,11 @@ async function probe() {
   try {
     const h = await _req("GET", out.lcedaBridge.url + "/api/health", null, 3000);
     out.lcedaBridge.ok = !!(h.ok || h.status === "ok");
-    out.lcedaBridge.namespaces = h.namespaces || 0;
-    out.lcedaBridge.verbs = h.verbs || 0;
     out.lcedaBridge.detail = h;
+    // 能力面全量: /api/verbs 回 { ok, total, namespaces: { ns: [verb...] } }
+    const v = await _req("GET", out.lcedaBridge.url + "/api/verbs", null, 3000);
+    out.lcedaBridge.namespaces = Object.keys(v.namespaces || {}).length;
+    out.lcedaBridge.verbs = v.total || 0;
   } catch (e) { out.lcedaBridge.error = e.message; }
   try {
     const v = await _req("GET", out.cdp.url + "/json/version", null, 3000);
