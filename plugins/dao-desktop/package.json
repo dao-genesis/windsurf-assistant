@@ -2,7 +2,7 @@
   "name": "dao-desktop",
   "displayName": "Devin Desktop",
   "description": "把官方 Devin Desktop 本体全量做成单一 VSIX 插件: 直接复用官方 codeium.windsurf(displayName \"Devin\")扩展本体 + Cascade 三模式面板(Cascade / Devin Cloud / Devin Local), 装进任意 VS Code 系 IDE 即得与官方一致的体感。与官方唯一差别: 从 IDE 本体降为一个插件, 功能 / 账号 / 模块 / 底层交互完全一致。",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "icon": "media/icon.png",
@@ -158,6 +158,26 @@
       {
         "command": "dao.cascade.openChangelog",
         "title": "Devin Desktop: Open Changelog (更新日志)"
+      },
+      {
+        "command": "dao.cascade.toggleAgentWindow",
+        "title": "Devin Desktop: Toggle Agent Window (Agent 模式 ↔ 编辑器模式)"
+      },
+      {
+        "command": "dao.cascade.toggleModelSelector",
+        "title": "Devin Desktop: Toggle Model Selector (模型选择器)"
+      },
+      {
+        "command": "dao.cascade.switchToNextModel",
+        "title": "Devin Desktop: Switch to Next Model (切下一模型)"
+      },
+      {
+        "command": "dao.cascade.toggleWriteChatMode",
+        "title": "Devin Desktop: Toggle Session Mode (Write/Chat/Plan 会话模式)"
+      },
+      {
+        "command": "dao.cascade.openAgentPicker",
+        "title": "Devin Desktop: Open Agent Picker (agent 选择器)"
       }
     ],
     "keybindings": [
@@ -184,6 +204,30 @@
         "key": "ctrl+shift+8",
         "mac": "cmd+shift+8",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "dao.cascade.toggleModelSelector",
+        "key": "ctrl+/",
+        "mac": "cmd+/",
+        "when": "!terminalFocus && !editorTextFocus"
+      },
+      {
+        "command": "dao.cascade.switchToNextModel",
+        "key": "ctrl+shift+/",
+        "mac": "cmd+shift+/",
+        "when": "!terminalFocus"
+      },
+      {
+        "command": "dao.cascade.toggleWriteChatMode",
+        "key": "ctrl+.",
+        "mac": "cmd+.",
+        "when": "!terminalFocus && !editorTextFocus"
+      },
+      {
+        "command": "dao.cascade.openAgentPicker",
+        "key": "ctrl+shift+.",
+        "mac": "cmd+shift+.",
+        "when": "!terminalFocus && !editorTextFocus"
       }
     ],
     "menus": {

@@ -287,7 +287,12 @@ window.addEventListener("message",e=>{const m=e.data;
 function register(context, log) {
   const board = new AgentBoardPanel(log);
   context.subscriptions.push(
-    vscode.commands.registerCommand("dao.cascade.agentBoard", () => board.open())
+    vscode.commands.registerCommand("dao.cascade.agentBoard", () => board.open()),
+    // 官方 workbench.action.toggleWindsurfAgentWindow 对位: Agent 模式 ↔ 编辑器模式一键互切
+    vscode.commands.registerCommand("dao.cascade.toggleAgentWindow", () => {
+      if (board._panel) board._panel.dispose();
+      else board.open();
+    })
   );
   return board;
 }

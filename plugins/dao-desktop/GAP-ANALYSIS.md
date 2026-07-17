@@ -106,3 +106,31 @@
 
 > 剩余(不伪称): 会话轨迹(Cascade Steps/Transcript)跨主机可见性的多机实证、
 > 官方 GUI 图形态与本插件并跑的人眼端到端录屏(可经 testing_agent 追加)。
+
+## R156 · 实机第三方 IDE 全链路跑通 + 本地 API 激活自启
+
+> 核心主线实证: 真 VS Code 1.129.0 装入本插件(非官方 IDE), 激活即自启本地 API(修复此前
+> 端点需面板手点才开的真缺口, `dao.localApi.autoStart` 默认开), 经开放端点跑通真对话。
+
+| 项目 | 当前状态 | 依据(本 VM 实机) |
+|---|---|---|
+| 本地 API 激活自启 | ✅ | VS Code 激活即落 ~/.dao/local-api.json(600), /api/health 200 |
+| 真对话全链路 | ✅ | /api/cascade/send 真发「道生」→ transcript 真回 → trajectories/steps 全可读 |
+| 独立官方侧可见 | ✅ | 另起全新 LS(新端口/新 db)同账号 GetAllCascadeTrajectories 见同一会话/轨迹 |
+| GUI 对照实证 | ✅ | testing_agent 录屏 4/4: VS Code 面板回放/新发消息真回, 官方 IDE Agent 看板见同一会话双向同步 |
+| 回归护栏 | ✅ | 73/73 |
+
+## R157 · 官方操作体系对位: Agent 模式互切 + 官方快捷命令组
+
+> 用户实测暴露的割裂点: VS Code 内不知如何切 Agent 模式、官方快捷操作组缺席。
+> 反者道之动: 从官方 workbench 二进制提取命令清单(workbench.action.toggleWindsurfAgentWindow /
+> devin.cascade.toggleModelSelector 等)逐项对位。
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| Agent 模式 ↔ 编辑器模式一键互切 | ✅ | dao.cascade.toggleAgentWindow(官方 toggleWindsurfAgentWindow 对位) + 状态栏常显「Agent 模式」切换项(补官方顶栏切换的可发现性) |
+| 官方快捷命令组 | ✅ | toggleModelSelector(Ctrl+/) · switchToNextModel(Ctrl+Shift+/) · toggleWriteChatMode(Ctrl+.) · openAgentPicker(Ctrl+Shift+.) 命令+键位与官方一致, 面板外亦可触发(聚焦后投递 ui-action) |
+| 回归护栏 | ✅ | headless-core.test.js 新增对位护栏(74/74) |
+
+> 剩余(不伪称): 编辑器内联(Command/Supercomplete/diff zone 接受拒绝键组)、Cascade Bar、
+> 会话 rename/archive/delete 的跨侧变更矩阵、官方 IDE 顶栏级 UI 完整还原 —— 持续对照推进。
