@@ -1892,3 +1892,69 @@ test("ls-boot: 独立宿主自持 LS 兜底接线在位", () => {
   process.env.DAO_NO_LS_BOOT = "1";
   return mod.boot({}).then((r) => { delete process.env.DAO_NO_LS_BOOT; assert.equal(r, null, "禁用时返回 null"); });
 });
+
+// R153 · 官方↔插件全资源双向同步: 源同一即双向同源。sync-audit 审计每类资源(MCP/
+// 全局 Rules/global_rules.md/Workflows/Skills/记忆)读写同一份官方真源, 并以"写后对侧
+// 复读"活体探测证实闭环(向官方真源写唯一标记探针→经另一侧读路径复读→原样还原不留痕)。
+test("sync-audit: 全资源真源归一审计, 无割裂", () => {
+  const home = os.homedir();
+  const sa = require(path.join(CASCADE, "sync-audit.js"));
+  const rep = sa.audit();
+  assert.deepStrictEqual(rep.diverged, [], "无割裂: 每类资源读写归一到官方同一真源");
+  const keys = rep.items.map((i) => i.key).sort();
+  assert.deepStrictEqual(keys, ["grules", "grulesmd", "gskills", "gworkflows", "mcp", "memories"].sort(),
+    "六类共享资源全覆盖");
+  const ws = path.join(home, ".codeium", "windsurf");
+  const byKey = Object.fromEntries(rep.items.map((i) => [i.key, i]));
+  assert.ok(byKey.mcp.source.endsWith("mcp_config.json"), "MCP 真源=官方 mcp_config.json");
+  assert.strictEqual(byKey.grulesmd.source, path.join(ws, "memories", "global_rules.md"));
+  assert.strictEqual(byKey.grules.source, path.join(home, ".devin", "rules"));
+  assert.strictEqual(byKey.gworkflows.source, path.join(ws, "global_workflows"));
+  assert.strictEqual(byKey.gskills.source, path.join(ws, "skills"));
+  assert.strictEqual(byKey.memories.source, path.join(ws, "memories"));
+  for (const it of rep.items) assert.strictEqual(it.unity, true, it.key + " 应源同一");
+});
+
+test("sync-audit: 写后对侧复读活体探测闭环, 探针不留痕", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-sync-"));
+  const prevHome = process.env.DAO_ENV_SYNC_HOME;
+  const prevMcp = process.env.DAO_MCP_CONFIG_FILE;
+  process.env.DAO_ENV_SYNC_HOME = tmp;
+  process.env.DAO_MCP_CONFIG_FILE = path.join(tmp, ".codeium", "windsurf", "mcp_config.json");
+  try {
+    delete require.cache[require.resolve(path.join(CASCADE, "sync-audit.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "mcp-config.js"))];
+    const sa = require(path.join(CASCADE, "sync-audit.js"));
+    const rt = sa.roundtrip();
+    assert.strictEqual(rt.ok, true, "全部资源写后对侧复读闭环成立");
+    for (const r of rt.results) {
+      assert.ok(r.wrote, r.key + " 应写入官方真源");
+      assert.ok(r.readBack, r.key + " 应经另一侧读路径复读到探针");
+      assert.ok(r.reverted, r.key + " 应原样还原");
+    }
+    // 不留痕: 探针标记不得残留在任一真源。
+    const leftovers = [];
+    const walk = (d) => { let e = []; try { e = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+      for (const x of e) { const p = path.join(d, x.name);
+        if (x.name.includes(sa.PROBE_TAG)) leftovers.push(p);
+        if (x.isDirectory()) walk(p);
+        else { try { if (fs.readFileSync(p, "utf8").includes(sa.PROBE_TAG)) leftovers.push(p); } catch (_) {} } } };
+    walk(tmp);
+    assert.deepStrictEqual(leftovers, [], "探测后无任何探针残留");
+  } finally {
+    prevHome == null ? delete process.env.DAO_ENV_SYNC_HOME : (process.env.DAO_ENV_SYNC_HOME = prevHome);
+    prevMcp == null ? delete process.env.DAO_MCP_CONFIG_FILE : (process.env.DAO_MCP_CONFIG_FILE = prevMcp);
+    delete require.cache[require.resolve(path.join(CASCADE, "sync-audit.js"))];
+    delete require.cache[require.resolve(path.join(CASCADE, "mcp-config.js"))];
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+test("local-api: sync-audit 路由接线在位", () => {
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('require("./sync-audit")'), "应引入 sync-audit");
+  assert.ok(api.includes('u === "/api/sync/audit"'), "应挂 GET /api/sync/audit");
+  assert.ok(api.includes('u === "/api/sync/roundtrip"'), "应挂 POST /api/sync/roundtrip");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/sync/audit") && schema.includes("/api/sync/roundtrip"), "openapi 应登记两路由");
+});

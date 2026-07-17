@@ -29,6 +29,7 @@ const githubFleet = require("./github-fleet");
 const webSearch = require("./web-search");
 const winAgent = require("./windows-agent");
 const coexist = require("./coexist");
+const syncAudit = require("./sync-audit");
 
 function statePath() { return process.env.DAO_LOCAL_API_FILE || path.join(os.homedir(), ".dao", "local-api.json"); }
 
@@ -230,6 +231,7 @@ function routes(reqUrl) {
   if (u === "/api/winagent") { return winAgent.status(); }
   if (u === "/api/boundary") { return boundaryView(); }
   if (u === "/api/coexist") { return coexist.report(); }
+  if (u === "/api/sync/audit") { return syncAudit.audit(); }
   return null;
 }
 
@@ -250,6 +252,7 @@ function boundaryView() {
       { surface: "settings/rules/memories/对话/MCP(官方 IDE 数据面)", policy: "1:1 同步镜像(env-sync/backup 只读采集); MCP 写仅经显式 /api/inject/apply-mcp" },
     ],
     coexistence: { ref: "/api/coexist", note: "与独立同类插件(dao-vsix/dao-one/proxy-pro/min)共存时的共享/隔离判定与只读兄弟账号可见性" },
+    syncAudit: { ref: "/api/sync/audit", roundtrip: "POST /api/sync/roundtrip", note: "官方↔插件全资源真源归一审计与写后对侧复读活体探测(探针写后原样还原)" },
   };
 }
 
@@ -385,6 +388,9 @@ async function postRoutes(u, body) {
   }
   if (u === "/api/backup/run") {
     return backup.backupAll(ls, body || {});
+  }
+  if (u === "/api/sync/roundtrip") {
+    return syncAudit.roundtrip((body || {}).only || null);
   }
   if (u === "/api/auth/login") {
     if (_login) return { ok: true, pending: true, url: _login.url || "" };
