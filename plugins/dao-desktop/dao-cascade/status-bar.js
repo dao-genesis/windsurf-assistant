@@ -16,15 +16,23 @@ function createStatusBar(context, viewId) {
   main.command = openCmd;
   const model = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 119);
   model.command = openCmd;
-  context.subscriptions.push(main, model);
+  // 官方右下角四项之三/四: 「Free - Upgrade Now」(付费套餐不显) / 「Devin - Settings」
+  const plan = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 118);
+  plan.command = { title: "Upgrade", command: "vscode.open", arguments: [vscode.Uri.parse("https://windsurf.com/subscription/upgrade")] };
+  const settings = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 117);
+  settings.text = "Devin - Settings";
+  settings.tooltip = "Devin Settings";
+  settings.command = "dao.unified.open";
+  settings.show();
+  context.subscriptions.push(main, model, plan, settings);
 
   const st = { user: null, plan: null, lsReady: false,
     modelLabel: null, mode: "write",
     dailyPct: null, weeklyPct: null };
 
   function render() {
-    const icon = st.lsReady ? "$(comment-discussion)" : "$(sync~spin)";
-    main.text = icon + " Devin" + (st.user ? " · " + st.user : "");
+    // 官方主项文案固定为「Devin」(账号/配额降为悬停提示)
+    main.text = st.lsReady ? "Devin" : "$(sync~spin) Devin";
     const tip = new vscode.MarkdownString();
     tip.appendMarkdown("**Devin Desktop · Cascade**\n\n");
     tip.appendMarkdown(st.user ? "账户: " + st.user + "\n\n" : "未登录 —— 点击打开面板登录\n\n");
@@ -36,11 +44,17 @@ function createStatusBar(context, viewId) {
     main.show();
 
     if (st.modelLabel) {
-      model.text = "$(sparkle) " + st.modelLabel +
+      model.text = st.modelLabel +
         (st.mode && st.mode !== "write" ? " · " + (MODE_LABELS[st.mode] || st.mode) : "");
       model.tooltip = "Cascade 当前模型/模式 —— 点击打开面板切换";
       model.show();
     } else model.hide();
+
+    if (st.plan && /free/i.test(st.plan)) {
+      plan.text = st.plan + " - Upgrade Now";
+      plan.tooltip = "升级套餐 (windsurf.com)";
+      plan.show();
+    } else plan.hide();
   }
 
   // 套餐/配额与官方账户卡同源(GetUserStatus); LS 就绪后拉一次, 之后低频刷新。

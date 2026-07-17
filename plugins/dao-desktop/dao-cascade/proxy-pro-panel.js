@@ -209,8 +209,10 @@ body{margin:0;font:13px/1.5 var(--vscode-font-family,system-ui);color:var(--vsco
 .badge{font-size:10px;padding:1px 7px;border-radius:10px;background:#0a53;margin-left:6px;font-weight:400}
 .badge.cloud{background:#37a3}
 .conv{padding:6px 12px;border-top:1px solid var(--vscode-panel-border,#2223);display:flex;justify-content:space-between;gap:8px}
-.btn{background:var(--vscode-button-background,#0a5);color:var(--vscode-button-foreground,#fff);border:none;border-radius:5px;padding:5px 12px;cursor:pointer;font:inherit;white-space:nowrap;flex:0 0 auto}
-.btn.sec{background:var(--vscode-button-secondaryBackground,#4443)}
+/* 官方视觉语言: 扁平静默钮(透底+细边框, 悬停提亮) —— 与归一面板同构 */
+.btn{background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border,#3335);border-radius:6px;padding:4px 12px;cursor:pointer;font:inherit;white-space:nowrap;flex:0 0 auto}
+.btn:hover{background:var(--vscode-list-hoverBackground,#8881)}
+.btn.sec{opacity:.8}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .muted{opacity:.55}
 .back{cursor:pointer;color:var(--vscode-textLink-foreground,#4af)}
