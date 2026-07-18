@@ -101,8 +101,31 @@ const KEYMAP_AUDIT = [
 
 // 官方 chat-client 内部快捷键对位表(R186): 非 contributes 键位,
 // 官方 workbench 内 DetectedAndRunByChatClient/jd.* 快捷键面, 逐条审计。
+// R188: 官方 3.4.27 workbench 真源全表(jd 枚举 21 动作 + iPi 键位映射, 逐条提取):
+//   parity — 插件同键同位已实装; no-surface — 插件无对应面(cascade 多标签/plan 模式/步骤评审);
+//   host — DetectedAndRunByWindsurfIde 宿主侧动作(host 会话切换, 非 webview 面)。
 const CHAT_CLIENT_KEYS = [
   { key: "ctrl+f", official: "cascade.chat.searchConversation(jd.SearchConversation)", cls: "parity", ours: "面板内会话搜索浮层(webview 同键: 匹配高亮+n/m 计数+Enter/Shift+Enter 巡航+Esc 关闭)" },
+  { key: "ctrl+l", official: "prioritized.chat.open(jd.ToggleFocus)", cls: "parity", ours: "聚焦 composer 输入框(webview 同键)" },
+  { key: "ctrl+shift+l", official: "prioritized.chat.openNewConversation(jd.CreateNewConversation)", cls: "parity", ours: "新建会话(session-new · 回 New session 首页)" },
+  { key: "ctrl+n", official: "cascade.resetCurrentConversation(jd.ResetCurrentConversation)", cls: "parity", ours: "重置当前会话(同组新会话 · session-new)" },
+  { key: "ctrl+.", official: "jd.ToggleWriteChatMode", cls: "parity", ours: "会话模式切换(modeBtn)" },
+  { key: "ctrl+'", official: "jd.ToggleAgentSelector", cls: "parity", ours: "循环切换 agent" },
+  { key: "ctrl+shift+.", official: "jd.OpenAgentPicker", cls: "parity", ours: "打开 agent 选择菜单(agentBtn)" },
+  { key: "ctrl+/", official: "jd.ToggleModelSelector", cls: "parity", ours: "模型选择器(modelBtn)" },
+  { key: "ctrl+shift+/", official: "jd.SwitchToNextModel", cls: "parity", ours: "切换下一模型" },
+  { key: "ctrl+;", official: "jd.ToggleWorktree", cls: "parity", ours: "Worktree 模式开关(wtBtn)" },
+  { key: "ctrl+shift+m", official: "jd.PressMicrophone", cls: "parity", ours: "语音输入(micBtn)" },
+  { key: "ctrl+alt+c", official: "jd.Cancel", cls: "parity", ours: "取消当前生成(busy 时 cancel)" },
+  { key: "alt+enter", official: "cascade.acceptCascadeStep(jd.AcceptCascadeStep)", cls: "no-surface", ours: "插件无步骤评审 accept/reject 面(diff zone 未实装)" },
+  { key: "alt+shift+backspace", official: "cascade.rejectCascadeStep(jd.RejectCascadeStep)", cls: "no-surface", ours: "同上" },
+  { key: "ctrl+enter", official: "jd.ImplementPlan", cls: "no-surface", ours: "插件无 plan 模式面" },
+  { key: "ctrl+w", official: "jd.CloseActiveCascadeTab", cls: "no-surface", ours: "插件单会话面无 cascade 多标签(且 Ctrl+W 归宿主关编辑器)" },
+  { key: "", official: "jd.CloseOtherCascadeTabs(官方亦无键位 isMatch:()=>!1)", cls: "no-surface", ours: "同上" },
+  { key: "ctrl+shift+t", official: "jd.ReopenClosedCascadeTab", cls: "no-surface", ours: "同上" },
+  { key: "ctrl+tab", official: "jd.SwitchToNextCascadeTab", cls: "no-surface", ours: "同上" },
+  { key: "ctrl+shift+tab", official: "jd.SwitchToPreviousCascadeTab", cls: "no-surface", ours: "同上" },
+  { key: "", official: "jd.SwitchToNextSession/PreviousSession/HighestPrioritySession(DetectedAndRunByWindsurfIde)", cls: "host", ours: "宿主侧会话切换动作, 非 webview 键位面" },
 ];
 
 // 官方非命令 contributes 面(R177): 逐面归类。

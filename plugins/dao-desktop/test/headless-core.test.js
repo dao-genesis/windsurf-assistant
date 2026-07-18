@@ -2555,3 +2555,61 @@ test("R187: Start With History 开关同位在位", () => {
   assert.ok(src.includes("swhPrefix + msg.text"), "摘要前置进首条消息");
   assert.ok(src.includes("<recent_coding_history>"), "结构化历史块在位");
 });
+
+// R187b · swhContext 功能验证(stub LS): 有当前轨迹 → 摘要块; 无轨迹/RPC 失败 → 空串优雅降级。
+test("R187: swhContext 摘要构建器功能(stub LS)", async () => {
+  const vscodePath = "vscode";
+  // panel.js 顶层 require("vscode") — 注入最小 stub 后加载
+  const Module = require("module");
+  const origResolve = Module._resolveFilename;
+  Module._resolveFilename = function (req, ...a) {
+    if (req === "vscode") return "vscode";
+    return origResolve.call(this, req, ...a);
+  };
+  require.cache["vscode"] = { id: "vscode", filename: "vscode", loaded: true, exports: {
+    Uri: { file: (p) => ({ fsPath: p }) }, window: {}, commands: {}, workspace: { workspaceFolders: [] },
+    EventEmitter: function(){ this.event=()=>{}; this.fire=()=>{}; }, ViewColumn: {}, env: {},
+  } };
+  try {
+    const { swhContext } = require(path.join(CASCADE, "panel.js"));
+    // 无当前轨迹 → 空串
+    assert.strictEqual(await swhContext({ call: async () => ({ trajectories: [] }) }), "");
+    // RPC 失败 → 空串(优雅降级)
+    assert.strictEqual(await swhContext({ call: async () => { throw new Error("boom"); } }), "");
+    // 有当前轨迹 → 结构化摘要块
+    const ls = { call: async (m) => m === "GetUserTrajectoryDescriptions"
+      ? { trajectories: [{ trajectoryId: "t1", current: true }] }
+      : { trajectory: { steps: [
+          { type: "CORTEX_STEP_TYPE_GIT_COMMIT", gitCommit: { commitMessage: "fix: panel" } },
+          { type: "CORTEX_STEP_TYPE_USER_INPUT", userInput: { userResponse: "add search" } },
+          { type: "CORTEX_STEP_TYPE_VIEW_FILE", viewFile: { absolutePathUri: "file:///a/b/c.js" } },
+          { type: "CORTEX_STEP_TYPE_CHECKPOINT", checkpoint: { userIntent: "search overlay" } },
+        ] } } };
+    const out = await swhContext(ls);
+    assert.ok(out.startsWith("<recent_coding_history>\n"), "块头在位");
+    assert.ok(out.includes("commit: fix: panel") && out.includes("user: add search"), "commit/user 行在位");
+    assert.ok(out.includes("viewed: b/c.js") && out.includes("intent: search overlay"), "viewed/intent 行在位");
+    assert.ok(out.endsWith("</recent_coding_history>\n\n"), "块尾在位");
+  } finally {
+    Module._resolveFilename = origResolve;
+    delete require.cache["vscode"];
+    delete require.cache[require.resolve(path.join(CASCADE, "panel.js"))];
+  }
+});
+
+// R188 · 官方 chat-client 键位全表对位: 官方 jd 枚举 21 动作逐条审计(parity/no-surface/host),
+// parity 项 webview 同键实装(Ctrl+L/Ctrl+Shift+L/Ctrl+N/Ctrl+Shift+./Ctrl+;/Ctrl+Shift+M/Ctrl+Alt+C)。
+test("R188: chat-client 键位全表审计与实装在位", () => {
+  const parity = require(path.join(ROOT, "dao-cascade", "official-parity.js"));
+  const ks = parity.CHAT_CLIENT_KEYS;
+  assert.strictEqual(ks.length, 21, "官方 jd 枚举全 21 动作逐条归类(宿主会话切换 3 动作合 1 行)");
+  for (const k of ks) assert.ok(["parity", "no-surface", "host"].includes(k.cls), k.official + " 归类合法");
+  const parityKeys = ks.filter((k) => k.cls === "parity").map((k) => k.key);
+  for (const need of ["ctrl+f","ctrl+l","ctrl+shift+l","ctrl+n","ctrl+.","ctrl+'","ctrl+shift+.","ctrl+/","ctrl+shift+/","ctrl+;","ctrl+shift+m","ctrl+alt+c"])
+    assert.ok(parityKeys.includes(need), need + " 已实装");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('type:"session-new"'), "Ctrl+Shift+L/Ctrl+N → session-new 在位");
+  assert.ok(src.includes("inputEl.focus(); return;"), "Ctrl+L 聚焦在位");
+  assert.ok(src.includes("micBtn.click()"), "Ctrl+Shift+M 语音在位");
+  assert.ok(src.includes("wtBtn.click()"), "Ctrl+; worktree 在位");
+});
