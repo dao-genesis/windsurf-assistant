@@ -221,7 +221,17 @@ function register(context, log) {
     vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration("dao.cascade.autoRefreshMinutes")) applyAutoRefresh(); })
   );
 
+  // 官方主题对位(R175): theme-windsurf 真源逐字节随包(Devin Dark/Light), 本命令一键切换
+  // 宿主 workbench.colorTheme → 官方默认 "Devin Dark"(product.json 同源默认)。
+  const applyOfficialTheme = async () => {
+    try {
+      await vscode.workspace.getConfiguration("workbench").update("colorTheme", "Devin Dark", true);
+      vscode.window.showInformationMessage("已应用官方 Devin Desktop 默认主题(Devin Dark) — 真源: 官方 theme-windsurf");
+    } catch (e) { vscode.window.showWarningMessage("主题应用失败: " + (e && e.message)); }
+  };
+
   context.subscriptions.push(
+    vscode.commands.registerCommand("dao.cascade.applyOfficialTheme", applyOfficialTheme),
     vscode.commands.registerCommand("dao.cascade.importRulesFromCursor", importRules),
     vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser),
     vscode.commands.registerCommand("dao.cascade.lifeguardCheck", lifeguardCheck),

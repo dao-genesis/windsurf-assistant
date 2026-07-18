@@ -293,3 +293,12 @@
 | scripts/coldstart.js 一键器 | ✅ 幂等(已就位步骤 skip), --json 报告, 退出码供 CI 消费; login 路径实测(移除 credentials 后 DAO_EMAIL/DAO_PASSWORD 重登 PASS) |
 | 官方对位快照重跑(sync-official) | ✅ 3.4.27 无漂移(新增 0/移除 0); 已接入计数修正 86→92(AddTrackedWorkspace 等历轮新接入档) |
 | 测试工装修缮 | ✅ ls-boot 测试改为保存/恢复 DAO_NO_LS_BOOT(原先无条件删除, 在官方二进制+凭据齐备的机器上导致后续测试真拉起 LS 挂死 runner); 90/90 通过 |
+
+## R175 · 宿主 UI 对照升级 · 官方主题真源随包(反者道之动)
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| Devin Dark/Light 主题 | ✅ | 官方 theme-windsurf 主题 JSON **逐字节**反提随包(product.json 默认即 Devin Dark); VS Code 宿主一键获得官方 Devin Desktop 视觉基调 |
+| dao.cascade.applyOfficialTheme | ✅ | 一键切换 workbench.colorTheme → "Devin Dark"(官方默认同源) |
+| 官方升级跟随 | ✅ | scripts/sync-official.js 增主题真源同步段: 重跑即逐字节对账/更新, 有漂移即报 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 1 例(登记/文件随包/完整配色非占位/命令接线/同步器承接), 91/91 |
