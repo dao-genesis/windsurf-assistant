@@ -631,6 +631,82 @@ async function runCacheCheck() {
     ),
   });
 
+  // ── 扩展缓存 TTL (对照 Anthropic 官方·agentic 慢链路 5min 断档根治) ──
+  //   默认 1h: 三断点均带 ttl=1h · beta 头含 extended-cache-ttl
+  checks.push({
+    name: "Anthropic 默认扩展 TTL=1h (system/工具/末消息三断点)",
+    pass:
+      body.system[0].cache_control.ttl === "1h" &&
+      body.tools[body.tools.length - 1].cache_control.ttl === "1h" &&
+      lastBlocks.some((b) => b && b.cache_control && b.cache_control.ttl === "1h"),
+  });
+  checks.push({
+    name: "Anthropic 1h TTL 必带 extended-cache-ttl beta 头",
+    pass: String(opts.headers["anthropic-beta"] || "").includes(
+      "extended-cache-ttl-2025-04-11",
+    ),
+  });
+  // 显式 5m: 省略 ttl 字段(兼容旧网关) · 不发 extended beta
+  const body5m = anth.buildRequest({
+    messages: [
+      { role: "system", content: "you are helpful" },
+      { role: "user", content: "hello" },
+    ],
+    model: "claude-sonnet-4-5",
+    maxOutputTokens: 100,
+    cacheTtl: "5m",
+  });
+  const opts5m = anth.buildRequestOpts(
+    { apiKey: "k", cacheTtl: "5m" },
+    body5m,
+    new URL("https://api.anthropic.com/v1/messages"),
+  );
+  checks.push({
+    name: "Anthropic 显式 5m TTL 省略 ttl 字段(兼容旧网关)",
+    pass:
+      body5m.system[0].cache_control.type === "ephemeral" &&
+      body5m.system[0].cache_control.ttl === undefined,
+  });
+  checks.push({
+    name: "Anthropic 5m 不发 extended-cache-ttl beta 头",
+    pass: !String(opts5m.headers["anthropic-beta"] || "").includes(
+      "extended-cache-ttl",
+    ),
+  });
+
+  // ── OpenAI prompt_cache_key (对照 OpenAI 官方·稳定前缀签名钉缓存节点) ──
+  const _msgsA = [
+    { role: "system", content: "sysP" },
+    { role: "user", content: "turn-1" },
+  ];
+  const _msgsB = [
+    { role: "system", content: "sysP" },
+    { role: "user", content: "turn-1" },
+    { role: "assistant", content: "ans" },
+    { role: "user", content: "turn-2-DIFFERENT" },
+  ];
+  const _tls = [{ function: { name: "Read" } }];
+  const keyA = adapters.promptCacheKey(_msgsA, _tls);
+  const keyB = adapters.promptCacheKey(_msgsB, _tls);
+  const keyC = adapters.promptCacheKey(
+    [{ role: "system", content: "OTHER-SYS" }, { role: "user", content: "x" }],
+    _tls,
+  );
+  checks.push({
+    name: "OpenAI prompt_cache_key 跨轮稳定(易变尾部不改键)",
+    pass: keyA === keyB && keyA.startsWith("dao-"),
+  });
+  checks.push({
+    name: "OpenAI prompt_cache_key 前缀变则键变(system 改)",
+    pass: keyA !== keyC,
+  });
+  checks.push({
+    name: "dao_router 默认路径下发 prompt_cache_key",
+    pass: fs
+      .readFileSync(path.join(__dirname, "dao_router.js"), "utf8")
+      .includes("bodyObj.prompt_cache_key"),
+  });
+
   // Anthropic usage: cache_read/cache_creation 提取
   const msgStart = anth.parseSSELine(
     JSON.stringify({

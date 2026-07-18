@@ -2890,6 +2890,14 @@ async function _callProvider(
     if (bodyObj.stream && provCfg.streamUsage !== false) {
       bodyObj.stream_options = { include_usage: true };
     }
+    // ★ OpenAI 自动前缀缓存 · prompt_cache_key(稳定前缀签名·同对话钉同缓存节点→命中率↑)
+    //   对照 OpenAI 官方: 键须同前缀恒同, 取 system+工具名(跨轮不变) · 掺易变尾部反破坏路由。
+    //   provCfg.promptCacheKey=false 可关(极少数严格网关不容未知字段时)。
+    if (_adapters && provCfg.promptCacheKey !== false) {
+      try {
+        bodyObj.prompt_cache_key = _adapters.promptCacheKey(messages, toolsField);
+      } catch {}
+    }
     if (toolsField) {
       bodyObj.tools = toolsField;
       // ★ v9.9.84 · DeepSeek V4 thinking 模式不支持 tool_choice
@@ -2946,6 +2954,9 @@ async function _callProvider(
         thinkingEnabled: target && target.thinkingEnabled,
         thinkingBudget: target && target.thinkingBudget,
         reasoningEffort: target && target.reasoningEffort,
+        // ★ 提示缓存 TTL: 渠道可配 cacheTtl(5m|1h) · 未配走 adapters 默认(1h)
+        cacheTtl: provCfg.cacheTtl,
+        promptCacheKey: provCfg.promptCacheKey,
         system:
           messages.length > 0 && messages[0].role === "system"
             ? messages[0].content

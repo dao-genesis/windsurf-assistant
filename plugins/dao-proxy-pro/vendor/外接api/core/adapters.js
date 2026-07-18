@@ -32,6 +32,7 @@
 const http = require("http");
 const https = require("https");
 const path = require("path");
+const crypto = require("crypto");
 
 // ── 协议类型枚举 ──────────────────────────────────────────────
 const PROTOCOL = Object.freeze({
@@ -39,6 +40,23 @@ const PROTOCOL = Object.freeze({
   ANTHROPIC: "anthropic",
   OPENAI_RESPONSES: "openai-responses",
 });
+
+// ── 提示缓存 TTL (对照 Anthropic 官方: 默认 ephemeral=5min · 可扩展 1h) ──
+//   反者道之动: agentic 慢链路(SWE-1.6 Slow + 多工具轮)单轮常超 5min → 5min 缓存
+//   在下一轮前已过期 → 每轮重写从不命中(命中率≈0)。1h TTL 写入贵一档(2x vs 1.25x),
+//   但一小时内多轮复用的读折扣(0.1x)远覆盖之 → agentic 净省。默认 1h 拉满命中。
+//   官方要求 1h 须带 beta 头 extended-cache-ttl-2025-04-11 且 cache_control.ttl="1h"。
+const _CACHE_TTL_ALLOWED = new Set(["5m", "1h"]);
+let _DEFAULT_CACHE_TTL = "1h";
+function _normCacheTtl(v) {
+  const s = String(v == null ? "" : v).trim();
+  return _CACHE_TTL_ALLOWED.has(s) ? s : _DEFAULT_CACHE_TTL;
+}
+//   5m → 官方默认省略 ttl 字段(兼容不识扩展 TTL 的网关) · 1h → 显式钉 ttl
+function _cacheControl(ttl) {
+  const t = _normCacheTtl(ttl);
+  return t === "5m" ? { type: "ephemeral" } : { type: "ephemeral", ttl: t };
+}
 
 // ── 模型信息缓存 (移植自 Go upstream.modelinfo_cache) ─────────
 const _modelInfoCache = new Map();
@@ -367,7 +385,9 @@ const AnthropicAdapter = {
       thinkingEnabled = false,
       thinkingBudget = null,
       system = "",
+      cacheTtl = null,
     } = opts;
+    const _cc = _cacheControl(cacheTtl);
 
     // 分离 system 消息
     const systemContent = system || _extractSystemFromMessages(rawMessages);
@@ -395,7 +415,7 @@ const AnthropicAdapter = {
         {
           type: "text",
           text: systemContent,
-          cache_control: { type: "ephemeral" },
+          cache_control: _cc,
         },
       ];
     }
@@ -417,7 +437,7 @@ const AnthropicAdapter = {
       // ★ 提示缓存: 末位工具钉断点 → 全部工具定义前缀可缓存
       const lastTool = body.tools[body.tools.length - 1];
       if (lastTool && typeof lastTool === "object") {
-        lastTool.cache_control = { type: "ephemeral" };
+        lastTool.cache_control = _cc;
       }
       if (toolChoice) {
         body.tool_choice = _convertToolChoiceToAnthropic(toolChoice);
@@ -425,7 +445,7 @@ const AnthropicAdapter = {
     }
 
     // ★ 提示缓存: 末条消息钉断点 → 下一轮整段历史成为缓存前缀 (递增缓存)
-    _applyMessageCacheBreakpoint(body.messages);
+    _applyMessageCacheBreakpoint(body.messages, _cc);
 
     return body;
   },
@@ -681,6 +701,11 @@ const OpenAIResponsesAdapter = {
 
     // 输出 token 限制
     if (maxOutputTokens) body.max_output_tokens = maxOutputTokens;
+
+    // ★ 提示缓存: 稳定前缀签名钉缓存节点 (opts.promptCacheKey=false 可关)
+    if (opts.promptCacheKey !== false) {
+      body.prompt_cache_key = promptCacheKey(messages, tools);
+    }
 
     // Reasoning (Responses API 专用)
     if (thinkingEnabled || reasoningEffort) {
@@ -1004,8 +1029,13 @@ function pickContextLength(model) {
  */
 function initAdapters(opts = {}) {
   _log = opts.log || (() => {});
+  // 可全局改提示缓存默认 TTL (5m|1h) · 未给则维持 1h 拉满 agentic 命中
+  if (opts.cacheTtl && _CACHE_TTL_ALLOWED.has(String(opts.cacheTtl).trim())) {
+    _DEFAULT_CACHE_TTL = String(opts.cacheTtl).trim();
+  }
   _log(
-    "[adapters] 初始化完成 · 支持 openai-chat + anthropic + openai-responses",
+    "[adapters] 初始化完成 · 支持 openai-chat + anthropic + openai-responses · cacheTtl=" +
+      _DEFAULT_CACHE_TTL,
   );
 }
 
@@ -1191,8 +1221,9 @@ const _CACHEABLE_BLOCK_TYPES = new Set([
   "tool_use",
   "image",
 ]);
-function _applyMessageCacheBreakpoint(messages) {
+function _applyMessageCacheBreakpoint(messages, cc) {
   if (!Array.isArray(messages) || messages.length === 0) return;
+  const _cc = cc || _cacheControl(null);
   const last = messages[messages.length - 1];
   if (!last || typeof last !== "object") return;
 
@@ -1202,7 +1233,7 @@ function _applyMessageCacheBreakpoint(messages) {
       {
         type: "text",
         text: last.content,
-        cache_control: { type: "ephemeral" },
+        cache_control: _cc,
       },
     ];
     return;
@@ -1214,7 +1245,7 @@ function _applyMessageCacheBreakpoint(messages) {
       if (!block || typeof block !== "object") continue;
       if (!_CACHEABLE_BLOCK_TYPES.has(block.type)) continue;
       if (block.type === "text" && !block.text) continue;
-      block.cache_control = { type: "ephemeral" };
+      block.cache_control = _cc;
       return;
     }
   }
@@ -1385,8 +1416,44 @@ function _anthropicStopReason(reason) {
  */
 function _composeAnthropicBetaHeader(provCfg) {
   const tokens = ["prompt-caching-2024-07-31"];
+  // ★ 扩展缓存 TTL(1h): 必携官方 beta 头 否则 cache_control.ttl 被忽略 → 仍 5min 断档
+  if (_normCacheTtl(provCfg && provCfg.cacheTtl) === "1h") {
+    tokens.push("extended-cache-ttl-2025-04-11");
+  }
   if (provCfg.thinkingEnabled) tokens.push("interleaved-thinking-2025-05-14");
   return tokens.join(",");
+}
+
+/**
+ * ★ OpenAI 自动前缀缓存 · prompt_cache_key (对照 OpenAI 官方做法)
+ *   OpenAI/Azure 按 prompt_cache_key+前缀哈希路由缓存节点; 不钉键则同一对话的
+ *   请求可能被负载均衡到不同节点 → 前缀虽同却命中不同节点缓存 → 命中率下降。
+ *   键须「同前缀恒同」: 取稳定前缀签名 = system 内容 + 工具名序列 (跨轮不变),
+ *   绝不掺入易变尾部(末条 user/时间戳) — 掺则键逐轮变化反而破坏路由。
+ *   DeepSeek 等兼容网关按 JSON 惯例忽略未知字段, 无害。
+ */
+function promptCacheKey(messages, tools) {
+  try {
+    const sys =
+      Array.isArray(messages) && messages[0] && messages[0].role === "system"
+        ? typeof messages[0].content === "string"
+          ? messages[0].content
+          : JSON.stringify(messages[0].content)
+        : "";
+    const toolNames = (Array.isArray(tools) ? tools : [])
+      .map((t) => (t && t.function && t.function.name) || (t && t.name) || "")
+      .join(",");
+    return (
+      "dao-" +
+      crypto
+        .createHash("sha256")
+        .update(sys + "\u0000" + toolNames)
+        .digest("hex")
+        .slice(0, 24)
+    );
+  } catch (_) {
+    return "dao-default";
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1416,4 +1483,9 @@ module.exports = {
   initAdapters,
   getSupportedProtocols,
   getModelInfoCache,
+
+  // 提示缓存 (对照 Anthropic 扩展 TTL / OpenAI prompt_cache_key 官方做法)
+  promptCacheKey,
+  _normCacheTtl,
+  _cacheControl,
 };
