@@ -1149,6 +1149,32 @@ class CascadePanelProvider {
     loop();
   }
 
+  // 官方 Start With History 同位(反者道之动·workbench 真源 tooltip: "messages will automatically
+  // include your recent coding history"): 新会话首条消息附带最近编码轨迹摘要。
+  // 数据同源: GetUserTrajectoryDescriptions(current) → GetUserTrajectory 末尾步骤。LS 无
+  // start_with_history 专用 RPC(二进制实测), 故与官方同为客户端态+消息内附带。
+  async _swhContext() {
+    const ls = require("./ls-bridge");
+    try {
+      const ds = await ls.call("GetUserTrajectoryDescriptions", {});
+      const cur = ((ds.trajectories || []).find((t) => t.current) || {});
+      if (!cur.trajectoryId) return "";
+      const r = await ls.call("GetUserTrajectory", { trajectoryId: cur.trajectoryId });
+      const one = (s) => String(s || "").split("\n")[0].slice(0, 120);
+      const rel = (u) => String(u || "").replace(/^file:\/\//, "").split("/").slice(-2).join("/");
+      const lines = ((r.trajectory || {}).steps || []).map((s) => {
+        const t = (s.type || "").replace("CORTEX_STEP_TYPE_", "");
+        if (t === "GIT_COMMIT") return "commit: " + one((s.gitCommit || {}).commitMessage);
+        if (t === "USER_INPUT") return "user: " + one((s.userInput || {}).userResponse);
+        if (t === "VIEW_FILE") return "viewed: " + rel((s.viewFile || {}).absolutePathUri);
+        if (t === "CHECKPOINT") return "intent: " + one((s.checkpoint || {}).userIntent);
+        return null;
+      }).filter(Boolean).slice(-12);
+      if (!lines.length) return "";
+      return "<recent_coding_history>\n" + lines.join("\n") + "\n</recent_coding_history>\n\n";
+    } catch (_) { return ""; }
+  }
+
   async _handleTimelineList() {
     const ls = require("./ls-bridge");
     try {
@@ -2146,6 +2172,9 @@ class CascadePanelProvider {
           this._cxRunning = true;
           return await this._cxArenaRace(msg, ls, imgs);
         }
+        // 官方 Start With History: 新会话首条消息前置最近编码轨迹摘要
+        let swhPrefix = "";
+        if (msg.startWithHistory && !this._cascadeLsId) swhPrefix = await this._swhContext();
         if (!this._cascadeLsId) {
           // 官方式 worktree 会话(后端实测): StartCascade{gitWorktree:true} → 首次发消息时 LS 自动
           // git worktree add 到 ~/.windsurf/worktrees/<repo>/<repo>-<slug>, 改动隔离于该 worktree, 主工作区不受影响
@@ -2160,7 +2189,7 @@ class CascadePanelProvider {
         try {
           const req = {
             cascadeId: this._cascadeLsId,
-            items: [{ text: msg.text }],
+            items: [{ text: swhPrefix + msg.text }],
             cascadeConfig: { plannerConfig: this._cxPlannerConfig() },
           };
           if (imgs.length) req.images = imgs;
@@ -2559,6 +2588,7 @@ class CascadePanelProvider {
         <div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>
         <div id="recentList"></div>
         <label id="autoOpenRow" style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--dim);cursor:pointer;"><input type="checkbox" id="autoOpenCk" style="margin:0;">启动时自动打开最近会话</label>
+        <label id="swhRow" title="When enabled, messages will automatically include your recent coding history for better context awareness." style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;color:var(--dim);cursor:pointer;"><input type="checkbox" id="swhCk" style="margin:0;">Start With History</label>
       </div>
     </div>
   </div>
@@ -2900,6 +2930,11 @@ class CascadePanelProvider {
   arenaBtn.onclick=()=>{ if(arenaBtn.disabled) return; arenaOn=!arenaOn; arenaBtn.classList.toggle("on",arenaOn); vscode.postMessage({type:"set-user-setting", patch:{lastArenaModeEnabled:arenaOn}}); };
   const autoOpenCk=$("autoOpenCk");
   autoOpenCk.onchange=()=>vscode.postMessage({type:"set-user-setting", patch:{openMostRecentChatConversation:autoOpenCk.checked}});
+  // 官方 Start With History 开关同位(官方 label/tooltip 逐字): 开启后新会话首条消息
+  // 自动附带最近编码轨迹(GetUserTrajectory)上下文。官方该态为 workbench 本地态(LS 无对应 RPC), 此处同为面板本地持久态。
+  const swhCk=$("swhCk");
+  swhCk.checked=!!state.startWithHistory;
+  swhCk.onchange=()=>{ state.startWithHistory=swhCk.checked; vscode.setState(state); };
   imgFile.onchange=()=>{ for(const f of imgFile.files||[]) addImageFile(f); imgFile.value=""; };
   inputEl.addEventListener("paste",(e)=>{ const items=(e.clipboardData&&e.clipboardData.items)||[]; let got=false;
     for(const it of items){ if(it.kind==="file"&&/^image\\//.test(it.type)){ addImageFile(it.getAsFile()); got=true; } }
@@ -2948,7 +2983,7 @@ class CascadePanelProvider {
     const arena=arenaOn&&agent==="cascade";
     if(arena){ arenaOn=false; arenaBtn.classList.remove("on"); vscode.postMessage({type:"set-user-setting", patch:{lastArenaModeEnabled:false}}); }
     const worktree=wtOn&&agent==="cascade";
-    vscode.postMessage({type:"chat", id, agent, text, images, arena, worktree});
+    vscode.postMessage({type:"chat", id, agent, text, images, arena, worktree, startWithHistory:!!state.startWithHistory});
   }
   sendEl.onclick=()=>{ if(busy){ vscode.postMessage({type:"cancel"}); setBusy(false); } else send(); };
 

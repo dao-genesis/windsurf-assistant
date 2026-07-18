@@ -2542,3 +2542,16 @@ test("R186: 会话搜索浮层(Ctrl+F SearchConversation 同位)在位", () => {
   const e = (parity.CHAT_CLIENT_KEYS || []).find((k) => k.key === "ctrl+f");
   assert.ok(e && e.cls === "parity", "chat-client 键位审计已录 ctrl+f parity");
 });
+
+// R187 · 官方 Start With History 同位: 官方 workbench 真源 label/tooltip 逐字,
+// 开启后新会话首条消息附带最近编码轨迹(GetUserTrajectory 同源)。LS 二进制无
+// start_with_history 专用 RPC(实测), 与官方同为客户端态——不伪造后端接口。
+test("R187: Start With History 开关同位在位", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes(">Start With History</label>"), "官方同名开关在位");
+  assert.ok(src.includes("include your recent coding history for better context awareness"), "官方 tooltip 逐字");
+  assert.ok(src.includes("_swhContext"), "轨迹摘要构建器在位");
+  assert.ok(src.includes("msg.startWithHistory && !this._cascadeLsId"), "仅新会话首条附带(官方语义)");
+  assert.ok(src.includes("swhPrefix + msg.text"), "摘要前置进首条消息");
+  assert.ok(src.includes("<recent_coding_history>"), "结构化历史块在位");
+});

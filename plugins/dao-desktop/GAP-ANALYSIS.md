@@ -421,3 +421,15 @@
   KEYMAP_AUDIT 分野不混)。
 - 官方另有 Start With History 开关(setStartWithHistoryEnabled)与 CloseActiveCascadeTab 等
   chat-client 键位, 列为后续对位点(如实待办)。98/98 测试。
+
+## R187 · Start With History 开关同位(官方真源逐字)
+
+官方 workbench 真源: 组件 label "Start With History" + tooltip "When enabled, messages will
+automatically include your recent coding history for better context awareness."; 状态
+startWithHistoryEnabled 为 workbench 本地态(初值 false), LS 二进制实测无 start_with_history
+专用 RPC/字段——即官方该开关亦为客户端态, 效果在消息侧注入。
+插件同位落法: 空态页(官方新会话首页同位)加同名开关(官方 label/tooltip 逐字), 面板本地持久
+(vscode.getState); 开启时新会话首条消息前置 <recent_coding_history> 摘要块, 数据同源
+GetUserTrajectoryDescriptions(current)→GetUserTrajectory 末尾步骤(commit/user/viewed/intent)。
+边界(如实): 官方注入的具体历史格式为 workbench 内部实现(压缩产物不可读), 本实现为同语义适配,
+非逐字节同格式; Arena 首条暂不附带(后续可扩)。99/99 测试。
