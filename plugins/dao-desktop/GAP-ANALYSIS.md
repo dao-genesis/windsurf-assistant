@@ -279,3 +279,17 @@
 | Memories 创建探针 | ✗ 官方无创建 RPC: UpdateCascadeMemory 仅改既存 id(实测 "memory does not exist"), memory 由 Cascade 代理运行产生 — 后端无法如实伪造探针, 跨端可见性按文件真源语义推定但不声称已证 |
 
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
+
+## R174 · 全新虚拟机冷启动复证 + 一键器落地(scripts/coldstart.js)
+
+全新 VM(零残留)全链路复跑上一轮成果, 纯后端零 GUI:
+
+| 探测 | 结果 |
+|---|---|
+| 官方 stable 通道下载解包 Devin Desktop 3.4.27 | ✅ |
+| 后端登录(windsurf_auth auto, email/password → apiKey → credentials.toml) | ✅ 不经 GUI/浏览器 |
+| 自持官方 LS → GetUserStatus | ✅ 账号/tier 正确(TEAMS_TIER_DEVIN_FREE) |
+| 体检 sweep(轨迹清点/RefreshCustomization/RefreshMcpServers/Lifeguard/诊断/Settings 写→复读→还原) | ✅ 全 PASS |
+| scripts/coldstart.js 一键器 | ✅ 幂等(已就位步骤 skip), --json 报告, 退出码供 CI 消费; login 路径实测(移除 credentials 后 DAO_EMAIL/DAO_PASSWORD 重登 PASS) |
+| 官方对位快照重跑(sync-official) | ✅ 3.4.27 无漂移(新增 0/移除 0); 已接入计数修正 86→92(AddTrackedWorkspace 等历轮新接入档) |
+| 测试工装修缮 | ✅ ls-boot 测试改为保存/恢复 DAO_NO_LS_BOOT(原先无条件删除, 在官方二进制+凭据齐备的机器上导致后续测试真拉起 LS 挂死 runner); 90/90 通过 |
