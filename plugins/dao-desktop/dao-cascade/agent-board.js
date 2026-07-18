@@ -85,7 +85,17 @@ class AgentBoardPanel {
   async _load() {
     this._post({ type: "loading" });
     const [cloud, local] = await Promise.all([this._loadCloud(), this._loadLocal()]);
-    this._post({ type: "data", cloud, local });
+    this._post({ type: "data", cloud, local, mcp: this._mcpCount() });
+  }
+
+  // 官方底栏「N MCP servers」同源: 与官方同一份 ~/.codeium/windsurf/mcp_config.json。
+  _mcpCount() {
+    try {
+      const fs = require("fs"), os = require("os"), path = require("path");
+      const p = path.join(os.homedir(), ".codeium", "windsurf", "mcp_config.json");
+      const j = JSON.parse(fs.readFileSync(p, "utf8"));
+      return Object.keys(j.mcpServers || {}).length;
+    } catch (_) { return 0; }
   }
 
   async _loadCloud() {
@@ -168,7 +178,16 @@ header .ttl{font-size:15px;font-weight:600}
 #newbtn{margin-left:auto;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer}
 #refresh{background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--dim);padding:4px 10px;cursor:pointer}
 main{flex:1;display:flex;min-height:0}
-aside{width:170px;border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+aside{width:190px;border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+aside .act{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12.5px}
+aside .act:hover{background:var(--hover)}
+aside .hdrow{display:flex;align-items:center;padding:8px 10px 3px}
+aside .hdrow .hd2{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;flex:1}
+aside .hdrow .ic{color:var(--dim);cursor:pointer;padding:0 3px;font-size:12px}
+aside .recent{padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+aside .recent:hover{background:var(--hover)}
+aside .recent .ra{color:var(--dim);font-size:10.5px;display:block}
+footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding:5px 16px;font-size:11.5px;color:var(--dim)}
 aside .sp{padding:5px 10px;border-radius:6px;cursor:pointer;color:var(--dim);font-size:12.5px}
 aside .sp.on{background:var(--hover);color:var(--vscode-foreground)}
 aside .hd{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px 3px}
@@ -220,16 +239,20 @@ tr:hover td{background:var(--hover)}
 </div>
 <main>
   <aside id="spaces">
-    <div class="hd">Spaces</div>
-    <div class="sp on" data-sp="all">All Sessions</div>
+    <div class="act" id="side-new">＋ New session</div>
+    <div class="sp on" data-sp="all">💬 Sessions</div>
+    <div class="hdrow"><span class="hd2">Spaces</span><span class="ic" id="sp-search" title="搜索">🔍</span><span class="ic" title="新建 Space(官方同位)">＋</span></div>
     <div class="sp" data-sp="unread">未读</div>
     <div class="sp" data-sp="pinned">已置顶</div>
     <div class="sp" data-sp="archived">已归档</div>
-    <div class="hd">本机</div>
+    <div class="hdrow"><span class="hd2">本机</span></div>
     <div class="sp" data-sp="local">Cascade 会话</div>
+    <div class="hdrow"><span class="hd2">近期</span></div>
+    <div id="recent"></div>
   </aside>
   <div id="content"><div class="muted">加载中…</div></div>
 </main>
+<footer><span id="mcpn">0 MCP servers</span></footer>
 <div id="modal"><div class="box">
   <div style="font-weight:600;margin-bottom:8px">New Session · Devin Cloud</div>
   <textarea id="nprompt" placeholder="首条任务描述(必填 — 云端空会话不会持久化)…"></textarea>
@@ -305,9 +328,16 @@ function cycle(opts,cur){const i=opts.findIndex(o=>o[0]===cur);return opts[(i+1)
 $("#chip-time").addEventListener("click",e=>{if(e.target.classList.contains("x")){F.time="any";}else{F.time=cycle(TIME_OPTS,F.time)[0];}document.getElementById("time-v").textContent=TIME_OPTS.find(o=>o[0]===F.time)[1];render();});
 $("#chip-arch").addEventListener("click",e=>{if(e.target.classList.contains("x")){F.arch="excluded";}else{F.arch=cycle(ARCH_OPTS,F.arch)[0];}document.getElementById("arch-v").textContent=ARCH_OPTS.find(o=>o[0]===F.arch)[1];render();});
 $("#display").addEventListener("change",e=>{F.sort=e.target.value;render();});
+$("#side-new").addEventListener("click",()=>{$("#modal").classList.add("show");$("#nprompt").focus();});
+$("#sp-search").addEventListener("click",()=>$("#search").focus());
+function renderRecent(){
+  const all=((D.cloud&&D.cloud.sessions)||[]).concat((D.local&&D.local.sessions)||[])
+    .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0,8);
+  document.getElementById("recent").innerHTML=all.map(s=>'<div class="recent" data-k="'+s.kind+'" data-u="'+E(s.url||"")+'" data-i="'+E(s.id)+'" title="'+E(s.title)+'">'+E(s.title)+'<span class="ra">◴ '+ago(s.updatedAt)+'</span></div>').join("");
+}
 window.addEventListener("message",e=>{const m=e.data;
   if(m.type==="loading"){$("#content").innerHTML='<div class="muted">加载中…</div>';}
-  else if(m.type==="data"){D={cloud:m.cloud,local:m.local};render();}
+  else if(m.type==="data"){D={cloud:m.cloud,local:m.local};document.getElementById("mcpn").textContent=(m.mcp||0)+" MCP servers";renderRecent();render();}
   else if(m.type==="create-error"){$("#content").insertAdjacentHTML("afterbegin",'<div class="err">创建失败: '+E(m.error)+'</div>');}
 });
 </script></body></html>`;

@@ -2455,3 +2455,13 @@ test("agent-board R179: 官方 Board 同貌(筛选 chips/Display/Running 泳道/
   assert.ok(src.includes("workbench.action.closeSidebar"), "Agent 模式整窗接管(收侧栏)");
   assert.ok(src.includes("TIME_OPTS") && src.includes("ARCH_OPTS"), "筛选语义落地(非纯装饰)");
 });
+
+// R180 · 官方 Agent 侧栏/底栏对照收敛: New session/Sessions/Spaces(🔍＋)/近期会话 + N MCP servers 底栏(同一份 mcp_config 真源)。
+test("agent-board R180: 官方 Agent 侧栏结构 + MCP servers 底栏同源", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "agent-board.js"), "utf8");
+  assert.ok(src.includes("＋ New session"), "侧栏 New session 对位");
+  assert.ok(src.includes("Sessions</div>"), "侧栏 Sessions 项对位");
+  assert.ok(src.includes('id="sp-search"'), "Spaces 头搜索图标对位");
+  assert.ok(src.includes('id="recent"') && src.includes("renderRecent"), "近期会话列表对位");
+  assert.ok(src.includes("MCP servers") && src.includes("mcp_config.json"), "底栏 N MCP servers 与官方同一份 mcp_config 真源");
+});
