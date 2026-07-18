@@ -62,6 +62,55 @@ const KEY_PARITY = [
   { key: "ctrl+shift+.", official: "devin.cascade.openAgentPicker", ours: "dao.cascade.openAgentPicker" },
 ];
 
+// 官方全键位审计表(R177): 官方 3.4.27 keybindings 共 29 条逐条归类(不伪造)。
+//   parity  — 插件同键同位承接(ours 指明落点)
+//   host    — 官方绑的是宿主原生命令, 插件同键透传即同源
+//   na      — 依赖官方引擎内部面(supercomplete/终端命令流/vim fork), 第三方宿主暂无对位面
+//   pending — 面板功能待接(如实待办)
+const KEYMAP_AUDIT = [
+  { key: "ctrl+i", official: "prioritized.terminalCommand.open", cls: "na", reason: "官方终端内联命令流为引擎内部面, 宿主终端暂无注入点" },
+  { key: "ctrl+enter", official: "terminalCommand.run", cls: "na", reason: "同上" },
+  { key: "alt+enter", official: "terminalCommand.accept", cls: "na", reason: "同上" },
+  { key: "shift+ctrl+backspace", official: "terminalCommand.reject", cls: "na", reason: "同上" },
+  { key: "ctrl+i", official: "prioritized.command.open", cls: "parity", ours: "dao.cascade.inlineCommand" },
+  { key: "ctrl+enter", official: "command.accept", cls: "parity", ours: "dao.cascade.acceptAllInFile(同键同域)" },
+  { key: "shift+ctrl+backspace", official: "command.reject", cls: "parity", ours: "dao.cascade.rejectAllInFile(同键同域)" },
+  { key: "ctrl+shift+i", official: "triggerCascade", cls: "parity", ours: "dao.cascade.newSession" },
+  { key: "ctrl+enter", official: "prioritized.cascadeAcceptAllInFile", cls: "parity", ours: "dao.cascade.acceptAllInFile" },
+  { key: "shift+ctrl+backspace", official: "prioritized.cascadeRejectAllInFile", cls: "parity", ours: "dao.cascade.rejectAllInFile" },
+  { key: "alt+j", official: "prioritized.cascadeFocusNextHunk", cls: "parity", ours: "dao.cascade.nextDiffHunk" },
+  { key: "alt+k", official: "prioritized.cascadeFocusPreviousHunk", cls: "parity", ours: "dao.cascade.prevDiffHunk" },
+  { key: "alt+enter", official: "prioritized.cascadeAcceptFocusedHunk", cls: "parity", ours: "dao.cascade.acceptFocusedHunk" },
+  { key: "alt+shift+backspace", official: "prioritized.cascadeRejectFocusedHunk", cls: "parity", ours: "dao.cascade.rejectFocusedHunk" },
+  { key: "alt+\\", official: "editor.action.inlineSuggest.trigger", cls: "host", ours: "同键绑宿主原生 inlineSuggest.trigger(官方即绑此宿主命令)" },
+  { key: "tab", official: "prioritized.supercompleteAccept", cls: "na", reason: "supercomplete 为官方引擎内部渲染面" },
+  { key: "escape", official: "prioritized.supercompleteEscape", cls: "na", reason: "同上" },
+  { key: "escape", official: "extension.vim_escape", cls: "na", reason: "官方 fork 内置 vim 扩展专用" },
+  { key: "alt+enter", official: "cascade.acceptCascadeStep", cls: "parity", ours: "面板步骤接受(webview 内同键)" },
+  { key: "alt+shift+backspace", official: "cascade.rejectCascadeStep", cls: "parity", ours: "面板步骤拒绝(webview 内同键)" },
+  { key: "ctrl+shift+m", official: "cascade.pressMicrophone", cls: "na", reason: "语音输入为官方 IDE 原生录音面, 宿主 webview 无麦克风注入点" },
+  { key: "ctrl+shift+.", official: "cascade.openAgentPicker", cls: "parity", ours: "dao.cascade.openAgentPicker" },
+  { key: "ctrl+/", official: "cascade.toggleModelSelector", cls: "parity", ours: "dao.cascade.toggleModelSelector" },
+  { key: "ctrl+shift+/", official: "cascade.switchToNextModel", cls: "parity", ours: "dao.cascade.switchToNextModel" },
+  { key: "ctrl+;", official: "cascade.toggleWorktree", cls: "na", reason: "官方 worktree 面板为 IDE 原生面, 待官方开放 RPC 面再接" },
+  { key: "ctrl+'", official: "cascade.toggleAgentSelector", cls: "parity", ours: "dao.cascade.openAgentPicker(官方同键别名)" },
+  { key: "ctrl+.", official: "prioritized.chat.toggleWriteChatMode", cls: "parity", ours: "dao.cascade.toggleWriteChatMode" },
+  { key: "ctrl+shift+\\", official: "tabReporting", cls: "na", reason: "官方内部上报工具" },
+  { key: "ctrl+u", official: "lifeguard.checkCurrentChanges", cls: "parity", ours: "dao.cascade.lifeguardCheck" },
+];
+
+// 官方非命令 contributes 面(R177): 逐面归类。
+//   adopted — 官方资源逐字节随包复用(themes/schemas); host — 宿主原生已有; na — 不适用
+const SURFACE_AUDIT = [
+  { surface: "themes", cls: "adopted", note: "theme-windsurf Devin Dark/Light 逐字节随包(R175)" },
+  { surface: "jsonValidation", cls: "adopted", note: "官方 mcp_config/acp_registry JSON Schema 逐字节随包, 同 fileMatch 同校验" },
+  { surface: "languages(jsonc: mcp_config.json)", cls: "adopted", note: "同官方: mcp_config.json 按 jsonc 高亮" },
+  { surface: "languages(codemap)", cls: "na", note: "官方 codemap 引擎内部格式, 无宿主渲染面" },
+  { surface: "configuration", cls: "adopted", note: "插件 configuration 面已有(dao.* 命名空间, 官方语义对位)" },
+  { surface: "authentication(windsurf_auth)", cls: "na", note: "官方本体在位时由其提供; 插件登录走 credentials.toml 同一真源" },
+  { surface: "menus(commandPalette)", cls: "host", note: "宿主命令面板原生" },
+];
+
 function audit() {
   const by = (c) => MANIFEST.filter((m) => m.cls === c);
   const covered = by("covered"), na = by("na"), pending = by("pending"), pass = by("passthrough");
@@ -71,6 +120,21 @@ function audit() {
     covered: covered.length, passthrough: pass.length, na: na.length, pending: pending.length,
     applicable, coveragePct: Math.round(((covered.length + pass.length) / applicable) * 100),
     keyParity: KEY_PARITY.length,
+    keymap: {
+      total: KEYMAP_AUDIT.length,
+      parity: KEYMAP_AUDIT.filter((k) => k.cls === "parity").length,
+      host: KEYMAP_AUDIT.filter((k) => k.cls === "host").length,
+      na: KEYMAP_AUDIT.filter((k) => k.cls === "na").length,
+      pending: KEYMAP_AUDIT.filter((k) => k.cls === "pending").length,
+    },
+    surfaces: {
+      total: SURFACE_AUDIT.length,
+      adopted: SURFACE_AUDIT.filter((s) => s.cls === "adopted").length,
+      host: SURFACE_AUDIT.filter((s) => s.cls === "host").length,
+      na: SURFACE_AUDIT.filter((s) => s.cls === "na").length,
+    },
+    keymapAudit: KEYMAP_AUDIT,
+    surfaceAudit: SURFACE_AUDIT,
     pendingList: pending.map((m) => ({ base: m.base, reason: m.reason })),
     naList: na.map((m) => ({ base: m.base, reason: m.reason })),
     manifest: MANIFEST,
@@ -244,4 +308,4 @@ function register(context, log) {
   l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions/refreshCustomizations/refreshMcp)");
 }
 
-module.exports = { MANIFEST, KEY_PARITY, audit, register };
+module.exports = { MANIFEST, KEY_PARITY, KEYMAP_AUDIT, SURFACE_AUDIT, audit, register };

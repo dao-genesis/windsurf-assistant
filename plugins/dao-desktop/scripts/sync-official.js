@@ -107,6 +107,20 @@ function main() {
     }
     console.log(drift ? `官方主题真源更新: ${drift} 个文件已同步` : "官方主题真源无漂移");
   }
+
+  // 官方 JSON Schema 真源同步(R177): mcp_config/acp_registry 校验 schema 逐字节随包。
+  const schemaSrc = path.join(root, "resources", "app", "extensions", "windsurf", "schemas");
+  const schemaDst = path.join(PLUGIN, "schemas");
+  if (fs.existsSync(schemaSrc)) {
+    fs.mkdirSync(schemaDst, { recursive: true });
+    let drift = 0;
+    for (const f of fs.readdirSync(schemaSrc).filter((n) => n.endsWith(".json"))) {
+      const s = fs.readFileSync(path.join(schemaSrc, f));
+      const d = path.join(schemaDst, f);
+      if (!fs.existsSync(d) || !s.equals(fs.readFileSync(d))) { fs.writeFileSync(d, s); drift++; }
+    }
+    console.log(drift ? `官方 schema 真源更新: ${drift} 个文件已同步` : "官方 schema 真源无漂移");
+  }
 }
 
 main();
