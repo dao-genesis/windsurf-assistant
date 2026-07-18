@@ -235,6 +235,8 @@ function routes(reqUrl) {
   if (u === "/api/parity/commands") { return require("./official-parity").audit(); }
   if (u === "/api/lifeguard/config") { return ls.call("GetLifeguardConfig", {}); }
   if (u === "/api/acp/registries") { return ls.call("GetAllAcpRegistries", {}).then((r) => JSON.parse((r && r.registryJson) || "{}")); }
+  if (u === "/api/diagnostics/ls") { return ls.call("GetDebugDiagnostics", {}); }
+  if (u === "/api/trajectory/debug") { return ls.call("GetUserTrajectoryDebug", {}); }
   if (u === "/api/coexist/flow") { return coexist.dataFlow(); }
   return null;
 }

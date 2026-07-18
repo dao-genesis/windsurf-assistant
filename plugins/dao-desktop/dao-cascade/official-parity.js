@@ -29,7 +29,7 @@ const MANIFEST = [
   { base: "openProfile", cls: "covered", equiv: "dao.cascade.openProfile" },
   { base: "openBillingPage", cls: "covered", equiv: "账号菜单 Billing(windsurf.com/subscription/manage-plan)" },
   { base: "openAutoRefillPage", cls: "covered", equiv: "账号菜单/设置页订阅入口" },
-  { base: "downloadDiagnostics", cls: "covered", equiv: "设置页·引擎运维「诊断包」" },
+  { base: "downloadDiagnostics", cls: "covered", equiv: "dao.cascade.downloadDiagnostics(官方在位直通; 否则 GetDebugDiagnostics RPC 真源落 JSON) + 设置页·引擎运维「诊断包」" },
   { base: "copyApiKey", cls: "covered", equiv: "统一面板 API key 复制(尾4位显示, 完整仅进剪贴板)" },
   { base: "openChangeLog", cls: "covered", equiv: "dao.cascade.openChangelog" },
   { base: "triggerCascade", cls: "covered", equiv: "dao.cascade.open(Ctrl+L)/newSession(Ctrl+Shift+I 官方同键)" },
@@ -182,6 +182,24 @@ function register(context, log) {
     } catch (e) { vscode.window.showWarningMessage(label + " 刷新失败: " + (e && e.message)); }
   };
 
+  // 诊断包下载(R167): 官方 downloadDiagnostics 对位 — 官方在位直通, 否则 GetDebugDiagnostics
+  // RPC(实机已证)同源拉 LS 诊断落 JSON 文件。
+  const downloadDiagnostics = async () => {
+    const cmds = await vscode.commands.getCommands(true).catch(() => []);
+    for (const c of ["devin.downloadDiagnostics", "windsurf.downloadDiagnostics"]) {
+      if (cmds.includes(c)) { try { await vscode.commands.executeCommand(c); return; } catch (_) {} }
+    }
+    try {
+      const ls = require("./ls-bridge");
+      if (!ls.ready()) throw new Error("LS 未就绪");
+      const r = await ls.call("GetDebugDiagnostics", {});
+      const os = require("os"), path = require("path"), fs = require("fs");
+      const out = path.join(os.homedir(), "dao-diagnostics-" + Date.now() + ".json");
+      fs.writeFileSync(out, JSON.stringify(r, null, 2));
+      vscode.window.showInformationMessage("LS 诊断已落盘(官方 GetDebugDiagnostics 真源): " + out);
+    } catch (e) { vscode.window.showWarningMessage("诊断下载失败: " + (e && e.message)); }
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand("dao.cascade.importRulesFromCursor", importRules),
     vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser),
@@ -189,7 +207,8 @@ function register(context, log) {
     vscode.commands.registerCommand("dao.cascade.acpRegistry", acpRegistry),
     vscode.commands.registerCommand("dao.cascade.refreshSessions", refreshSessions),
     vscode.commands.registerCommand("dao.cascade.refreshCustomizations", refreshVia("RefreshCustomization", "Rules/Workflows/Skills")),
-    vscode.commands.registerCommand("dao.cascade.refreshMcp", refreshVia("RefreshMcpServers", "MCP 服务"))
+    vscode.commands.registerCommand("dao.cascade.refreshMcp", refreshVia("RefreshMcpServers", "MCP 服务")),
+    vscode.commands.registerCommand("dao.cascade.downloadDiagnostics", downloadDiagnostics)
   );
   l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions/refreshCustomizations/refreshMcp)");
 }
