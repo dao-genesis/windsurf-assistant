@@ -44,10 +44,32 @@ function lsBinOf(root) {
 function plan(state) {
   return [
     { step: "download", run: !state.officialRoot && !state.noDownload },
+    { step: "urlHandler", run: !state.hasUrlHandler && !!(state.officialRoot || !state.noDownload) },
     { step: "login", run: !state.hasKey },
     { step: "boot", run: true },
     { step: "sweep", run: true },
   ];
+}
+
+// devin:// 深链处理器(R178): tar 包无 .desktop 注册, 官方 IDE 的浏览器 OAuth 回跳
+// (devin://codeium.windsurf)会落空。落一份 x-scheme-handler/devin 即打通官方 GUI 登录回环。
+function urlHandlerPath() {
+  return path.join(os.homedir(), ".local", "share", "applications", "devin-desktop.desktop");
+}
+
+function hasUrlHandler() {
+  try { return fs.readFileSync(urlHandlerPath(), "utf8").includes("x-scheme-handler/devin"); } catch (_) { return false; }
+}
+
+function installUrlHandler(root, log) {
+  const bin = path.join(root, "bin", "devin-desktop");
+  if (!fs.existsSync(bin)) return false;
+  const p = urlHandlerPath();
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, "[Desktop Entry]\nName=Devin\nExec=" + bin + " --open-url %U\nType=Application\nNoDisplay=true\nMimeType=x-scheme-handler/devin;\n");
+  try { execFileSync("xdg-mime", ["default", "devin-desktop.desktop", "x-scheme-handler/devin"]); } catch (_) {}
+  log("devin:// 深链处理器已注册: " + p);
+  return true;
 }
 
 async function download(log) {
@@ -99,10 +121,11 @@ async function main() {
   const report = { steps: {}, ok: false };
   try {
     let root = officialRoot();
-    const steps = plan({ officialRoot: root, hasKey: !!credKey(), noDownload: process.argv.includes("--no-download") });
+    const steps = plan({ officialRoot: root, hasKey: !!credKey(), noDownload: process.argv.includes("--no-download"), hasUrlHandler: hasUrlHandler() });
     for (const { step, run } of steps) {
       if (!run) { report.steps[step] = "skip"; log(step + ": 已就位, 跳过"); continue; }
       if (step === "download") { root = await download(log); report.steps.download = root ? "ok" : "fail"; }
+      if (step === "urlHandler") { report.steps.urlHandler = root && installUrlHandler(root, log) ? "ok" : "skip"; }
       if (step === "login") { report.steps.login = login(log) ? "ok" : "fail"; }
       if (step === "boot") {
         if (!root) throw new Error("官方 bundle 不在位(--no-download 且未安装)");
@@ -133,4 +156,4 @@ async function main() {
 }
 
 if (require.main === module) main();
-module.exports = { plan, credPath, credKey, officialRoot, lsBinOf };
+module.exports = { plan, credPath, credKey, officialRoot, lsBinOf, urlHandlerPath, hasUrlHandler, installUrlHandler };
