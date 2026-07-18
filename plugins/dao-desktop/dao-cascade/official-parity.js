@@ -140,9 +140,11 @@ const RPC_GAP_AUDIT = {
   GetKnowledgeBaseItemsForTeam: "removed", // 后端实测: knowledge base feature has been deprecated
   SetPinnedContext: "unimpl", SetPinnedGuideline: "unimpl", // 后端实测: not implemented
   GetSuggestedContextScopeItems: "ux", // 需工作区文件追踪就绪(实测: relative filepaths must not be empty)
-  SubmitBugReport: "ux", GetGithubPullRequestSearchInfo: "ux",
+  SubmitBugReport: "ux-done", // 官方 bug 报告(后端实测返回 Slack messageLink)
+  GetGithubPullRequestSearchInfo: "removed", // 后端实测: knowledge base feature has been deprecated
   GetCascadeModelConfigs: "unimpl", // 后端实测: unimplemented; use GetUserStatus instead(插件已接 GetUserStatus)
-  RecordChatFeedback: "ux", GetChatMessage: "ux", RawGetChatMessage: "ux",
+  RecordChatFeedback: "ux", // legacy chat 域, 需 messageId(插件回合反馈已走云端 RecordCortexFeedback)
+  GetChatMessage: "internal", RawGetChatMessage: "internal", // 后端实测 HTTP 415(非 JSON 通道, LS 内部消息格式)
   GetConversationTags: "removed", UpdateConversationTags: "removed", // 后端实测: feature has been removed
   AcceptCompletion: "completion", ProvideCompletionFeedback: "completion", OnEdit: "completion",
   HandleStreamingTab: "completion", HandleStreamingCommand: "completion",
