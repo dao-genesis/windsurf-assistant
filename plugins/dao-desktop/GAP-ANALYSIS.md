@@ -351,3 +351,15 @@
 | 状态泳道 Running/... | 中文「运行中/待处理/已完成」 | ✅ 官方词 Running/Blocked/Finished + 计数 |
 | Agent 模式整窗接管 | 看板挤在编辑器列 | ✅ 打开即收侧栏, 看板独占; Editor 标签回编辑器 |
 | 宿主观感 | VS Code 默认主题+Welcome 页 | ✅ 实机已应用 Devin Dark + startupEditor none(R175 命令即官方化) |
+
+## R180 · 二轮截图对照: Agent 侧栏结构 + MCP 底栏
+
+官方单实例干净态截图再对照, 收敛:
+
+| 官方 | 收敛 |
+|---|---|
+| 侧栏顶「＋ New session」「💬 Sessions」 | ✅ 同结构落地 |
+| Spaces 区头带 🔍/＋ 图标 | ✅ 同貌(＋ 为官方同位注记) |
+| 侧栏近期会话(标题+相对时间) | ✅ 云端+本机合流前 8 条 |
+| 底栏「0 MCP servers」 | ✅ 同源计数(~/.codeium/windsurf/mcp_config.json, 与官方同一份) |
+| 官方二实例 LS 竞态报错 | 单实例重启后消失, 印证与插件无关 |
