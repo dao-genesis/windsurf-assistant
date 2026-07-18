@@ -128,6 +128,46 @@ const CHAT_CLIENT_KEYS = [
   { key: "", official: "jd.SwitchToNextSession/PreviousSession/HighestPrioritySession(DetectedAndRunByWindsurfIde)", cls: "host", ours: "宿主侧会话切换动作, 非 webview 键位面" },
 ];
 
+// R189 · 官方 LanguageServerService 未接入 77 方法逐项甄别(反提 3.4.27 · 后端实测校准):
+//   ux — 用户可见且可接入(候选实装); ux-done — 本轮已实装; telemetry — 埋点/上报(无用户面);
+//   completion — 编辑器补全/tab 管线(宿主 IDE 原生补全域, 非聊天面板域); experiment — 实验/灰度开关;
+//   internal — LS 内部/生命周期; removed — 官方已弃用(后端实测报 removed); deploy — WindsurfJS 部署域(未开放)。
+const RPC_GAP_AUDIT = {
+  CreateTrajectoryShare: "ux-done", // 会话分享链接(后端实测: {cascadeId,shareStatus:TEAM}→shareId)
+  GetTranscription: "ux", GetProfileData: "ux", GetKnowledgeBaseItemsForTeam: "ux",
+  SetPinnedContext: "ux", SetPinnedGuideline: "ux", GetSuggestedContextScopeItems: "ux",
+  SubmitBugReport: "ux", GetGithubPullRequestSearchInfo: "ux", GetCascadeModelConfigs: "ux",
+  RecordChatFeedback: "ux", GetChatMessage: "ux", RawGetChatMessage: "ux",
+  GetConversationTags: "removed", UpdateConversationTags: "removed", // 后端实测: feature has been removed
+  AcceptCompletion: "completion", ProvideCompletionFeedback: "completion", OnEdit: "completion",
+  HandleStreamingTab: "completion", HandleStreamingCommand: "completion",
+  HandleStreamingTerminalCommand: "completion", StreamTerminalShellCommand: "completion",
+  CaptureCode: "completion", CaptureFile: "completion", GetMatchingCodeContext: "completion",
+  GetCodeMapsForFile: "completion", GetCodeValidationStates: "completion", CheckBugs: "completion",
+  GetPatchAndCodeChange: "completion", RefreshContextForIdeAction: "completion",
+  GetMatchingIndexedRepos: "completion", WellSupportedLanguages: "completion",
+  GenerateVibeAndReplaceStreaming: "completion",
+  RecordEvent: "telemetry", RecordLints: "telemetry", RecordSystemMetrics: "telemetry",
+  RecordUserGrep: "telemetry", RecordUserStepSnapshot: "telemetry", RecordSearchDocOpen: "telemetry",
+  RecordSearchResultsView: "telemetry", RecordCommitMessageSave: "telemetry",
+  RecordChatPanelSession: "telemetry", LogCascadeSession: "telemetry", UploadRecentCommands: "telemetry",
+  ProgressBars: "telemetry",
+  SetBaseExperiments: "experiment", UpdateDevExperiments: "experiment",
+  UpdateEnterpriseExperimentsFromUrl: "experiment", GetUnleashData: "experiment",
+  ShouldEnableUnleash: "experiment", GetExternalModel: "experiment",
+  ResetOnboarding: "experiment", SkipOnboarding: "experiment", SetupUniversitySandbox: "experiment",
+  Exit: "internal", CancelRequest: "internal", GetStatus: "internal", GetAuthToken: "internal",
+  MigrateApiKey: "internal", GetPrimaryApiKeyForDevsOnly: "internal", StatUri: "internal",
+  GetSystemPromptAndTools: "internal", GetBrainStatus: "internal",
+  ForceBackgroundResearchRefresh: "internal", ReplayGroundTruthTrajectory: "internal",
+  ResolveOutstandingSteps: "internal", SendActionToChatPanel: "internal",
+  UpdatePanelStateWithUserStatus: "internal", SyncExploreAgentRun: "internal",
+  BranchCascadeAndGenerateCodeMap: "internal", MountCascadeFilesystem: "internal",
+  UnmountCascadeFilesystem: "internal", UpdateAutoCascadeGithubCredentials: "internal",
+  GetActiveAppDeploymentForWorkspace: "deploy", GetWindsurfJSAppDeployment: "deploy",
+  SaveWindsurfJSAppProjectName: "deploy", ValidateWindsurfJSAppProjectName: "deploy",
+};
+
 // 官方非命令 contributes 面(R177): 逐面归类。
 //   adopted — 官方资源逐字节随包复用(themes/schemas); host — 宿主原生已有; na — 不适用
 const SURFACE_AUDIT = [
@@ -337,4 +377,4 @@ function register(context, log) {
   l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions/refreshCustomizations/refreshMcp)");
 }
 
-module.exports = { MANIFEST, KEY_PARITY, KEYMAP_AUDIT, CHAT_CLIENT_KEYS, SURFACE_AUDIT, audit, register };
+module.exports = { MANIFEST, KEY_PARITY, KEYMAP_AUDIT, CHAT_CLIENT_KEYS, RPC_GAP_AUDIT, SURFACE_AUDIT, audit, register };

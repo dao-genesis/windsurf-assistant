@@ -122,6 +122,7 @@ class CascadePanelProvider {
         if (msg.type === "session-archive") return this._handleSessionArchive(msg.sessionId);
         if (msg.type === "session-rename") return this._handleSessionRename(msg.sessionId);
         if (msg.type === "session-export") return this._handleSessionExport(msg.sessionId);
+        if (msg.type === "share-conversation") return this._handleShareConversation();
         if (msg.type === "open-file") return this._handleOpenFile(msg.path);
         if (msg.type === "memories-list") return this._handleMemoriesList();
         if (msg.type === "status-info") return this._handleStatusInfo();
@@ -2002,6 +2003,26 @@ class CascadePanelProvider {
     } catch (e) { vscode.window.showWarningMessage("打不开 " + p + ": " + e.message); }
   }
 
+  // 官方 Share 对位: CreateTrajectoryShare{cascadeId,shareStatus:TEAM}→shareId,
+  // 链接同官方 {webappHost}/windsurf/conversation-shares/{shareId}, 复制到剪贴板。
+  async _handleShareConversation() {
+    const cid = this._cascadeLsId;
+    if (!cid) return vscode.window.showWarningMessage("当前无进行中的 Cascade 会话可分享");
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("CreateTrajectoryShare", { cascadeId: cid, shareStatus: "TRAJECTORY_SHARE_STATUS_TEAM" });
+      if (!r.shareId) throw new Error("服务端未返回 shareId");
+      let host = "app.devin.ai";
+      try {
+        const u = await ls.call("GetUserStatus", {});
+        host = ((((u.userStatus || u).planStatus || {}).planInfo || {}).devinInfo || {}).webappHost || host;
+      } catch (_) {}
+      const url = "https://" + host.replace(/^https?:\/\//, "") + "/windsurf/conversation-shares/" + r.shareId;
+      await vscode.env.clipboard.writeText(url);
+      vscode.window.showInformationMessage("分享链接已复制: " + url);
+    } catch (e) { vscode.window.showWarningMessage("分享失败: " + e.message); }
+  }
+
   async _handleSessionNew() {
     if (this._cxWatch) { try { this._cxWatch.close(); } catch (_) {} this._cxWatch = null; }
     this._cxWatchId = null;
@@ -2554,7 +2575,8 @@ class CascadePanelProvider {
   <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
     <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
     <button id="mtEditor" title="Editor 模式(当前)" style="border:1px solid var(--line);background:var(--pill-hover);color:var(--vscode-foreground);border-radius:0 6px 6px 0;padding:2px 12px;cursor:default;margin-left:-2px;">Editor</button>
-    <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">📚</button>
+    <button id="mtShare" title="Share conversation · 生成团队分享链接并复制" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">🔗</button>
+    <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">📚</button>
     <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
   </div>
   <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="上一处 (Shift+Enter)">↑</button><button id="cfNext" title="下一处 (Enter)">↓</button><button id="cfClose" title="关闭 (Esc)">✕</button></div>
@@ -2843,6 +2865,8 @@ class CascadePanelProvider {
   if(mtSettings) mtSettings.onclick=()=>vscode.postMessage({type:"open-devin-settings"});
   const mtCustom=document.getElementById("mtCustom");
   if(mtCustom) mtCustom.onclick=()=>vscode.postMessage({type:"open-customizations"});
+  const mtShare=document.getElementById("mtShare");
+  if(mtShare) mtShare.onclick=()=>vscode.postMessage({type:"share-conversation"});
 
   // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
   const tryCloudBtn=document.getElementById("tryCloud");

@@ -2613,3 +2613,18 @@ test("R188: chat-client 键位全表审计与实装在位", () => {
   assert.ok(src.includes("micBtn.click()"), "Ctrl+Shift+M 语音在位");
   assert.ok(src.includes("wtBtn.click()"), "Ctrl+; worktree 在位");
 });
+
+// R189 · 官方 LanguageServerService 未接入 77 方法逐项甄别 + Share conversation 实装。
+test("R189: RPC 甄别全表与 Share conversation 在位", () => {
+  const parity = require(path.join(ROOT, "dao-cascade", "official-parity.js"));
+  const g = parity.RPC_GAP_AUDIT;
+  assert.strictEqual(Object.keys(g).length, 77, "官方未接入 77 方法逐项归类");
+  const legal = new Set(["ux", "ux-done", "telemetry", "completion", "experiment", "internal", "removed", "deploy"]);
+  for (const [k, v] of Object.entries(g)) assert.ok(legal.has(v), k + " 归类合法");
+  assert.strictEqual(g.CreateTrajectoryShare, "ux-done", "分享链接已实装");
+  assert.strictEqual(g.GetConversationTags, "removed", "后端实测 removed");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"CreateTrajectoryShare"') && src.includes("TRAJECTORY_SHARE_STATUS_TEAM"), "官方同参调用在位");
+  assert.ok(src.includes("/windsurf/conversation-shares/"), "官方同构分享链接在位");
+  assert.ok(src.includes('id="mtShare"') && src.includes('type:"share-conversation"'), "分享按钮与桥接在位");
+});
