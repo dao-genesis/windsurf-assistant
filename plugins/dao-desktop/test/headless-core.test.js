@@ -2243,7 +2243,7 @@ test("official-parity: 33 基名清单/归类/审计聚合与接线在位", () =
   }
   const a = mod.audit();
   assert.strictEqual(a.covered + a.passthrough + a.na + a.pending, 33, "归类应无遗漏");
-  assert.ok(a.pending > 0, "pending 应如实存在(ACP/Lifeguard 未接, 不伪造 100%)");
+  assert.ok(a.pending >= 0 && Array.isArray(a.pendingList), "pending 列表应如实可列(R162 后 ACP/Lifeguard 已承接)");
   assert.strictEqual(a.keyParity, 12, "12 键 1:1 键位表");
   assert.ok(a.coveragePct >= 80, "适用面覆盖率应 ≥80%(当前审计)");
   const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
@@ -2256,4 +2256,26 @@ test("official-parity: 33 基名清单/归类/审计聚合与接线在位", () =
   const cmds = pkg.contributes.commands.map((c) => c.command);
   for (const c of ["dao.cascade.importRulesFromCursor", "dao.cascade.openBrowser"])
     assert.ok(cmds.includes(c), c + " 应登记为命令");
+});
+
+// R162 · Lifeguard/ACP 官方对位: 命令/键位/后端读路径在位, 直通优先不伪造。
+test("official-parity R162: lifeguardCheck/acpRegistry 命令+Ctrl+U 键位+API 路由在位", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "official-parity.js"), "utf8");
+  assert.ok(src.includes('"devin.lifeguard.checkCurrentChanges"'), "lifeguard 官方直通候选");
+  assert.ok(src.includes('"GetLifeguardConfig"'), "回退应读官方 GetLifeguardConfig 如实报告");
+  assert.ok(src.includes('"devin.openAcpLocalRegistry"'), "ACP 官方直通候选");
+  assert.ok(src.includes('"GetAllAcpRegistries"'), "ACP 回退应读官方注册表真源");
+  const mod = require(path.join(CASCADE, "official-parity.js"));
+  const cls = Object.fromEntries(mod.MANIFEST.map((m) => [m.base, m.cls]));
+  assert.strictEqual(cls["lifeguard.checkCurrentChanges"], "covered");
+  assert.strictEqual(cls["reloadAcpConnections"], "covered");
+  assert.strictEqual(cls["openAcpLocalRegistry"], "covered");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const cmds = pkg.contributes.commands.map((c) => c.command);
+  for (const c of ["dao.cascade.lifeguardCheck", "dao.cascade.acpRegistry"])
+    assert.ok(cmds.includes(c), c + " 应登记为命令");
+  const kb = pkg.contributes.keybindings.find((k) => k.command === "dao.cascade.lifeguardCheck");
+  assert.ok(kb && kb.key === "ctrl+u" && /config\.dao\.cascadeBar\.keys/.test(kb.when), "Ctrl+U 官方同键且可配置退让");
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/lifeguard/config"') && api.includes('u === "/api/acp/registries"'), "后端读路径应在位");
 });

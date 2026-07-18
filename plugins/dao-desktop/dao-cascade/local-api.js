@@ -233,6 +233,8 @@ function routes(reqUrl) {
   if (u === "/api/coexist") { return coexist.report(); }
   if (u === "/api/sync/audit") { return syncAudit.audit(); }
   if (u === "/api/parity/commands") { return require("./official-parity").audit(); }
+  if (u === "/api/lifeguard/config") { return ls.call("GetLifeguardConfig", {}); }
+  if (u === "/api/acp/registries") { return ls.call("GetAllAcpRegistries", {}).then((r) => JSON.parse((r && r.registryJson) || "{}")); }
   if (u === "/api/coexist/flow") { return coexist.dataFlow(); }
   return null;
 }

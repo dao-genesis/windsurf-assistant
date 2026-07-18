@@ -164,8 +164,15 @@
 | 覆盖审计模块 | ✅ | dao-cascade/official-parity.js: 官方 3.4.27 contributes.commands(64 条, devin.*/windsurf.* 成对)去偶 33 基名逐条归类(covered/na/pending, 如实不伪造) + 12 键 1:1 键位表; GET /api/parity/commands 后端可验 |
 | importRulesFromCursor | ✅ | dao.cascade.importRulesFromCursor: 工作区 .cursorrules/.cursor/rules/*(mdc→md) → .windsurf/rules 后端复制(官方同源目录) |
 | openBrowser | ✅ | dao.cascade.openBrowser: 官方在位直通 devin/windsurf.openBrowser; 否则宿主 simpleBrowser.show 同位承接(再回退 openExternal) |
-| 如实 pending | ◐ | reloadAcpConnections/openAcpLocalRegistry(ACP 面板)、lifeguard.checkCurrentChanges(Ctrl+U 代码守护) —— 官方 RPC 在(GetLifeguardConfig), 待后续轮次, 不伪造 |
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例(清单完整性/归类如实/审计聚合/路由与接线), 83/83 |
 
-> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位)、
-> ACP 连接管理与 Lifeguard 承接 —— 持续对照推进。
+## R162 · Lifeguard/ACP 官方对位(实机 RPC 已证)
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| lifeguard.checkCurrentChanges | ✅ | dao.cascade.lifeguardCheck(Ctrl+U 官方同键, config 可退让): 官方在位直通 devin/windsurf.lifeguard.checkCurrentChanges; 纯第三方回退读 GetLifeguardConfig 如实报告引擎态(实机: agent enabled, cognition-lifeguard v2), 不伪造检查面板 |
+| reloadAcpConnections/openAcpLocalRegistry | ✅ | dao.cascade.acpRegistry: 官方在位直通; 回退 GetAllAcpRegistries(registryJson) quickpick 官方真源清单(实机: Devin CLI acp 等 bundled agents) |
+| 后端读路径 | ✅ | GET /api/lifeguard/config、GET /api/acp/registries —— 官方 LS RPC 直取, 实机往返已证 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 1 例(直通候选/回退真源/命令/Ctrl+U 键位/路由), 84/84; v1.5.10 构建通过 |
+
+> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
