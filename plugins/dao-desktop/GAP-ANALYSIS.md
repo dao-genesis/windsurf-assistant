@@ -397,3 +397,12 @@
 - 修复既有 CSS 病灶: 增强钮(图/Arena/Worktree/token 计数)的悬停显形规则误写成只改边框色 → 拆分为 display 规则 + .on 高亮规则。
 - 空态「启动时自动打开最近会话」勾选行: 官方无此行 → 静息隐去, 悬停 Recent 区即现。
 - 底部目标行与官方一致只剩「Local」: 工作区/用量/引擎详情悬停即现。
+
+## R184 · 切号/多实例插件版实操验证(全后端·反者道之动)
+
+在 VS Code 内跑通 vendor-one 归一底层的账号全链路(零 GUI 依赖, curl 直证):
+- `/api/devin/login` 账号密码登录取 auth1 ✓(lywh 账号 · org rogerssydney63)。
+- 多实例钉号: `POST /devin-cloud/api/users/post-auth?dao_acct=<号>` 返**该号** org; 未知号返 Unauthenticated(宁空注入不冒名, 踩坑7 修法在位)✓。
+- 同源反代 `/?dao_acct=<号>` 浏览器打开即自动登录整官方 Devin SPA(webapp_host 改写在位, 无回弹)✓ 实机截图。
+- 统一外壳多实例开页 `_shellResolveOpen` 同源相对 URL 形态确认。
+- 新增 CI 安全护栏测试: vendor-one 在位时断言多实例/钉号/反代源完整搬运(97/97)。
