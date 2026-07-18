@@ -82,4 +82,4 @@ function register(context, log) {
   );
 }
 
-module.exports = { watchTargets, start, stop, register, DEBOUNCE_MS };
+module.exports = { watchTargets, start, stop, register, DEBOUNCE_MS, _fire };
