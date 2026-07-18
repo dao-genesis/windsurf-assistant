@@ -212,4 +212,18 @@
 | GET /api/trajectory/debug | ✅ | 官方 GetUserTrajectoryDebug 直取(实机 OK, mainline 轨迹元数据) |
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例, 88/88; v1.5.14 构建通过 |
 
+## R168 · 官方流式订阅 RPC 逆向实测(如实边界)
+
+官方 LS 3.4.27 二进制内的 server-streaming 订阅面(strings 实测提取):
+`StreamCascadeReactiveUpdates`(单会话生成流, 已在用) / `StreamCascadeSummariesReactiveUpdates` /
+`StreamCascadePanelReactiveUpdates` / `StreamUserTrajectoryReactiveUpdates` / `StreamTerminalShellCommand`。
+
+| 探测 | 结果 | 依据 |
+|---|---|---|
+| StreamCascadeSummariesReactiveUpdates 订阅 | ◐ | HTTP 200 connect+json, 建流即回初始空帧 {}; 订阅存活 |
+| 本 LS 内 RPC 驱动 StartCascade+Rename → 推送 | ✗ | 12s/40s 观察窗零事件帧 — RPC 直写不经 panel 轨, 未触发 summaries 推送 |
+| 跨 LS(A 侧独立官方 LS 写) → B 侧订阅推送 | ✗ | 20s 观察窗零事件帧 — 与 R160 结论一致: 跨端会话列表无实时云端推送, 仍为 pull-on-(re)start |
+| 结论 | 如实 | 官方订阅流面向 IDE panel 内部反应式轨, 不承载 RPC 直写/跨端实时同步; R163 refreshSessions(重启重拉)仍是跨端即见的正道 — 不伪造实时推送 |
+| dao.cascade.autoRefreshMinutes | ✅ | 如实兜底轮询: 自持 LS 周期性重启重拉(默认 0=关, 热起停); 共生官方 LS 不代杀 |
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。

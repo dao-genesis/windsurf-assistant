@@ -200,6 +200,27 @@ function register(context, log) {
     } catch (e) { vscode.window.showWarningMessage("诊断下载失败: " + (e && e.message)); }
   };
 
+  // 定时重拉(R168): 官方无跨端实时推送(R160/R168 实测), 自持 LS 可选周期性重启重拉。
+  // dao.cascade.autoRefreshMinutes(默认 0=关); 仅自持 LS 生效, 共生官方 LS 不代杀。
+  let _autoTimer = null;
+  const applyAutoRefresh = () => {
+    if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null; }
+    const mins = vscode.workspace.getConfiguration("dao").get("cascade.autoRefreshMinutes", 0);
+    if (!(mins > 0)) return;
+    _autoTimer = setInterval(() => {
+      const boot = require("./ls-boot");
+      if (!boot.alive()) return;
+      boot.stop();
+      boot.boot({ log: () => {} }).then(() => l("autoRefresh: 自持 LS 周期重拉完成"), () => {});
+    }, mins * 60 * 1000);
+    l("autoRefresh: 每 " + mins + " 分钟重拉(仅自持 LS)");
+  };
+  applyAutoRefresh();
+  context.subscriptions.push(
+    { dispose: () => { if (_autoTimer) clearInterval(_autoTimer); } },
+    vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration("dao.cascade.autoRefreshMinutes")) applyAutoRefresh(); })
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand("dao.cascade.importRulesFromCursor", importRules),
     vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser),
