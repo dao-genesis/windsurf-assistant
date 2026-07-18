@@ -506,3 +506,12 @@ RecordChatFeedback → internal(官方无调用点, legacy chat 域)。至此 16
 | Memories 创建路径 | 官方 bundle 反提: memory 面仅 updateCascadeMemory(workbench 记忆编辑 UI)/deleteCascadeMemory 调用点, 无任何创建路径(memory 由 Cascade 代理运行产生); 插件 update/delete 已同位(local-api /api/memories/*), 官方等价面齐平 |
 
 > 至此 HANDOFF 主攻项 1–3 全部收口; 剩余: 官方 UI 视觉 1:1 实机对照、官方不可达能力如实标注维持。
+
+## R196 · 双 IDE 实机 UI 对照(官方 IDE 真机登录并排比对) + composer 微对位
+
+冷启动官方 IDE 3.4.27 真机登录(反者道之动: 后端 auth1→show-auth-code 取一次性 code→GUI 仅粘贴,
+Playwright/CDP 取 code 不经人工浏览器), Editor 模式 Cascade 面板与插件面板并排截屏比对。
+已同位确认: W 空态卡(Cascade Code + Ctrl+. 徽记 + Try Devin Cloud)、Recent sessions、composer
+(+/Code/模型/agent 切换/mic/send)、Local+workspace target 行、云端会话同源互见(官方 Agent 面板
+即见插件侧创建的会话)。本轮微对位: composer 占位官方双态同文(失焦 Focus input (Ctrl+L)/聚焦
+Ask anything, workbench 真源字串), target 行 emoji→SVG 图标(官方无 emoji)。107/107 测试, v1.5.33。

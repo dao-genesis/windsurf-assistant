@@ -2708,7 +2708,7 @@ class CascadePanelProvider {
     <div id="agentMenu"><div id="agentList"></div></div>
     <div class="card">
       <div id="imgStrip" class="imgstrip"></div>
-      <textarea id="input" rows="1" placeholder="Ask anything (Ctrl+L)"></textarea>
+      <textarea id="input" rows="1" placeholder="Focus input (Ctrl+L)"></textarea>
       <input type="file" id="imgFile" accept="image/*" multiple style="display:none">
       <div class="row">
         <button id="plusBtn" title="附加上下文"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
@@ -2725,8 +2725,8 @@ class CascadePanelProvider {
       </div>
     </div>
     <div class="target">
-      <span class="seg" title="本地执行">🖥 Local</span>
-      <span class="seg" id="folderSeg">📁 —</span>
+      <span class="seg" title="本地执行"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg> Local</span>
+      <span class="seg" id="folderSeg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg> <span id="folderName">—</span></span>
       <span class="seg" id="usage"></span>
       <span class="env" id="env"></span>
     </div>
@@ -2973,6 +2973,9 @@ class CascadePanelProvider {
   if(tryCloudBtn) tryCloudBtn.onclick=()=>{ agent="devin-cloud"; onAgentChange(); inputEl.focus(); };
   // 官方式麦克风: 官方真源路径 GetTranscription{audioData}→transcribedText——录音(MediaRecorder)
   // 送 LS 转写入 composer; getUserMedia 不可用时回退 Web Speech, 两者皆不可用则隐藏(不留死按钮)。
+  // 官方同文: 失焦 "Focus input (Ctrl+L)" / 聚焦 "Ask anything"(workbench 真源双态)
+  inputEl.addEventListener("focus",()=>{ inputEl.placeholder="Ask anything"; });
+  inputEl.addEventListener("blur",()=>{ inputEl.placeholder="Focus input (Ctrl+L)"; });
   const micBtn=document.getElementById("micBtn");
   (function(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -3240,7 +3243,7 @@ class CascadePanelProvider {
         +(m.windsurf&&m.windsurf.authSignedIn?" · 官登"+(m.windsurf.authName?"("+m.windsurf.authName+")":"✓"):"");
       envEl.title=(m.devinBin||"未找到 devin 引擎(内置 engine/ 或设 DAO_DEVIN_BIN)")
         +(m.windsurf&&m.windsurf.lsPort?"\\n官方 language_server 端口 "+m.windsurf.lsPort+" · CSRF "+(m.windsurf.lsCsrf?"已捕获":"未捕获"):"");
-      if(m.folder) folderSeg.textContent="📁 "+m.folder;
+      if(m.folder){ const fn=document.getElementById("folderName"); if(fn) fn.textContent=m.folder; }
       envEl.style.cursor="pointer"; envEl.onclick=()=>{ const ex=document.getElementById("acctPop");
         if(ex){ ex.remove(); vscode.postMessage({type:"account-close"}); } else vscode.postMessage({type:"account-status"}); };
       if(m.devinBin && !m.loggedIn){ authbar.classList.add("show"); authmsg.textContent="未登录 — 插件自持登录(不依赖 Devin Desktop)"; }
