@@ -92,6 +92,12 @@ async function activate(context) {
     log("✓ 官方命令对位就位 (importRulesFromCursor/openBrowser + /api/parity/commands)");
   } catch (e) { log("✗ 官方命令对位注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②b⁙ 真源守望(R166): 官方落盘真源变更 → Refresh RPC 即时重读(跨 IDE 改动自动即见)。
+  try {
+    require("./dao-cascade/truth-watch").register(context, log);
+    log("✓ 真源守望就位 (MCP/Rules/Workflows/Skills/记忆 → Refresh RPC)");
+  } catch (e) { log("✗ 真源守望注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ②c Proxy Pro 独立面板(dao.proxyPro): 与 dao-proxy-pro 独立插件面板对位,
   // 插件自持渠道/路由(~/.dao/proxy-channels.json), 与 dao-vsix 的 ~/.codeium/dao-byok 隔离。
   try {

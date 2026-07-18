@@ -2308,3 +2308,33 @@ test("official-parity R165: refreshCustomizations/refreshMcp 命令 + API 路由
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/customizations/refresh") && schema.includes("/api/mcp/refresh"), "openapi 应登记");
 });
+
+// R166 · 真源守望: 官方真源 fs.watch → Refresh RPC 去抖触发(headless 桩实测)。
+test("truth-watch R166: 守望点/去抖触发/配置开关/extension 接线在位", async () => {
+  const mod = require(path.join(CASCADE, "truth-watch.js"));
+  const targets = mod.watchTargets();
+  assert.strictEqual(targets.length, 5, "5 个守望点");
+  const rpcs = new Set(targets.map((t) => t.rpc));
+  assert.ok(rpcs.has("RefreshMcpServers") && rpcs.has("RefreshCustomization"), "两类官方 Refresh RPC");
+  assert.ok(targets.some((t) => /mcp_config\.json$/.test(t.path)), "MCP 真源在列");
+  assert.ok(targets.some((t) => /\.devin[\/\\]rules$/.test(t.path)), "全局 Rules 真源在列");
+  // 活体: 隔离 home 下建真源目录, watch 后落探针文件 → 观察 start/stop 无异常(RPC 层 LS 未就绪时如实跳过)
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-tw-"));
+  process.env.DAO_ENV_SYNC_HOME = tmp;
+  fs.mkdirSync(path.join(tmp, ".codeium", "windsurf", "memories"), { recursive: true });
+  fs.mkdirSync(path.join(tmp, ".devin", "rules"), { recursive: true });
+  const logs = [];
+  const n = mod.start((m) => logs.push(m));
+  assert.ok(n >= 2, "隔离 home 下应至少守望 2 个已存在真源点");
+  fs.writeFileSync(path.join(tmp, ".devin", "rules", "probe.md"), "# probe");
+  await new Promise((r) => setTimeout(r, mod.DEBOUNCE_MS + 600));
+  mod.stop();
+  delete process.env.DAO_ENV_SYNC_HOME;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  assert.ok(logs.some((m) => m.includes("守望")), "启动日志应报守望点数");
+  assert.ok(logs.some((m) => m.includes("LS 未就绪") || m.includes("已重读真源")), "变更应触发去抖回调(LS 未就绪时如实跳过)");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.configuration.properties["dao.truthWatch.enabled"], "配置开关应登记");
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('require("./dao-cascade/truth-watch").register'), "extension 应接线");
+});
