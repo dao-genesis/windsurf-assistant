@@ -2443,3 +2443,15 @@ test("official-parity R177: 全键位审计表 + 官方 schema 随包 + jsonVali
   const sync = fs.readFileSync(path.join(__dirname, "..", "scripts", "sync-official.js"), "utf8");
   assert.ok(sync.includes("schemas"), "sync-official 应承接官方 schema 真源同步");
 });
+
+// R179 · Agent 看板官方同貌: 筛选 chips(Time/Archived/＋) + Display + 官方状态泳道 + 整窗接管。
+test("agent-board R179: 官方 Board 同貌(筛选 chips/Display/Running 泳道/整窗)", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "agent-board.js"), "utf8");
+  assert.ok(src.includes("Time is") && src.includes("Archived is"), "官方筛选 chips 对位(Time/Archived)");
+  assert.ok(src.includes('"chip add"'), "＋ 叠加筛选 chip 对位");
+  assert.ok(src.includes('id="display"'), "Display 下拉对位");
+  for (const lane of ['"Running"', '"Blocked"', '"Finished"'])
+    assert.ok(src.includes(lane), "官方状态泳道: " + lane);
+  assert.ok(src.includes("workbench.action.closeSidebar"), "Agent 模式整窗接管(收侧栏)");
+  assert.ok(src.includes("TIME_OPTS") && src.includes("ARCH_OPTS"), "筛选语义落地(非纯装饰)");
+});
