@@ -2408,3 +2408,33 @@ test("official-parity R175: 官方 Devin Dark/Light 主题随包 + applyOfficial
   const sync = fs.readFileSync(path.join(__dirname, "..", "scripts", "sync-official.js"), "utf8");
   assert.ok(sync.includes("theme-windsurf"), "sync-official 应承接官方主题真源同步");
 });
+
+// R177 · 官方全表面对位: 29 键位逐条审计 + schemas/languages/jsonValidation 真源随包 + 新增同键绑定。
+test("official-parity R177: 全键位审计表 + 官方 schema 随包 + jsonValidation/languages 对位", () => {
+  const op = require(path.join(CASCADE, "official-parity.js"));
+  assert.strictEqual(op.KEYMAP_AUDIT.length, 29, "官方 3.4.27 共 29 条键位, 逐条归类");
+  for (const k of op.KEYMAP_AUDIT) {
+    assert.ok(["parity", "host", "na", "pending"].includes(k.cls), "归类合法: " + k.official);
+    if (k.cls === "na") assert.ok(k.reason, "na 必须给出如实理由: " + k.official);
+    if (k.cls === "parity" || k.cls === "host") assert.ok(k.ours, "对位必须指明落点: " + k.official);
+  }
+  const a = op.audit();
+  assert.strictEqual(a.keymap.total, 29);
+  assert.strictEqual(a.keymap.pending, 0, "无 pending 键位(全部对位或如实 na)");
+  assert.ok(a.surfaces.adopted >= 4, "themes/jsonValidation/languages/configuration 均已承接");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const jv = pkg.contributes.jsonValidation || [];
+  assert.ok(jv.some((v) => v.fileMatch === "**/mcp_config.json"), "mcp_config 校验对位");
+  assert.ok(jv.some((v) => v.fileMatch === "**/acp/registry.json"), "acp registry 校验对位");
+  for (const v of jv) {
+    const f = path.join(__dirname, "..", v.url);
+    assert.ok(fs.existsSync(f), "schema 文件应随包: " + v.url);
+    JSON.parse(fs.readFileSync(f, "utf8"));
+  }
+  assert.ok((pkg.contributes.languages || []).some((l) => l.id === "jsonc" && (l.filenames || []).includes("mcp_config.json")), "mcp_config.json jsonc 高亮对位");
+  const kb = pkg.contributes.keybindings;
+  assert.ok(kb.some((k) => k.key === "alt+\\" && k.command === "editor.action.inlineSuggest.trigger"), "alt+\\ 宿主原生同键");
+  assert.ok(kb.some((k) => k.key === "ctrl+'" && k.command === "dao.cascade.openAgentPicker"), "ctrl+' 官方同键别名");
+  const sync = fs.readFileSync(path.join(__dirname, "..", "scripts", "sync-official.js"), "utf8");
+  assert.ok(sync.includes("schemas"), "sync-official 应承接官方 schema 真源同步");
+});

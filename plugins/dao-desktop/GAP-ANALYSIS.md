@@ -316,3 +316,14 @@
 | verify-sync-matrix(两轨都部署后) | ✅ 判定通过: 安装顺序无关, 共享真源一致(credentials/memories/global_rules 单一真源三点同读) |
 
 结论: "官方 IDE 内装归一/Proxy Pro" 与 "VS Code 内装 dao-desktop 插件版" 双轨并行实机成立, 道并行而不相悖 —— 共享家目录真源, 两轨互不割裂。
+
+## R177 · 官方全表面对位(命令之外的一切 contributes 面 · 反者道之动)
+
+| 面 | 官方(3.4.27) | 插件承接 |
+|---|---|---|
+| keybindings | 29 条 | 逐条审计入 KEYMAP_AUDIT: parity 18 + host 1(alt+\ 官方即绑宿主 inlineSuggest.trigger, 同键随包) + na 10(supercomplete/终端命令流/vim fork/麦克风/worktree/内部上报, 各给如实理由), pending 0; 新增 alt+\ 与 ctrl+'(toggleAgentSelector 官方同键别名) |
+| jsonValidation | mcp_config/acp_registry schema | ✅ 官方 schema **逐字节**随包 + 同 fileMatch 校验; sync-official 增 schema 真源跟随 |
+| languages | jsonc(mcp_config.json)/codemap | ✅ jsonc 对位随包; codemap 为引擎内部格式如实 na |
+| themes | theme-windsurf | ✅ R175 已随包 |
+| authentication | windsurf_auth | na: 官方本体在位由其提供; 插件登录走 credentials.toml 同一真源 |
+| audit() | — | 新增 keymap/surfaces 汇总与全表, /api/parity 后端可验 |
