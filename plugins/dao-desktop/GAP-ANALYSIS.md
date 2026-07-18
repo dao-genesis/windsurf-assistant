@@ -389,3 +389,11 @@
 | 前端零新造 | ✅ dao-one 全部 contributes(dao-one 容器/wam.panel/dao.cloudPanel/115 命令)打包期原样并入 manifest, 打完还原源 package.json |
 | 道并行而不相悖 | ✅ 宿主已装 dao-one/dao-vsix/rt-flow 即跳过内置激活, 共用同一 ~/.dao 真源 |
 | 实机验证 | ✅ VS Code 装 1.5.23 → 9920 起(dao-vsix@3.58.11), /shell 归一网页原生可用(主页·六合一, 账号在线, 浏览器套浏览器), 底栏 道Agent Pro/0号/Dao:9920/Cascade Bar 全在 |
+
+## R183 · 对话板块细粒度同貌(截图对照收敛)
+
+双 IDE 同屏截图对照官方 Cascade 面板, 逐项收敛静息态差异(功能零删减, 扩展件悬停/聚焦即现):
+- 标题 `Cascade Code Ctrl .` 键帽 nowrap 不折行(与官方同行)。
+- 修复既有 CSS 病灶: 增强钮(图/Arena/Worktree/token 计数)的悬停显形规则误写成只改边框色 → 拆分为 display 规则 + .on 高亮规则。
+- 空态「启动时自动打开最近会话」勾选行: 官方无此行 → 静息隐去, 悬停 Recent 区即现。
+- 底部目标行与官方一致只剩「Local」: 工作区/用量/引擎详情悬停即现。
