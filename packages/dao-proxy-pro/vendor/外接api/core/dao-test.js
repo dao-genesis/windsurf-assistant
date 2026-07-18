@@ -852,6 +852,42 @@ async function runCustomSPCheck() {
     pass: routerSrc2.includes("getCustomSP"),
   });
 
+  // ── v9.9.357 · custom 模式源级替换链门控回归 ──
+  //   根因回归: 源级替换链(modifySPProto/preview/observe/INFER_STRIP)历来只认
+  //   SP_MODE==="invert" → custom 模式整链被跳过 → 官方SP透传 → 增强路径底部补经
+  checks.push({
+    name: "source.js 定义 _spReplaceActive (invert+custom 皆走源级替换)",
+    pass:
+      srcJs.includes("function _spReplaceActive()") &&
+      srcJs.includes('SP_MODE === "invert" || SP_MODE === "custom"'),
+  });
+  const _gateCount = (srcJs.match(/_spReplaceActive\(\)/g) || []).length;
+  checks.push({
+    name: "源级替换链门控已由「仅invert」改为 _spReplaceActive (≥3处: 主链/preview/INFER_STRIP)",
+    pass: _gateCount >= 4, // 定义1处 + 门控≥3处
+  });
+  checks.push({
+    name: "observe 延迟观照亦认 custom 模式 (面板 after=真实替换结果)",
+    pass: srcJs.includes('_dMode === "invert" || _dMode === "custom"'),
+  });
+  const _noFallback =
+    (srcJs.match(/if \(SP_MODE === "custom"\) return null;/g) || []).length >=
+    2;
+  checks.push({
+    name: "custom 无自编文本则透传 · 主/副路皆绝不回落经藏注入",
+    pass: _noFallback,
+  });
+  checks.push({
+    name: "注入自编即自动入 custom 模式 (面板无需额外模式按钮)",
+    pass:
+      srcJs.includes("注入自编 → 自动入 custom 模式") &&
+      srcJs.includes('SP_MODE = "custom"'),
+  });
+  checks.push({
+    name: "归道清空即自动回 invert 模式 (与注入对称)",
+    pass: srcJs.includes("归道 → 自动回 invert 模式"),
+  });
+
   for (const c of checks) {
     if (c.pass) {
       console.log(ok(c.name));

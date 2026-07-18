@@ -1,7 +1,7 @@
 {
-  "_ts": "2026-07-13T10:36:53.089Z",
+  "_ts": "2026-07-18T17:30:44.226Z",
   "_model": "deepseek-reasoner",
-  "_url": "http://127.0.0.1:40721/chat/completions",
+  "_url": "http://127.0.0.1:35493/chat/completions",
   "_extraHeaders": {
     "Authorization": "(14B)"
   },
