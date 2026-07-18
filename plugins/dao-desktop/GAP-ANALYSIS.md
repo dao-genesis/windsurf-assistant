@@ -226,4 +226,22 @@
 | 结论 | 如实 | 官方订阅流面向 IDE panel 内部反应式轨, 不承载 RPC 直写/跨端实时同步; R163 refreshSessions(重启重拉)仍是跨端即见的正道 — 不伪造实时推送 |
 | dao.cascade.autoRefreshMinutes | ✅ | 如实兜底轮询: 自持 LS 周期性重启重拉(默认 0=关, 热起停); 共生官方 LS 不代杀 |
 
+## R169 · 全链路实机体检(官方 LS 3.4.27 · 同账号云端真源)
+
+一次性实机 sweep(自持官方 LS, 全后端零 GUI):
+
+| 探测 | 结果 |
+|---|---|
+| GetStatus / GetUserStatus / GetLifeguardConfig / GetDebugDiagnostics / GetUserTrajectoryDebug | ✅ 全通 |
+| GetAllCascadeTrajectories | ✅ 5 会话(云端真源, 历轮实验累积) |
+| GetAllAcpRegistries | ✅ 40 agents |
+| RefreshCustomization / RefreshMcpServers | ✅ |
+| GetAllRules/Skills/Workflows/CascadeMemories/UserMemories | ✅ 5 RPC 全通 |
+| 会话写矩阵 Start/Rename/Archive | ✅ |
+| 自持重启重拉(pull-on-restart) | ✅ 重启后 6 会话(含本轮新建即见) |
+| Settings 写→复读→还原 | ✅ sync-rpc.roundtrip: wrote/readBack/reverted 全 true(注: sweep 初测误用 {settings} 字段致 socket hang up, 正确形为 {userSettings} — 探针笔误, 非产品缺口) |
+| 定制类 CreateCustomizationFile→GetAllWorkflows→还原 | ✅ 全 true |
+
+结论: R158–R168 累积的官方对位面在真实官方 LS + 云端真源上全链路可用; 覆盖审计 100%(covered 22 + na 11 如实, pending 0)。
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
