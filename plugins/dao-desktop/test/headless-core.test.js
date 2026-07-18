@@ -2352,3 +2352,15 @@ test("official-parity R167: downloadDiagnostics 命令 + 诊断/轨迹调试 API
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/diagnostics/ls") && schema.includes("/api/trajectory/debug"), "openapi 应登记");
 });
+
+// R168 · 定时重拉 + 流式订阅如实边界: autoRefresh 配置接线与 GAP 记录在位。
+test("official-parity R168: autoRefreshMinutes 配置 + 定时重拉接线在位", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "official-parity.js"), "utf8");
+  assert.ok(src.includes('"cascade.autoRefreshMinutes"'), "应读配置");
+  assert.ok(src.includes("applyAutoRefresh") && src.includes("clearInterval"), "应可热起停");
+  assert.ok(src.includes("boot.alive()") && src.includes("不代杀"), "仅自持 LS 生效, 共生不代杀(如实)");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.configuration.properties["dao.cascade.autoRefreshMinutes"], "配置应登记");
+  const gap = fs.readFileSync(path.join(__dirname, "..", "GAP-ANALYSIS.md"), "utf8");
+  assert.ok(gap.includes("StreamCascadeSummariesReactiveUpdates"), "R168 流式订阅实测应入档");
+});
