@@ -57,6 +57,52 @@ async function customizationRoundtrip(lsMod, fsMod) {
     wrote: onDisk, readBack: listed, reverted: gone };
 }
 
+// 会话变更矩阵 RPC 往返(R158): rename / archive 在官方 LS 运行态做「写→经另一读路径复读→还原」。
+// 本源: 官方 IDE 与本插件对会话轨迹读写同一份官方真源(GetAllCascadeTrajectories 为共同读路径,
+//   Rename/ArchiveCascadeTrajectory 为共同写路径)。故一侧改名/归档, 另一侧直读即见(跨侧同步)。
+// 探针只作用于既有轨迹的元数据(名字/归档位), 每步后原样还原, 绝不新建/删除会话。
+// 无任何轨迹时如实标注 skipped(不伪造)。lsMod 可注入(测试桩)。
+async function sessionMatrixRoundtrip(lsMod) {
+  const ls = lsMod || _ls();
+  const listCids = async () => {
+    const r = await ls.call("GetAllCascadeTrajectories", {});
+    const s = (r && (r.trajectorySummaries || r.summaries)) || {};
+    // trajectorySummaries 可为 map(id→summary) 或数组; 归一取一个可用 cascadeId 与其当前名/归档位。
+    const arr = Array.isArray(s) ? s : Object.keys(s).map((k) => Object.assign({ cascadeId: k }, s[k]));
+    return arr.filter((t) => t && (t.cascadeId || t.id));
+  };
+  const list0 = await listCids();
+  if (!list0.length) return { key: "session-matrix", rpc: "Rename/ArchiveCascadeTrajectory↔GetAllCascadeTrajectories", skipped: true, note: "无任何 Cascade 轨迹, 矩阵未验证(如实标注, 不伪造)" };
+  const t = list0[0];
+  const cid = t.cascadeId || t.id;
+  const nameOf = (x) => (x && (x.name || x.title)) || "";
+  const archOf = (x) => !!(x && x.isArchived);
+  const origName = nameOf(t);
+  const origArch = archOf(t);
+  const find = (arr) => arr.find((x) => (x.cascadeId || x.id) === cid) || {};
+
+  // ① 改名往返: 写唯一探针名 → 另一读路径复读 → 还原原名 → 复读确认归位。
+  const probe = "dao-matrix-probe-" + Date.now();
+  await ls.call("RenameCascadeTrajectory", { cascadeId: cid, name: probe });
+  const renamed = nameOf(find(await listCids())) === probe;
+  await ls.call("RenameCascadeTrajectory", { cascadeId: cid, name: origName });
+  const renameReverted = nameOf(find(await listCids())) === origName;
+
+  // ② 归档往返: 翻转归档位 → 复读 → 还原 → 复读确认归位。
+  const flip = !origArch;
+  await ls.call("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived: flip });
+  const archived = archOf(find(await listCids())) === flip;
+  await ls.call("ArchiveCascadeTrajectory", { cascadeId: cid, isArchived: origArch });
+  const archiveReverted = archOf(find(await listCids())) === origArch;
+
+  return {
+    key: "session-matrix", rpc: "Rename/ArchiveCascadeTrajectory↔GetAllCascadeTrajectories", cascadeId: cid,
+    wrote: renamed && archived, readBack: renamed && archived, reverted: renameReverted && archiveReverted,
+    detail: { renamed, renameReverted, archived, archiveReverted },
+    note: "改名/归档写官方真源→经 GetAllCascadeTrajectories 复读→原样还原(跨侧同源同证; delete 破坏性不入探针)",
+  };
+}
+
 // 全量 RPC 往返(LS 不在跑时自持拉起同源 LS; 无登录态/无二进制则如实返回不可用, 不伪称)。
 async function roundtrip(opts) {
   const o = opts || {};
@@ -71,11 +117,11 @@ async function roundtrip(opts) {
     }
   }
   const results = [];
-  for (const fn of [settingsRoundtrip, customizationRoundtrip]) {
+  for (const fn of [settingsRoundtrip, customizationRoundtrip, sessionMatrixRoundtrip]) {
     try { results.push(await fn(o.ls)); }
     catch (e) { results.push({ key: fn.name, wrote: false, readBack: false, reverted: false, note: "探测异常: " + e.message }); }
   }
-  return { ok: results.every((r) => r.wrote && r.readBack && r.reverted), available: true, results };
+  return { ok: results.every((r) => r.skipped || (r.wrote && r.readBack && r.reverted)), available: true, results };
 }
 
-module.exports = { settingsRoundtrip, customizationRoundtrip, roundtrip };
+module.exports = { settingsRoundtrip, customizationRoundtrip, sessionMatrixRoundtrip, roundtrip };

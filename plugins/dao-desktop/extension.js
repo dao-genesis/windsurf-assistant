@@ -74,6 +74,12 @@ async function activate(context) {
     log("✓ Devin Settings 整页就位 (dao.cascade.openSettings)");
   } catch (e) { log("✗ Devin Settings 注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②b‴ 编辑器内联键组(dao.cascade.inlineCommand / accept·rejectDiff): 官方编辑器内联操作面对位。
+  try {
+    require("./dao-cascade/inline-command").register(context, log, { ns: "dao", cascade: cascadeProvider });
+    log("✓ 编辑器内联键组就位 (inlineCommand/diff accept·reject)");
+  } catch (e) { log("✗ 编辑器内联键组注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ②c Proxy Pro 独立面板(dao.proxyPro): 与 dao-proxy-pro 独立插件面板对位,
   // 插件自持渠道/路由(~/.dao/proxy-channels.json), 与 dao-vsix 的 ~/.codeium/dao-byok 隔离。
   try {
