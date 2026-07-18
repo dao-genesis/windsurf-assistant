@@ -51,6 +51,8 @@ class AgentBoardPanel {
     const p = vscode.window.createWebviewPanel("dao.agentBoard", "Devin — Agent",
       vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true });
     this._panel = p;
+    // 官方 Agent 模式 = 整窗接管: 收起侧栏, 看板独占(Editor 模式时还原)。
+    vscode.commands.executeCommand("workbench.action.closeSidebar").then(undefined, () => {});
     p.onDidDispose(() => { this._panel = null; });
     p.webview.onDidReceiveMessage((m) => this._onMessage(m));
     p.webview.html = this._html();
@@ -151,8 +153,14 @@ class AgentBoardPanel {
 <style>
 :root{color-scheme:light dark;--line:var(--vscode-widget-border,var(--vscode-panel-border));--dim:var(--vscode-descriptionForeground);--card:var(--vscode-input-background);--hover:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.15))}
 html,body{height:100%;margin:0}body{display:flex;flex-direction:column;font:13px var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background)}
-header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 header .ttl{font-size:15px;font-weight:600}
+#chips{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:11.5px;color:var(--dim);cursor:pointer;background:var(--card)}
+.chip b{color:var(--vscode-foreground);font-weight:500}
+.chip .x{opacity:.7;padding-left:2px}
+.chip.add{border-style:dashed;padding:3px 9px}
+#display{margin-left:auto;background:var(--card);border:1px solid var(--line);border-radius:6px;color:inherit;padding:3px 8px;font-size:11.5px}
 #search{flex:0 1 260px;background:var(--card);border:1px solid var(--line);border-radius:6px;color:inherit;padding:4px 10px;font-size:12px}
 .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{border:none;background:transparent;color:var(--dim);padding:4px 12px;font-size:12px;cursor:pointer}
@@ -200,6 +208,16 @@ tr:hover td{background:var(--hover)}
   <button id="refresh" title="刷新">↻</button>
   <button id="newbtn">＋ New Session</button>
 </header>
+<div id="chips">
+  <span class="chip" id="chip-time">◴ Time is <b id="time-v">Any time</b><span class="x">×</span></span>
+  <span class="chip" id="chip-arch">▤ Archived is <b id="arch-v">Excluded</b><span class="x">×</span></span>
+  <span class="chip add" id="chip-add" title="官方同位: 叠加筛选">＋</span>
+  <select id="display" title="Display">
+    <option value="updated">Display · 按更新</option>
+    <option value="created">Display · 按创建</option>
+    <option value="title">Display · 按标题</option>
+  </select>
+</div>
 <main>
   <aside id="spaces">
     <div class="hd">Spaces</div>
@@ -222,15 +240,23 @@ const vs=acquireVsCodeApi();
 const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const LBL=${JSON.stringify(STATUS_LABEL)};
 let D={cloud:null,local:null},view="board",space="all",q="";
+const TIME_OPTS=[["any","Any time"],["24h","Past 24 hours"],["7d","Past 7 days"],["30d","Past 30 days"]];
+const ARCH_OPTS=[["excluded","Excluded"],["included","Included"],["only","Only"]];
+let F={time:"any",arch:"excluded",sort:"updated"};
+function inTime(s){if(F.time==="any")return true;const ms={"24h":864e5,"7d":6048e5,"30d":2592e6}[F.time];const t=new Date(s.updatedAt||s.createdAt||0).getTime();return isFinite(t)&&Date.now()-t<=ms;}
 const $=s=>document.querySelector(s);
 function ago(t){if(!t)return"";const d=Date.now()-new Date(t).getTime();if(!isFinite(d))return"";const m=Math.floor(d/60000);if(m<1)return"刚刚";if(m<60)return m+" 分钟前";const h=Math.floor(m/60);if(h<24)return h+" 小时前";return Math.floor(h/24)+" 天前";}
 function filtered(){
-  if(space==="local")return(D.local&&D.local.sessions||[]).filter(s=>!q||s.title.toLowerCase().includes(q));
+  if(space==="local")return(D.local&&D.local.sessions||[]).filter(s=>(!q||s.title.toLowerCase().includes(q))&&inTime(s));
   let l=(D.cloud&&D.cloud.sessions||[]);
-  if(space==="archived")l=l.filter(s=>s.archived);else l=l.filter(s=>!s.archived);
+  if(space==="archived"||F.arch==="only")l=l.filter(s=>s.archived);
+  else if(F.arch==="excluded")l=l.filter(s=>!s.archived);
   if(space==="unread")l=l.filter(s=>s.unread);
   if(space==="pinned")l=l.filter(s=>s.pinned);
   if(q)l=l.filter(s=>s.title.toLowerCase().includes(q));
+  l=l.filter(inTime);
+  if(F.sort==="title")l=l.slice().sort((a,b)=>a.title.localeCompare(b.title));
+  else if(F.sort==="created")l=l.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   return l;
 }
 function card(s){return '<div class="card" data-k="'+s.kind+'" data-u="'+E(s.url||"")+'" data-i="'+E(s.id)+'">'+
@@ -250,7 +276,7 @@ function render(){
     const g={working:[],blocked:[],finished:[]};
     for(const s of l){const k=/work|resum/.test(s.status)?"working":(s.status==="blocked"?"blocked":"finished");g[k].push(s);}
     h+='<div class="cols">';
-    for(const[k,t]of[["working","运行中"],["blocked","待处理"],["finished","已完成"]])
+    for(const[k,t]of[["working","Running"],["blocked","Blocked"],["finished","Finished"]])
       h+='<div class="col"><div class="chd">'+t+'<span class="cnt">'+g[k].length+'</span></div>'+g[k].map(card).join("")+'</div>';
     h+='</div>';
   }else{
@@ -275,6 +301,10 @@ $("#ncancel").addEventListener("click",()=>$("#modal").classList.remove("show"))
 $("#nprompt").addEventListener("input",e=>{$("#ncreate").disabled=!e.target.value.trim();});
 $("#ncreate").addEventListener("click",()=>{const p=$("#nprompt").value;if(!p.trim())return;$("#modal").classList.remove("show");$("#nprompt").value="";$("#ncreate").disabled=true;vs.postMessage({type:"new-session",prompt:p});});
 $("#search").addEventListener("input",e=>{q=e.target.value.trim().toLowerCase();render();});
+function cycle(opts,cur){const i=opts.findIndex(o=>o[0]===cur);return opts[(i+1)%opts.length];}
+$("#chip-time").addEventListener("click",e=>{if(e.target.classList.contains("x")){F.time="any";}else{F.time=cycle(TIME_OPTS,F.time)[0];}document.getElementById("time-v").textContent=TIME_OPTS.find(o=>o[0]===F.time)[1];render();});
+$("#chip-arch").addEventListener("click",e=>{if(e.target.classList.contains("x")){F.arch="excluded";}else{F.arch=cycle(ARCH_OPTS,F.arch)[0];}document.getElementById("arch-v").textContent=ARCH_OPTS.find(o=>o[0]===F.arch)[1];render();});
+$("#display").addEventListener("change",e=>{F.sort=e.target.value;render();});
 window.addEventListener("message",e=>{const m=e.data;
   if(m.type==="loading"){$("#content").innerHTML='<div class="muted">加载中…</div>';}
   else if(m.type==="data"){D={cloud:m.cloud,local:m.local};render();}

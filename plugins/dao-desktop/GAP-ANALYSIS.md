@@ -339,3 +339,15 @@
 | 官方 IDE 内并存我方三件(归一 rt-flow + Proxy Pro + dao-desktop) | ✅ 官方 Cascade 面板与我方 Devin Desktop: Cascade 面板、道Agent Pro 侧栏并存不冲突(道并行而不相悖) |
 | 官方 IDE 二实例(--open-url 唤起 <2>)瞬时报 windsurf client couldn't create connection | 如实记录: 二实例竞态, 单实例无此报; 与插件无关 |
 | OS keyring 缺失提示(裸 X 桌面) | 如实记录: 选 weaker encryption 即过, 官方自身行为 |
+
+## R179 · 双图对照 → Agent 看板官方同貌收敛
+
+按双 IDE 截图逐项对照官方 Agent 模式看板, 收敛差距:
+
+| 官方 | 此前插件版 | 收敛 |
+|---|---|---|
+| 筛选 chips: Time is Any time × / Archived is Excluded × / ＋ | 无 | ✅ 同貌 chips, 点击轮换 Any/24h/7d/30d 与 Excluded/Included/Only, × 复位, 筛选真实生效 |
+| Display 下拉 | 无 | ✅ Display·按更新/创建/标题 |
+| 状态泳道 Running/... | 中文「运行中/待处理/已完成」 | ✅ 官方词 Running/Blocked/Finished + 计数 |
+| Agent 模式整窗接管 | 看板挤在编辑器列 | ✅ 打开即收侧栏, 看板独占; Editor 标签回编辑器 |
+| 宿主观感 | VS Code 默认主题+Welcome 页 | ✅ 实机已应用 Devin Dark + startupEditor none(R175 命令即官方化) |
