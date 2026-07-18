@@ -257,4 +257,17 @@
 
 结论: 双 IDE 并行一致性在定制类数据面实机闭环 —— "两边任何操作一边, 对应一边也都会更新"对文件真源类资源已成立(自动化由 R166 truth-watch 承担); 会话列表类保持如实的重拉语义。
 
+## R171 · Settings 存储域实证(双 LS 并行 · 全翻转跟随 PASS)
+
+两个官方 LS 同时运行(A=独立 db, B=插件自持 LS 另一 db), A 侧 SetUserSettings 全翻转序列(false→读→true→读):
+
+| 探测 | 结果 |
+|---|---|
+| A→false 后 B live 读 | ✅ false |
+| A→true 后 B live 读 | ✅ true |
+| 结论 | ✅ **并行即见** — GetUserSettings/SetUserSettings 为云端/共享域(非本地 db 域), 双 IDE 同时运行不重启即跟随; 排除 proto3 false 缺省歧义(双向翻转均跟随) |
+| 探针还原 | ✅ 原设置写回 |
+
+同步语义三分野(全部实机实证): ① Settings=云端域**并行即见**(R171); ② 定制类/MCP=文件真源+刷新 RPC, **刷新即见**(R170, truth-watch 自动化); ③ 会话轨迹=云端 **pull-on-restart**(R160/R164/R168, refreshSessions/autoRefresh 承接)。
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
