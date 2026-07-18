@@ -123,6 +123,7 @@ class CascadePanelProvider {
         if (msg.type === "session-rename") return this._handleSessionRename(msg.sessionId);
         if (msg.type === "session-export") return this._handleSessionExport(msg.sessionId);
         if (msg.type === "share-conversation") return this._handleShareConversation();
+        if (msg.type === "transcribe") return this._handleTranscribe(msg.b64);
         if (msg.type === "open-file") return this._handleOpenFile(msg.path);
         if (msg.type === "memories-list") return this._handleMemoriesList();
         if (msg.type === "status-info") return this._handleStatusInfo();
@@ -2003,6 +2004,15 @@ class CascadePanelProvider {
     } catch (e) { vscode.window.showWarningMessage("打不开 " + p + ": " + e.message); }
   }
 
+  // 官方语音转写对位: GetTranscription{audioData}→transcribedText(后端实测 wav/webm 均可)。
+  async _handleTranscribe(b64) {
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("GetTranscription", { audioData: String(b64 || "") });
+      this._post({ type: "transcribed", text: r.transcribedText || "" });
+    } catch (e) { this._post({ type: "error", text: "语音转写失败: " + e.message }); }
+  }
+
   // 官方 Share 对位: CreateTrajectoryShare{cascadeId,shareStatus:TEAM}→shareId,
   // 链接同官方 {webappHost}/windsurf/conversation-shares/{shareId}, 复制到剪贴板。
   async _handleShareConversation() {
@@ -2622,7 +2632,7 @@ class CascadePanelProvider {
         <span class="spacer"></span>
         <span id="tokCount" title="输入 token / 上限 (GetMessageTokenCount)" style="font-size:10.5px;color:var(--dim);"></span>
         <span class="pill" id="agentWrap" title="切换 agent (Ctrl+')"><span id="agentIcon">⬡</span><button id="agentBtn" type="button"></button><span class="badge" id="badge"></span></span>
-        <button id="micBtn" class="bare" title="语音输入 (Web Speech)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></button>
+        <button id="micBtn" class="bare" title="语音输入 · 官方 GetTranscription 转写(不可用时回退 Web Speech)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></button>
         <button class="send" id="send" title="发送 (Enter)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.7 3.08 C 11.59 3.13,10.52 4.17,8.29 6.41 C 5.22 9.49,5.05 9.67,5.02 9.83 C 4.98 10.08,5.03 10.29,5.17 10.46 C 5.30 10.62,5.56 10.76,5.72 10.76 C 6.06 10.76,6.01 10.80,8.69 8.13 L 11.24 5.58 11.24 12.98 L 11.24 20.38 11.33 20.56 C 11.38 20.66,11.49 20.79,11.57 20.86 C 11.71 20.97,11.76 20.98,12.00 20.98 C 12.24 20.98,12.29 20.97,12.43 20.86 C 12.51 20.79,12.62 20.66,12.67 20.56 L 12.76 20.38 12.76 12.98 L 12.76 5.58 15.31 8.13 C 17.99 10.80,17.94 10.76,18.28 10.76 C 18.45 10.76,18.70 10.62,18.83 10.46 C 18.97 10.29,19.02 10.08,18.98 9.83 C 18.95 9.67,18.78 9.49,15.71 6.41 C 13.48 4.17,12.41 3.13,12.30 3.08 C 12.21 3.04,12.08 3.00,12.00 3.00 C 11.92 3.00,11.79 3.04,11.70 3.08"/></svg></button>
       </div>
     </div>
@@ -2871,18 +2881,39 @@ class CascadePanelProvider {
   // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
   const tryCloudBtn=document.getElementById("tryCloud");
   if(tryCloudBtn) tryCloudBtn.onclick=()=>{ agent="devin-cloud"; onAgentChange(); inputEl.focus(); };
-  // 官方式麦克风: Web Speech 可用则听写入 composer, 不可用则隐藏(不留死按钮)
+  // 官方式麦克风: 官方真源路径 GetTranscription{audioData}→transcribedText——录音(MediaRecorder)
+  // 送 LS 转写入 composer; getUserMedia 不可用时回退 Web Speech, 两者皆不可用则隐藏(不留死按钮)。
   const micBtn=document.getElementById("micBtn");
-  (function(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){ if(micBtn) micBtn.style.display="none"; return; }
-    let rec=null, on=false;
-    micBtn.onclick=()=>{ if(on){ try{rec.stop();}catch(_){} return; }
-      rec=new SR(); rec.continuous=false; rec.interimResults=false;
+  (function(){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const hasMedia=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+    if(!hasMedia&&!SR){ if(micBtn) micBtn.style.display="none"; return; }
+    let mr=null, on=false, chunks=[];
+    function fallbackSR(){ if(!SR) return false;
+      let rec=new SR(); rec.continuous=false; rec.interimResults=false;
       rec.onresult=(ev)=>{ const t=Array.from(ev.results).map(r=>r[0].transcript).join(" ");
         if(t){ inputEl.value=(inputEl.value?inputEl.value+" ":"")+t; inputEl.dispatchEvent(new Event("input")); } };
       rec.onend=()=>{ on=false; micBtn.style.opacity=""; };
       rec.onerror=()=>{ on=false; micBtn.style.opacity=""; };
-      try{ rec.start(); on=true; micBtn.style.opacity="0.5"; }catch(_){ on=false; } };
+      try{ rec.start(); on=true; micBtn.style.opacity="0.5"; return true; }catch(_){ return false; } }
+    micBtn.onclick=async()=>{
+      if(on){ try{ mr?mr.stop():null; }catch(_){} on=false; micBtn.style.opacity=""; return; }
+      if(!hasMedia){ fallbackSR(); return; }
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        chunks=[]; mr=new MediaRecorder(stream);
+        mr.ondataavailable=(ev)=>{ if(ev.data&&ev.data.size) chunks.push(ev.data); };
+        mr.onstop=async()=>{
+          try{ stream.getTracks().forEach(t=>t.stop()); }catch(_){}
+          on=false; micBtn.style.opacity="";
+          if(!chunks.length) return;
+          const buf=await new Blob(chunks,{type:mr.mimeType||"audio/webm"}).arrayBuffer();
+          let s="",u=new Uint8Array(buf); for(let i=0;i<u.length;i++) s+=String.fromCharCode(u[i]);
+          vscode.postMessage({type:"transcribe", b64:btoa(s)});
+        };
+        mr.start(); on=true; micBtn.style.opacity="0.5";
+      }catch(_){ if(!fallbackSR()&&!SR) micBtn.style.display="none"; }
+    };
   })();
 
   // 极简 markdown 渲染(围栏代码块/行内码/粗斜体/链接/标题/列表)，先转义再替换
@@ -3445,6 +3476,7 @@ class CascadePanelProvider {
         fb.title=m.text; }
     } else if(m.type==="insert-input"){ inputEl.value=(inputEl.value?inputEl.value+"\\n":"")+m.text; autoGrow(); inputEl.focus(); }
     else if(m.type==="error"){ addMsg("assistant","⚠ "+m.text); setBusy(false); }
+    else if(m.type==="transcribed"){ if(m.text){ inputEl.value=(inputEl.value?inputEl.value+" ":"")+m.text; inputEl.dispatchEvent(new Event("input")); inputEl.focus(); } }
   });
 
   renderAgents(); vscode.postMessage({type:"ready"}); vscode.postMessage({type:"sessions-list"});

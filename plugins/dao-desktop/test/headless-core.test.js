@@ -2628,3 +2628,14 @@ test("R189: RPC 甄别全表与 Share conversation 在位", () => {
   assert.ok(src.includes("/windsurf/conversation-shares/"), "官方同构分享链接在位");
   assert.ok(src.includes('id="mtShare"') && src.includes('type:"share-conversation"'), "分享按钮与桥接在位");
 });
+
+// R190 · 官方语音转写对位: GetTranscription{audioData}→transcribedText, 录音送 LS 转写入 composer。
+test("R190: GetTranscription 语音转写链路在位", () => {
+  const parity = require(path.join(ROOT, "dao-cascade", "official-parity.js"));
+  assert.strictEqual(parity.RPC_GAP_AUDIT.GetTranscription, "ux-done", "已实装归类");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"GetTranscription"') && src.includes("transcribedText"), "官方 RPC 调用在位");
+  assert.ok(src.includes('type:"transcribe"') && src.includes('"transcribed"'), "webview↔host 桥接在位");
+  assert.ok(src.includes("MediaRecorder"), "录音路径在位");
+  assert.ok(src.includes("fallbackSR"), "Web Speech 回退在位");
+});

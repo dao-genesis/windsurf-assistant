@@ -134,7 +134,8 @@ const CHAT_CLIENT_KEYS = [
 //   internal — LS 内部/生命周期; removed — 官方已弃用(后端实测报 removed); deploy — WindsurfJS 部署域(未开放)。
 const RPC_GAP_AUDIT = {
   CreateTrajectoryShare: "ux-done", // 会话分享链接(后端实测: {cascadeId,shareStatus:TEAM}→shareId)
-  GetTranscription: "ux", GetProfileData: "ux", GetKnowledgeBaseItemsForTeam: "ux",
+  GetTranscription: "ux-done", // 官方语音转写(后端实测 wav→transcribedText)
+  GetProfileData: "ux", GetKnowledgeBaseItemsForTeam: "ux",
   SetPinnedContext: "ux", SetPinnedGuideline: "ux", GetSuggestedContextScopeItems: "ux",
   SubmitBugReport: "ux", GetGithubPullRequestSearchInfo: "ux", GetCascadeModelConfigs: "ux",
   RecordChatFeedback: "ux", GetChatMessage: "ux", RawGetChatMessage: "ux",
