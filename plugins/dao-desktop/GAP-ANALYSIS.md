@@ -182,5 +182,6 @@
 | dao.cascade.refreshSessions | ✅ | 自持 LS 重启即重拉云端真源(R160 实证语义)→ 另一侧(官方 IDE/另一机)新建/改名/归档即见; 共生官方 LS 不代杀官方进程, 如实提示由官方侧自身重载刷新 |
 | POST /api/cascade/refresh | ✅ | 后端同路径: selfhost-restart(重启+前后轨迹数)/symbiotic-or-none 两态如实分流; 实机 stop→boot→GetAllCascadeTrajectories 往返已证 |
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例(命令/分流/路由/登记), 85/85; v1.5.11 构建通过 |
+| 端到端实机实证(R164) | ✅ | A 侧独立官方 LS(全新 db/workspace)StartCascade+改名探针 → B 侧插件自持 LS 启动即见(pull-on-start), refresh 重启后仍见且 renamedTitle=探针值(probe-match: true) —— 跨端会话同步全链路实机闭环 |
 
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
