@@ -14,10 +14,11 @@ const crypto = require("crypto");
 
 function nonce() { return crypto.randomBytes(16).toString("base64"); }
 
+// 官方看板同文(英文真源): 列=Running/Blocked/Ready, 状态标签同语义。
 const STATUS_LABEL = {
-  working: "运行中", blocked: "待处理", finished: "已完成",
-  expired: "已过期", suspend_requested: "挂起中", suspend_requested_frontend: "挂起中",
-  resumed: "运行中", resume_requested: "唤醒中",
+  working: "Running", blocked: "Blocked", finished: "Ready",
+  expired: "Expired", suspend_requested: "Suspending", suspend_requested_frontend: "Suspending",
+  resumed: "Running", resume_requested: "Resuming",
 };
 
 // cognition.ai/* 元数据 → 扁平会话对象(前端直接消费)。
@@ -27,7 +28,7 @@ function mapCloudSession(s) {
   return {
     kind: "cloud",
     id: s.sessionId || "",
-    title: s.title || s.sessionId || "(无标题)",
+    title: s.title || s.sessionId || "(untitled)",
     status: String(g("statusEnum") || "").toLowerCase(),
     url: g("url") || ("https://app.devin.ai/sessions/" + String(s.sessionId || "").replace(/^devin-/, "")),
     archived: !!g("isArchived"),
@@ -222,19 +223,19 @@ tr:hover td{background:var(--hover)}
 <header>
   <span class="ttl">Devin</span>
   <div class="seg" id="modetabs"><button class="on">Agent</button><button id="mt-editor">Editor</button></div>
-  <input id="search" placeholder="搜索会话…">
+  <input id="search" placeholder="Search sessions...">
   <div class="seg" id="viewseg"><button data-v="board" class="on">Board</button><button data-v="list">List</button></div>
   <button id="refresh" title="刷新">↻</button>
-  <button id="newbtn">＋ New Session</button>
+  <button id="newbtn">＋ New session</button>
 </header>
 <div id="chips">
   <span class="chip" id="chip-time">◴ Time is <b id="time-v">Any time</b><span class="x">×</span></span>
   <span class="chip" id="chip-arch">▤ Archived is <b id="arch-v">Excluded</b><span class="x">×</span></span>
   <span class="chip add" id="chip-add" title="官方同位: 叠加筛选">＋</span>
   <select id="display" title="Display">
-    <option value="updated">Display · 按更新</option>
-    <option value="created">Display · 按创建</option>
-    <option value="title">Display · 按标题</option>
+    <option value="updated">Display · Updated</option>
+    <option value="created">Display · Created</option>
+    <option value="title">Display · Title</option>
   </select>
 </div>
 <main>
@@ -242,15 +243,15 @@ tr:hover td{background:var(--hover)}
     <div class="act" id="side-new">＋ New session</div>
     <div class="sp on" data-sp="all">💬 Sessions</div>
     <div class="hdrow"><span class="hd2">Spaces</span><span class="ic" id="sp-search" title="搜索">🔍</span><span class="ic" title="新建 Space(官方同位)">＋</span></div>
-    <div class="sp" data-sp="unread">未读</div>
-    <div class="sp" data-sp="pinned">已置顶</div>
-    <div class="sp" data-sp="archived">已归档</div>
-    <div class="hdrow"><span class="hd2">本机</span></div>
-    <div class="sp" data-sp="local">Cascade 会话</div>
-    <div class="hdrow"><span class="hd2">近期</span></div>
+    <div class="sp" data-sp="unread">Unread</div>
+    <div class="sp" data-sp="pinned">Pinned</div>
+    <div class="sp" data-sp="archived">Archived</div>
+    <div class="hdrow"><span class="hd2">Local</span></div>
+    <div class="sp" data-sp="local">Cascade sessions</div>
+    <div class="hdrow"><span class="hd2">Recent</span></div>
     <div id="recent"></div>
   </aside>
-  <div id="content"><div class="muted">加载中…</div></div>
+  <div id="content"><div class="muted">Loading…</div></div>
 </main>
 <footer><span id="mcpn">0 MCP servers</span></footer>
 <div id="modal"><div class="box">
@@ -268,7 +269,7 @@ const ARCH_OPTS=[["excluded","Excluded"],["included","Included"],["only","Only"]
 let F={time:"any",arch:"excluded",sort:"updated"};
 function inTime(s){if(F.time==="any")return true;const ms={"24h":864e5,"7d":6048e5,"30d":2592e6}[F.time];const t=new Date(s.updatedAt||s.createdAt||0).getTime();return isFinite(t)&&Date.now()-t<=ms;}
 const $=s=>document.querySelector(s);
-function ago(t){if(!t)return"";const d=Date.now()-new Date(t).getTime();if(!isFinite(d))return"";const m=Math.floor(d/60000);if(m<1)return"刚刚";if(m<60)return m+" 分钟前";const h=Math.floor(m/60);if(h<24)return h+" 小时前";return Math.floor(h/24)+" 天前";}
+function ago(t){if(!t)return"";const d=Date.now()-new Date(t).getTime();if(!isFinite(d))return"";const m=Math.floor(d/60000);if(m<1)return"just now";if(m<60)return m+"m ago";const h=Math.floor(m/60);if(h<24)return h+"h ago";return Math.floor(h/24)+"d ago";}
 function filtered(){
   if(space==="local")return(D.local&&D.local.sessions||[]).filter(s=>(!q||s.title.toLowerCase().includes(q))&&inTime(s));
   let l=(D.cloud&&D.cloud.sessions||[]);
@@ -284,26 +285,27 @@ function filtered(){
 }
 function card(s){return '<div class="card" data-k="'+s.kind+'" data-u="'+E(s.url||"")+'" data-i="'+E(s.id)+'">'+
   '<div class="t">'+(s.pinned?'<span class="pin">📌 </span>':"")+(s.unread?'<span class="unread"></span> ':"")+E(s.title)+'</div>'+
-  '<div class="m"><span class="dot '+E(s.status)+'"></span><span>'+(LBL[s.status]||E(s.status)||"—")+'</span>'+
+  '<div class="m">'+(s.kind==="cloud"?'<span title="Devin Cloud">☁</span>':"")+
   (s.tags||[]).map(t=>'<span class="tag">'+E(t)+'</span>').join("")+
   '<span style="margin-left:auto">'+ago(s.updatedAt)+'</span></div></div>';}
 function render(){
   const c=$("#content");
-  if(!D.cloud&&!D.local){c.innerHTML='<div class="muted">加载中…</div>';return;}
+  if(!D.cloud&&!D.local){c.innerHTML='<div class="muted">Loading…</div>';return;}
   let h="";
   if(space!=="local"&&D.cloud&&!D.cloud.ok)h+='<div class="err">Devin Cloud 不可达: '+E(D.cloud.error)+'</div>';
   if(space==="local"&&D.local&&!D.local.ok)h+='<div class="err">本机 Cascade 不可达: '+E(D.local.error)+'</div>';
   const l=filtered();
-  if(!l.length){c.innerHTML=h+'<div class="muted">没有会话</div>';return;}
+  if(!l.length){c.innerHTML=h+'<div class="muted">No sessions</div>';return;}
   if(view==="board"&&space!=="local"){
     const g={working:[],blocked:[],finished:[]};
     for(const s of l){const k=/work|resum/.test(s.status)?"working":(s.status==="blocked"?"blocked":"finished");g[k].push(s);}
     h+='<div class="cols">';
-    for(const[k,t]of[["working","Running"],["blocked","Blocked"],["finished","Finished"]])
-      h+='<div class="col"><div class="chd">'+t+'<span class="cnt">'+g[k].length+'</span></div>'+g[k].map(card).join("")+'</div>';
+    const CICO={working:'<span style="color:#8b949e">◌</span>',blocked:'<span style="color:#d29922">⧖</span>',finished:'<span style="color:#3fb950">✓</span>'};
+    for(const[k,t]of[["working","Running"],["blocked","Blocked"],["finished","Ready"]])
+      h+='<div class="col"><div class="chd">'+CICO[k]+t+'<span class="cnt">'+g[k].length+'</span></div>'+g[k].map(card).join("")+'</div>';
     h+='</div>';
   }else{
-    h+='<table><tr><th></th><th>会话</th><th>状态</th><th>更新</th></tr>'+l.map(s=>
+    h+='<table><tr><th></th><th>Session</th><th>Status</th><th>Updated</th></tr>'+l.map(s=>
       '<tr data-k="'+s.kind+'" data-u="'+E(s.url||"")+'" data-i="'+E(s.id)+'"><td>'+(s.unread?'<span class="unread"></span>':"")+'</td><td>'+(s.pinned?"📌 ":"")+E(s.title)+
       (s.workspace?' <span class="tag">'+E(String(s.workspace).split("/").pop())+'</span>':"")+'</td><td><span class="dot '+E(s.status)+'"></span> '+(LBL[s.status]||E(s.status)||"—")+'</td><td>'+ago(s.updatedAt)+'</td></tr>').join("")+'</table>';
   }

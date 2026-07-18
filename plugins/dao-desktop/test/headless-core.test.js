@@ -2451,7 +2451,7 @@ test("agent-board R179: 官方 Board 同貌(筛选 chips/Display/Running 泳道/
   assert.ok(src.includes("Time is") && src.includes("Archived is"), "官方筛选 chips 对位(Time/Archived)");
   assert.ok(src.includes('"chip add"'), "＋ 叠加筛选 chip 对位");
   assert.ok(src.includes('id="display"'), "Display 下拉对位");
-  for (const lane of ['"Running"', '"Blocked"', '"Finished"'])
+  for (const lane of ['"Running"', '"Blocked"', '"Ready"'])
     assert.ok(src.includes(lane), "官方状态泳道: " + lane);
   assert.ok(src.includes("workbench.action.closeSidebar"), "Agent 模式整窗接管(收侧栏)");
   assert.ok(src.includes("TIME_OPTS") && src.includes("ARCH_OPTS"), "筛选语义落地(非纯装饰)");
@@ -2690,4 +2690,13 @@ test("R197: 顶栏工具行 SVG 图标化与账号圆片在位", () => {
   for (const e of ["🔗", "🐞", "📚"]) assert.ok(!src.includes(e), "emoji " + e + " 已替换为 SVG");
   assert.ok(src.includes('id="acctChip"'), "账号圆片在位");
   assert.ok(src.includes('ch.textContent=nm.replace'), "已登录首字母渲染在位");
+});
+
+// R200 · Agent 看板官方同文对位: 列 Running/Blocked/Ready + 全英文标签(官方真机截图对照)。
+test("R200: Agent 看板官方同文(Ready 列/英文标签/Search sessions)", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "agent-board.js"), "utf8");
+  assert.ok(src.includes('["finished","Ready"]'), "第三列官方同文 Ready");
+  assert.ok(src.includes('placeholder="Search sessions..."'), "搜索框官方同文");
+  assert.ok(src.includes('finished: "Ready"'), "状态标签英文化");
+  assert.ok(!src.includes("已完成"), "中文状态标签已移除");
 });

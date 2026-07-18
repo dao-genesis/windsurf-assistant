@@ -530,3 +530,11 @@ IDE(~/.devin/extensions), 重启即激活: 状态栏 道Agent Pro·道/0号/Dao:
 dao-desktop 占用, dao-one 自动让位 9924, 道并行而不相悖)。数据同源实证(全后端): 两端 /api/health
 均 dao-vsix 3.58.20; 两端 /shell 均 200; 共用 ~/.dao 单一账号库(dao-accounts-auth.json 同一账号
 两端互见)。即「VS Code 装 dao-desktop ↔ 官方 IDE 装 dao-one」双向等价、共享一套底层数据。
+
+## R200 · Agent 整窗看板官方同文对位(实机截图闭环比对)
+
+官方 Agent 模式真机截图逐块比对后收敛错位清单并全数修复: 第三泳道 Finished→**Ready**(官方同文,
+含状态映射 finished→Ready); 全部界面文案英文化与官方一致(Search sessions... / Unread / Pinned /
+Archived / Local / Recent / Loading… / No sessions / Session/Status/Updated 表头 / just now·m·h·d
+ago 相对时间 / Display·Updated); 泳道头加官方样式状态图标(◌/⧖/✓); 卡片元行去状态 chip(列已表意,
+官方卡即 标题+云标+时间)。109/109 测试, v1.5.35 实机装回复验(Ready 泳道/英文全量齐显)。
