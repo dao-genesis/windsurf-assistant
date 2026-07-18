@@ -157,4 +157,15 @@
 | 回归护栏 | ✅ | headless-core.test.js 新增 4 例(六键/键位/config 退让/接线 + 官方 ID 真源一致 + editor/title 顶栏入口 + diffStat 桩聚合与如实 null), 82/82 |
 | 双 LS 同时运行实时互推 | ◐(实机实证边界) | 同账号双官方 LS 并行(独立 database_dir/workspace_id): A 侧新建+改名+归档, B 侧不重启轮询 GetAllCascadeTrajectories 60s 内不可见 —— 官方二进制无轨迹级 Refresh/Sync RPC(strings 实测仅 RefreshCustomization/RefreshMcpServers 等), 轨迹列表为**启动时拉取**语义; 重启/冷拉即见(上行已证)。如实标注: 跨侧同步为 pull-on-(re)start, 非实时推送 |
 
-> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
+## R161 · 官方命令/键位 1:1 覆盖审计(真源为锚)
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| 覆盖审计模块 | ✅ | dao-cascade/official-parity.js: 官方 3.4.27 contributes.commands(64 条, devin.*/windsurf.* 成对)去偶 33 基名逐条归类(covered/na/pending, 如实不伪造) + 12 键 1:1 键位表; GET /api/parity/commands 后端可验 |
+| importRulesFromCursor | ✅ | dao.cascade.importRulesFromCursor: 工作区 .cursorrules/.cursor/rules/*(mdc→md) → .windsurf/rules 后端复制(官方同源目录) |
+| openBrowser | ✅ | dao.cascade.openBrowser: 官方在位直通 devin/windsurf.openBrowser; 否则宿主 simpleBrowser.show 同位承接(再回退 openExternal) |
+| 如实 pending | ◐ | reloadAcpConnections/openAcpLocalRegistry(ACP 面板)、lifeguard.checkCurrentChanges(Ctrl+U 代码守护) —— 官方 RPC 在(GetLifeguardConfig), 待后续轮次, 不伪造 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 1 例(清单完整性/归类如实/审计聚合/路由与接线), 83/83 |
+
+> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位)、
+> ACP 连接管理与 Lifeguard 承接 —— 持续对照推进。

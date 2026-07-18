@@ -232,6 +232,7 @@ function routes(reqUrl) {
   if (u === "/api/boundary") { return boundaryView(); }
   if (u === "/api/coexist") { return coexist.report(); }
   if (u === "/api/sync/audit") { return syncAudit.audit(); }
+  if (u === "/api/parity/commands") { return require("./official-parity").audit(); }
   if (u === "/api/coexist/flow") { return coexist.dataFlow(); }
   return null;
 }
