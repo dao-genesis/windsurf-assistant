@@ -399,6 +399,11 @@ async function postRoutes(u, body) {
   if (u === "/api/sync/rpc-roundtrip") {
     return require("./sync-rpc").roundtrip({});
   }
+  if (u === "/api/cascade/matrix-roundtrip") {
+    // 会话变更跨侧矩阵(R158): rename/archive 写官方真源→GetAllCascadeTrajectories 复读→还原。
+    if (!ls.ready()) return { ok: false, available: false, note: "官方 LS 不可用, 矩阵未验证 — 如实标注, 不伪称" };
+    return require("./sync-rpc").sessionMatrixRoundtrip(null);
+  }
   if (u === "/api/auth/login") {
     if (_login) return { ok: true, pending: true, url: _login.url || "" };
     const bin = provision.resolveEngine(null, null);

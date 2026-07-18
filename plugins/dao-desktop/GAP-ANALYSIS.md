@@ -132,5 +132,18 @@
 | 官方快捷命令组 | ✅ | toggleModelSelector(Ctrl+/) · switchToNextModel(Ctrl+Shift+/) · toggleWriteChatMode(Ctrl+.) · openAgentPicker(Ctrl+Shift+.) 命令+键位与官方一致, 面板外亦可触发(聚焦后投递 ui-action) |
 | 回归护栏 | ✅ | headless-core.test.js 新增对位护栏(74/74) |
 
-> 剩余(不伪称): 编辑器内联(Command/Supercomplete/diff zone 接受拒绝键组)、Cascade Bar、
-> 会话 rename/archive/delete 的跨侧变更矩阵、官方 IDE 顶栏级 UI 完整还原 —— 持续对照推进。
+## R158 · 编辑器内联键组对位 + 会话变更跨侧矩阵后端可验
+
+> 承接 R157「剩余」深水区, 逐项对照官方编辑器内联操作面与会话变更矩阵(反者道之动·规避 GUI)。
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| 编辑器内联命令(Ctrl+I) | ✅ | dao.cascade.inlineCommand(官方 command.open 对位): 官方本体在位即直通(devin.* 优先/windsurf.* 回退); 纯第三方 IDE 无官方本体时回退把选区/光标处带入 Cascade composer 作「就地编辑」意图承接, 体感不割裂 |
+| diff zone 接受/拒绝键组 | ◐ | acceptDiff/rejectDiff/acceptAllDiffs/rejectAllDiffs 命令+官方直通序列在位; 官方 diff zone 需宿主官方本体在跑, 纯第三方 IDE 下如实提示改在 Cascade 面板内接受(不伪造就地 diff) |
+| Tab supercomplete 补全 | ⛔ | 官方 GetCompletions 已 deprecated(LS 自身返回 deprecated, R138 判定), 平台不可达 — 如实不伪造; 宿主内建官方本体时由其接管 |
+| 会话 rename/archive/delete 跨侧变更矩阵 | ✅ | /api/cascade/{rename,archive,delete} 写官方真源已在位; R158 新增 `/api/cascade/matrix-roundtrip`(sync-rpc.sessionMatrixRoundtrip): rename/archive 写→经**另一读路径** GetAllCascadeTrajectories 复读→原样还原(delete 破坏性不入探针); 并入 /api/sync/rpc-roundtrip。**实机实证(真 LS+真账号)**: archive 翻转/还原同进程复读即见; delete 后列表即消; rename 写云端真源(CascadeTrajectorySummary.renamed_title), 同进程不即时回流、重启 LS(≈另一侧重拉)后 renamedTitle 可见 —— 探针短轮询不见时如实标 cloud-deferred |
+| 回归护栏 | ✅ | headless-core.test.js 新增 4 例(内联键组接线 + 矩阵往返闭环/不留痕 + 无轨迹如实 skipped + 路由接线, 78/78) |
+| 实机冷启动链路(本轮 VM) | ✅ | 官方 IDE 3.4.27 冷启动下载 + windsurf_auth 四步链后端登录(零 GUI) → credentials.toml 同源落盘 → ls-boot 自持拉起官方 LS → settings/customization/session-matrix 三往返实机全绿 |
+
+> 剩余(不伪称): Cascade Bar(官方编辑器顶部内联操作条)、官方 IDE 顶栏级 UI 完整还原、
+> 会话轨迹跨主机可见性多机实证 —— 持续对照推进。

@@ -2110,3 +2110,57 @@ test("parity: Agent 窗口互切与官方快捷命令组接线在位", () => {
   const sb = fs.readFileSync(path.join(CASCADE, "status-bar.js"), "utf8");
   assert.ok(sb.includes("dao.cascade.toggleAgentWindow"), "状态栏应有 Agent 模式一键互切项");
 });
+
+// R158 · 编辑器内联键组对位: 命令/键位登记 + 官方直通序列 + 接线在位。
+test("parity: 编辑器内联键组(inlineCommand/diff accept·reject)登记与接线在位", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const cmds = pkg.contributes.commands.map((c) => c.command);
+  for (const c of ["dao.cascade.inlineCommand", "dao.cascade.acceptDiff", "dao.cascade.rejectDiff",
+    "dao.cascade.acceptAllDiffs", "dao.cascade.rejectAllDiffs"])
+    assert.ok(cmds.includes(c), c + " 应登记为命令");
+  const kb = pkg.contributes.keybindings;
+  const ic = kb.find((k) => k.command === "dao.cascade.inlineCommand") || {};
+  assert.strictEqual(ic.key, "ctrl+i", "内联命令官方 Ctrl+I 对位");
+  assert.strictEqual(ic.when, "editorTextFocus", "内联命令仅编辑器聚焦时触发");
+  const mod = require(path.join(CASCADE, "inline-command.js"));
+  // 官方候选序列: devin.* 优先于 windsurf.*(反者道之动·官方直通)。
+  assert.ok(mod.OFFICIAL.inlineCommand[0].startsWith("devin."), "内联命令首候选应为 devin.*");
+  assert.ok(mod.OFFICIAL.acceptDiff.some((c) => c.startsWith("windsurf.")), "acceptDiff 应含 windsurf.* 回退");
+  assert.strictEqual(typeof mod.register, "function", "应导出 register");
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('require("./dao-cascade/inline-command").register'), "extension 应注册内联键组");
+});
+
+// R158 · 会话变更跨侧矩阵 RPC 往返: 桩 LS 验证 rename/archive 写→复读→还原闭环, 且不留痕。
+test("sync-rpc.sessionMatrixRoundtrip: rename/archive 写→GetAllCascadeTrajectories 复读→原样还原", async () => {
+  const rpc = require(path.join(CASCADE, "sync-rpc.js"));
+  const store = { cid7: { cascadeId: "cid7", name: "原名", isArchived: false } };
+  const calls = [];
+  const stub = { call: async (m, b) => {
+    calls.push(m);
+    if (m === "GetAllCascadeTrajectories") return { trajectorySummaries: JSON.parse(JSON.stringify(store)) };
+    if (m === "RenameCascadeTrajectory") { store[b.cascadeId].name = b.name; return {}; }
+    if (m === "ArchiveCascadeTrajectory") { store[b.cascadeId].isArchived = b.isArchived; return {}; }
+    throw new Error("unexpected " + m);
+  } };
+  const r = await rpc.sessionMatrixRoundtrip(stub);
+  assert.strictEqual(r.wrote, true, "改名+归档探针应写入并复读到");
+  assert.strictEqual(r.reverted, true, "两项均应原样还原");
+  assert.ok(r.detail.renamed && r.detail.archived, "复读应见探针值");
+  assert.strictEqual(store.cid7.name, "原名", "改名探针不留痕");
+  assert.strictEqual(store.cid7.isArchived, false, "归档探针不留痕");
+});
+
+test("sync-rpc.sessionMatrixRoundtrip: 无轨迹时如实 skipped(不伪造)", async () => {
+  const rpc = require(path.join(CASCADE, "sync-rpc.js"));
+  const stub = { call: async (m) => (m === "GetAllCascadeTrajectories" ? { trajectorySummaries: {} } : {}) };
+  const r = await rpc.sessionMatrixRoundtrip(stub);
+  assert.strictEqual(r.skipped, true, "无轨迹应标注 skipped");
+});
+
+test("local-api: 会话变更矩阵路由接线在位", () => {
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/cascade/matrix-roundtrip"'), "应挂 POST /api/cascade/matrix-roundtrip");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/cascade/matrix-roundtrip"), "openapi 应登记");
+});
