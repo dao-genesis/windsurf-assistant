@@ -376,3 +376,16 @@
 | 数据 = dao-vsix 自持真源 | ✅ 换源为插件自持真源: 板块页 fetch 同一套 /api/*(与 unified-panel 面板同真源, 一侧写全侧见) |
 | iframe 无法带 header → token 走查询串 | ✅ ?t= 鉴权(/web 同法), 只绑 127.0.0.1, 错 token 401 |
 | 公网穿透(dao-bridge) | 待续轮: 插件版隧道折入后 /shell 即公网可达(与本源同径) |
+
+## R182 · 归一本体拼积木(方向归正) — 原样搬运 dao-one, 零重写
+
+用户纠偏: 不自研任何外壳/UI/新设计, 与 Dao-Windows-Agent 同法 —— 直接把 devin-remote 的
+归一插件本体(dao-vsix 二合一 + Proxy Pro, 即 dao-one)拿过来拼装整合:
+
+| 拼积木法 | 落地 |
+|---|---|
+| 不重写逻辑, 仅装配 | ✅ build.js 直接调用 dao-one 官方装配器(core/dao-one/build.js), vendor-vsix/proxy/flow/bridge 整目录搬运进 vendor-one/ |
+| 原装驱动器 | ✅ dao-one extension.js 逐字节拷入, subContext 锚 vendor-one 原样激活(测试断言字节级一致) |
+| 前端零新造 | ✅ dao-one 全部 contributes(dao-one 容器/wam.panel/dao.cloudPanel/115 命令)打包期原样并入 manifest, 打完还原源 package.json |
+| 道并行而不相悖 | ✅ 宿主已装 dao-one/dao-vsix/rt-flow 即跳过内置激活, 共用同一 ~/.dao 真源 |
+| 实机验证 | ✅ VS Code 装 1.5.23 → 9920 起(dao-vsix@3.58.11), /shell 归一网页原生可用(主页·六合一, 账号在线, 浏览器套浏览器), 底栏 道Agent Pro/0号/Dao:9920/Cascade Bar 全在 |
