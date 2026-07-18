@@ -155,6 +155,6 @@
 | 会话轨迹跨主机可见性 | ✅(实机实证) | 全新 database_dir + 全新 workspace_id(≈另一台机器同账号冷拉)启动第二个官方 LS: A 侧创建+改名的轨迹在 B 侧 GetAllCascadeTrajectories 立即可见且 renamedTitle=探针值 —— 云端真源跨主机同源同证 |
 | Tab supercomplete | ⛔ | 官方以 devin.prioritized.supercompleteAccept(Tab)/supercompleteEscape(Esc) 由本体内部渲染; 平台 GetCompletions 已 deprecated, 第三方 IDE 无官方本体时不可达 — 如实不伪造; Tab/Esc 全局劫持风险高, 不做回退绑定 |
 | 回归护栏 | ✅ | headless-core.test.js 新增 4 例(六键/键位/config 退让/接线 + 官方 ID 真源一致 + editor/title 顶栏入口 + diffStat 桩聚合与如实 null), 82/82 |
+| 双 LS 同时运行实时互推 | ◐(实机实证边界) | 同账号双官方 LS 并行(独立 database_dir/workspace_id): A 侧新建+改名+归档, B 侧不重启轮询 GetAllCascadeTrajectories 60s 内不可见 —— 官方二进制无轨迹级 Refresh/Sync RPC(strings 实测仅 RefreshCustomization/RefreshMcpServers 等), 轨迹列表为**启动时拉取**语义; 重启/冷拉即见(上行已证)。如实标注: 跨侧同步为 pull-on-(re)start, 非实时推送 |
 
-> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位)、
-> 双 GUI IDE 同时运行的实时互推实证 —— 持续对照推进。
+> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
