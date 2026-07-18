@@ -2619,7 +2619,7 @@ test("R189: RPC 甄别全表与 Share conversation 在位", () => {
   const parity = require(path.join(ROOT, "dao-cascade", "official-parity.js"));
   const g = parity.RPC_GAP_AUDIT;
   assert.strictEqual(Object.keys(g).length, 77, "官方未接入 77 方法逐项归类");
-  const legal = new Set(["ux", "ux-done", "telemetry", "completion", "experiment", "internal", "removed", "deploy"]);
+  const legal = new Set(["ux", "ux-done", "telemetry", "completion", "experiment", "internal", "removed", "unimpl", "deploy"]);
   for (const [k, v] of Object.entries(g)) assert.ok(legal.has(v), k + " 归类合法");
   assert.strictEqual(g.CreateTrajectoryShare, "ux-done", "分享链接已实装");
   assert.strictEqual(g.GetConversationTags, "removed", "后端实测 removed");
@@ -2638,4 +2638,13 @@ test("R190: GetTranscription 语音转写链路在位", () => {
   assert.ok(src.includes('type:"transcribe"') && src.includes('"transcribed"'), "webview↔host 桥接在位");
   assert.ok(src.includes("MediaRecorder"), "录音路径在位");
   assert.ok(src.includes("fallbackSR"), "Web Speech 回退在位");
+});
+
+// R191 · RPC 甄别后端实测再校准: unimpl/removed 以 LS 真实回应为准。
+test("R191: RPC 甄别实测校准在位", () => {
+  const g = require(path.join(ROOT, "dao-cascade", "official-parity.js")).RPC_GAP_AUDIT;
+  assert.strictEqual(g.SetPinnedContext, "unimpl");
+  assert.strictEqual(g.SetPinnedGuideline, "unimpl");
+  assert.strictEqual(g.GetCascadeModelConfigs, "unimpl");
+  assert.strictEqual(g.GetKnowledgeBaseItemsForTeam, "removed");
 });
