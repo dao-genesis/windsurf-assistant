@@ -10,10 +10,10 @@
 
 ## 当前基线
 
-- 版本：v1.5.15；测试 89/89（`DAO_NO_LS_BOOT=1 node --test test/*.test.js`）；`node build.js` 构建通过。
-- PR #91–#104（R158–R172）全部 CI 全绿并已合入 main（均经 GitHub API `merged: true` 权威确认）。
+- 版本：v1.5.32；测试 106/106（`DAO_NO_LS_BOOT=1 node --test test/*.test.js`）；`node build.js` 构建通过。
+- PR #91–#126（R158–R194）全部 CI 全绿并已合入 main（均经 GitHub API `merged: true` 权威确认）。
 - 官方真源：`/home/ubuntu/devin-desktop/Devin`（LS 3.4.27，`resources/app/extensions/windsurf/bin/language_server_linux_x64`）。
-- 全量差距与实证记录见 `GAP-ANALYSIS.md`（R158–R172 逐轮入档）。
+- 全量差距与实证记录见 `GAP-ANALYSIS.md`（R158–R195 逐轮入档）。
 
 ## 已实机实证（同步语义三分野）
 
@@ -28,9 +28,9 @@
 
 ## 未实现 / 如实边界（下一个 Agent 的主攻方向）
 
-1. **跨端实时推送不存在**：5 个官方 server-streaming RPC（`StreamCascade*`/`StreamUserTrajectoryReactiveUpdates` 等）建流 200 但只收初始空帧，本地/跨 LS 写操作均无事件（R168）。可继续逆向 `StreamCascadePanelReactiveUpdates`/`StreamCascadeReactiveUpdates` 面，区分 panel 内部反应式流与云端同步流。
-2. **MCP 双 LS 完整闭环未收口**（R172 PARTIAL）：最小独立 LS harness 的 `GetMcpServerStates` 恒为 `{}`（MCP 面未初始化）。需找官方 IDE 启动该面的真实初始化条件（启动参数/workspace/host RPC），不凭猜测补参数。
-3. **Memories 无创建 RPC**：`UpdateCascadeMemory` 只能更新已存在 ID（不存在 ID 报 `memory with id ... does not exist`）。只有在官方 bundle 里发现真实创建路径后才可做写实证。
+1. ~~跨端实时推送~~ **已收口（R195）**：官方 workbench/extension 两 bundle 调用点审计——`StreamCascadeReactiveUpdates`/`StreamUserTrajectoryReactiveUpdates`/`StreamCascadePanelReactiveUpdates` 均零调用点（仅 proto/service 定义），官方自身不消费跨端实时推送；插件 pull-on-refresh 即官方同态（插件把 PanelReactiveUpdates 用作变更信号系超官方增强）。
+2. ~~MCP 双 LS 闭环~~ **已收口（R195）**：生产 ls-boot 路径（`--codeium_dir`/`--database_dir`/`--workspace_id` 全参 + AddTrackedWorkspace）后端实测哨兵 server `GetMcpServerStates` 即见 `states.len=1`——R172 的 A 侧 `{}` 确证为最小 harness 局限而非产品缺口，生产路径 MCP 面初始化闭环。
+3. ~~Memories 创建~~ **已收口（R195）**：官方 bundle 反提——memory 面仅 `updateCascadeMemory`/`deleteCascadeMemory` 调用点，无任何创建路径（memory 由 Cascade 代理运行产生）；插件 update/delete 已同位（local-api /api/memories/*），官方等价面齐平。
 4. **官方 UI 视觉 1:1**：GUI 层对照（双 IDE 并行全 UI 一致性）尚未做，需实机界面实测。
 5. **官方不可达能力保持如实标注**：VS Code 原生标题栏重写、Tab supercomplete（官方 RPC 已 deprecated）、Lifeguard 检查面板原生渲染、完整 ACP 管理面板写操作。
 
