@@ -2,6 +2,24 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.355 · 提示缓存命中率根治·对照 Anthropic/OpenAI 官方做法(反者道之动·节用而爱人)
+: 用户反馈外接 API 反代整体缓存命中率仍非常低。对照市面/官方缓存底层反向提炼两处根因(现有
+  实现已钉 system/末位工具/末条消息三断点, 但缺两项官方标准做法):
+  ① **Anthropic 缓存默认 5min TTL 断档** —— 用户跑 SWE-1.6 **Slow** + agentic 多工具轮,
+     单轮推理/工具往返常超 5 分钟 → 上一轮写入的缓存前缀在下一轮请求前已过期 → 每轮重写从不
+     读命中(命中率≈0)。正法(对照 Anthropic 官方扩展缓存): `adapters.js` cache_control 支持
+     `ttl:"1h"`, 三断点(system/工具/末消息)统一带 TTL, 且 1h 时 beta 头必带
+     `extended-cache-ttl-2025-04-11`(缺则 ttl 被忽略仍 5min 断档); 默认 1h 拉满 agentic 命中,
+     `provCfg.cacheTtl="5m"` 或 `initAdapters({cacheTtl})` 可改; 显式 5m 省略 ttl 字段兼容旧网关。
+  ② **OpenAI/DeepSeek 自动前缀缓存缺 `prompt_cache_key`** —— 不钉键则同对话请求被负载均衡到
+     不同缓存节点 → 前缀虽同却命中异节点缓存 → 命中率下降。正法(对照 OpenAI 官方): 新增
+     `promptCacheKey(messages,tools)` 取**稳定前缀签名**(system+工具名·跨轮不变·绝不掺易变尾部),
+     openai-chat 默认路径与 openai-responses 均下发 `prompt_cache_key`; `provCfg.promptCacheKey=false`
+     可关(极少数严格网关不容未知字段)。
+  守正: 键须「同前缀恒同」——实测跨轮(尾部变)键不变、前缀(system)变则键变, 掺易变尾部反破坏路由。
+  自检 L4.5 新增 7 例(1h 三断点 TTL / extended beta 头 / 显式 5m 兼容 / prompt_cache_key 稳定性
+  与前缀敏感 / dao_router 下发)。dao-test 335 passing。
+
 v9.9.353 · 官方直通 502 根治·收官(stale 优先于配额·实证反代真通)
 : 承接 v9.9.352——实机(Devin Desktop · 免费 SWE-1.6 Slow)复现暴露残缺: 官方以 Connect
   `code=failed_precondition` 回陈旧会话错, 而旧 `exhausted` 启发式含 `precondition` 关键字
