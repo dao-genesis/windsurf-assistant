@@ -203,4 +203,13 @@
 | 配置开关 | ✅ | dao.truthWatch.enabled(默认开), 变更即热起停 |
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例(守望点/去抖活体桩/开关/接线), 87/87; v1.5.13 构建通过 |
 
+## R167 · 诊断/轨迹调试对位(官方 RPC 实机已证)
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| dao.cascade.downloadDiagnostics | ✅ | 官方 devin/windsurf.downloadDiagnostics 在位直通; 否则 GetDebugDiagnostics RPC(实机 OK, languageServerDiagnostics.logs 真源)落 JSON 文件 |
+| GET /api/diagnostics/ls | ✅ | 官方 GetDebugDiagnostics 直取 — 官方诊断包的后端读路径 |
+| GET /api/trajectory/debug | ✅ | 官方 GetUserTrajectoryDebug 直取(实机 OK, mainline 轨迹元数据) |
+| 回归护栏 | ✅ | headless-core.test.js 新增 1 例, 88/88; v1.5.14 构建通过 |
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。

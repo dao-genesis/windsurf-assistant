@@ -77,6 +77,8 @@ const ROUTES = [
   { path: "/api/lifeguard/config", method: "get", summary: "Lifeguard 引擎配置(官方 GetLifeguardConfig 直取): 启用态/模型 — 官方 Ctrl+U 代码守护的后端读路径" },
   { path: "/api/acp/registries", method: "get", summary: "ACP 代理注册表(官方 GetAllAcpRegistries 直取, registryJson 解包): 官方 openAcpLocalRegistry 的后端读路径" },
   { path: "/api/parity/commands", method: "get", summary: "官方命令/键位 1:1 覆盖审计(R161): 以官方 3.4.27 package.json 真源为锚, 64 命令去偶 33 基名逐条归类(covered/passthrough/na/pending, 如实不伪造) + 12 键 1:1 键位表" },
+  { path: "/api/diagnostics/ls", method: "get", summary: "LS 诊断(R167): 官方 GetDebugDiagnostics RPC 直取 — 官方 downloadDiagnostics 的后端读路径(实机已证)" },
+  { path: "/api/trajectory/debug", method: "get", summary: "用户轨迹调试视图(R167): 官方 GetUserTrajectoryDebug RPC 直取(mainline 轨迹元数据, 实机已证)" },
   { path: "/api/customizations/refresh", method: "post", summary: "定制类轻量刷新(R165): 官方 RefreshCustomization RPC — 不重启 LS 即重读 Rules/Workflows/Skills 文件真源, 跨 IDE 改动即见(实机已证)" },
   { path: "/api/mcp/refresh", method: "post", summary: "MCP 轻量刷新(R165): 官方 RefreshMcpServers RPC — 不重启 LS 即重读 mcp_config.json 真源并重连(实机已证)" },
   { path: "/api/cascade/refresh", method: "post", summary: "跨端会话重拉(R163): 自持 LS 重启即重拉云端真源(pull-on-restart, R160 实证语义) — 另一侧新建/改名/归档即见; 共生官方 LS 不代为重启(如实 mode 区分)" },
