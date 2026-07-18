@@ -80,6 +80,12 @@ async function activate(context) {
     log("✓ 编辑器内联键组就位 (inlineCommand/diff accept·reject)");
   } catch (e) { log("✗ 编辑器内联键组注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②b⁗ Cascade Bar(dao.cascade.cascadeBar): 官方 diff zone 操作条对位(hunk 导航/接受/拒绝)。
+  try {
+    require("./dao-cascade/cascade-bar").register(context, log);
+    log("✓ Cascade Bar 就位 (六键 + 状态栏段)");
+  } catch (e) { log("✗ Cascade Bar 注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ②c Proxy Pro 独立面板(dao.proxyPro): 与 dao-proxy-pro 独立插件面板对位,
   // 插件自持渠道/路由(~/.dao/proxy-channels.json), 与 dao-vsix 的 ~/.codeium/dao-byok 隔离。
   try {

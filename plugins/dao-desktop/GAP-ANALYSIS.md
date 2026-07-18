@@ -145,5 +145,16 @@
 | 回归护栏 | ✅ | headless-core.test.js 新增 4 例(内联键组接线 + 矩阵往返闭环/不留痕 + 无轨迹如实 skipped + 路由接线, 78/78) |
 | 实机冷启动链路(本轮 VM) | ✅ | 官方 IDE 3.4.27 冷启动下载 + windsurf_auth 四步链后端登录(零 GUI) → credentials.toml 同源落盘 → ls-boot 自持拉起官方 LS → settings/customization/session-matrix 三往返实机全绿 |
 
-> 剩余(不伪称): Cascade Bar(官方编辑器顶部内联操作条)、官方 IDE 顶栏级 UI 完整还原、
-> 会话轨迹跨主机可见性多机实证 —— 持续对照推进。
+## R159 · Cascade Bar / 顶栏级入口 / 跨主机可见性实证
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| Cascade Bar(diff zone 操作条) | ✅ | dao-cascade/cascade-bar.js: 六键(hunk 上/下导航 + 当前 hunk 接受/拒绝 + 本文件全收/全拒)与官方键位 1:1(Alt+J/K · Alt+Enter · Alt+Shift+Backspace · Ctrl+Enter · Ctrl+Shift+Backspace); 命令 ID 为官方 3.4.27 package.json 键位真源实测提取(devin.prioritized.cascade*); 官方本体在位即直通, 不在位如实瞬时提示(不伪造 diff zone); 状态栏常显段以官方真源 diff 水位(diffLinesAdded/Removed)常显 + 点击开六键面板; 键位可经 dao.cascadeBar.keys 退让 |
+| 官方候选命令 ID 纠偏 | ✅ | R158 猜测 ID(devin.acceptDiff 等)全量替换为官方真源实测 ID(devin.prioritized.cascadeAcceptFocusedHunk/…AllInFile 等); inlineCommand 首候选 devin.prioritized.command.open 实测吻合 |
+| 顶栏级入口对位 | ✅ | editor/title 挂 Cascade 开关($(comment-discussion))/Cascade Bar($(diff))/Agent 窗口切换($(layout-panel)) —— 官方顶栏可发现性在第三方 IDE 的原生等价位(VS Code 扩展 API 上限即 editor/title+状态栏, 如实不伪称改写标题栏) |
+| 会话轨迹跨主机可见性 | ✅(实机实证) | 全新 database_dir + 全新 workspace_id(≈另一台机器同账号冷拉)启动第二个官方 LS: A 侧创建+改名的轨迹在 B 侧 GetAllCascadeTrajectories 立即可见且 renamedTitle=探针值 —— 云端真源跨主机同源同证 |
+| Tab supercomplete | ⛔ | 官方以 devin.prioritized.supercompleteAccept(Tab)/supercompleteEscape(Esc) 由本体内部渲染; 平台 GetCompletions 已 deprecated, 第三方 IDE 无官方本体时不可达 — 如实不伪造; Tab/Esc 全局劫持风险高, 不做回退绑定 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 4 例(六键/键位/config 退让/接线 + 官方 ID 真源一致 + editor/title 顶栏入口 + diffStat 桩聚合与如实 null), 82/82 |
+
+> 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位)、
+> 双 GUI IDE 同时运行的实时互推实证 —— 持续对照推进。

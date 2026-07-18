@@ -2164,3 +2164,70 @@ test("local-api: 会话变更矩阵路由接线在位", () => {
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/cascade/matrix-roundtrip"), "openapi 应登记");
 });
+
+// R159 · Cascade Bar 对位: 官方 3.4.27 键位真源实测提取的命令 ID + 键位登记 + 接线在位。
+test("cascade-bar: 六键命令/官方真源 ID/键位登记与接线在位", () => {
+  const mod = require(path.join(CASCADE, "cascade-bar.js"));
+  // 官方命令 ID 为 3.4.27 package.json 实测提取(非猜测)。
+  assert.strictEqual(mod.OFFICIAL.acceptAllInFile[0], "devin.prioritized.cascadeAcceptAllInFile");
+  assert.strictEqual(mod.OFFICIAL.focusNextHunk[0], "devin.prioritized.cascadeFocusNextHunk");
+  assert.strictEqual(mod.OFFICIAL.rejectFocusedHunk[0], "devin.prioritized.cascadeRejectFocusedHunk");
+  for (const k of Object.keys(mod.OFFICIAL))
+    assert.ok(mod.OFFICIAL[k].some((c) => c.startsWith("windsurf.")), k + " 应含 windsurf.* 回退");
+  assert.strictEqual(mod.ITEMS.length, 6, "操作面板应为六键");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const cmds = pkg.contributes.commands.map((c) => c.command);
+  for (const c of ["dao.cascade.cascadeBar", "dao.cascade.nextDiffHunk", "dao.cascade.prevDiffHunk",
+    "dao.cascade.acceptFocusedHunk", "dao.cascade.rejectFocusedHunk",
+    "dao.cascade.acceptAllInFile", "dao.cascade.rejectAllInFile"])
+    assert.ok(cmds.includes(c), c + " 应登记为命令");
+  // 官方键位 1:1(Alt+J/K · Alt+Enter · Ctrl+Enter 等), 且可经 config 开关退让。
+  const kb = pkg.contributes.keybindings;
+  const key = (c) => (kb.find((k) => k.command === c) || {});
+  assert.strictEqual(key("dao.cascade.nextDiffHunk").key, "alt+j");
+  assert.strictEqual(key("dao.cascade.prevDiffHunk").key, "alt+k");
+  assert.strictEqual(key("dao.cascade.acceptFocusedHunk").key, "alt+enter");
+  assert.strictEqual(key("dao.cascade.acceptAllInFile").key, "ctrl+enter");
+  assert.strictEqual(key("dao.cascade.rejectAllInFile").key, "shift+ctrl+backspace");
+  for (const c of ["dao.cascade.nextDiffHunk", "dao.cascade.acceptAllInFile"])
+    assert.ok(key(c).when.includes("config.dao.cascadeBar.keys"), c + " 键位应受 config 开关约束");
+  assert.ok(pkg.contributes.configuration.properties["dao.cascadeBar.keys"], "应登记 dao.cascadeBar.keys 配置");
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('require("./dao-cascade/cascade-bar").register'), "extension 应注册 Cascade Bar");
+});
+
+// R159 · inline-command 官方候选 ID 应与官方键位真源一致(纠偏 R158 的猜测 ID)。
+test("inline-command: 官方候选 ID 与 3.4.27 键位真源一致", () => {
+  const mod = require(path.join(CASCADE, "inline-command.js"));
+  assert.strictEqual(mod.OFFICIAL.inlineCommand[0], "devin.prioritized.command.open");
+  assert.strictEqual(mod.OFFICIAL.acceptDiff[0], "devin.prioritized.cascadeAcceptFocusedHunk");
+  assert.strictEqual(mod.OFFICIAL.acceptAllDiffs[0], "devin.prioritized.cascadeAcceptAllInFile");
+  assert.strictEqual(mod.OFFICIAL.rejectAllDiffs[0], "devin.prioritized.cascadeRejectAllInFile");
+});
+
+// R159 · 顶栏级对位: editor/title 挂 Cascade 开关/Cascade Bar/Agent 窗口切换(官方顶栏可发现性)。
+test("editor/title: 顶栏级入口(Cascade/Cascade Bar/Agent 窗口)登记在位", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const et = (pkg.contributes.menus["editor/title"] || []).map((m) => m.command);
+  for (const c of ["dao.cascade.open", "dao.cascade.cascadeBar", "dao.cascade.toggleAgentWindow"])
+    assert.ok(et.includes(c), c + " 应挂 editor/title");
+  const icon = (c) => (pkg.contributes.commands.find((x) => x.command === c) || {}).icon;
+  assert.ok(icon("dao.cascade.open") && icon("dao.cascade.cascadeBar"), "顶栏入口应带 icon");
+});
+
+// R159 · 桩验证 cascade-bar.diffStat: 官方真源 diff 水位聚合(LS 未就绪时如实 null)。
+test("cascade-bar.diffStat: 桩 ls-bridge 聚合 diff 行数/未就绪如实 null", async () => {
+  const mod = require(path.join(CASCADE, "cascade-bar.js"));
+  const lsPath = path.join(CASCADE, "ls-bridge.js");
+  const real = require.cache[require.resolve(lsPath)];
+  require.cache[require.resolve(lsPath)] = { exports: { ready: () => true, call: async () => ({
+    trajectorySummaries: { a: { diffLinesAdded: 3, diffLinesRemoved: 1 }, b: { diffLinesAdded: 2 } } } ) } };
+  try {
+    const st = await mod.diffStat();
+    assert.deepStrictEqual(st, { trajectories: 2, diffLinesAdded: 5, diffLinesRemoved: 1 });
+    require.cache[require.resolve(lsPath)] = { exports: { ready: () => false } };
+    assert.strictEqual(await mod.diffStat(), null, "LS 未就绪应如实 null");
+  } finally {
+    if (real) require.cache[require.resolve(lsPath)] = real; else delete require.cache[require.resolve(lsPath)];
+  }
+});
