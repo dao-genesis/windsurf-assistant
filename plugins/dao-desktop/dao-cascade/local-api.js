@@ -402,6 +402,21 @@ async function postRoutes(u, body) {
   if (u === "/api/sync/rpc-roundtrip") {
     return require("./sync-rpc").roundtrip({});
   }
+  if (u === "/api/cascade/refresh") {
+    // 跨端会话重拉(R163): 官方 LS 轨迹列表为 pull-on-(re)start 语义(R160 实机实证),
+    // 自持 LS 可重启即重拉云端真源; 共生官方 LS 不可代为重启 — 如实区分。
+    const boot = require("./ls-boot");
+    if (!boot.alive()) {
+      return { ok: false, refreshed: false, mode: "symbiotic-or-none",
+        note: "当前无自持 LS(共生官方 LS 或未接): 官方侧由其 IDE 自身重载刷新; 插件不代杀官方进程 — 如实标注" };
+    }
+    const before = await ls.call("GetAllCascadeTrajectories", {}).then((r) => Object.keys(r.trajectorySummaries || {}).length).catch(() => null);
+    boot.stop();
+    await boot.boot({ log: () => {} });
+    const after = await ls.call("GetAllCascadeTrajectories", {}).then((r) => Object.keys(r.trajectorySummaries || {}).length);
+    return { ok: true, refreshed: true, mode: "selfhost-restart", trajectoriesBefore: before, trajectoriesAfter: after,
+      note: "自持 LS 重启重拉云端真源(pull-on-restart, R160 实证语义) — 另一侧(官方 IDE/另一机)的新建/改名/归档即见" };
+  }
   if (u === "/api/cascade/matrix-roundtrip") {
     // 会话变更跨侧矩阵(R158): rename/archive 写官方真源→GetAllCascadeTrajectories 复读→还原。
     if (!ls.ready()) return { ok: false, available: false, note: "官方 LS 不可用, 矩阵未验证 — 如实标注, 不伪称" };

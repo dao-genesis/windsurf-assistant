@@ -153,13 +153,31 @@ function register(context, log) {
       () => vscode.env.openExternal(vscode.Uri.parse(url)));
   };
 
+  // 跨端会话重拉(R163): 官方轨迹列表 pull-on-(re)start 语义(R160 实证) — 自持 LS 重启即重拉云端真源。
+  const refreshSessions = async () => {
+    const boot = require("./ls-boot");
+    if (!boot.alive()) return void vscode.window.showInformationMessage("当前接官方共生 LS: 官方侧自身重载即刷新, 插件不代杀官方进程 — 如实标注");
+    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "重拉云端会话(自持 LS 重启)…" }, async () => {
+      boot.stop();
+      await boot.boot({ log: () => {} });
+    });
+    try {
+      const ls = require("./ls-bridge");
+      const r = await ls.call("GetAllCascadeTrajectories", {});
+      const n = Object.keys((r && r.trajectorySummaries) || {}).length;
+      vscode.window.showInformationMessage("已重拉云端真源: " + n + " 个会话(另一侧新建/改名/归档即见)");
+    } catch (e) { vscode.window.showWarningMessage("重拉后读取失败: " + (e && e.message)); }
+    l("refreshSessions: 自持 LS 重启重拉完成");
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand("dao.cascade.importRulesFromCursor", importRules),
     vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser),
     vscode.commands.registerCommand("dao.cascade.lifeguardCheck", lifeguardCheck),
-    vscode.commands.registerCommand("dao.cascade.acpRegistry", acpRegistry)
+    vscode.commands.registerCommand("dao.cascade.acpRegistry", acpRegistry),
+    vscode.commands.registerCommand("dao.cascade.refreshSessions", refreshSessions)
   );
-  l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry)");
+  l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions)");
 }
 
 module.exports = { MANIFEST, KEY_PARITY, audit, register };

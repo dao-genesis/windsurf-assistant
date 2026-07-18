@@ -2279,3 +2279,17 @@ test("official-parity R162: lifeguardCheck/acpRegistry 命令+Ctrl+U 键位+API 
   const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
   assert.ok(api.includes('u === "/api/lifeguard/config"') && api.includes('u === "/api/acp/registries"'), "后端读路径应在位");
 });
+
+// R163 · 跨端会话重拉: pull-on-restart 语义落地为命令+API, 共生/自持如实分流。
+test("official-parity R163: refreshSessions 命令 + /api/cascade/refresh 分流在位", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "official-parity.js"), "utf8");
+  assert.ok(src.includes('"dao.cascade.refreshSessions"'), "命令应注册");
+  assert.ok(src.includes("boot.alive()"), "应先辨自持/共生");
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/cascade/refresh"'), "POST /api/cascade/refresh 应在位");
+  assert.ok(api.includes('"symbiotic-or-none"') && api.includes('"selfhost-restart"'), "共生不代杀/自持重启两态应如实区分");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.refreshSessions"), "package.json 应登记命令");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/cascade/refresh"), "openapi 应登记");
+});

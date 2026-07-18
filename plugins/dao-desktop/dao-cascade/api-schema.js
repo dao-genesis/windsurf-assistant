@@ -77,6 +77,7 @@ const ROUTES = [
   { path: "/api/lifeguard/config", method: "get", summary: "Lifeguard 引擎配置(官方 GetLifeguardConfig 直取): 启用态/模型 — 官方 Ctrl+U 代码守护的后端读路径" },
   { path: "/api/acp/registries", method: "get", summary: "ACP 代理注册表(官方 GetAllAcpRegistries 直取, registryJson 解包): 官方 openAcpLocalRegistry 的后端读路径" },
   { path: "/api/parity/commands", method: "get", summary: "官方命令/键位 1:1 覆盖审计(R161): 以官方 3.4.27 package.json 真源为锚, 64 命令去偶 33 基名逐条归类(covered/passthrough/na/pending, 如实不伪造) + 12 键 1:1 键位表" },
+  { path: "/api/cascade/refresh", method: "post", summary: "跨端会话重拉(R163): 自持 LS 重启即重拉云端真源(pull-on-restart, R160 实证语义) — 另一侧新建/改名/归档即见; 共生官方 LS 不代为重启(如实 mode 区分)" },
   { path: "/api/cascade/matrix-roundtrip", method: "post", summary: "会话变更跨侧矩阵活体验证(R158): rename/archive 写官方真源→经 GetAllCascadeTrajectories 复读→原样还原(跨侧同源同证; delete 破坏性不入探针); LS 不可用时如实返回 available:false" },
   { path: "/api/pool/capture", method: "post", summary: "收录当前登录号入池", b: [{ name: "account", desc: "缺省取 /api/account 视图" }] },
   { path: "/api/pool/switch", method: "post", summary: "切换到池内账号(写 credentials.toml, 首次自动备份官方原态)", b: [{ name: "email", req: true }] },
