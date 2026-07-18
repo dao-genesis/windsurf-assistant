@@ -184,4 +184,13 @@
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例(命令/分流/路由/登记), 85/85; v1.5.11 构建通过 |
 | 端到端实机实证(R164) | ✅ | A 侧独立官方 LS(全新 db/workspace)StartCascade+改名探针 → B 侧插件自持 LS 启动即见(pull-on-start), refresh 重启后仍见且 renamedTitle=探针值(probe-match: true) —— 跨端会话同步全链路实机闭环 |
 
+## R165 · 定制类/MCP 轻量刷新(官方 Refresh RPC 实机已证)
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| dao.cascade.refreshCustomizations | ✅ | 官方 RefreshCustomization RPC(实机 OK {}): 不重启 LS 即重读 Rules/Workflows/Skills 文件真源 — 跨 IDE 改动即见 |
+| dao.cascade.refreshMcp | ✅ | 官方 RefreshMcpServers RPC(实机 OK {}): 不重启 LS 即重读 mcp_config.json 真源并重连 MCP 服务 |
+| 后端路径 | ✅ | POST /api/customizations/refresh、POST /api/mcp/refresh; openapi 登记 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 1 例(接线/路由/登记), 86/86; v1.5.12 构建通过 |
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。

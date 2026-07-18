@@ -170,14 +170,28 @@ function register(context, log) {
     l("refreshSessions: 自持 LS 重启重拉完成");
   };
 
+  // 定制类/MCP 轻量刷新(R165): 官方 RefreshCustomization/RefreshMcpServers RPC(实机已证) — 不重启 LS
+  // 即重读 Rules/Workflows/Skills/MCP 文件真源, 跨 IDE 改动即见。
+  const refreshVia = (rpcName, label) => async () => {
+    try {
+      const ls = require("./ls-bridge");
+      if (!ls.ready()) throw new Error("LS 未就绪");
+      await ls.call(rpcName, {});
+      vscode.window.setStatusBarMessage("$(sync) " + label + " 已重读真源(" + rpcName + ")", 2500);
+      l(rpcName + " 完成");
+    } catch (e) { vscode.window.showWarningMessage(label + " 刷新失败: " + (e && e.message)); }
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand("dao.cascade.importRulesFromCursor", importRules),
     vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser),
     vscode.commands.registerCommand("dao.cascade.lifeguardCheck", lifeguardCheck),
     vscode.commands.registerCommand("dao.cascade.acpRegistry", acpRegistry),
-    vscode.commands.registerCommand("dao.cascade.refreshSessions", refreshSessions)
+    vscode.commands.registerCommand("dao.cascade.refreshSessions", refreshSessions),
+    vscode.commands.registerCommand("dao.cascade.refreshCustomizations", refreshVia("RefreshCustomization", "Rules/Workflows/Skills")),
+    vscode.commands.registerCommand("dao.cascade.refreshMcp", refreshVia("RefreshMcpServers", "MCP 服务"))
   );
-  l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions)");
+  l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions/refreshCustomizations/refreshMcp)");
 }
 
 module.exports = { MANIFEST, KEY_PARITY, audit, register };

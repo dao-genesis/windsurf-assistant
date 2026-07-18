@@ -2293,3 +2293,18 @@ test("official-parity R163: refreshSessions 命令 + /api/cascade/refresh 分流
   const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
   assert.ok(schema.includes("/api/cascade/refresh"), "openapi 应登记");
 });
+
+// R165 · 定制类/MCP 轻量刷新: 官方 RefreshCustomization/RefreshMcpServers RPC 接线在位。
+test("official-parity R165: refreshCustomizations/refreshMcp 命令 + API 路由在位", () => {
+  const src = fs.readFileSync(path.join(CASCADE, "official-parity.js"), "utf8");
+  assert.ok(src.includes('refreshVia("RefreshCustomization"') && src.includes('refreshVia("RefreshMcpServers"'), "两 RPC 应经 refreshVia 接线");
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/customizations/refresh"') && api.includes('u === "/api/mcp/refresh"'), "POST 路由应在位");
+  assert.ok(api.includes('ls.call("RefreshCustomization", {})') && api.includes('ls.call("RefreshMcpServers", {})'), "路由应直呼官方 RPC");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const cmds = pkg.contributes.commands.map((c) => c.command);
+  for (const c of ["dao.cascade.refreshCustomizations", "dao.cascade.refreshMcp"])
+    assert.ok(cmds.includes(c), c + " 应登记为命令");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/customizations/refresh") && schema.includes("/api/mcp/refresh"), "openapi 应登记");
+});
