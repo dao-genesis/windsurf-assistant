@@ -74,6 +74,8 @@ const ROUTES = [
   { path: "/api/coexist/flow", method: "get", summary: "跨插件数据流通矩阵: 官方引擎真源=跨插件数据总线(官方IDE/dao-vsix/dao-one/dao-desktop 源同一即流通) + 自持面命名空间隔离" },
   { path: "/api/coexist/roundtrip", method: "post", summary: "跨插件数据流通活体验证: 共享总线写后对侧复读 + 自持面隔离断言", b: [{ name: "only", desc: "限定共享资源 key 数组, 缺省全测" }] },
   { path: "/api/sync/rpc-roundtrip", method: "post", summary: "RPC 层同步活体验证(官方 LS 运行态): Settings(Get/SetUserSettings)/定制类(CreateCustomizationFile↔文件真源↔GetAllWorkflows)/会话变更矩阵 写→复读→还原; LS 不可用时如实返回 available:false" },
+  { path: "/api/lifeguard/config", method: "get", summary: "Lifeguard 引擎配置(官方 GetLifeguardConfig 直取): 启用态/模型 — 官方 Ctrl+U 代码守护的后端读路径" },
+  { path: "/api/acp/registries", method: "get", summary: "ACP 代理注册表(官方 GetAllAcpRegistries 直取, registryJson 解包): 官方 openAcpLocalRegistry 的后端读路径" },
   { path: "/api/parity/commands", method: "get", summary: "官方命令/键位 1:1 覆盖审计(R161): 以官方 3.4.27 package.json 真源为锚, 64 命令去偶 33 基名逐条归类(covered/passthrough/na/pending, 如实不伪造) + 12 键 1:1 键位表" },
   { path: "/api/cascade/matrix-roundtrip", method: "post", summary: "会话变更跨侧矩阵活体验证(R158): rename/archive 写官方真源→经 GetAllCascadeTrajectories 复读→原样还原(跨侧同源同证; delete 破坏性不入探针); LS 不可用时如实返回 available:false" },
   { path: "/api/pool/capture", method: "post", summary: "收录当前登录号入池", b: [{ name: "account", desc: "缺省取 /api/account 视图" }] },
