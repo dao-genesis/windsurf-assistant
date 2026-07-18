@@ -2683,3 +2683,11 @@ test("R196: composer 官方双态占位与 target 行图标化在位", () => {
   assert.ok(src.includes('id="folderName"'), "target 行 SVG 图标化(去 emoji)");
   assert.ok(!src.includes('"📁 "+m.folder'), "emoji 文件夹已替换");
 });
+
+// R197 · 顶栏对位: 工具行 SVG 图标化 + 官方顶栏头像同位账号圆片。
+test("R197: 顶栏工具行 SVG 图标化与账号圆片在位", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  for (const e of ["🔗", "🐞", "📚"]) assert.ok(!src.includes(e), "emoji " + e + " 已替换为 SVG");
+  assert.ok(src.includes('id="acctChip"'), "账号圆片在位");
+  assert.ok(src.includes('ch.textContent=nm.replace'), "已登录首字母渲染在位");
+});
