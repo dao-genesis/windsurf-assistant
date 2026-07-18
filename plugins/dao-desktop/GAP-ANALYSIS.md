@@ -244,4 +244,17 @@
 
 结论: R158–R168 累积的官方对位面在真实官方 LS + 云端真源上全链路可用; 覆盖审计 100%(covered 22 + na 11 如实, pending 0)。
 
+## R170 · 双 LS 并行一致性实机实证(定制类 · 不重启即见)
+
+两个官方 LS **同时运行**(A=独立官方 LS 全新 db/workspace, B=插件自持 LS), 共享落盘真源 + RefreshCustomization:
+
+| 探测 | 结果 |
+|---|---|
+| 共享真源写 workflow 文件 → 双侧各自 RefreshCustomization → 双侧 GetAllWorkflows | ✅ A: true, B: true — 并行同见 |
+| B 侧 CreateCustomizationFile(返 file:// 路径, 内容由调用方落盘)+写文件 → A 侧 Refresh 后 GetAllWorkflows | ✅ B 写 A 见(true) — 反向并行同见 |
+| 与会话轨迹对比 | 定制类(Rules/Workflows/Skills/MCP)为**文件真源+刷新 RPC**语义 → 双 IDE 并行运行时不重启即见(R166 守望自动化); 会话轨迹为云端 pull-on-restart(R160/R168) — 两种语义如实分野 |
+| 探针还原 | ✅ 全部删除+再刷新, 不留痕 |
+
+结论: 双 IDE 并行一致性在定制类数据面实机闭环 —— "两边任何操作一边, 对应一边也都会更新"对文件真源类资源已成立(自动化由 R166 truth-watch 承担); 会话列表类保持如实的重拉语义。
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
