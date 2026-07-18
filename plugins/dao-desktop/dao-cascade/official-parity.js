@@ -136,14 +136,14 @@ const CHAT_CLIENT_KEYS = [
 const RPC_GAP_AUDIT = {
   CreateTrajectoryShare: "ux-done", // 会话分享链接(后端实测: {cascadeId,shareStatus:TEAM}→shareId)
   GetTranscription: "ux-done", // 官方语音转写(后端实测 wav→transcribedText)
-  GetProfileData: "ux", // 需 Devin session token 域鉴权(后端实测: API key requires token authentication)
+  GetProfileData: "ux-done", // 官方同路(登录后 {apiKey}→profilePictureUrl 入账户卡; 官方 extension.js 同 try/catch 静默容错——本账号域后端回 token authentication 亦如官方静默)
   GetKnowledgeBaseItemsForTeam: "removed", // 后端实测: knowledge base feature has been deprecated
   SetPinnedContext: "unimpl", SetPinnedGuideline: "unimpl", // 后端实测: not implemented
-  GetSuggestedContextScopeItems: "ux", // 需工作区文件追踪就绪(实测: relative filepaths must not be empty)
+  GetSuggestedContextScopeItems: "internal", // 官方 3.4.27 workbench/extension 均无调用点(仅 proto 定义); 后端实测 suggestionSources 全枚举仍报 relative filepaths must not be empty(需 LS 内部文件追踪态)
   SubmitBugReport: "ux-done", // 官方 bug 报告(后端实测返回 Slack messageLink)
   GetGithubPullRequestSearchInfo: "removed", // 后端实测: knowledge base feature has been deprecated
   GetCascadeModelConfigs: "unimpl", // 后端实测: unimplemented; use GetUserStatus instead(插件已接 GetUserStatus)
-  RecordChatFeedback: "ux", // legacy chat 域, 需 messageId(插件回合反馈已走云端 RecordCortexFeedback)
+  RecordChatFeedback: "internal", // 官方 3.4.27 无调用点(legacy chat 域仅 proto 定义); 插件回合反馈已走云端 RecordCortexFeedback
   GetChatMessage: "internal", RawGetChatMessage: "internal", // 后端实测 HTTP 415(非 JSON 通道, LS 内部消息格式)
   GetConversationTags: "removed", UpdateConversationTags: "removed", // 后端实测: feature has been removed
   AcceptCompletion: "completion", ProvideCompletionFeedback: "completion", OnEdit: "completion",

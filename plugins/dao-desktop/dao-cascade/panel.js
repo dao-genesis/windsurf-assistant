@@ -36,6 +36,26 @@ const AGENTS = [
     hint: "远端 ACP · wss://app.devin.ai/api/acp/live" },
 ];
 
+// 官方同义 prepareProfilePictureBase64: 宿主侧取回头像转 data URI(webview CSP 只放行 data:)。
+// 失败返回 null(与官方 catch→sentry 静默同语义)。上限 512KB, 防异常大图。
+function profilePictureDataUrl(url) {
+  return new Promise((resolve) => {
+    try {
+      const mod = url.startsWith("https:") ? require("https") : require("http");
+      const req = mod.get(url, { timeout: 8000 }, (res) => {
+        if (res.statusCode !== 200) { res.resume(); return resolve(null); }
+        const mime = String(res.headers["content-type"] || "image/png").split(";")[0];
+        const bufs = []; let n = 0;
+        res.on("data", (b) => { n += b.length; if (n > 512 * 1024) { req.destroy(); resolve(null); } else bufs.push(b); });
+        res.on("end", () => resolve("data:" + mime + ";base64," + Buffer.concat(bufs).toString("base64")));
+        res.on("error", () => resolve(null));
+      });
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+      req.on("error", () => resolve(null));
+    } catch (_) { resolve(null); }
+  });
+}
+
 function nonce() {
   let s = "";
   const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -1534,6 +1554,15 @@ class CascadePanelProvider {
       const ps = u.planStatus || {};
       const pi = ps.planInfo || {};
       const num = (x) => (typeof x === "number" ? x : (x === undefined || x === null ? null : Number(x)));
+      // 官方同路头像: GetProfileData{apiKey}→profilePictureUrl(官方 extension.js 登录后同路同参,
+      // 失败静默容错不阻断账户卡 —— 与官方 try/catch+sentry 同语义)。一次取得即缓存。
+      if (this._profileUrl === undefined) {
+        try {
+          const pd = await ls.call("GetProfileData", { apiKey: ls.apiKey() || "" });
+          const u2 = (pd && pd.profilePictureUrl) || "";
+          this._profileUrl = u2 ? await profilePictureDataUrl(u2) : null;
+        } catch (_) { this._profileUrl = null; }
+      }
       // 官方式团队管控: GetTeamOrganizationalControls → 组织级可用模型标签(先取缓存, 首帧即带标签)
       if (this._teamModelLabels === undefined) {
         try {
@@ -1541,7 +1570,7 @@ class CascadePanelProvider {
           this._teamModelLabels = ((tc && tc.controls) || {}).extensionModelLabels || [];
         } catch (_) { this._teamModelLabels = []; }
       }
-      this._post({ type: "account", name: u.name || "", email: u.email || "",
+      this._post({ type: "account", profileUrl: this._profileUrl || "", name: u.name || "", email: u.email || "",
         plan: pi.planName || "", promptCredits: pi.monthlyPromptCredits || 0,
         flowCredits: pi.monthlyFlowCredits || 0, maxInputTokens: pi.maxNumChatInputTokens || "",
         dailyQuotaPct: num(ps.dailyQuotaRemainingPercent), weeklyQuotaPct: num(ps.weeklyQuotaRemainingPercent),
@@ -2415,6 +2444,7 @@ class CascadePanelProvider {
       `style-src ${webview.cspSource} 'unsafe-inline'`,
       `script-src 'nonce-${n}'`,
       `connect-src 'none'`,
+      `img-src data:`,
     ].join("; ");
     const agentsJson = JSON.stringify(AGENTS);
     return `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"/>
@@ -3227,6 +3257,8 @@ class CascadePanelProvider {
       const p=document.createElement("div"); p.id="acctPop";
       p.style.cssText="position:fixed;left:8px;bottom:34px;z-index:99;background:var(--vscode-editorWidget-background,#252526);border:1px solid var(--vscode-widget-border,#444);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.7;box-shadow:0 4px 12px rgba(0,0,0,.4);";
       const fmtT=(u)=>{ try{ return new Date(u*1000).toLocaleString(); }catch(_){ return ""; } };
+      if(m.profileUrl){ const av=document.createElement("img"); av.src=m.profileUrl; av.alt="";
+        av.style.cssText="width:28px;height:28px;border-radius:50%;display:block;margin-bottom:6px;"; p.appendChild(av); }
       const rows=[["账户",m.name],["邮箱",m.email],["套餐",m.plan],["Prompt 额度/月",m.promptCredits],["Flow 额度/月",m.flowCredits],["输入 token 上限",m.maxInputTokens],
         ["今日配额剩余",(m.dailyQuotaPct===null||m.dailyQuotaPct===undefined)?"":m.dailyQuotaPct+"%"],
         ["本周配额剩余",(m.weeklyQuotaPct===null||m.weeklyQuotaPct===undefined)?"":m.weeklyQuotaPct+"%"],
