@@ -117,6 +117,17 @@ async function activate(context) {
     }
   } catch (e) { log("✗ 本地 API 自启失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②d′ 归一外壳单网页(dao-vsix /shell 同源形态): 一键在浏览器打开, 单网页操作一切板块。
+  try {
+    context.subscriptions.push(vscode.commands.registerCommand("dao.cascade.openShell", async () => {
+      const localApi = require("./dao-cascade/local-api");
+      if (!localApi.running()) await localApi.start(0);
+      const url = "http://127.0.0.1:" + localApi.port() + "/shell?t=" + encodeURIComponent(localApi.token());
+      await vscode.env.openExternal(vscode.Uri.parse(url));
+    }));
+    log("✓ 归一外壳就位 (dao.cascade.openShell → /shell 单网页)");
+  } catch (e) { log("✗ 归一外壳注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ③ 宿主已内建官方本体(codeium.windsurf) → 共生模式, 面板接宿主 LS, 不重复激活。
   const hostCore = vscode.extensions.getExtension("codeium.windsurf");
   const selfId = context.extension && context.extension.id;
