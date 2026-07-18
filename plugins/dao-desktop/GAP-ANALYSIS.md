@@ -270,4 +270,12 @@
 
 同步语义三分野(全部实机实证): ① Settings=云端域**并行即见**(R171); ② 定制类/MCP=文件真源+刷新 RPC, **刷新即见**(R170, truth-watch 自动化); ③ 会话轨迹=云端 **pull-on-restart**(R160/R164/R168, refreshSessions/autoRefresh 承接)。
 
+## R172 · MCP/Memories 域实证(如实边界)
+
+| 探测 | 结果 |
+|---|---|
+| 共享 mcp_config.json 写哨兵 server → B 侧(插件自持 LS 生产路径) RefreshMcpServers → GetMcpServerStates | ✅ 刷新即见(true), 还原不留痕 — MCP 与 R170 定制类同为文件真源+刷新语义 |
+| 同哨兵 → A 侧(最小化独立 LS harness) GetMcpServerStates | ✗ 恒返 {} (重试 5 轮) — 该 harness 未初始化 MCP 面; **harness 局限而非产品缺口**(共享文件真源语义已由 B 侧+R170 证立), 如实标注不伪称双侧 |
+| Memories 创建探针 | ✗ 官方无创建 RPC: UpdateCascadeMemory 仅改既存 id(实测 "memory does not exist"), memory 由 Cascade 代理运行产生 — 后端无法如实伪造探针, 跨端可见性按文件真源语义推定但不声称已证 |
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
