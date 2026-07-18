@@ -193,4 +193,14 @@
 | 后端路径 | ✅ | POST /api/customizations/refresh、POST /api/mcp/refresh; openapi 登记 |
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例(接线/路由/登记), 86/86; v1.5.12 构建通过 |
 
+## R166 · 真源守望(跨 IDE 定制类改动自动即见 · 实机已证)
+
+| 项目 | 当前状态 | 依据 |
+|---|---|---|
+| truth-watch.js | ✅ | fs.watch 官方落盘真源 5 点(mcp_config.json/memories/~/.devin/rules/global_workflows/skills) → 去抖 1.5s → 官方 Refresh RPC(RefreshMcpServers/RefreshCustomization)重读 —— "一侧改动另一侧即见"从手动升级为自动 |
+| 实机实证 | ✅ | 真实官方 LS 运行态: 落探针 .md 到 ~/.devin/rules → `全局 Rules 变更 → RefreshCustomization 已重读真源`(RPC fired OK) |
+| 如实边界 | ◐ | 启动时不存在的真源点不守望(不虚造目录); 会话轨迹为云端 pull-on-restart 语义(R160), 不入本模块 |
+| 配置开关 | ✅ | dao.truthWatch.enabled(默认开), 变更即热起停 |
+| 回归护栏 | ✅ | headless-core.test.js 新增 1 例(守望点/去抖活体桩/开关/接线), 87/87; v1.5.13 构建通过 |
+
 > 剩余(不伪称): 官方标题栏原生改写(VS Code 扩展 API 无此上限, 以 editor/title+状态栏为等价位) —— 持续对照推进。
