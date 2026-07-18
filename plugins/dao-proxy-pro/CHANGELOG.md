@@ -2,11 +2,19 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.358 · 注入即入 custom · 归道即回 invert · 面板闭环(实机验证暴露之缺口)
+: 承 v9.9.357 实机全量验证(Devin Desktop 3.4.27 · invert/custom/passthrough 三态 ·
+  模型路由 /origin/ea/overview · 内网穿透 · 7 项皆过)暴露一处面板可达性缺口:
+  「本源观照」仅有 道(invert)/官(passthrough) 两模式按钮, custom 模式无 UI 入口 ——
+  用户可存自编却无法从面板进入 custom 模式。修法(编辑即真):
+  ① `POST /origin/custom_sp`(编→注入)保存自编即**自动切入 custom 模式**并落盘;
+  ② `DELETE`(归道)清空即自动回 invert —— 注入即真、归道即返, 面板闭环,
+  无需额外模式按钮; 响应体增返 `mode` 供面板即时回显。自检 L4.6 增 2 例。
+  三副本(devin-remote + windsurf plugins/packages)同步, dao-one 重建装配。
+
+
 v9.9.357 · custom 模式 SP 不替换根治·三态归位(invert/passthrough/custom)
-: 承
-
-
-v9.9.356 · 自定义SP隔离替换根治·用户即道(自编平替经藏·不再重复注入阴符经)
+: 承 v9.9.356 · 自定义SP隔离替换根治·用户即道(自编平替经藏·不再重复注入阴符经)
 : 用户反馈: 自定义编写模式下, 用户以自己的新提示词替换后, 实测系统提示里自编文本在最顶、
   而底层《阴符经》仍带了一份(<!-- DAO-ENHANCE --> 后附全经) —— 未能平替。究根溯源:
   custom SP 输出 = 用户自编文本 + realtime/keep 块(<user_information> 等), 这些块本身

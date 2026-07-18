@@ -877,6 +877,16 @@ async function runCustomSPCheck() {
     name: "custom 无自编文本则透传 · 主/副路皆绝不回落经藏注入",
     pass: _noFallback,
   });
+  checks.push({
+    name: "注入自编即自动入 custom 模式 (面板无需额外模式按钮)",
+    pass:
+      srcJs.includes("注入自编 → 自动入 custom 模式") &&
+      srcJs.includes('SP_MODE = "custom"'),
+  });
+  checks.push({
+    name: "归道清空即自动回 invert 模式 (与注入对称)",
+    pass: srcJs.includes("归道 → 自动回 invert 模式"),
+  });
 
   for (const c of checks) {
     if (c.pass) {
