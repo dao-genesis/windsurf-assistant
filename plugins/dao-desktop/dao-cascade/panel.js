@@ -124,6 +124,8 @@ class CascadePanelProvider {
         if (msg.type === "session-export") return this._handleSessionExport(msg.sessionId);
         if (msg.type === "share-conversation") return this._handleShareConversation();
         if (msg.type === "transcribe") return this._handleTranscribe(msg.b64);
+        if (msg.type === "record-start") return this._handleRecordStart();
+        if (msg.type === "record-stop") return this._handleRecordStop();
         if (msg.type === "open-file") return this._handleOpenFile(msg.path);
         if (msg.type === "memories-list") return this._handleMemoriesList();
         if (msg.type === "status-info") return this._handleStatusInfo();
@@ -2004,6 +2006,43 @@ class CascadePanelProvider {
     } catch (e) { vscode.window.showWarningMessage("打不开 " + p + ": " + e.message); }
   }
 
+  // 宿主侧录音: 第三方 IDE webview 权限策略禁麦克风(NotAllowedError), 改由扩展宿主进程
+  // 调系统录音(ffmpeg pulse/avfoundation/dshow 或 arecord)落 wav, 停止后同路 GetTranscription。
+  _recCmd(out) {
+    const p = process.platform;
+    if (p === "darwin") return ["ffmpeg", ["-y", "-f", "avfoundation", "-i", ":0", "-ac", "1", "-ar", "16000", out]];
+    if (p === "win32") return ["ffmpeg", ["-y", "-f", "dshow", "-i", "audio=default", "-ac", "1", "-ar", "16000", out]];
+    return ["ffmpeg", ["-y", "-f", "pulse", "-i", "default", "-ac", "1", "-ar", "16000", out]];
+  }
+
+  _handleRecordStart() {
+    if (this._recProc) return;
+    const os = require("os"), path = require("path"), cp = require("child_process");
+    this._recFile = path.join(os.tmpdir(), "dao-mic-" + Date.now() + ".wav");
+    const [bin, args] = this._recCmd(this._recFile);
+    try {
+      const proc = cp.spawn(bin, args, { stdio: ["pipe", "ignore", "ignore"] });
+      proc.on("error", (e) => { this._recProc = null; this._post({ type: "record-state", on: false }); this._post({ type: "error", text: "录音不可用(" + bin + "): " + e.message }); });
+      this._recProc = proc;
+      this._post({ type: "record-state", on: true });
+    } catch (e) { this._post({ type: "error", text: "录音启动失败: " + e.message }); }
+  }
+
+  async _handleRecordStop() {
+    const proc = this._recProc, file = this._recFile;
+    this._recProc = null;
+    this._post({ type: "record-state", on: false });
+    if (!proc) return;
+    const fs = require("fs");
+    await new Promise((res) => { proc.on("exit", res); try { proc.stdin.write("q"); } catch (_) {} try { proc.kill("SIGINT"); } catch (_) {} setTimeout(res, 3000); });
+    try {
+      const b = fs.readFileSync(file);
+      try { fs.unlinkSync(file); } catch (_) {}
+      if (b.length < 128) return this._post({ type: "error", text: "录音为空(无麦克风输入?)" });
+      return this._handleTranscribe(b.toString("base64"));
+    } catch (e) { this._post({ type: "error", text: "录音读取失败: " + e.message }); }
+  }
+
   // 官方语音转写对位: GetTranscription{audioData}→transcribedText(后端实测 wav/webm 均可)。
   async _handleTranscribe(b64) {
     try {
@@ -2888,7 +2927,8 @@ class CascadePanelProvider {
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const hasMedia=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
     if(!hasMedia&&!SR){ if(micBtn) micBtn.style.display="none"; return; }
-    let mr=null, on=false, chunks=[];
+    let mr=null, on=false, chunks=[], hostRec=false, gumDenied=false;
+    window.__setRecordState=(v)=>{ hostRec=v; on=v; micBtn.style.opacity=v?"0.5":""; };
     function fallbackSR(){ if(!SR) return false;
       let rec=new SR(); rec.continuous=false; rec.interimResults=false;
       rec.onresult=(ev)=>{ const t=Array.from(ev.results).map(r=>r[0].transcript).join(" ");
@@ -2897,7 +2937,10 @@ class CascadePanelProvider {
       rec.onerror=()=>{ on=false; micBtn.style.opacity=""; };
       try{ rec.start(); on=true; micBtn.style.opacity="0.5"; return true; }catch(_){ return false; } }
     micBtn.onclick=async()=>{
-      if(on){ try{ mr?mr.stop():null; }catch(_){} on=false; micBtn.style.opacity=""; return; }
+      if(on){
+        if(hostRec){ vscode.postMessage({type:"record-stop"}); return; }
+        try{ mr?mr.stop():null; }catch(_){} on=false; micBtn.style.opacity=""; return; }
+      if(gumDenied){ vscode.postMessage({type:"record-start"}); return; }
       if(!hasMedia){ fallbackSR(); return; }
       try{
         const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -2912,7 +2955,7 @@ class CascadePanelProvider {
           vscode.postMessage({type:"transcribe", b64:btoa(s)});
         };
         mr.start(); on=true; micBtn.style.opacity="0.5";
-      }catch(_){ if(!fallbackSR()&&!SR) micBtn.style.display="none"; }
+      }catch(_){ gumDenied=true; vscode.postMessage({type:"record-start"}); }
     };
   })();
 
@@ -3477,6 +3520,7 @@ class CascadePanelProvider {
     } else if(m.type==="insert-input"){ inputEl.value=(inputEl.value?inputEl.value+"\\n":"")+m.text; autoGrow(); inputEl.focus(); }
     else if(m.type==="error"){ addMsg("assistant","⚠ "+m.text); setBusy(false); }
     else if(m.type==="transcribed"){ if(m.text){ inputEl.value=(inputEl.value?inputEl.value+" ":"")+m.text; inputEl.dispatchEvent(new Event("input")); inputEl.focus(); } }
+    else if(m.type==="record-state"){ if(window.__setRecordState) window.__setRecordState(!!m.on); }
   });
 
   renderAgents(); vscode.postMessage({type:"ready"}); vscode.postMessage({type:"sessions-list"});

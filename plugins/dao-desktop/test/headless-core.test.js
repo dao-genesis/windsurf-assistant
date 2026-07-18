@@ -2638,6 +2638,7 @@ test("R190: GetTranscription 语音转写链路在位", () => {
   assert.ok(src.includes('type:"transcribe"') && src.includes('"transcribed"'), "webview↔host 桥接在位");
   assert.ok(src.includes("MediaRecorder"), "录音路径在位");
   assert.ok(src.includes("fallbackSR"), "Web Speech 回退在位");
+  assert.ok(src.includes('"record-start"') && src.includes("_handleRecordStart") && src.includes('"-f", "pulse"'), "宿主侧录音回退在位(webview 禁麦实测修复)");
 });
 
 // R191 · RPC 甄别后端实测再校准: unimpl/removed 以 LS 真实回应为准。
