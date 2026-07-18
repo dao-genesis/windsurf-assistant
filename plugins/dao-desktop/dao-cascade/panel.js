@@ -2672,10 +2672,11 @@ class CascadePanelProvider {
   <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
     <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
     <button id="mtEditor" title="Editor 模式(当前)" style="border:1px solid var(--line);background:var(--pill-hover);color:var(--vscode-foreground);border-radius:0 6px 6px 0;padding:2px 12px;cursor:default;margin-left:-2px;">Editor</button>
-    <button id="mtShare" title="Share conversation · 生成团队分享链接并复制" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">🔗</button>
-    <button id="mtBug" title="Submit bug report · 官方同路提交 bug 报告" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">🐞</button>
-    <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">📚</button>
-    <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
+    <button id="mtShare" title="Share conversation · 生成团队分享链接并复制" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+    <button id="mtBug" title="Submit bug report · 官方同路提交 bug 报告" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg></button>
+    <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg></button>
+    <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button id="acctChip" title="账号 · 点击查看账户卡(官方顶栏头像同位)" style="display:none;border:none;background:#2ea3ff;color:#fff;cursor:pointer;width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:600;line-height:18px;padding:0;margin-left:4px;align-self:center;text-align:center;"></button>
   </div>
   <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="上一处 (Shift+Enter)">↑</button><button id="cfNext" title="下一处 (Enter)">↓</button><button id="cfClose" title="关闭 (Esc)">✕</button></div>
   <div id="log">
@@ -3244,6 +3245,15 @@ class CascadePanelProvider {
       envEl.title=(m.devinBin||"未找到 devin 引擎(内置 engine/ 或设 DAO_DEVIN_BIN)")
         +(m.windsurf&&m.windsurf.lsPort?"\\n官方 language_server 端口 "+m.windsurf.lsPort+" · CSRF "+(m.windsurf.lsCsrf?"已捕获":"未捕获"):"");
       if(m.folder){ const fn=document.getElementById("folderName"); if(fn) fn.textContent=m.folder; }
+      // 官方顶栏头像同位: 已登录即显账号首字母圆片, 点击开账户卡
+      (function(){ const ch=document.getElementById("acctChip"); if(!ch) return;
+        const nm=(m.windsurf&&m.windsurf.authSignedIn&&m.windsurf.authName)||(m.loggedIn&&m.userName)||"";
+        if(nm){ ch.textContent=nm.replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?";
+          ch.style.display="inline-block";
+          ch.onclick=()=>{ const ex=document.getElementById("acctPop");
+            if(ex){ ex.remove(); vscode.postMessage({type:"account-close"}); }
+            else vscode.postMessage({type:"account-status"}); };
+        } else ch.style.display="none"; })();
       envEl.style.cursor="pointer"; envEl.onclick=()=>{ const ex=document.getElementById("acctPop");
         if(ex){ ex.remove(); vscode.postMessage({type:"account-close"}); } else vscode.postMessage({type:"account-status"}); };
       if(m.devinBin && !m.loggedIn){ authbar.classList.add("show"); authmsg.textContent="未登录 — 插件自持登录(不依赖 Devin Desktop)"; }
