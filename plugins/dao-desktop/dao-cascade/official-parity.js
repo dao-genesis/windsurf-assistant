@@ -131,12 +131,17 @@ const CHAT_CLIENT_KEYS = [
 // R189 · 官方 LanguageServerService 未接入 77 方法逐项甄别(反提 3.4.27 · 后端实测校准):
 //   ux — 用户可见且可接入(候选实装); ux-done — 本轮已实装; telemetry — 埋点/上报(无用户面);
 //   completion — 编辑器补全/tab 管线(宿主 IDE 原生补全域, 非聊天面板域); experiment — 实验/灰度开关;
-//   internal — LS 内部/生命周期; removed — 官方已弃用(后端实测报 removed); deploy — WindsurfJS 部署域(未开放)。
+//   internal — LS 内部/生命周期; removed — 官方已弃用(后端实测报 removed/deprecated);
+//   unimpl — LS 后端实测报 not implemented/unimplemented(官方自身未实现); deploy — WindsurfJS 部署域(未开放)。
 const RPC_GAP_AUDIT = {
   CreateTrajectoryShare: "ux-done", // 会话分享链接(后端实测: {cascadeId,shareStatus:TEAM}→shareId)
-  GetTranscription: "ux", GetProfileData: "ux", GetKnowledgeBaseItemsForTeam: "ux",
-  SetPinnedContext: "ux", SetPinnedGuideline: "ux", GetSuggestedContextScopeItems: "ux",
-  SubmitBugReport: "ux", GetGithubPullRequestSearchInfo: "ux", GetCascadeModelConfigs: "ux",
+  GetTranscription: "ux-done", // 官方语音转写(后端实测 wav→transcribedText)
+  GetProfileData: "ux", // 需 Devin session token 域鉴权(后端实测: API key requires token authentication)
+  GetKnowledgeBaseItemsForTeam: "removed", // 后端实测: knowledge base feature has been deprecated
+  SetPinnedContext: "unimpl", SetPinnedGuideline: "unimpl", // 后端实测: not implemented
+  GetSuggestedContextScopeItems: "ux", // 需工作区文件追踪就绪(实测: relative filepaths must not be empty)
+  SubmitBugReport: "ux", GetGithubPullRequestSearchInfo: "ux",
+  GetCascadeModelConfigs: "unimpl", // 后端实测: unimplemented; use GetUserStatus instead(插件已接 GetUserStatus)
   RecordChatFeedback: "ux", GetChatMessage: "ux", RawGetChatMessage: "ux",
   GetConversationTags: "removed", UpdateConversationTags: "removed", // 后端实测: feature has been removed
   AcceptCompletion: "completion", ProvideCompletionFeedback: "completion", OnEdit: "completion",
