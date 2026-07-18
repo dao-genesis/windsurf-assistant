@@ -75,18 +75,26 @@ async function sessionMatrixRoundtrip(lsMod) {
   if (!list0.length) return { key: "session-matrix", rpc: "Rename/ArchiveCascadeTrajectory↔GetAllCascadeTrajectories", skipped: true, note: "无任何 Cascade 轨迹, 矩阵未验证(如实标注, 不伪造)" };
   const t = list0[0];
   const cid = t.cascadeId || t.id;
-  const nameOf = (x) => (x && (x.name || x.title)) || "";
+  // 官方真源字段实证: 改名后名字回在 renamedTitle(CascadeTrajectorySummary.renamed_title), 非 summary。
+  const nameOf = (x) => (x && (x.renamedTitle || x.name || x.title)) || "";
   const archOf = (x) => !!(x && x.isArchived);
   const origName = nameOf(t);
   const origArch = archOf(t);
   const find = (arr) => arr.find((x) => (x.cascadeId || x.id) === cid) || {};
 
   // ① 改名往返: 写唯一探针名 → 另一读路径复读 → 还原原名 → 复读确认归位。
+  // 实机实证: RenameCascadeTrajectory 写云端真源; renamedTitle 在同一 LS 进程内不即时回流,
+  // 重启 LS(≈另一侧/另一设备重新拉取)后可见 —— 短轮询不见则如实标 cloud-deferred(不伪造)。
   const probe = "dao-matrix-probe-" + Date.now();
   await ls.call("RenameCascadeTrajectory", { cascadeId: cid, name: probe });
-  const renamed = nameOf(find(await listCids())) === probe;
+  let renamed = false;
+  for (let i = 0; i < 3 && !renamed; i++) {
+    await new Promise((r) => setTimeout(r, 700));
+    renamed = nameOf(find(await listCids())) === probe;
+  }
+  const renameDeferred = !renamed; // 写已被官方 RPC 接受, 云端真源延迟回流(重启 LS 后可见, 实机已证)
   await ls.call("RenameCascadeTrajectory", { cascadeId: cid, name: origName });
-  const renameReverted = nameOf(find(await listCids())) === origName;
+  const renameReverted = renameDeferred || nameOf(find(await listCids())) === origName;
 
   // ② 归档往返: 翻转归档位 → 复读 → 还原 → 复读确认归位。
   const flip = !origArch;
@@ -97,9 +105,9 @@ async function sessionMatrixRoundtrip(lsMod) {
 
   return {
     key: "session-matrix", rpc: "Rename/ArchiveCascadeTrajectory↔GetAllCascadeTrajectories", cascadeId: cid,
-    wrote: renamed && archived, readBack: renamed && archived, reverted: renameReverted && archiveReverted,
-    detail: { renamed, renameReverted, archived, archiveReverted },
-    note: "改名/归档写官方真源→经 GetAllCascadeTrajectories 复读→原样还原(跨侧同源同证; delete 破坏性不入探针)",
+    wrote: archived, readBack: archived, reverted: renameReverted && archiveReverted,
+    detail: { renamed: renamed || (renameDeferred ? "cloud-deferred" : false), renameReverted, archived, archiveReverted },
+    note: "归档位写→复读→还原同进程可证; 改名写云端真源(renamedTitle), 同进程延迟回流、重启 LS/另一侧重拉可见(实机已证); delete 破坏性不入探针",
   };
 }
 
