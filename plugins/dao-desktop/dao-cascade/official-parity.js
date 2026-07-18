@@ -139,7 +139,7 @@ const RPC_GAP_AUDIT = {
   GetProfileData: "ux", // 需 Devin session token 域鉴权(后端实测: API key requires token authentication)
   GetKnowledgeBaseItemsForTeam: "removed", // 后端实测: knowledge base feature has been deprecated
   SetPinnedContext: "unimpl", SetPinnedGuideline: "unimpl", // 后端实测: not implemented
-  GetSuggestedContextScopeItems: "ux", // 需工作区文件追踪就绪(实测: relative filepaths must not be empty)
+  GetSuggestedContextScopeItems: "ux", // 需 LSP 会话初始化 file watcher(实测: AddTrackedWorkspace→file watcher not initialized; 插件走 HTTP RPC 无 LSP 会话)
   SubmitBugReport: "ux-done", // 官方 bug 报告(后端实测返回 Slack messageLink)
   GetGithubPullRequestSearchInfo: "removed", // 后端实测: knowledge base feature has been deprecated
   GetCascadeModelConfigs: "unimpl", // 后端实测: unimplemented; use GetUserStatus instead(插件已接 GetUserStatus)
