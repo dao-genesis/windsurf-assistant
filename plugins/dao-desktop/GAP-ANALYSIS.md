@@ -327,3 +327,15 @@
 | themes | theme-windsurf | ✅ R175 已随包 |
 | authentication | windsurf_auth | na: 官方本体在位由其提供; 插件登录走 credentials.toml 同一真源 |
 | audit() | — | 新增 keymap/surfaces 汇总与全表, /api/parity 后端可验 |
+
+## R178 · 双 IDE 并排实机对照 + 官方 GUI 登录回环打通(devin:// 深链)
+
+双 IDE 同屏对照(左: VS Code + dao-desktop 1.5.18; 右: 官方 Devin Desktop 3.4.27 + 归一/Proxy Pro/dao-desktop):
+
+| 发现 | 处置 |
+|---|---|
+| 官方 IDE 浏览器 OAuth 回跳 devin://codeium.windsurf 在 tar 包安装下落空(无 .desktop 注册) | ✅ coldstart.js 增 urlHandler 步: 落 x-scheme-handler/devin → devin-desktop --open-url, 幂等; 实机点通官方 GUI 登录全回环(app.devin.ai → 深链 → IDE 登录成功) |
+| 两侧同账号同时在线 | ✅ 左 VS Code 插件面板 引擎✓已登录(lywh6h4frtftdv)·LS:38657; 右官方 IDE 登录同账号, Cascade/Board 就位 |
+| 官方 IDE 内并存我方三件(归一 rt-flow + Proxy Pro + dao-desktop) | ✅ 官方 Cascade 面板与我方 Devin Desktop: Cascade 面板、道Agent Pro 侧栏并存不冲突(道并行而不相悖) |
+| 官方 IDE 二实例(--open-url 唤起 <2>)瞬时报 windsurf client couldn't create connection | 如实记录: 二实例竞态, 单实例无此报; 与插件无关 |
+| OS keyring 缺失提示(裸 X 桌面) | 如实记录: 选 weaker encryption 即过, 官方自身行为 |

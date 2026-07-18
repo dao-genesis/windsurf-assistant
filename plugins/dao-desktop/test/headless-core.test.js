@@ -2373,11 +2373,11 @@ test("official-parity R168: autoRefreshMinutes 配置 + 定时重拉接线在位
 test("coldstart R174: 步骤规划/凭据解析/幂等跳过语义", () => {
   const cs = require(path.join(__dirname, "..", "scripts", "coldstart.js"));
   // 全新机: 全步 run
-  const fresh = cs.plan({ officialRoot: null, hasKey: false, noDownload: false });
-  assert.deepStrictEqual(fresh.map((s) => s.run), [true, true, true, true], "全新机应全步执行");
-  // 已就位: download/login 跳过, boot/sweep 恒跑
-  const warm = cs.plan({ officialRoot: "/x", hasKey: true, noDownload: false });
-  assert.deepStrictEqual(warm.map((s) => s.run), [false, false, true, true], "已就位应跳过 download/login");
+  const fresh = cs.plan({ officialRoot: null, hasKey: false, noDownload: false, hasUrlHandler: false });
+  assert.deepStrictEqual(fresh.map((s) => s.run), [true, true, true, true, true], "全新机应全步执行");
+  // 已就位: download/urlHandler/login 跳过, boot/sweep 恒跑
+  const warm = cs.plan({ officialRoot: "/x", hasKey: true, noDownload: false, hasUrlHandler: true });
+  assert.deepStrictEqual(warm.map((s) => s.run), [false, false, false, true, true], "已就位应跳过 download/urlHandler/login");
   // --no-download 且未安装: download 不跑(boot 阶段如实报错, 不静默下载)
   const nd = cs.plan({ officialRoot: null, hasKey: true, noDownload: true });
   assert.strictEqual(nd[0].run, false, "--no-download 应禁下载");
@@ -2388,6 +2388,11 @@ test("coldstart R174: 步骤规划/凭据解析/幂等跳过语义", () => {
   assert.strictEqual(cs.credKey(f), "k-test-1234", "应解析 key");
   assert.strictEqual(cs.credKey(path.join(tmp, "none.toml")), null, "缺文件应返 null 不抛");
   fs.rmSync(tmp, { recursive: true, force: true });
+  // R178 · devin:// 深链处理器: tar 包无 .desktop 注册, 官方浏览器 OAuth 回跳依赖此处理器
+  assert.ok(typeof cs.installUrlHandler === "function" && typeof cs.hasUrlHandler === "function", "深链处理器 API 在位");
+  assert.ok(cs.urlHandlerPath().endsWith(path.join("applications", "devin-desktop.desktop")), "handler 落 XDG applications");
+  const src = fs.readFileSync(path.join(__dirname, "..", "scripts", "coldstart.js"), "utf8");
+  assert.ok(src.includes("x-scheme-handler/devin") && src.includes("--open-url"), "应注册 devin:// scheme 并经 --open-url 回环");
 });
 
 // R175 · 官方主题对位: theme-windsurf 真源逐字节随包 + Devin Dark/Light 登记 + 一键应用命令。
