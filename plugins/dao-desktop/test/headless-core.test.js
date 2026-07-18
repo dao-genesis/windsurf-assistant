@@ -2674,3 +2674,12 @@ test("R194: GetProfileData 官方同路与甄别收敛在位", () => {
   assert.ok(src.includes("profilePictureDataUrl") && src.includes("img-src data:"), "宿主侧 data URI 与 CSP 放行在位");
   assert.ok(src.includes("m.profileUrl"), "账户卡头像渲染在位");
 });
+
+// R196 · 双 IDE 实机 UI 对照: composer 官方双态占位/图标化 target 行(反提 workbench 真源字串)。
+test("R196: composer 官方双态占位与 target 行图标化在位", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('placeholder="Focus input (Ctrl+L)"'), "失焦态官方同文占位");
+  assert.ok(src.includes('inputEl.placeholder="Ask anything"'), "聚焦态官方同文占位");
+  assert.ok(src.includes('id="folderName"'), "target 行 SVG 图标化(去 emoji)");
+  assert.ok(!src.includes('"📁 "+m.folder'), "emoji 文件夹已替换");
+});
