@@ -14,12 +14,13 @@
 function V() { return require("vscode"); }
 
 // 官方候选命令序列(devin.* 优先, windsurf.* 回退)。逐个 executeCommand, 首个成功即止。
+// 命令 ID 为官方 3.4.27 package.json 键位真源实测提取(非猜测)。
 const OFFICIAL = {
-  inlineCommand: ["devin.prioritized.command.open", "windsurf.prioritized.command.open", "devin.command", "windsurf.command"],
-  acceptDiff: ["devin.acceptDiff", "windsurf.acceptDiff", "devin.diffApply", "windsurf.diffApply"],
-  rejectDiff: ["devin.rejectDiff", "windsurf.rejectDiff", "devin.diffReject", "windsurf.diffReject"],
-  acceptAllDiffs: ["devin.acceptAllDiffs", "windsurf.acceptAllDiffs"],
-  rejectAllDiffs: ["devin.rejectAllDiffs", "windsurf.rejectAllDiffs"],
+  inlineCommand: ["devin.prioritized.command.open", "windsurf.prioritized.command.open"],
+  acceptDiff: ["devin.prioritized.cascadeAcceptFocusedHunk", "windsurf.prioritized.cascadeAcceptFocusedHunk"],
+  rejectDiff: ["devin.prioritized.cascadeRejectFocusedHunk", "windsurf.prioritized.cascadeRejectFocusedHunk"],
+  acceptAllDiffs: ["devin.prioritized.cascadeAcceptAllInFile", "windsurf.prioritized.cascadeAcceptAllInFile"],
+  rejectAllDiffs: ["devin.prioritized.cascadeRejectAllInFile", "windsurf.prioritized.cascadeRejectAllInFile"],
 };
 
 // 逐个尝试官方候选命令; 全不可用时返回 false(交由调用方回退)。
