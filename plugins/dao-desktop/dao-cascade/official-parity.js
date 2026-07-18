@@ -39,10 +39,10 @@ const MANIFEST = [
   { base: "migrateWorkspaceConfig", cls: "na", reason: "官方 IDE 工作区配置迁移, 第三方宿主不适用" },
   { base: "openBrowser", cls: "covered", equiv: "dao.cascade.openBrowser(官方在位直通; 否则宿主 simpleBrowser.show 同位承接)" },
   { base: "setPortalUrl", cls: "na", reason: "企业自托管门户地址, 与插件无关(官方本体在位时由其管理)" },
-  { base: "reloadAcpConnections", cls: "pending", reason: "ACP(Agent Client Protocol)连接管理, 待对照官方 ACP 面板承接" },
-  { base: "openAcpLocalRegistry", cls: "pending", reason: "同上" },
+  { base: "reloadAcpConnections", cls: "covered", equiv: "dao.cascade.acpRegistry(官方在位直通 reload; GetAllAcpRegistries RPC 同源列表)" },
+  { base: "openAcpLocalRegistry", cls: "covered", equiv: "dao.cascade.acpRegistry(ACP 代理清单 quickpick + /api/acp/registries)" },
   { base: "cascade.toggleAgentSelector", cls: "covered", equiv: "dao.cascade.openAgentPicker(Ctrl+Shift+. 官方同键)" },
-  { base: "lifeguard.checkCurrentChanges", cls: "pending", reason: "官方 Lifeguard 代码守护(Ctrl+U); LS RPC GetLifeguardConfig 在, 待接" },
+  { base: "lifeguard.checkCurrentChanges", cls: "covered", equiv: "dao.cascade.lifeguardCheck(Ctrl+U 官方同键; 官方在位直通, 否则 GetLifeguardConfig 如实报告引擎态)" },
   { base: "lifeguard.evaluateDataset", cls: "na", reason: "官方内部评测工具, 面向 Windsurf 开发者" },
 ];
 
@@ -104,6 +104,44 @@ function register(context, log) {
     l("importRulesFromCursor: " + srcs.length + " 个");
   };
 
+  // 官方 lifeguard.checkCurrentChanges 对位(Ctrl+U): 官方在位直通; 纯第三方如实报引擎态(不伪造检查)。
+  const lifeguardCheck = async () => {
+    const cmds = await vscode.commands.getCommands(true).catch(() => []);
+    for (const c of ["devin.lifeguard.checkCurrentChanges", "windsurf.lifeguard.checkCurrentChanges"]) {
+      if (cmds.includes(c)) { try { await vscode.commands.executeCommand(c); return; } catch (_) {} }
+    }
+    try {
+      const ls = require("./ls-bridge");
+      if (!ls.ready()) throw new Error("LS 未就绪");
+      const r = await ls.call("GetLifeguardConfig", {});
+      const agent = r && r.config && r.config.modes && r.config.modes.agent;
+      vscode.window.showInformationMessage("Lifeguard 引擎: " + (agent && agent.enabled ? "已启用(" + (agent.modelDisplayName || agent.model) + ")" : "未启用") + " · 检查面板由官方本体渲染, 第三方宿主如实不伪造");
+    } catch (e) {
+      vscode.window.showWarningMessage("Lifeguard: 官方本体不在位且 LS 不可用 — " + (e && e.message));
+    }
+  };
+
+  // 官方 ACP(reloadAcpConnections/openAcpLocalRegistry) 对位: 直通优先, 否则官方真源清单 quickpick。
+  const acpRegistry = async () => {
+    const cmds = await vscode.commands.getCommands(true).catch(() => []);
+    for (const c of ["devin.openAcpLocalRegistry", "windsurf.openAcpLocalRegistry"]) {
+      if (cmds.includes(c)) { try { await vscode.commands.executeCommand(c); return; } catch (_) {} }
+    }
+    try {
+      const ls = require("./ls-bridge");
+      if (!ls.ready()) throw new Error("LS 未就绪");
+      const r = await ls.call("GetAllAcpRegistries", {});
+      const reg = JSON.parse((r && r.registryJson) || "{}");
+      const agents = reg.agents || [];
+      await vscode.window.showQuickPick(
+        agents.map((a) => ({ label: a.name || a.description || "agent", description: (a.authors || []).join(", "), detail: a.description })),
+        { placeHolder: "ACP 代理清单(官方 GetAllAcpRegistries 真源) · " + agents.length + " 个" }
+      );
+    } catch (e) {
+      vscode.window.showWarningMessage("ACP: 官方本体不在位且 LS 不可用 — " + (e && e.message));
+    }
+  };
+
   // 官方 openBrowser 对位: 官方本体在位直通, 否则用宿主 simpleBrowser 同位承接。
   const openBrowser = async () => {
     const cmds = await vscode.commands.getCommands(true).catch(() => []);
@@ -117,9 +155,11 @@ function register(context, log) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("dao.cascade.importRulesFromCursor", importRules),
-    vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser)
+    vscode.commands.registerCommand("dao.cascade.openBrowser", openBrowser),
+    vscode.commands.registerCommand("dao.cascade.lifeguardCheck", lifeguardCheck),
+    vscode.commands.registerCommand("dao.cascade.acpRegistry", acpRegistry)
   );
-  l("官方命令对位就位(importRulesFromCursor/openBrowser)");
+  l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry)");
 }
 
 module.exports = { MANIFEST, KEY_PARITY, audit, register };
