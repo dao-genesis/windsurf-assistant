@@ -1,6 +1,6 @@
 {
  "version": "3.4.27",
- "syncedAt": "2026-07-11",
+ "syncedAt": "2026-07-18",
  "methods": [
   "AcceptCompletion",
   "AcknowledgeCascadeCodeEdit",

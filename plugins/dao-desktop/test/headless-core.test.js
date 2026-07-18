@@ -1915,8 +1915,12 @@ test("ls-boot: 独立宿主自持 LS 兜底接线在位", () => {
   const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
   assert.ok(ext.includes('ls-boot").stop()'), "deactivate 应停自持子进程");
   const mod = require(path.join(CASCADE, "ls-boot.js"));
+  const prev = process.env.DAO_NO_LS_BOOT;
   process.env.DAO_NO_LS_BOOT = "1";
-  return mod.boot({}).then((r) => { delete process.env.DAO_NO_LS_BOOT; assert.equal(r, null, "禁用时返回 null"); });
+  return mod.boot({}).then((r) => {
+    if (prev === undefined) delete process.env.DAO_NO_LS_BOOT; else process.env.DAO_NO_LS_BOOT = prev;
+    assert.equal(r, null, "禁用时返回 null");
+  });
 });
 
 // R153 · 官方↔插件全资源双向同步: 源同一即双向同源。sync-audit 审计每类资源(MCP/
@@ -2363,4 +2367,25 @@ test("official-parity R168: autoRefreshMinutes 配置 + 定时重拉接线在位
   assert.ok(pkg.contributes.configuration.properties["dao.cascade.autoRefreshMinutes"], "配置应登记");
   const gap = fs.readFileSync(path.join(__dirname, "..", "GAP-ANALYSIS.md"), "utf8");
   assert.ok(gap.includes("StreamCascadeSummariesReactiveUpdates"), "R168 流式订阅实测应入档");
+});
+
+// R174 · 冷启动一键器: 步骤规划纯函数 + 幂等跳过语义 + 凭据解析(不触网络)。
+test("coldstart R174: 步骤规划/凭据解析/幂等跳过语义", () => {
+  const cs = require(path.join(__dirname, "..", "scripts", "coldstart.js"));
+  // 全新机: 全步 run
+  const fresh = cs.plan({ officialRoot: null, hasKey: false, noDownload: false });
+  assert.deepStrictEqual(fresh.map((s) => s.run), [true, true, true, true], "全新机应全步执行");
+  // 已就位: download/login 跳过, boot/sweep 恒跑
+  const warm = cs.plan({ officialRoot: "/x", hasKey: true, noDownload: false });
+  assert.deepStrictEqual(warm.map((s) => s.run), [false, false, true, true], "已就位应跳过 download/login");
+  // --no-download 且未安装: download 不跑(boot 阶段如实报错, 不静默下载)
+  const nd = cs.plan({ officialRoot: null, hasKey: true, noDownload: true });
+  assert.strictEqual(nd[0].run, false, "--no-download 应禁下载");
+  // 凭据解析: 隔离文件往返
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-cs-"));
+  const f = path.join(tmp, "credentials.toml");
+  fs.writeFileSync(f, 'windsurf_api_key = "k-test-1234"\n');
+  assert.strictEqual(cs.credKey(f), "k-test-1234", "应解析 key");
+  assert.strictEqual(cs.credKey(path.join(tmp, "none.toml")), null, "缺文件应返 null 不抛");
+  fs.rmSync(tmp, { recursive: true, force: true });
 });
