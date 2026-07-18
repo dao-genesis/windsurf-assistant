@@ -402,6 +402,14 @@ async function postRoutes(u, body) {
   if (u === "/api/sync/rpc-roundtrip") {
     return require("./sync-rpc").roundtrip({});
   }
+  if (u === "/api/customizations/refresh") {
+    await ls.call("RefreshCustomization", {});
+    return { ok: true, rpc: "RefreshCustomization", note: "不重启 LS 即重读 Rules/Workflows/Skills 文件真源 — 跨 IDE 改动即见" };
+  }
+  if (u === "/api/mcp/refresh") {
+    await ls.call("RefreshMcpServers", {});
+    return { ok: true, rpc: "RefreshMcpServers", note: "不重启 LS 即重读 mcp_config.json 真源并重连 MCP 服务" };
+  }
   if (u === "/api/cascade/refresh") {
     // 跨端会话重拉(R163): 官方 LS 轨迹列表为 pull-on-(re)start 语义(R160 实机实证),
     // 自持 LS 可重启即重拉云端真源; 共生官方 LS 不可代为重启 — 如实区分。
