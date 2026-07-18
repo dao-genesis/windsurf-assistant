@@ -2389,3 +2389,22 @@ test("coldstart R174: 步骤规划/凭据解析/幂等跳过语义", () => {
   assert.strictEqual(cs.credKey(path.join(tmp, "none.toml")), null, "缺文件应返 null 不抛");
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+// R175 · 官方主题对位: theme-windsurf 真源逐字节随包 + Devin Dark/Light 登记 + 一键应用命令。
+test("official-parity R175: 官方 Devin Dark/Light 主题随包 + applyOfficialTheme 命令在位", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const themes = pkg.contributes.themes || [];
+  assert.ok(themes.some((t) => t.id === "Devin Dark" && t.uiTheme === "vs-dark"), "Devin Dark 应登记");
+  assert.ok(themes.some((t) => t.id === "Devin Light" && t.uiTheme === "vs"), "Devin Light 应登记");
+  for (const t of themes) {
+    const f = path.join(__dirname, "..", t.path);
+    assert.ok(fs.existsSync(f), "主题文件应随包: " + t.path);
+    const j = JSON.parse(fs.readFileSync(f, "utf8"));
+    assert.ok(j.colors && Object.keys(j.colors).length > 50, "应为官方完整配色(非占位): " + t.path);
+  }
+  assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.applyOfficialTheme"), "命令应登记");
+  const src = fs.readFileSync(path.join(CASCADE, "official-parity.js"), "utf8");
+  assert.ok(src.includes('"dao.cascade.applyOfficialTheme"') && src.includes('"Devin Dark"'), "应接线并指向官方默认主题");
+  const sync = fs.readFileSync(path.join(__dirname, "..", "scripts", "sync-official.js"), "utf8");
+  assert.ok(sync.includes("theme-windsurf"), "sync-official 应承接官方主题真源同步");
+});

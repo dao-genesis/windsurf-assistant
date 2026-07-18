@@ -93,6 +93,20 @@ function main() {
     console.log("GAP.md 计数与已接入清单已重写。");
   }
   if (added.length || removed.length) process.exitCode = 2; // 提示有官方变更待适配
+
+  // 官方主题真源同步(R175): theme-windsurf(Devin Dark/Light)逐字节随包, 官方升级即跟随。
+  const themeSrc = path.join(root, "resources", "app", "extensions", "theme-windsurf", "themes");
+  const themeDst = path.join(PLUGIN, "themes");
+  if (fs.existsSync(themeSrc)) {
+    fs.mkdirSync(themeDst, { recursive: true });
+    let drift = 0;
+    for (const f of fs.readdirSync(themeSrc).filter((n) => n.endsWith(".json"))) {
+      const s = fs.readFileSync(path.join(themeSrc, f));
+      const d = path.join(themeDst, f);
+      if (!fs.existsSync(d) || !s.equals(fs.readFileSync(d))) { fs.writeFileSync(d, s); drift++; }
+    }
+    console.log(drift ? `官方主题真源更新: ${drift} 个文件已同步` : "官方主题真源无漂移");
+  }
 }
 
 main();
