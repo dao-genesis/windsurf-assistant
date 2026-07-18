@@ -2649,3 +2649,14 @@ test("R191: RPC 甄别实测校准在位", () => {
   assert.strictEqual(g.GetCascadeModelConfigs, "unimpl");
   assert.strictEqual(g.GetKnowledgeBaseItemsForTeam, "removed");
 });
+
+// R192 · 官方 bug 报告对位: SubmitBugReport{description,bugType,...}→messageLink。
+test("R192: SubmitBugReport 链路与甄别再校准在位", () => {
+  const g = require(path.join(ROOT, "dao-cascade", "official-parity.js")).RPC_GAP_AUDIT;
+  assert.strictEqual(g.SubmitBugReport, "ux-done");
+  assert.strictEqual(g.GetGithubPullRequestSearchInfo, "removed");
+  assert.strictEqual(g.GetChatMessage, "internal");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"SubmitBugReport"') && src.includes("bugType"), "官方同参调用在位");
+  assert.ok(src.includes('id="mtBug"') && src.includes('type:"bug-report"'), "🐞 按钮与桥接在位");
+});

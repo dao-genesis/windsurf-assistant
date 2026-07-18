@@ -126,6 +126,7 @@ class CascadePanelProvider {
         if (msg.type === "transcribe") return this._handleTranscribe(msg.b64);
         if (msg.type === "record-start") return this._handleRecordStart();
         if (msg.type === "record-stop") return this._handleRecordStop();
+        if (msg.type === "bug-report") return this._handleBugReport();
         if (msg.type === "open-file") return this._handleOpenFile(msg.path);
         if (msg.type === "memories-list") return this._handleMemoriesList();
         if (msg.type === "status-info") return this._handleStatusInfo();
@@ -2006,6 +2007,23 @@ class CascadePanelProvider {
     } catch (e) { vscode.window.showWarningMessage("打不开 " + p + ": " + e.message); }
   }
 
+  // 官方 bug 报告对位: SubmitBugReport{description,bugType(ide|cascade),diagnosticsJson,tabInfo,other}
+  // →{messageLink}(后端实测返回 Slack 链接)。bugType 选项与官方面板同为 IDE/Cascade。
+  async _handleBugReport() {
+    const type = await vscode.window.showQuickPick(
+      [{ label: "Cascade", value: "cascade" }, { label: "IDE", value: "ide" }],
+      { placeHolder: "Bug 类型(官方同项)" });
+    if (!type) return;
+    const desc = await vscode.window.showInputBox({ prompt: "描述问题(Submit bug report)", placeHolder: "What went wrong?" });
+    if (!desc) return;
+    try {
+      const ls = require("./ls-bridge");
+      const diag = JSON.stringify({ source: "dao-desktop", cascadeId: this._cascadeLsId || "", agent: this._agent || "" });
+      const r = await ls.call("SubmitBugReport", { description: desc, bugType: type.value, diagnosticsJson: diag, tabInfo: "", other: "" });
+      vscode.window.showInformationMessage("Bug report submitted" + (r.messageLink ? ": " + r.messageLink : ""));
+    } catch (e) { vscode.window.showWarningMessage("Bug 报告提交失败: " + e.message); }
+  }
+
   // 宿主侧录音: 第三方 IDE webview 权限策略禁麦克风(NotAllowedError), 改由扩展宿主进程
   // 调系统录音(ffmpeg pulse/avfoundation/dshow 或 arecord)落 wav, 停止后同路 GetTranscription。
   _recCmd(out) {
@@ -2625,6 +2643,7 @@ class CascadePanelProvider {
     <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
     <button id="mtEditor" title="Editor 模式(当前)" style="border:1px solid var(--line);background:var(--pill-hover);color:var(--vscode-foreground);border-radius:0 6px 6px 0;padding:2px 12px;cursor:default;margin-left:-2px;">Editor</button>
     <button id="mtShare" title="Share conversation · 生成团队分享链接并复制" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">🔗</button>
+    <button id="mtBug" title="Submit bug report · 官方同路提交 bug 报告" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">🐞</button>
     <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">📚</button>
     <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
   </div>
@@ -2916,6 +2935,8 @@ class CascadePanelProvider {
   if(mtCustom) mtCustom.onclick=()=>vscode.postMessage({type:"open-customizations"});
   const mtShare=document.getElementById("mtShare");
   if(mtShare) mtShare.onclick=()=>vscode.postMessage({type:"share-conversation"});
+  const mtBug=document.getElementById("mtBug");
+  if(mtBug) mtBug.onclick=()=>vscode.postMessage({type:"bug-report"});
 
   // 官方式空态 Try Devin Cloud: 一键切到 devin-cloud agent(与官方按钮同位同义)
   const tryCloudBtn=document.getElementById("tryCloud");
