@@ -496,3 +496,13 @@ RecordChatFeedback 保留 ux(legacy chat 域, 插件回合反馈已走云端 Rec
 甄别收敛(反提 3.4.27 调用点 + 后端实测): GetSuggestedContextScopeItems → internal(官方 workbench/
 extension 均无调用点, 仅 proto 定义; suggestionSources 全枚举仍报 relative filepaths must not be empty);
 RecordChatFeedback → internal(官方无调用点, legacy chat 域)。至此 169 方法审计 ux 候选清零。106/106 测试。
+
+## R195 · 三大如实边界收口(全后端实证 + 官方 bundle 调用点审计)
+
+| 边界(HANDOFF 主攻项) | 收口实证 |
+|---|---|
+| 跨端实时推送(R168 空帧) | 官方 3.4.27 workbench + extension 两 bundle 调用点审计: StreamCascadeReactiveUpdates / StreamUserTrajectoryReactiveUpdates / StreamCascadePanelReactiveUpdates 均零调用点(仅 proto/service 定义)——官方自身不消费跨端实时推送, 插件 pull-on-refresh 即官方同态; 插件把 PanelReactiveUpdates 用作变更信号系超官方增强 |
+| MCP 双 LS 闭环(R172 PARTIAL) | 生产 ls-boot 全参路径(--codeium_dir/--database_dir/--workspace_id + AddTrackedWorkspace)哨兵 server 实测: RefreshMcpServers→GetMcpServerStates 即见 states.len=1(哨兵进程状态可见)——A 侧 {} 确证为最小 harness 局限而非产品缺口 |
+| Memories 创建路径 | 官方 bundle 反提: memory 面仅 updateCascadeMemory(workbench 记忆编辑 UI)/deleteCascadeMemory 调用点, 无任何创建路径(memory 由 Cascade 代理运行产生); 插件 update/delete 已同位(local-api /api/memories/*), 官方等价面齐平 |
+
+> 至此 HANDOFF 主攻项 1–3 全部收口; 剩余: 官方 UI 视觉 1:1 实机对照、官方不可达能力如实标注维持。
