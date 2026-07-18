@@ -165,6 +165,26 @@ const TAO_SENTINEL = INVERTED_PREFIX;
 const TAO_TRAILER = "\n\n---\n\n";
 const TAO_FOOTER = ""; // v9.7.7 损至空
 
+// ★ v9.9.356 · 自定义SP幂等标记 · 用户即道
+//   根因: custom SP 输出(用户自编文本+realtime/keep块)含 <user_information> 等
+//   官方标记 → 下游 isLikelyOfficialSP 误判为官方SP → dao_router 增强路径
+//   再追加经藏(阴符经) → 用户自编未能平替经文、经文重复带一份。
+//   修复: custom 输出末尾附此标记 → 下游识别即知已由用户自编替换 · 不再增强。
+const CUSTOM_SP_MARKER = "<!-- DAO-CUSTOM-SP -->";
+
+// 读取用户自编SP(_custom_sp.json · source.js 写 · 此处只读) · 单一真源
+const _CUSTOM_SP_FILE = path.join(_BUNDLED_DIR, "_custom_sp.json");
+function getCustomSP() {
+  try {
+    if (fs.existsSync(_CUSTOM_SP_FILE)) {
+      const d = JSON.parse(fs.readFileSync(_CUSTOM_SP_FILE, "utf8"));
+      if (d && typeof d.sp === "string" && d.sp.length > 0) return d;
+    }
+  } catch {}
+  return null;
+}
+
+
 // v9.9.95 · 损之又损 · 去末锚 · 只保留开头语+经文
 //   TAO_TURN_ANCHOR(道法自然之嘱) 和 TAO_SUB_ANCHOR(道法自然之要) 已损
 //   道义: 四十八章「损之又损·以至于无为·无为而无以为」
@@ -763,6 +783,10 @@ module.exports = {
   // ★ v9.9.94 · 经藏热同步 · 让 source.js 能同步 sp_invert 的 _activeCanon
   setCanon,
   hotReloadCanon,
+
+  // ★ v9.9.356 · 自定义SP · 标记 + 只读取数
+  CUSTOM_SP_MARKER,
+  getCustomSP,
 
   // 常量
   INVERTED_PREFIX,

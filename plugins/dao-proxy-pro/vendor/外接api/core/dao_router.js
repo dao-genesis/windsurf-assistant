@@ -259,6 +259,11 @@ function _deOfficialDescDeep(obj) {
 function _getDaoEnhanceText() {
   try {
     if (!_spInvert) return null;
+    // ★ v9.9.356 · 用户即道 · 用户自编SP存在即平替经藏(增强文本也用自编 · 不再附经文)
+    if (typeof _spInvert.getCustomSP === "function") {
+      const _cus = _spInvert.getCustomSP();
+      if (_cus && _cus.sp) return _cus.sp;
+    }
     // ★ 经藏热切真生效 · 以持久化 _origin_canon.txt 为准 · 不滞启动值
     if (typeof _spInvert.hotReloadCanon === "function") {
       try {
@@ -2815,8 +2820,17 @@ async function _callProvider(
       const _spText = messages[0].content;
       const _isInverted = _spInvert && _spInvert.isAlreadyInverted(_spText);
       const _isEnhanced = _spText.indexOf("<!-- DAO-ENHANCE") >= 0;
+      // ★ v9.9.356 · 自定义SP已替换 · 不可再增强追加经藏
+      //   根因: custom 输出含 <user_information> 等 realtime/keep 块 →
+      //   isLikelyOfficialSP 命中≥2标记误判为官方SP → 用户自编之下又重复
+      //   追加一份经文(阴符经) · 未能平替。
+      const _isCustom = _spText.indexOf("<!-- DAO-CUSTOM-SP") >= 0;
       const _isOfficial = _spInvert && _spInvert.isLikelyOfficialSP(_spText);
-      if (!_isInverted && !_isEnhanced && _isOfficial) {
+      if (_isCustom) {
+        _routeDiag(
+          `[dao-router] [SP已自编] ✓ 用户即道 ${_spText.length}B · 自定义SP已替换 · 不增强不追加`,
+        );
+      } else if (!_isInverted && !_isEnhanced && _isOfficial) {
         // ★ 官方SP未被道化/增强 → 增强模式: 保留官方SP + 追加DAO
         const _daoText = _getDaoEnhanceText();
         if (_daoText) {

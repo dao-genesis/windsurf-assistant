@@ -2,6 +2,22 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.356 · 自定义SP隔离替换根治·用户即道(自编平替经藏·不再重复注入阴符经)
+: 用户反馈: 自定义编写模式下, 用户以自己的新提示词替换后, 实测系统提示里自编文本在最顶、
+  而底层《阴符经》仍带了一份(<!-- DAO-ENHANCE --> 后附全经) —— 未能平替。究根溯源:
+  custom SP 输出 = 用户自编文本 + realtime/keep 块(<user_information> 等), 这些块本身
+  就是官方 SP 标记 → 下游 dao_router 增强路径 isLikelyOfficialSP 命中 ≥2 标记误判为
+  「官方SP未处理」→ 再追加经藏一份。修法(执一·单一真源):
+  ① `sp_invert.js` 新增 `CUSTOM_SP_MARKER`("<!-- DAO-CUSTOM-SP -->") 与 `getCustomSP()`
+     (只读 _custom_sp.json); ② `source.js` 两处 custom 分支输出末尾附标记 + 幂等守卫
+     (已带标记即不重复处理); ③ `dao_router.js` 增强路径识别标记即知已由用户自编替换 ·
+     不增强不追加; 且 `_getDaoEnhanceText()` 优先返回用户自编文本 —— 即使官方SP未经
+     source.js 处理直达路由层, 增强附文也用自编平替经藏, 官方SP路径(无自编)增强照常。
+  自检 L4.6 新增 6 例; 线级实证: mock 上游抓包, custom SP 出网不含 DAO-ENHANCE/经文、
+  自编文本完整, 官方SP对照组增强照常。三副本(devin-remote + windsurf plugins/packages)
+  同步, dao-one 重建装配。
+
+
 v9.9.355 · 提示缓存命中率根治·对照 Anthropic/OpenAI 官方做法(反者道之动·节用而爱人)
 : 用户反馈外接 API 反代整体缓存命中率仍非常低。对照市面/官方缓存底层反向提炼两处根因(现有
   实现已钉 system/末位工具/末条消息三断点, 但缺两项官方标准做法):

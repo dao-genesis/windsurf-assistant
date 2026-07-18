@@ -785,6 +785,84 @@ async function runCacheCheck() {
   }
 }
 
+// ─── L4.6: 自定义SP隔离替换 (custom SP 平替经藏 · 不重复注入) ──
+//   根因回归: custom 输出(用户自编+realtime/keep块)含 <user_information> 等官方标记
+//   → isLikelyOfficialSP 误判 → dao_router 增强路径再追加经藏(阴符经)一份
+async function runCustomSPCheck() {
+  console.log(header("\n═══════════════════════════════════════════"));
+  console.log(header("  L4.6 · 自定义SP隔离替换 (用户即道 · 平替经藏)"));
+  console.log(header("═══════════════════════════════════════════\n"));
+
+  const checks = [];
+  let spInv;
+  try {
+    const p = path.join(__dirname, "sp_invert.js");
+    delete require.cache[require.resolve(p)];
+    spInv = require(p);
+  } catch (e) {
+    console.log(fail(`sp_invert.js 加载失败: ${e.message}`));
+    totalFail++;
+    return;
+  }
+
+  checks.push({
+    name: "sp_invert 导出 CUSTOM_SP_MARKER (单一真源)",
+    pass: spInv.CUSTOM_SP_MARKER === "<!-- DAO-CUSTOM-SP -->",
+  });
+  checks.push({
+    name: "sp_invert 导出 getCustomSP (dao_router 可读用户自编)",
+    pass: typeof spInv.getCustomSP === "function",
+  });
+
+  // 模拟 custom 输出(自编文本 + realtime 块 + 标记) · 不得被增强路径再追经
+  const pad = "The USER OS version is windows. ".repeat(30);
+  const customOut =
+    "用户自编提示词".repeat(20) +
+    "\n\n<user_information>\n" + pad + "\n</user_information>" +
+    "\n<workspace_information>\n" + pad + "\n</workspace_information>" +
+    "\n\n" + spInv.CUSTOM_SP_MARKER;
+  const misjudged = spInv.isLikelyOfficialSP(customOut);
+  const guarded = customOut.indexOf("<!-- DAO-CUSTOM-SP") >= 0;
+  checks.push({
+    name: "custom 输出虽命中官方标记 · 但 CUSTOM 标记可识别(不再追加经藏)",
+    pass: misjudged === true && guarded === true,
+  });
+
+  // 源码级: source.js custom 分支附标记 + 幂等; dao_router 识别标记跳过增强
+  const srcJs = fs.readFileSync(
+    path.join(__dirname, "..", "..", "bundled-origin", "source.js"),
+    "utf8",
+  );
+  checks.push({
+    name: "source.js custom 分支输出附 CUSTOM_SP_MARKER + 幂等守卫",
+    pass:
+      srcJs.includes("CUSTOM_SP_MARKER") &&
+      srcJs.includes('indexOf(_cm) >= 0'),
+  });
+  const routerSrc2 = fs.readFileSync(
+    path.join(__dirname, "dao_router.js"),
+    "utf8",
+  );
+  checks.push({
+    name: "dao_router 增强路径识别 DAO-CUSTOM-SP · 不追加经藏",
+    pass: routerSrc2.includes('indexOf("<!-- DAO-CUSTOM-SP") >= 0'),
+  });
+  checks.push({
+    name: "dao_router 增强文本优先用户自编(getCustomSP 平替经藏)",
+    pass: routerSrc2.includes("getCustomSP"),
+  });
+
+  for (const c of checks) {
+    if (c.pass) {
+      console.log(ok(c.name));
+      totalPass++;
+    } else {
+      console.log(fail(c.name));
+      totalFail++;
+    }
+  }
+}
+
 // ─── 主入口 ──
 async function main() {
   const start = Date.now();
@@ -809,6 +887,7 @@ async function main() {
     if (!optQuick) {
       await runProtocolCheck();
       await runCacheCheck();
+      await runCustomSPCheck();
     }
 
     // L6: 端到端 (仅--e2e)
