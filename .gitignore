@@ -121,3 +121,4 @@ _test_auth*_real.cjs
 # dao-desktop 构建产物 (官方本体折入 + 占位图标)
 plugins/dao-desktop/engines/
 plugins/dao-desktop/media/icon.png
+plugins/dao-desktop/vendor-one/

@@ -128,6 +128,28 @@ async function activate(context) {
     log("✓ 归一外壳就位 (dao.cascade.openShell → /shell 单网页)");
   } catch (e) { log("✗ 归一外壳注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②e 归一本体(拼积木·零重写): build.js 把 devin-remote 的 dao-one 原样装配进 vendor-one/
+  //    (dao-vsix 二合一 + Proxy Pro + rt-flow + dao-bridge), 此处用 dao-one 原装驱动器
+  //    原样激活 —— 不生产水, 只搬运。宿主已另装归一系插件时跳过(道并行而不相悖)。
+  try {
+    const oneEntry = path.join(__dirname, "vendor-one", "extension.js");
+    if (fs.existsSync(oneEntry)) {
+      const meId = context.extension && context.extension.id;
+      const sibling = ["dao.dao-one", "dao.dao-vsix", "devaid.rt-flow"]
+        .find((id) => { const x = vscode.extensions.getExtension(id); return x && x.id !== meId; });
+      if (sibling) {
+        log("· 宿主已装归一本体(" + sibling + ") · 道并行而不相悖, 跳过内置归一激活(共用同一 ~/.dao 真源)");
+      } else {
+        const one = require(oneEntry);
+        await one.activate(subContext(context, "vendor-one"));
+        context.subscriptions.push({ dispose: () => { try { one.deactivate && one.deactivate(); } catch (_) {} } });
+        log("✓ 归一本体就位 (dao-one 原样驱动: 切号/全能板/Proxy Pro/穿透 · 9920 单网页一切)");
+      }
+    } else {
+      log("· 未装配归一本体(构建期无 devin-remote) · 共生模式");
+    }
+  } catch (e) { log("✗ 归一本体激活失败: " + (e && e.stack ? e.stack : e)); }
+
   // ③ 宿主已内建官方本体(codeium.windsurf) → 共生模式, 面板接宿主 LS, 不重复激活。
   const hostCore = vscode.extensions.getExtension("codeium.windsurf");
   const selfId = context.extension && context.extension.id;
