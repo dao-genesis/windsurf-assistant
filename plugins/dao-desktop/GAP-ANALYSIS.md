@@ -302,3 +302,17 @@
 | dao.cascade.applyOfficialTheme | ✅ | 一键切换 workbench.colorTheme → "Devin Dark"(官方默认同源) |
 | 官方升级跟随 | ✅ | scripts/sync-official.js 增主题真源同步段: 重跑即逐字节对账/更新, 有漂移即报 |
 | 回归护栏 | ✅ | headless-core.test.js 新增 1 例(登记/文件随包/完整配色非占位/命令接线/同步器承接), 91/91 |
+
+## R176 · 双轨实机部署矩阵(真实 VS Code + 官方 IDE · 全后端 CLI)
+
+全新 VM 双轨全链路实机部署(GUI 仅截屏辅助, 全程后端/CLI):
+
+| 探测 | 结果 |
+|---|---|
+| 真实 VS Code 1.129.1 冷装(deb) → `code --install-extension` dao-desktop-1.5.17.vsix | ✅ 列表可见 dao-agi.dao-desktop@1.5.17 |
+| 扩展实机激活 | ✅ exthost.log: `_doActivateExtension dao-agi.dao-desktop`(onStartupFinished), 无错误 |
+| Devin Dark 主题应用(R175 真源) | ✅ settings.json 写入 → 实机深色工作台(截屏辅助佐证) |
+| 官方 Devin Desktop IDE 侧: 归一(rt-flow 4.26.9)+ Proxy Pro(9.9.347)+ dao-desktop 1.5.17 经官方 CLI 安装 | ✅ `devin-desktop --install-extension` 三件全部成功, --list-extensions 可见 |
+| verify-sync-matrix(两轨都部署后) | ✅ 判定通过: 安装顺序无关, 共享真源一致(credentials/memories/global_rules 单一真源三点同读) |
+
+结论: "官方 IDE 内装归一/Proxy Pro" 与 "VS Code 内装 dao-desktop 插件版" 双轨并行实机成立, 道并行而不相悖 —— 共享家目录真源, 两轨互不割裂。
