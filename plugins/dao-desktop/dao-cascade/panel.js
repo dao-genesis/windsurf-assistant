@@ -2786,6 +2786,22 @@ class CascadePanelProvider {
       return; }
     if(e.key==="."&&!e.shiftKey){ e.preventDefault(); modeBtn.click(); }
   });
+  // 官方 chat-client 键位全表对位(R188·官方 jd 枚举/iPi 键位映射逐条提取):
+  //   Ctrl+L 聚焦 composer(ToggleFocus) · Ctrl+Shift+L 新会话(CreateNewConversation)
+  //   Ctrl+N 重置当前会话(ResetCurrentConversation) · Ctrl+Shift+. agent 菜单(OpenAgentPicker)
+  //   Ctrl+; Worktree 开关(ToggleWorktree) · Ctrl+Shift+M 语音(PressMicrophone)
+  //   Ctrl+Alt+C 取消生成(Cancel)
+  document.addEventListener("keydown",(e)=>{
+    if(!e.ctrlKey) return;
+    const k=(e.key||"").toLowerCase();
+    if(k==="l"&&!e.shiftKey&&!e.altKey){ e.preventDefault(); inputEl.focus(); return; }
+    if(k==="l"&&e.shiftKey&&!e.altKey){ e.preventDefault(); vscode.postMessage({type:"session-new"}); return; }
+    if(k==="n"&&!e.shiftKey&&!e.altKey){ e.preventDefault(); vscode.postMessage({type:"session-new"}); return; }
+    if((k==="."||k===">")&&e.shiftKey&&!e.altKey){ e.preventDefault(); agentBtn.click(); return; }
+    if(e.key===";"&&!e.shiftKey&&!e.altKey){ e.preventDefault(); wtBtn.click(); return; }
+    if(k==="m"&&e.shiftKey&&!e.altKey){ e.preventDefault(); micBtn.click(); return; }
+    if(k==="c"&&e.altKey){ e.preventDefault(); if(busy){ vscode.postMessage({type:"cancel"}); setBusy(false); } return; }
+  });
   // 官方 chat-client 内部快捷键 SearchConversation(Ctrl+F) 同位: 会话内搜索浮层。
   // 匹配行高亮 + n/m 计数, Enter/↓ 下一处 · Shift+Enter/↑ 上一处 · Esc 关闭。
   const convFind=$("convFind"), cfIn=$("cfIn"), cfCnt=$("cfCnt");

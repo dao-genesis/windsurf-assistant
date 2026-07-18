@@ -2596,3 +2596,20 @@ test("R187: swhContext 摘要构建器功能(stub LS)", async () => {
     delete require.cache[require.resolve(path.join(CASCADE, "panel.js"))];
   }
 });
+
+// R188 · 官方 chat-client 键位全表对位: 官方 jd 枚举 21 动作逐条审计(parity/no-surface/host),
+// parity 项 webview 同键实装(Ctrl+L/Ctrl+Shift+L/Ctrl+N/Ctrl+Shift+./Ctrl+;/Ctrl+Shift+M/Ctrl+Alt+C)。
+test("R188: chat-client 键位全表审计与实装在位", () => {
+  const parity = require(path.join(ROOT, "dao-cascade", "official-parity.js"));
+  const ks = parity.CHAT_CLIENT_KEYS;
+  assert.strictEqual(ks.length, 21, "官方 jd 枚举全 21 动作逐条归类(宿主会话切换 3 动作合 1 行)");
+  for (const k of ks) assert.ok(["parity", "no-surface", "host"].includes(k.cls), k.official + " 归类合法");
+  const parityKeys = ks.filter((k) => k.cls === "parity").map((k) => k.key);
+  for (const need of ["ctrl+f","ctrl+l","ctrl+shift+l","ctrl+n","ctrl+.","ctrl+'","ctrl+shift+.","ctrl+/","ctrl+shift+/","ctrl+;","ctrl+shift+m","ctrl+alt+c"])
+    assert.ok(parityKeys.includes(need), need + " 已实装");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('type:"session-new"'), "Ctrl+Shift+L/Ctrl+N → session-new 在位");
+  assert.ok(src.includes("inputEl.focus(); return;"), "Ctrl+L 聚焦在位");
+  assert.ok(src.includes("micBtn.click()"), "Ctrl+Shift+M 语音在位");
+  assert.ok(src.includes("wtBtn.click()"), "Ctrl+; worktree 在位");
+});

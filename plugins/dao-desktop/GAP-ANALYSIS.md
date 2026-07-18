@@ -437,3 +437,12 @@ GetUserTrajectoryDescriptions(current)→GetUserTrajectory 末尾步骤(commit/u
 R187 实机验证补记: 本 VM 全新环境 GetUserTrajectoryDescriptions 返回空(无编码轨迹), 开关开启
 后端到端实测消息未附块且模型回 SWH-NO——即空轨迹优雅降级为不附带, 与设计一致; 正路径以
 stub-LS 单测覆盖(swhContext: 空轨迹/RPC 失败→空串, 有轨迹→结构化块)。100/100 测试。
+
+## R188 · 官方 chat-client 键位全表对位(jd 枚举 21 动作逐条)
+
+官方真源(3.4.27 workbench): jd 枚举 21 动作 + iPi 键位映射 + wtr 运行面归类
+(DetectedAndRunByWindsurfIde/DetectedByWindsurfIdeRunByChatClient/DetectedAndRunByChatClient)
+逐条提取。插件 CHAT_CLIENT_KEYS 全表审计: parity 12 条(Ctrl+F/Ctrl+L/Ctrl+Shift+L/Ctrl+N/
+Ctrl+./Ctrl+'/Ctrl+Shift+./Ctrl+//Ctrl+Shift+//Ctrl+;/Ctrl+Shift+M/Ctrl+Alt+C 全部 webview
+同键实装), no-surface 8 条(cascade 多标签组/步骤评审/plan 模式——插件单会话面无对应 UI, 如实
+归类不伪装), host 1 行(宿主侧会话切换 3 动作)。101/101 测试。
