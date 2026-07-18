@@ -2420,11 +2420,15 @@ class CascadePanelProvider {
   #micBtn.bare { width:24px; height:24px; border:none; background:transparent; color:var(--dim); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
   #micBtn.bare:hover { background:var(--pill-hover); }
   #plusBtn:hover, #imgBtn:hover, #arenaBtn:hover, #wtBtn:hover { background:var(--pill-hover); }
+  /* 官方空态无此行: 静息隐去, 悬停 Recent 区即现(功能不减) */
+  #autoOpenRow { opacity:0; transition:opacity .15s; }
+  #recent:hover #autoOpenRow { opacity:1; }
   /* 官方 1:1: 默认行只有 ＋ / Code / 模型 / agent / 🎙 / ↑ —— 增强钮(图/竞技场/worktree)悬停或聚焦时才现身, 静态外观与官方一致 */
   #imgBtn, #arenaBtn, #wtBtn, #tokCount { display:none; }
   .card:hover #imgBtn, .card:focus-within #imgBtn,
   .card:hover #arenaBtn, .card:focus-within #arenaBtn,
   .card:hover #wtBtn, .card:focus-within #wtBtn,
+  .card:hover #tokCount, .card:focus-within #tokCount { display:inline-flex; }
   #arenaBtn.on, #wtBtn.on { border-color:var(--accent,#4a9eff); color:var(--accent,#4a9eff); }
   #wtBar { display:none; align-items:center; gap:8px; font-size:11px; color:var(--dim); padding:3px 8px; border:1px dashed var(--line); border-radius:6px; margin:4px 0; }
   #wtBar button { background:transparent; border:1px solid var(--line); border-radius:6px; color:inherit; cursor:pointer; font-size:11px; padding:1px 8px; }
@@ -2456,6 +2460,9 @@ class CascadePanelProvider {
   .target { display:flex; gap:10px; align-items:center; font-size:11.5px; color:var(--dim); padding:5px 4px 0; }
   .target .seg { display:inline-flex; gap:4px; align-items:center; }
   .target .env { margin-left:auto; }
+  /* 官方底行只有「Local」: 工作区/用量/引擎详情静息隐去, 悬停即现(信息不减) */
+  .target #folderSeg, .target #usage, .target .env { opacity:0; transition:opacity .15s; }
+  .target:hover #folderSeg, .target:hover #usage, .target:hover .env { opacity:1; }
   #authbar { display:none; gap:6px; align-items:center; padding:6px 12px; font-size:12px; flex-wrap:wrap; }
   #authbar.show { display:flex; }
   #authbar input { flex:1; min-width:120px; background:var(--card); color:var(--vscode-input-foreground); border:1px solid var(--line); border-radius:6px; padding:3px 6px; }
@@ -2535,7 +2542,7 @@ class CascadePanelProvider {
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
-      <div class="ttl" id="emptyTtl">Cascade Code <span class="kbd">Ctrl</span><span class="kbd">.</span></div>
+      <div class="ttl" id="emptyTtl">Cascade Code <span style="white-space:nowrap"><span class="kbd">Ctrl</span><span class="kbd">.</span></span></div>
       <div class="sub">Kick off a new project. Make changes across your entire codebase.</div>
       <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent">☁ Try Devin Cloud</button>
       <div id="recent">
