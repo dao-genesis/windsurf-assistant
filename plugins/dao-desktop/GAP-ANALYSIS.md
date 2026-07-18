@@ -363,3 +363,16 @@
 | 侧栏近期会话(标题+相对时间) | ✅ 云端+本机合流前 8 条 |
 | 底栏「0 MCP servers」 | ✅ 同源计数(~/.codeium/windsurf/mcp_config.json, 与官方同一份) |
 | 官方二实例 LS 竞态报错 | 单实例重启后消失, 印证与插件无关 |
+
+## R181 · 归一外壳单网页(/shell) — dao-vsix 本源同形态原生落地
+
+对照 devin-remote 本源(AGENTS.md: dao-vsix 才是本源主体, /shell 归一网页 = 浏览器套浏览器,
+每板块一张平级 iframe 标签; IDE 内能操作的, 任意浏览器打开 /shell 同样能操作):
+
+| 本源(dao-vsix@3.58.11) | 插件版适配 |
+|---|---|
+| 主口 9920 起 /shell 归一网页 | ✅ 插件 local-api 同口直出 /shell(dao.cascade.openShell 一键浏览器打开) |
+| 板块各一张平级 iframe 标签 | ✅ 八标签: 主页/切号/桥接/备份/注入/MCP/GitHub/Proxy Pro |
+| 数据 = dao-vsix 自持真源 | ✅ 换源为插件自持真源: 板块页 fetch 同一套 /api/*(与 unified-panel 面板同真源, 一侧写全侧见) |
+| iframe 无法带 header → token 走查询串 | ✅ ?t= 鉴权(/web 同法), 只绑 127.0.0.1, 错 token 401 |
+| 公网穿透(dao-bridge) | 待续轮: 插件版隧道折入后 /shell 即公网可达(与本源同径) |

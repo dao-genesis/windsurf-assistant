@@ -2465,3 +2465,32 @@ test("agent-board R180: 官方 Agent 侧栏结构 + MCP servers 底栏同源", (
   assert.ok(src.includes('id="recent"') && src.includes("renderRecent"), "近期会话列表对位");
   assert.ok(src.includes("MCP servers") && src.includes("mcp_config.json"), "底栏 N MCP servers 与官方同一份 mcp_config 真源");
 });
+
+// R181 · 归一外壳单网页(/shell): dao-vsix「单网页实现一切」插件本体原生对位。
+test("shell-page R181: /shell 归一外壳 + 板块子网页 + token 鉴权(实起服务活体验证)", async () => {
+  const sp = require(path.join(CASCADE, "shell-page.js"));
+  assert.ok(sp.BOARDS.length >= 8, "八大板块标签(六大板块+github+proxy)");
+  for (const k of ["overview", "switch", "bridge", "backups", "inject", "mcp", "github", "proxy"])
+    assert.ok(sp.BOARDS.some((b) => b.key === k), "板块在位: " + k);
+  assert.ok(sp.shellPage("tk").includes("iframe"), "浏览器套浏览器(iframe 平级标签)");
+  assert.ok(sp.boardPage("mcp", "tk", 1).includes("/api/mcp"), "板块页 fetch 同一套 /api 真源");
+  assert.strictEqual(sp.boardPage("nope", "tk", 1), null, "未知板块拒绝");
+  // 活体: 实起 local-api, /shell 走 ?t= 鉴权, 错 token 401, 对 token 200 HTML
+  const api = require(path.join(CASCADE, "local-api.js"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dao-shell-"));
+  process.env.DAO_LOCAL_API_FILE = path.join(tmp, "s.json");
+  const { port, token } = await api.start(0);
+  const get = (u) => new Promise((res) => require("http").get("http://127.0.0.1:" + port + u, (r) => {
+    let b = ""; r.on("data", (c) => b += c); r.on("end", () => res({ code: r.statusCode, body: b }));
+  }));
+  const bad = await get("/shell?t=wrong");
+  assert.strictEqual(bad.code, 401, "错 token 401");
+  const ok = await get("/shell?t=" + encodeURIComponent(token));
+  assert.strictEqual(ok.code, 200);
+  assert.ok(ok.body.includes("归一"), "/shell 外壳直出");
+  const bd = await get("/shell/board/overview?t=" + encodeURIComponent(token));
+  assert.ok(bd.code === 200 && bd.body.includes("/api/account"), "板块子网页直出");
+  await api.stop();
+  delete process.env.DAO_LOCAL_API_FILE;
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
