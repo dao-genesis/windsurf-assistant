@@ -406,3 +406,18 @@
 - 同源反代 `/?dao_acct=<号>` 浏览器打开即自动登录整官方 Devin SPA(webapp_host 改写在位, 无回弹)✓ 实机截图。
 - 统一外壳多实例开页 `_shellResolveOpen` 同源相对 URL 形态确认。
 - 新增 CI 安全护栏测试: vendor-one 在位时断言多实例/钉号/反代源完整搬运(97/97)。
+
+## R186 · 冷启动全复验(全新 VM) + 会话搜索浮层(Ctrl+F SearchConversation 同位)
+
+全新 VM 全链路复验(全后端·零 GUI): IDE 3.4.27 下载解压 → windsurf_auth 四步登录(credentials.toml
+同源落盘) → 官方 LS 自持 boot → GetUserStatus ✓ → vendor-one 装配(dao-one@2.26.8·上游 dao-vsix
+已从 3.58.11 演进到 3.58.16, build 即自动跟随) → VS Code 装 vsix → 9920 /api/health ✓ /shell ✓
+`/api/devin/login` auth1 ✓ 多实例钉号 post-auth 返本号 org·未知号 Unauthenticated ✓ `/?dao_acct=` 200 ✓。
+
+对照收敛(反者道之动·官方 workbench 真源提取): 官方 chat-client 内部快捷键面(jd.*, 非 contributes
+键位)含 SearchConversation=Ctrl+F(命令 devin.cascade.chat.searchConversation)——插件此前无此面。
+- 面板 webview 同键同位落地会话搜索浮层: 匹配行高亮 + n/m 计数 + Enter/Shift+Enter 巡航 + Esc 关闭。
+- official-parity 新增 CHAT_CLIENT_KEYS 审计表(chat-client 内部键位逐条归类, 与 29 条 contributes
+  KEYMAP_AUDIT 分野不混)。
+- 官方另有 Start With History 开关(setStartWithHistoryEnabled)与 CloseActiveCascadeTab 等
+  chat-client 键位, 列为后续对位点(如实待办)。98/98 测试。

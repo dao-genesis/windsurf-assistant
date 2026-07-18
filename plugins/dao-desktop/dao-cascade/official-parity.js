@@ -99,6 +99,12 @@ const KEYMAP_AUDIT = [
   { key: "ctrl+u", official: "lifeguard.checkCurrentChanges", cls: "parity", ours: "dao.cascade.lifeguardCheck" },
 ];
 
+// 官方 chat-client 内部快捷键对位表(R186): 非 contributes 键位,
+// 官方 workbench 内 DetectedAndRunByChatClient/jd.* 快捷键面, 逐条审计。
+const CHAT_CLIENT_KEYS = [
+  { key: "ctrl+f", official: "cascade.chat.searchConversation(jd.SearchConversation)", cls: "parity", ours: "面板内会话搜索浮层(webview 同键: 匹配高亮+n/m 计数+Enter/Shift+Enter 巡航+Esc 关闭)" },
+];
+
 // 官方非命令 contributes 面(R177): 逐面归类。
 //   adopted — 官方资源逐字节随包复用(themes/schemas); host — 宿主原生已有; na — 不适用
 const SURFACE_AUDIT = [
@@ -308,4 +314,4 @@ function register(context, log) {
   l("官方命令对位就位(importRulesFromCursor/openBrowser/lifeguardCheck/acpRegistry/refreshSessions/refreshCustomizations/refreshMcp)");
 }
 
-module.exports = { MANIFEST, KEY_PARITY, KEYMAP_AUDIT, SURFACE_AUDIT, audit, register };
+module.exports = { MANIFEST, KEY_PARITY, KEYMAP_AUDIT, CHAT_CLIENT_KEYS, SURFACE_AUDIT, audit, register };

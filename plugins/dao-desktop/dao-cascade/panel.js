@@ -2330,7 +2330,16 @@ class CascadePanelProvider {
     --dim: var(--vscode-descriptionForeground);
     --pill-hover: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.15)); }
   html,body { height:100%; margin:0; }
-  body { display:flex; flex-direction:column; font:13px var(--vscode-font-family); color:var(--vscode-foreground); background:var(--vscode-sideBar-background); }
+  body { display:flex; flex-direction:column; font:13px var(--vscode-font-family); color:var(--vscode-foreground); background:var(--vscode-sideBar-background); position:relative; }
+  /* 官方会话内搜索浮层(SearchConversation · Ctrl+F): 输入 + n/m 计数 + 上/下/关 */
+  #convFind { display:none; position:absolute; top:32px; right:12px; z-index:40; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:3px 6px; align-items:center; gap:2px; box-shadow:0 4px 12px rgba(0,0,0,.3); }
+  #convFind.show { display:flex; }
+  #convFind input { width:150px; background:transparent; border:none; outline:none; color:var(--vscode-foreground); font:12px var(--vscode-font-family); }
+  #convFind .cfc { font-size:11px; color:var(--dim); min-width:30px; text-align:center; }
+  #convFind button { background:transparent; border:none; color:var(--dim); cursor:pointer; padding:1px 4px; font-size:12px; border-radius:4px; }
+  #convFind button:hover { background:var(--pill-hover); color:var(--vscode-foreground); }
+  .cfHit { outline:1px solid var(--vscode-editor-findMatchHighlightBorder, rgba(86,156,214,.45)); border-radius:4px; }
+  .cfCur { outline:2px solid var(--vscode-focusBorder, rgba(86,156,214,.9)); border-radius:4px; }
   #log { flex:1; overflow:auto; padding:10px 12px; display:flex; flex-direction:column; gap:10px; }
   #log > * { flex-shrink:0; }
   /* 空态 = 官方 New session 首页:居中 logo + 近期会话 */
@@ -2539,6 +2548,7 @@ class CascadePanelProvider {
     <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">📚</button>
     <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;">⚙</button>
   </div>
+  <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="上一处 (Shift+Enter)">↑</button><button id="cfNext" title="下一处 (Enter)">↓</button><button id="cfClose" title="关闭 (Esc)">✕</button></div>
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
@@ -2766,6 +2776,25 @@ class CascadePanelProvider {
       return; }
     if(e.key==="."&&!e.shiftKey){ e.preventDefault(); modeBtn.click(); }
   });
+  // 官方 chat-client 内部快捷键 SearchConversation(Ctrl+F) 同位: 会话内搜索浮层。
+  // 匹配行高亮 + n/m 计数, Enter/↓ 下一处 · Shift+Enter/↑ 上一处 · Esc 关闭。
+  const convFind=$("convFind"), cfIn=$("cfIn"), cfCnt=$("cfCnt");
+  let cfHits=[], cfIdx=-1;
+  function cfClear(){ cfHits.forEach(el=>el.classList.remove("cfHit","cfCur")); cfHits=[]; cfIdx=-1; cfCnt.textContent=""; }
+  function cfMark(){ cfHits.forEach((el,i)=>el.classList.toggle("cfCur",i===cfIdx)); cfCnt.textContent=(cfIdx+1)+"/"+cfHits.length; if(cfHits[cfIdx]) cfHits[cfIdx].scrollIntoView({block:"center"}); }
+  function cfRun(){ cfClear(); const q=cfIn.value.trim().toLowerCase(); if(!q) return;
+    for(const el of logEl.children){ if(el.id==="empty") continue;
+      if((el.textContent||"").toLowerCase().includes(q)){ el.classList.add("cfHit"); cfHits.push(el); } }
+    if(cfHits.length){ cfIdx=0; cfMark(); } else cfCnt.textContent="0/0"; }
+  function cfStep(d){ if(!cfHits.length) return; cfIdx=(cfIdx+d+cfHits.length)%cfHits.length; cfMark(); }
+  function cfOpen(){ convFind.classList.add("show"); cfIn.focus(); cfIn.select(); if(cfIn.value) cfRun(); }
+  function cfCloseFn(){ convFind.classList.remove("show"); cfClear(); inputEl.focus(); }
+  cfIn.addEventListener("input", cfRun);
+  cfIn.addEventListener("keydown",(e)=>{
+    if(e.key==="Escape"){ e.preventDefault(); return cfCloseFn(); }
+    if(e.key==="Enter"){ e.preventDefault(); return cfStep(e.shiftKey?-1:1); } });
+  $("cfPrev").onclick=()=>cfStep(-1); $("cfNext").onclick=()=>cfStep(1); $("cfClose").onclick=cfCloseFn;
+  document.addEventListener("keydown",(e)=>{ if(e.ctrlKey&&!e.shiftKey&&!e.altKey&&(e.key==="f"||e.key==="F")){ e.preventDefault(); cfOpen(); }});
   // mode/agent 弹层键盘导航(同 R101): ↑↓ 循环 .kbd 高亮, Enter 选中, Escape 关闭
   document.addEventListener("keydown",(e)=>{
     const open=[[modeMenu,modeList],[agentMenu,agentList]].find(([m])=>m.classList.contains("show"));
