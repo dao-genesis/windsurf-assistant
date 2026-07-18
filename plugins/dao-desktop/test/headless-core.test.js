@@ -2231,3 +2231,29 @@ test("cascade-bar.diffStat: 桩 ls-bridge 聚合 diff 行数/未就绪如实 nul
     if (real) require.cache[require.resolve(lsPath)] = real; else delete require.cache[require.resolve(lsPath)];
   }
 });
+
+// R161 · 官方命令/键位 1:1 覆盖审计: 清单完整性 + 归类如实 + 路由/接线在位。
+test("official-parity: 33 基名清单/归类/审计聚合与接线在位", () => {
+  const mod = require(path.join(CASCADE, "official-parity.js"));
+  assert.strictEqual(mod.MANIFEST.length, 33, "官方 64 命令去偶应为 33 基名");
+  for (const m of mod.MANIFEST) {
+    assert.ok(["covered", "passthrough", "na", "pending"].includes(m.cls), m.base + " 归类应合法");
+    if (m.cls === "covered") assert.ok(m.equiv, m.base + " covered 应指明等价落点");
+    else if (m.cls !== "passthrough") assert.ok(m.reason, m.base + " 应指明理由(如实)");
+  }
+  const a = mod.audit();
+  assert.strictEqual(a.covered + a.passthrough + a.na + a.pending, 33, "归类应无遗漏");
+  assert.ok(a.pending > 0, "pending 应如实存在(ACP/Lifeguard 未接, 不伪造 100%)");
+  assert.strictEqual(a.keyParity, 12, "12 键 1:1 键位表");
+  assert.ok(a.coveragePct >= 80, "适用面覆盖率应 ≥80%(当前审计)");
+  const api = fs.readFileSync(path.join(CASCADE, "local-api.js"), "utf8");
+  assert.ok(api.includes('u === "/api/parity/commands"'), "应挂 GET /api/parity/commands");
+  const schema = fs.readFileSync(path.join(CASCADE, "api-schema.js"), "utf8");
+  assert.ok(schema.includes("/api/parity/commands"), "openapi 应登记");
+  const ext = fs.readFileSync(path.join(__dirname, "..", "extension.js"), "utf8");
+  assert.ok(ext.includes('require("./dao-cascade/official-parity").register'), "extension 应注册对位命令");
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const cmds = pkg.contributes.commands.map((c) => c.command);
+  for (const c of ["dao.cascade.importRulesFromCursor", "dao.cascade.openBrowser"])
+    assert.ok(cmds.includes(c), c + " 应登记为命令");
+});

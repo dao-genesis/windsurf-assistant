@@ -86,6 +86,12 @@ async function activate(context) {
     log("✓ Cascade Bar 就位 (六键 + 状态栏段)");
   } catch (e) { log("✗ Cascade Bar 注册失败: " + (e && e.stack ? e.stack : e)); }
 
+  // ②b⁙ 官方命令对位补齐(importRulesFromCursor/openBrowser) + 覆盖审计模块。
+  try {
+    require("./dao-cascade/official-parity").register(context, log);
+    log("✓ 官方命令对位就位 (importRulesFromCursor/openBrowser + /api/parity/commands)");
+  } catch (e) { log("✗ 官方命令对位注册失败: " + (e && e.stack ? e.stack : e)); }
+
   // ②c Proxy Pro 独立面板(dao.proxyPro): 与 dao-proxy-pro 独立插件面板对位,
   // 插件自持渠道/路由(~/.dao/proxy-channels.json), 与 dao-vsix 的 ~/.codeium/dao-byok 隔离。
   try {
