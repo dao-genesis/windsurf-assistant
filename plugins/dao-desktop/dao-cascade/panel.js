@@ -1153,27 +1153,7 @@ class CascadePanelProvider {
   // include your recent coding history"): 新会话首条消息附带最近编码轨迹摘要。
   // 数据同源: GetUserTrajectoryDescriptions(current) → GetUserTrajectory 末尾步骤。LS 无
   // start_with_history 专用 RPC(二进制实测), 故与官方同为客户端态+消息内附带。
-  async _swhContext() {
-    const ls = require("./ls-bridge");
-    try {
-      const ds = await ls.call("GetUserTrajectoryDescriptions", {});
-      const cur = ((ds.trajectories || []).find((t) => t.current) || {});
-      if (!cur.trajectoryId) return "";
-      const r = await ls.call("GetUserTrajectory", { trajectoryId: cur.trajectoryId });
-      const one = (s) => String(s || "").split("\n")[0].slice(0, 120);
-      const rel = (u) => String(u || "").replace(/^file:\/\//, "").split("/").slice(-2).join("/");
-      const lines = ((r.trajectory || {}).steps || []).map((s) => {
-        const t = (s.type || "").replace("CORTEX_STEP_TYPE_", "");
-        if (t === "GIT_COMMIT") return "commit: " + one((s.gitCommit || {}).commitMessage);
-        if (t === "USER_INPUT") return "user: " + one((s.userInput || {}).userResponse);
-        if (t === "VIEW_FILE") return "viewed: " + rel((s.viewFile || {}).absolutePathUri);
-        if (t === "CHECKPOINT") return "intent: " + one((s.checkpoint || {}).userIntent);
-        return null;
-      }).filter(Boolean).slice(-12);
-      if (!lines.length) return "";
-      return "<recent_coding_history>\n" + lines.join("\n") + "\n</recent_coding_history>\n\n";
-    } catch (_) { return ""; }
-  }
+  async _swhContext() { return swhContext(require("./ls-bridge")); }
 
   async _handleTimelineList() {
     const ls = require("./ls-bridge");
@@ -3759,4 +3739,26 @@ function register(context, log, opts) {
   return provider;
 }
 
-module.exports = { register, VIEW_ID, AGENTS };
+// 官方 Start With History 同位摘要构建器(R187): 无当前轨迹/无可用步骤/RPC 失败均优雅降级为空串。
+async function swhContext(ls) {
+  try {
+    const ds = await ls.call("GetUserTrajectoryDescriptions", {});
+    const cur = ((ds.trajectories || []).find((t) => t.current) || {});
+    if (!cur.trajectoryId) return "";
+    const r = await ls.call("GetUserTrajectory", { trajectoryId: cur.trajectoryId });
+    const one = (s) => String(s || "").split("\n")[0].slice(0, 120);
+    const rel = (u) => String(u || "").replace(/^file:\/\//, "").split("/").slice(-2).join("/");
+    const lines = ((r.trajectory || {}).steps || []).map((s) => {
+      const t = (s.type || "").replace("CORTEX_STEP_TYPE_", "");
+      if (t === "GIT_COMMIT") return "commit: " + one((s.gitCommit || {}).commitMessage);
+      if (t === "USER_INPUT") return "user: " + one((s.userInput || {}).userResponse);
+      if (t === "VIEW_FILE") return "viewed: " + rel((s.viewFile || {}).absolutePathUri);
+      if (t === "CHECKPOINT") return "intent: " + one((s.checkpoint || {}).userIntent);
+      return null;
+    }).filter(Boolean).slice(-12);
+    if (!lines.length) return "";
+    return "<recent_coding_history>\n" + lines.join("\n") + "\n</recent_coding_history>\n\n";
+  } catch (_) { return ""; }
+}
+
+module.exports = { register, VIEW_ID, AGENTS, swhContext };
