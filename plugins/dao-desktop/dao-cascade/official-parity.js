@@ -139,7 +139,7 @@ const RPC_GAP_AUDIT = {
   GetProfileData: "ux-done", // 官方同路(登录后 {apiKey}→profilePictureUrl 入账户卡; 官方 extension.js 同 try/catch 静默容错——本账号域后端回 token authentication 亦如官方静默)
   GetKnowledgeBaseItemsForTeam: "removed", // 后端实测: knowledge base feature has been deprecated
   SetPinnedContext: "unimpl", SetPinnedGuideline: "unimpl", // 后端实测: not implemented
-  GetSuggestedContextScopeItems: "internal", // 官方 3.4.27 workbench/extension 均无调用点(仅 proto 定义); 后端实测 suggestionSources 全枚举仍报 relative filepaths must not be empty(需 LS 内部文件追踪态)
+  GetSuggestedContextScopeItems: "internal", // 官方 3.4.27 workbench/extension 均无调用点(仅 proto 定义); 需 LSP 会话初始化 file watcher(实测: AddTrackedWorkspace→file watcher not initialized; 插件走 HTTP RPC 无 LSP 会话), suggestionSources 全枚举仍报 relative filepaths must not be empty
   SubmitBugReport: "ux-done", // 官方 bug 报告(后端实测返回 Slack messageLink)
   GetGithubPullRequestSearchInfo: "removed", // 后端实测: knowledge base feature has been deprecated
   GetCascadeModelConfigs: "unimpl", // 后端实测: unimplemented; use GetUserStatus instead(插件已接 GetUserStatus)

@@ -2661,8 +2661,8 @@ test("R192: SubmitBugReport 链路与甄别再校准在位", () => {
   assert.ok(src.includes('id="mtBug"') && src.includes('type:"bug-report"'), "🐞 按钮与桥接在位");
 });
 
-// R193 · 官方头像对位: GetProfileData{apiKey}→profilePictureUrl(宿主转 data URI)入账户卡。
-test("R193: GetProfileData 官方同路与甄别收敛在位", () => {
+// R194 · 官方头像对位: GetProfileData{apiKey}→profilePictureUrl(宿主转 data URI)入账户卡。
+test("R194: GetProfileData 官方同路与甄别收敛在位", () => {
   const g = require(path.join(ROOT, "dao-cascade", "official-parity.js")).RPC_GAP_AUDIT;
   assert.strictEqual(g.GetProfileData, "ux-done");
   assert.strictEqual(g.GetSuggestedContextScopeItems, "internal");
