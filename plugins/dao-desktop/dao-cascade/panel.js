@@ -2407,7 +2407,8 @@ class CascadePanelProvider {
                 const cid = this._cascadeLsId, kk = k;
                 new Promise((resolve) => {
                   this._permPending.set(reqId, resolve);
-                  this._post({ type: "permission", reqId, title: "运行命令? " + cmd,
+                  // 官方同文: 浮标 "Command Awaiting Approval", 钮 Run/Skip(反提 sVs 真源)
+                  this._post({ type: "permission", reqId, header: "Command Awaiting Approval", title: cmd,
                     options: [{ optionId: "confirm", name: "Run" }, { optionId: "skip", name: "Skip" }] });
                 }).then(async (opt) => {
                   const action = opt === "confirm" ? "RUN_COMMAND_ACTION_CONFIRM" : "RUN_COMMAND_ACTION_SKIP";
@@ -3644,7 +3645,8 @@ class CascadePanelProvider {
     else if(m.type==="permission"){
       if(emptyEl) emptyEl.remove();
       const el=document.createElement("div"); el.className="perm"; el.dataset.perm=m.reqId;
-      const t=document.createElement("div"); t.textContent="权限请求: "+m.title; el.appendChild(t);
+      // 官方同文(反提 workbench 真源): 非命令类头文案 "Permission required"
+      const t=document.createElement("div"); t.textContent=(m.header||"Permission required")+(m.title?": "+m.title:""); el.appendChild(t);
       for(const o of (m.options||[])){ const b=document.createElement("button"); b.textContent=o.name||o.optionId;
         b.onclick=()=>{ vscode.postMessage({type:"permission-reply", reqId:m.reqId, optionId:o.optionId}); el.remove(); };
         el.appendChild(b); }
