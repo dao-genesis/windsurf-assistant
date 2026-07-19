@@ -2444,6 +2444,35 @@ class CascadePanelProvider {
                 }
               }
             }
+            // 官方式 web 请求审批: READ_URL_CONTENT 待确认步 → Allow web request?
+            // (官方 ReadUrlContentAction: ALLOW_ONCE / ALWAYS_ALLOW_ORIGIN / REJECT)
+            if (ty === "CORTEX_STEP_TYPE_READ_URL_CONTENT" && /WAITING|HALTED/.test(st.status || "")) {
+              this._cxAsked = this._cxAsked || new Set();
+              const ukey = this._cascadeLsId + ":url:" + k;
+              if (!this._cxAsked.has(ukey)) {
+                this._cxAsked.add(ukey);
+                const reqId = "cxurl-" + Date.now() + "-" + k;
+                const url = (st.readUrlContent && (st.readUrlContent.url || st.readUrlContent.proposedUrl)) || "";
+                this._permPending = this._permPending || new Map();
+                const cid = this._cascadeLsId, kk = k;
+                new Promise((resolve) => {
+                  this._permPending.set(reqId, resolve);
+                  // 官方同文: "Allow web request?" · 副文 "Cascade wants to fetch this URL"
+                  this._post({ type: "permission", reqId, header: "Allow web request?", title: url,
+                    options: [{ optionId: "allow", name: "Allow" },
+                      { optionId: "always", name: "Always allow origin" },
+                      { optionId: "reject", name: "Reject" }] });
+                }).then(async (opt) => {
+                  const action = opt === "allow" ? "READ_URL_CONTENT_ACTION_ALLOW_ONCE"
+                    : opt === "always" ? "READ_URL_CONTENT_ACTION_ALWAYS_ALLOW_ORIGIN"
+                    : "READ_URL_CONTENT_ACTION_REJECT";
+                  const tr = await ls.call("GetCascadeTrajectory", { cascadeId: cid });
+                  const tid = ((tr && tr.trajectory) || {}).trajectoryId || "";
+                  return ls.call("HandleCascadeUserInteraction", { cascadeId: cid,
+                    interaction: { trajectoryId: tid, stepIndex: kk, readUrlContent: { action } } });
+                }).catch((e) => this._log("cascade: web 请求审批回传失败 " + e.message));
+              }
+            }
             // 官方式提问交互: ASK_USER_QUESTION 待答步 → 选项按钮 → askUserQuestion.response 回传
             if (ty === "CORTEX_STEP_TYPE_ASK_USER_QUESTION" && /WAITING|HALTED/.test(st.status || "")) {
               this._cxAsked = this._cxAsked || new Set();
@@ -3533,7 +3562,7 @@ class CascadePanelProvider {
           const rn=document.createElement("span"); rn.className="arch"; rn.title="Rename conversation"; rn.innerHTML=OICONS.pencil;
           rn.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-rename", sessionId:s.sessionId}); };
           it.appendChild(rn);
-          const ex=document.createElement("span"); ex.className="arch"; ex.title="导出会话转录"; ex.innerHTML=OICONS.download;
+          const ex=document.createElement("span"); ex.className="arch"; ex.title="Export"; ex.innerHTML=OICONS.download;
           ex.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-export", sessionId:s.sessionId}); };
           it.appendChild(ex);
           const a=document.createElement("span"); a.className="arch"; a.title="Delete conversation"; a.innerHTML=OICONS.trash;
@@ -3695,6 +3724,7 @@ class CascadePanelProvider {
       const el=document.createElement("div"); el.className="perm"; el.dataset.perm=m.reqId;
       // 官方同文(反提 workbench 真源): 非命令类头文案 "Permission required"
       const t=document.createElement("div"); t.textContent=(m.header||"Permission required")+(m.title?": "+m.title:""); el.appendChild(t);
+      if(m.header==="Allow web request?"){ const s=document.createElement("div"); s.style.cssText="font-size:11px;color:var(--dim);margin:2px 0 4px;"; s.textContent="Cascade wants to fetch this URL"; el.appendChild(s); } // 官方同文副文
       for(const o of (m.options||[])){ const b=document.createElement("button"); b.textContent=o.name||o.optionId;
         b.onclick=()=>{ vscode.postMessage({type:"permission-reply", reqId:m.reqId, optionId:o.optionId}); el.remove(); };
         el.appendChild(b); }
