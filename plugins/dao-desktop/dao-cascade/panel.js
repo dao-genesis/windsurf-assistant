@@ -3433,6 +3433,23 @@ class CascadePanelProvider {
       d.appendChild(strip); }
     logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; return d; }
 
+  // 官方式拖拽上下文: 文件拖入面板 → 官方同文遮罩 "Drop to add to agent" → @路径 入 composer
+  (function(){
+    let ov=null;
+    function overlay(){ if(ov) return ov;
+      ov=document.createElement("div");
+      ov.style.cssText="position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);border:2px dashed var(--dim);border-radius:8px;font-size:14px;pointer-events:none;";
+      ov.textContent="Drop to add to agent"; document.body.appendChild(ov); return ov; }
+    document.addEventListener("dragover",(e)=>{ e.preventDefault(); overlay().style.display="flex"; });
+    document.addEventListener("dragleave",(e)=>{ if(!e.relatedTarget&&ov) ov.style.display="none"; });
+    document.addEventListener("drop",(e)=>{ e.preventDefault(); if(ov) ov.style.display="none";
+      const parts=[];
+      for(const f of (e.dataTransfer&&e.dataTransfer.files)||[]){ if(f.path) parts.push("@"+f.path); }
+      const uri=e.dataTransfer&&e.dataTransfer.getData("text/uri-list");
+      if(!parts.length&&uri) for(const u of uri.split(/\r?\n/)) if(u&&!u.startsWith("#")) parts.push("@"+u.replace(/^file:\/\//,""));
+      if(parts.length){ inputEl.value=(inputEl.value?inputEl.value+" ":"")+parts.join(" ")+" "; autoGrow(); inputEl.focus(); } });
+  })();
+
   // 官方式图像附件: 粘贴 / 🖼 选择 → dataURL 暂存, composer 内缩略图预览, 发送随消息带出
   const imgStrip=$("imgStrip"), imgBtn=$("imgBtn"), imgFile=$("imgFile");
   let pendingImages=[];
@@ -3767,7 +3784,7 @@ class CascadePanelProvider {
       if(m.home&&emptyEl){ logEl.appendChild(emptyEl); vscode.postMessage({type:"sessions-list"}); } }
     else if(m.type==="history-done"){ logEl.scrollTop=logEl.scrollHeight; }
     else if(m.type==="user-replay"){ const n=addMsg("user", m.text, m.images);
-      if(typeof m.stepIndex==="number"){ const rv=document.createElement("button"); rv.className="msgrevert"; rv.title="回退到此消息(丢弃之后步骤)"; rv.textContent="↩";
+      if(typeof m.stepIndex==="number"){ const rv=document.createElement("button"); rv.className="msgrevert"; rv.title="Revert to this snapshot"; rv.textContent="↩";
         rv.onclick=(e)=>{ e.stopPropagation(); vscode.postMessage({type:"cx-revert", stepIndex:m.stepIndex}); }; n.appendChild(rv);
         const br=document.createElement("button"); br.className="msgbranch"; br.title="从此消息开分支(原会话保持不变)"; br.textContent="⑂";
         br.onclick=(e)=>{ e.stopPropagation(); vscode.postMessage({type:"cx-branch", stepIndex:m.stepIndex, text:m.text}); }; n.appendChild(br); } }
