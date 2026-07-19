@@ -855,3 +855,10 @@ v1.5.80。
 N"; DEPLOY_WEB_APP{subdomain,deployment{projectUrl}} → 进行中 "Deploying app - X"
 / 完成 "Deployment is live." + View Deployment 官方同文钮(外开 projectUrl)。
 153/153 测试, v1.5.81。
+
+## R247 · P1: Settings Cascade 行为族 + Terminal 分区
+
+官方 UserSettings proto 真源七开关: Cascade 区补 Web search / Auto-fix lints /
+Browser previews / Auto-generate memories(反相 usetInv); 新增 Terminal 分区
+(Terminal completion / Command Cascade mode / Sounds for special events)。
+154/154 测试, v1.5.82。

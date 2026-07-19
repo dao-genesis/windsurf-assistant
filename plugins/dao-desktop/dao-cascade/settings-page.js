@@ -19,7 +19,7 @@ function nonce() { return crypto.randomBytes(16).toString("base64"); }
 const SECTIONS = [
   ["general", "General"], ["plan", "Plan"], ["plugins", "Plugins"],
   ["agents", "Agents"], ["local", "Devin Local"], ["editor", "Editor"],
-  ["cascade", "Cascade"], ["advanced", "Advanced"],
+  ["cascade", "Cascade"], ["terminal", "Terminal"], ["advanced", "Advanced"],
 ];
 
 class SettingsPagePanel {
@@ -223,6 +223,15 @@ function render(){
   h+=row("对话自动备份",sw(!!c.autoBackup,"cfg","dao.cascade.autoBackup"),"会话变更即增量导出轨迹转录");
   h+=row("备份目录",E(c.backupDir||"~/.wam/conversation_backups"));
   h+=row("规则/工作流",btn("新建规则","cmd","dao.cascade.createRule")+" "+btn("新建工作流","cmd","dao.cascade.createWorkflow"));
+  h+=row("Web search",sw(!st.cascadeWebSearchDisabled,"usetInv","cascadeWebSearchDisabled"),"官方 cascadeWebSearchDisabled 反相同源");
+  h+=row("Auto-fix lints",sw(!st.disableCascadeAutoFixLints,"usetInv","disableCascadeAutoFixLints"),"官方 disableCascadeAutoFixLints 反相同源");
+  h+=row("Browser previews",sw(!st.disableCascadeBrowserPreviews,"usetInv","disableCascadeBrowserPreviews"),"官方 disableCascadeBrowserPreviews 反相同源");
+  h+=row("Auto-generate memories",sw(!st.disableAutoGenerateMemories,"usetInv","disableAutoGenerateMemories"),"官方 disableAutoGenerateMemories 反相同源");
+  h+='</div>';
+  h+='<h2 id="s-terminal">Terminal</h2><div class="sub">终端域(官方 UserSettings 同源键)</div><div class="card">';
+  h+=row("Terminal completion",sw(!!st.enableTerminalCompletion,"uset","enableTerminalCompletion"),"官方 enableTerminalCompletion 同源");
+  h+=row("Command Cascade mode",sw(!!st.enableCommandCascadeMode,"uset","enableCommandCascadeMode"),"官方 enableCommandCascadeMode 同源");
+  h+=row("Sounds for special events",sw(!!st.enableSoundsForSpecialEvents,"uset","enableSoundsForSpecialEvents"),"官方 enableSoundsForSpecialEvents 同源");
   h+='</div>';
   h+='<h2 id="s-advanced">Advanced</h2><div class="sub">引擎运维与本地桥</div><div class="card">';
   h+=row("插件版本",E(D.version||"—"));

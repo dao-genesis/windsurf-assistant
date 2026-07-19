@@ -3123,3 +3123,12 @@ test("R246: checkpoint / deploy-card 官方同文", () => {
   assert.ok(src.includes('"Deployment is live."') && src.includes('"View Deployment"'), "部署官方同文");
   assert.ok(src.includes("dep.projectUrl"), "deployment proto 真源");
 });
+
+// R247 · Settings Cascade 行为族 + Terminal 分区。
+test("R247: Cascade/Terminal 官方 UserSettings 七键", () => {
+  const sp = fs.readFileSync(path.join(ROOT, "dao-cascade", "settings-page.js"), "utf8");
+  for (const k of ["cascadeWebSearchDisabled", "disableCascadeAutoFixLints", "disableCascadeBrowserPreviews",
+    "disableAutoGenerateMemories", "enableTerminalCompletion", "enableCommandCascadeMode",
+    "enableSoundsForSpecialEvents"]) assert.ok(sp.includes(k), k + " 在位");
+  assert.ok(sp.includes('["terminal", "Terminal"]') && sp.includes('id="s-terminal"'), "Terminal 分区在位");
+});
