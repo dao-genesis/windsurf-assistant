@@ -2726,3 +2726,13 @@ test("R203: 空态标题粗体 Cascade + 副题随模式官方同文", () => {
   assert.ok(src.includes("Build and validate. Test your changes automatically end-to-end."), "Testing 态官方同文副题");
   assert.ok(src.includes('{Plan:"Planning"}'), "Plan→Planning 官方空态标题词映射");
 });
+
+// R204 · 云标官方 cloud-simple SVG 化(反提 workbench GDs/lde 真源, 去 ☁ emoji)。
+test("R204: Try Devin Cloud 钮/云标官方 SVG 化", () => {
+  const p = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  const b = fs.readFileSync(path.join(ROOT, "dao-cascade", "agent-board.js"), "utf8");
+  assert.ok(!p.includes("☁"), "panel 内 ☁ emoji 已全数替换");
+  assert.ok(!b.includes("☁"), "agent-board 内 ☁ emoji 已全数替换");
+  assert.ok(p.includes("CLOUD_SVG"), "官方 cloud-simple SVG 常量在位");
+  assert.ok(p.includes('fill-rule="evenodd"'), "官方路径属性同源(evenodd/currentColor)");
+});

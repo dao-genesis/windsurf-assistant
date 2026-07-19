@@ -2715,7 +2715,7 @@ class CascadePanelProvider {
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
       <div class="ttl" id="emptyTtl"><b>Cascade</b> <span id="emptyModeName">Code</span> <span style="white-space:nowrap"><span class="kbd">Ctrl</span><span class="kbd">.</span></span></div>
       <div class="sub" id="emptySub">Kick off a new project. Make changes across your entire codebase.</div>
-      <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent">☁ Try Devin Cloud</button>
+      <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-2px"><path d="M8.120 4.042 C 5.012 4.380,2.409 6.479,1.423 9.443 C 0.555 12.051,1.045 14.847,2.750 17.017 C 3.051 17.400,3.710 18.048,4.102 18.346 C 5.293 19.253,6.701 19.816,8.140 19.961 C 8.444 19.991,10.018 20.000,13.220 19.990 C 18.375 19.973,18.072 19.989,18.949 19.697 C 19.684 19.452,20.371 19.063,20.949 18.562 C 22.629 17.109,23.359 14.796,22.819 12.639 C 22.541 11.528,22.013 10.611,21.194 9.816 C 20.287 8.936,19.251 8.419,17.986 8.215 C 17.669 8.164,17.419 8.155,16.841 8.172 C 15.925 8.200,15.924 8.200,15.636 7.746 C 14.696 6.265,13.372 5.168,11.740 4.520 C 11.360 4.369,10.649 4.180,10.160 4.100 C 9.692 4.024,8.578 3.992,8.120 4.042 M9.907 5.582 C 10.933 5.734,11.911 6.154,12.802 6.825 C 13.349 7.237,13.853 7.787,14.310 8.469 C 14.686 9.031,14.885 9.245,15.200 9.425 C 15.635 9.672,16.011 9.737,16.646 9.675 C 17.475 9.594,18.231 9.720,18.949 10.060 C 19.461 10.302,19.857 10.586,20.248 10.993 C 20.618 11.379,20.793 11.626,21.031 12.101 C 21.344 12.725,21.479 13.327,21.480 14.094 C 21.481 16.114,20.139 17.851,18.180 18.366 C 17.629 18.511,17.051 18.526,12.600 18.510 C 7.987 18.492,8.131 18.499,7.300 18.285 C 4.951 17.679,3.068 15.640,2.616 13.213 C 2.528 12.742,2.497 11.649,2.558 11.184 C 2.840 9.038,4.117 7.199,6.000 6.226 C 6.952 5.735,7.792 5.529,8.875 5.523 C 9.242 5.521,9.658 5.545,9.907 5.582 " stroke="none" fill-rule="evenodd" fill="currentColor"/></svg> Try Devin Cloud</button>
       <div id="recent">
         <div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>
         <div id="recentList"></div>
@@ -2882,8 +2882,10 @@ class CascadePanelProvider {
   function renderAgents(){ onAgentChange(); }
   // 官方式 agent 图标:Cascade=波形,Devin Local/Cloud=Devin 六边形(cloud 带云标)
   // 反者道之动·官方真源 W 标(自官方本体 workbench DOM 逆流提取, viewBox 512x297)
+  // 反提官方 cloud-simple 图标(GDs viewBox 24, fill currentColor evenodd) —— 官方 Try Devin Cloud 钮/云标同源
+  const CLOUD_SVG='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-2px"><path d="M8.120 4.042 C 5.012 4.380,2.409 6.479,1.423 9.443 C 0.555 12.051,1.045 14.847,2.750 17.017 C 3.051 17.400,3.710 18.048,4.102 18.346 C 5.293 19.253,6.701 19.816,8.140 19.961 C 8.444 19.991,10.018 20.000,13.220 19.990 C 18.375 19.973,18.072 19.989,18.949 19.697 C 19.684 19.452,20.371 19.063,20.949 18.562 C 22.629 17.109,23.359 14.796,22.819 12.639 C 22.541 11.528,22.013 10.611,21.194 9.816 C 20.287 8.936,19.251 8.419,17.986 8.215 C 17.669 8.164,17.419 8.155,16.841 8.172 C 15.925 8.200,15.924 8.200,15.636 7.746 C 14.696 6.265,13.372 5.168,11.740 4.520 C 11.360 4.369,10.649 4.180,10.160 4.100 C 9.692 4.024,8.578 3.992,8.120 4.042 M9.907 5.582 C 10.933 5.734,11.911 6.154,12.802 6.825 C 13.349 7.237,13.853 7.787,14.310 8.469 C 14.686 9.031,14.885 9.245,15.200 9.425 C 15.635 9.672,16.011 9.737,16.646 9.675 C 17.475 9.594,18.231 9.720,18.949 10.060 C 19.461 10.302,19.857 10.586,20.248 10.993 C 20.618 11.379,20.793 11.626,21.031 12.101 C 21.344 12.725,21.479 13.327,21.480 14.094 C 21.481 16.114,20.139 17.851,18.180 18.366 C 17.629 18.511,17.051 18.526,12.600 18.510 C 7.987 18.492,8.131 18.499,7.300 18.285 C 4.951 17.679,3.068 15.640,2.616 13.213 C 2.528 12.742,2.497 11.649,2.558 11.184 C 2.840 9.038,4.117 7.199,6.000 6.226 C 6.952 5.735,7.792 5.529,8.875 5.523 C 9.242 5.521,9.658 5.545,9.907 5.582 " stroke="none" fill-rule="evenodd" fill="currentColor"/></svg>';
   const W_SVG='<svg width="14" height="9" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg>';
-  const AGENT_ICONS={cascade:"","devin-local":"⬢","devin-cloud":"☁"};
+  const AGENT_ICONS={cascade:"","devin-local":"⬢","devin-cloud":CLOUD_SVG};
   const agentIcon=$("agentIcon");
   // 每 agent 轨各存一份 model/mode 配置; cascade=LS 本地轨, acp=Devin Local/Cloud 云端轨。
   const cfgStore={cascade:{model:null,mode:null},acp:{model:null,mode:null}};
@@ -2902,7 +2904,8 @@ class CascadePanelProvider {
     if(typeof slashSync==="function") slashSync();
     const a=AGENTS.find(x=>x.id===agent);
     badgeEl.textContent=a&&a.preview?"Preview":"";
-    if(agent==="cascade") agentIcon.innerHTML=W_SVG; else agentIcon.textContent=AGENT_ICONS[agent]||"⬡";
+    if(agent==="cascade") agentIcon.innerHTML=W_SVG;
+    else { const ic=AGENT_ICONS[agent]||"⬡"; if(ic.indexOf("<svg")===0) agentIcon.innerHTML=ic; else agentIcon.textContent=ic; }
     agentBtn.textContent=a?a.label:agent;
     const pill=agentBtn.closest(".pill"); if(pill&&a) pill.title=a.label+" · "+a.hint+" (Ctrl+')";
     renderConfigFor(curGroup());
@@ -2912,7 +2915,11 @@ class CascadePanelProvider {
   function agentMenuRender(){ agentList.innerHTML="";
     for(const a of AGENTS){ const it=document.createElement("div"); it.className="mit"+(a.id===agent?" sel":"");
       const row=document.createElement("div"); row.className="mrow";
-      const nm=document.createElement("span"); nm.className="mnm"; if(a.id==="cascade"){ nm.innerHTML=W_SVG+" "; nm.appendChild(document.createTextNode(a.label)); } else { nm.textContent=(AGENT_ICONS[a.id]||"⬡")+" "+a.label; } row.appendChild(nm);
+      const nm=document.createElement("span"); nm.className="mnm";
+      const ic0=a.id==="cascade"?W_SVG:(AGENT_ICONS[a.id]||"⬡");
+      if(ic0.indexOf("<svg")===0){ nm.innerHTML=ic0+" "; nm.appendChild(document.createTextNode(a.label)); }
+      else nm.textContent=ic0+" "+a.label;
+      row.appendChild(nm);
       if(a.preview){ const b=document.createElement("span"); b.className="bdg"; b.textContent="Preview"; row.appendChild(b); }
       it.appendChild(row);
       it.title=a.hint; // 官方菜单仅显名称, 技术轨道信息降为悬停提示
