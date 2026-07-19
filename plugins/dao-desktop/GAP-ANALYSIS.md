@@ -848,3 +848,10 @@ Stop 钮, 直通 CancelCascadeSteps{cascadeId,stepIndices})。152/152 测试, v1
 P0 七项(R236–R240)全量落地、P1 五项(R241–R244)落地对账入路线图, 剩余项
 (Pinned context/Settings 分区/agent-board 徽标/Queued 同文)与 P2 保持在案。
 v1.5.80。
+
+## R246 · P2: CHECKPOINT 检查点卡 + DEPLOY_WEB_APP 部署卡
+
+官方 workbench/proto 真源同文: CHECKPOINT{checkpointIndex} → "Created checkpoint
+N"; DEPLOY_WEB_APP{subdomain,deployment{projectUrl}} → 进行中 "Deploying app - X"
+/ 完成 "Deployment is live." + View Deployment 官方同文钮(外开 projectUrl)。
+153/153 测试, v1.5.81。

@@ -3114,3 +3114,12 @@ test("R244: backgroundCommands 聚合 + Stop 直通", () => {
   assert.ok(src.includes('type: "bg-cmds"') && src.includes('m.type==="bg-cmds"'), "双端通道在位");
   assert.ok(src.includes('"bg-cmd-cancel"') && src.includes("stepIndices: [Number(msg.stepIndex || 0)]"), "Stop 直通 CancelCascadeSteps");
 });
+
+// R246 · 检查点卡 + 部署卡。
+test("R246: checkpoint / deploy-card 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("Created checkpoint ") && src.includes("st.checkpoint.checkpointIndex"), "检查点官方同文 + proto 真源");
+  assert.ok(src.includes('type: "deploy-card"') && src.includes('m.type==="deploy-card"'), "deploy-card 双端在位");
+  assert.ok(src.includes('"Deployment is live."') && src.includes('"View Deployment"'), "部署官方同文");
+  assert.ok(src.includes("dep.projectUrl"), "deployment proto 真源");
+});
