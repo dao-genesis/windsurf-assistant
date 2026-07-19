@@ -1204,14 +1204,14 @@ class CascadePanelProvider {
       const items = ((r.trajectory || {}).steps || []).map((s) => {
         const t = (s.type || "").replace("CORTEX_STEP_TYPE_", "");
         const ts = ((s.metadata || {}).createdAt || "").replace("T", " ").slice(5, 16);
-        if (t === "GIT_COMMIT") return { ts, icon: "⎇", text: one((s.gitCommit || {}).commitMessage) + " · " + String((s.gitCommit || {}).commitHash || "").slice(0, 7) };
-        if (t === "USER_INPUT") return { ts, icon: "💬", text: one((s.userInput || {}).userResponse) };
-        if (t === "PLANNER_RESPONSE") return { ts, icon: "✦", text: one((s.plannerResponse || {}).response) };
-        if (t === "VIEW_FILE") return { ts, icon: "📄", text: "阅读 " + rel((s.viewFile || {}).absolutePathUri) };
-        if (t === "GREP_SEARCH_V2") return { ts, icon: "🔍", text: "搜索 " + one((s.grepSearchV2 || {}).pattern) };
-        if (t === "CODE_ACTION") return { ts, icon: "✎", text: "代码动作 " + rel(((((s.codeAction || {}).actionSpec || {}).createFile || {}).path || {}).absoluteUri) };
-        if (t === "CHECKPOINT") return { ts, icon: "⚑", text: one((s.checkpoint || {}).userIntent) };
-        if (t === "ERROR_MESSAGE") return { ts, icon: "⚠", text: one(((s.errorMessage || {}).error || {}).shortError) };
+        if (t === "GIT_COMMIT") return { ts, icon: "commits", text: one((s.gitCommit || {}).commitMessage) + " · " + String((s.gitCommit || {}).commitHash || "").slice(0, 7) };
+        if (t === "USER_INPUT") return { ts, icon: "bubble-5", text: one((s.userInput || {}).userResponse) };
+        if (t === "PLANNER_RESPONSE") return { ts, icon: "devin-logo", text: one((s.plannerResponse || {}).response) };
+        if (t === "VIEW_FILE") return { ts, icon: "file-text", text: "阅读 " + rel((s.viewFile || {}).absolutePathUri) };
+        if (t === "GREP_SEARCH_V2") return { ts, icon: "magnifying-glass", text: "搜索 " + one((s.grepSearchV2 || {}).pattern) };
+        if (t === "CODE_ACTION") return { ts, icon: "pencil", text: "代码动作 " + rel(((((s.codeAction || {}).actionSpec || {}).createFile || {}).path || {}).absoluteUri) };
+        if (t === "CHECKPOINT") return { ts, icon: "flag-1", text: one((s.checkpoint || {}).userIntent) };
+        if (t === "ERROR_MESSAGE") return { ts, icon: "exclamation-triangle", text: one(((s.errorMessage || {}).error || {}).shortError) };
         return null;
       }).filter((it) => it && it.text).slice(-40).reverse();
       this._post({ type: "timeline", tid: cur.trajectoryId, branch: ((cur.trajectoryScope || {}).branchName) || "", items });
@@ -2811,7 +2811,9 @@ class CascadePanelProvider {
   const vscode = acquireVsCodeApi();
   const AGENTS = ${agentsJson};
   // 官方图标(反提 workbench 真源): 终端卡头 console-simple / Copy command / Insert in terminal
-  const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12) })};
+  const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12),
+    "commits": OI.svg("commits", 11), "bubble-5": OI.svg("bubble-5", 11), "devin-logo": OI.svg("devin-logo", 11), "file-text": OI.svg("file-text", 11),
+    "magnifying-glass": OI.svg("magnifying-glass", 11), "pencil": OI.svg("pencil", 11), "flag-1": OI.svg("flag-1", 11), "exclamation-triangle": OI.svg("exclamation-triangle", 11) })};
   let agent = AGENTS[0].id;
   const state = vscode.getState() || { history: [] };
   const $ = (id) => document.getElementById(id);
@@ -3475,7 +3477,7 @@ class CascadePanelProvider {
       const its=m.items||[];
       for(const it of its){ const r=document.createElement("div"); r.className="tli";
         const t=document.createElement("span"); t.className="tlt"; t.textContent=it.ts||"";
-        const i=document.createElement("span"); i.textContent=it.icon||"";
+        const i=document.createElement("span"); if(OICONS[it.icon]) i.innerHTML=OICONS[it.icon]; else i.textContent=it.icon||"";
         const x=document.createElement("span"); x.className="tlx"; x.textContent=it.text||""; x.title=it.text||"";
         r.appendChild(t); r.appendChild(i); r.appendChild(x); tlBody.appendChild(r); }
       if(!its.length){ const e=document.createElement("div"); e.className="tlempty"; e.textContent="No trajectory steps available"; tlBody.appendChild(e); }

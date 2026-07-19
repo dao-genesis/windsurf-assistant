@@ -675,3 +675,9 @@ isBeta/betaWarningMessage/isNew/fastStatus 四源, host config-options 透传, w
 非命令类工具审批头 "Permission required"。宿主 permission 帧新增 header 字段: RUN_COMMAND
 待审步 header="Command Awaiting Approval" + title=命令行; webview 头文案 "权限请求:" →
 官方同文(header 缺省 "Permission required")。125/125 测试, v1.5.52。
+
+## R218 · timeline 步列图标官方同源化(emoji 全清)
+
+轨迹 timeline 步列 8 类 emoji(⎇💬✦📄🔍✎⚑⚠) → 官方图标键(commits/bubble-5/devin-logo/
+file-text/magnifying-glass/pencil/flag-1/exclamation-triangle), 宿主发 icon 键, webview 经
+OICONS(official-icons 全量库)渲官方 SVG, 未知键回退文本。126/126 测试, v1.5.53。

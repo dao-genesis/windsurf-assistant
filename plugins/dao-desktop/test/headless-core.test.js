@@ -2880,3 +2880,12 @@ test("R217: Command Awaiting Approval / Permission required 官方同文", () =>
   assert.ok(src.includes('m.header||"Permission required"'), "非命令审批头官方同文");
   assert.ok(!src.includes('"权限请求: "'), "自撰头文案已替换");
 });
+
+// R218 · timeline 图标官方同源化。
+test("R218: timeline emoji 全清 → 官方图标键", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  for (const k of ["commits", "bubble-5", "devin-logo", "flag-1", "exclamation-triangle"])
+    assert.ok(src.includes('icon: "' + k + '"'), k + " 官方图标键在位");
+  assert.ok(src.includes("OICONS[it.icon]"), "webview 官方 SVG 渲染在位");
+  assert.ok(!src.includes('icon: "⎇"') && !src.includes('icon: "💬"'), "timeline emoji 已全清");
+});
