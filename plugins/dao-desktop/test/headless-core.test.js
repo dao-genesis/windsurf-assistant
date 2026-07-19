@@ -3140,3 +3140,10 @@ test("R248: summary 徽标真源字段", () => {
     assert.ok(src.includes(k), k + " proto 真源在位");
   assert.ok(src.includes('b.textContent="Waiting"') && src.includes('b.textContent="Running"'), "状态徽标在位");
 });
+
+// R249 · Codemap 卡。
+test("R249: upsertCodemap 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("st.upsertCodemap") && src.includes("uc.editingCodemapTitle"), "proto 真源在位");
+  assert.ok(src.includes('"Generating codemap…"') && src.includes("Codemap from this Cascade: "), "官方同文在位");
+});

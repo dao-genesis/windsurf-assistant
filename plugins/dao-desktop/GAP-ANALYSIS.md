@@ -868,3 +868,9 @@ Browser previews / Auto-generate memories(反相 usetInv); 新增 Terminal 分�
 官方 CascadeTrajectorySummary 真源字段接线: renamedTitle 优先标题、waitingSteps
 → Waiting 徽标、status RUNNING → Running、errored → ! 、diffLinesAdded/Removed
 → +N/-N 变更行数徽标, Recent sessions 行内随行渲染。155/155 测试, v1.5.83。
+
+## R249 · P2: Codemap 卡(UPSERT_CODEMAP)
+
+官方 proto 真源 CortexStepUpsertCodemap{output{title,description},editing_codemap_
+title,running_status}: 生成中官方同文 "Generating codemap…"(editingCodemapTitle
+优先), 完成后 "Codemap from this Cascade: <title>"。156/156 测试, v1.5.84。
