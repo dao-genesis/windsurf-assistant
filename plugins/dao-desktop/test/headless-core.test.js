@@ -3087,3 +3087,14 @@ test("R241: memory-card / git-card 官方同文", () => {
   assert.ok(src.includes('type: "git-card"') && src.includes('m.type==="git-card"'), "git-card 双端在位");
   assert.ok(src.includes("Updated to commit ") && src.includes("gc.commitHash"), "提交卡官方同文 + proto 真源");
 });
+
+// R242 · Cascade 后台三开关。
+test("R242: 后台三开关官方同源键 + 完轮通知接线", () => {
+  const sp = fs.readFileSync(path.join(ROOT, "dao-cascade", "settings-page.js"), "utf8");
+  assert.ok(sp.includes('"Allow Cascade in background"'), "官方同文开关在位");
+  assert.ok(sp.includes("allowCascadeInBackground") && sp.includes("enableCascadeAlwaysNotifyOnFinish")
+    && sp.includes("disableAutoOpenEditedFiles"), "官方 UserSettings 三键真源");
+  assert.ok(sp.includes('act==="usetInv"'), "反相开关通道在位");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("us.enableCascadeAlwaysNotifyOnFinish"), "完轮通知按官方键接线");
+});
