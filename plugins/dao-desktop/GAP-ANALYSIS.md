@@ -598,3 +598,9 @@ emoji 徽标全去(门控走灰置+tooltip)。114/114 测试, v1.5.41。
 file-text(Read), 均 viewBox 24 · stroke:none fillRule:evenodd fill:currentColor。插件此前用
 🗀/🔍/📄 emoji(含展开明细目录项 🗀)。本轮: 官方三 path 逐字同源落 FOLDER_SVG/SEARCH_SVG/
 FILE_SVG + BROWSE_ICONS 映射, 卡头与目录项全量 SVG 化。115/115 测试, v1.5.42。
+
+## R208 · 变更卡 Accept/Reject 官方同文(反提 workbench 真源)
+
+官方代码变更卡操作钮/回执标签为 "Accept"/"Reject"/"Accepted"/"Rejected" 英文同文。插件此前
+用 ✓/✗ 符号钮 + 中文"已接受/已拒绝"标签。本轮: 三处官方同文替换(操作钮 Accept/Reject +
+回执 Accepted/Rejected), tooltip 保留中文释义。116/116 测试, v1.5.43。

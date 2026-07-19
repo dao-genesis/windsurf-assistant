@@ -2769,3 +2769,12 @@ test("R207: browse-card 图标去 emoji → 官方三源 SVG", () => {
   assert.ok(!src.includes('m.kind==="grep"?"🔍"'), "browse-card emoji 三元已替换");
   assert.ok(!src.includes('it.isDir?"🗀 "'), "目录项 🗀 emoji 已替换");
 });
+
+// R208 · 变更卡 Accept/Reject 官方同文(反提 workbench 真源)。
+test("R208: 变更卡 Accept/Reject/Accepted/Rejected 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('ok.textContent="Accept"'), "Accept 钮官方同文");
+  assert.ok(src.includes('no.textContent="Reject"'), "Reject 钮官方同文");
+  assert.ok(src.includes('m.accept?"Accepted":"Rejected"'), "回执标签官方同文");
+  assert.ok(!src.includes('m.accept?"已接受":"已拒绝"'), "中文回执标签已替换");
+});
