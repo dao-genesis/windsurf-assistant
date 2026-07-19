@@ -2401,6 +2401,24 @@ class CascadePanelProvider {
               const akey = this._cascadeLsId + ":" + k;
               if (!this._cxAsked.has(akey)) {
                 this._cxAsked.add(akey);
+                // 官方 Auto-Run 策略语义(jUs 真源): Off/Allowlist/Auto/Turbo。
+                // Allowlist=允许清单放行(拒绝清单优先); Auto=LS shouldAutoRun 放行; Turbo=全放行。
+                const pol = this._ctx.globalState.get("cascadeAutoExecutionPolicy") || "Off";
+                const cmd0 = (st.runCommand && (st.runCommand.proposedCommandLine || st.runCommand.commandLine)) || "";
+                const head = (cmd0.trim().split(/\s+/)[0] || "");
+                const denied = (this._ctx.globalState.get("cascadeDeniedCommands") || []).includes(head);
+                const allowed = (this._ctx.globalState.get("cascadeAllowedCommands") || []).includes(head);
+                const auto = !denied && (pol === "Turbo"
+                  || (pol === "Auto" && !!(st.runCommand && st.runCommand.shouldAutoRun))
+                  || (pol === "Allowlist" && allowed));
+                if (auto) {
+                  const cid0 = this._cascadeLsId, kk0 = k;
+                  ls.call("GetCascadeTrajectory", { cascadeId: cid0 }).then((tr) =>
+                    ls.call("HandleCascadeUserInteraction", { cascadeId: cid0,
+                      interaction: { trajectoryId: ((tr && tr.trajectory) || {}).trajectoryId || "",
+                        stepIndex: kk0, runCommand: { action: "RUN_COMMAND_ACTION_CONFIRM" } } }))
+                    .catch((e) => this._log("cascade: auto-run 回传失败 " + e.message));
+                } else {
                 const reqId = "cxrc-" + Date.now() + "-" + k;
                 const cmd = (st.runCommand && (st.runCommand.proposedCommandLine || st.runCommand.commandLine)) || "";
                 this._permPending = this._permPending || new Map();
@@ -2417,6 +2435,7 @@ class CascadePanelProvider {
                   return ls.call("HandleCascadeUserInteraction", { cascadeId: cid,
                     interaction: { trajectoryId: tid, stepIndex: kk, runCommand: { action } } });
                 }).catch((e) => this._log("cascade: 审批回传失败 " + e.message));
+                }
               }
             }
             // 官方式提问交互: ASK_USER_QUESTION 待答步 → 选项按钮 → askUserQuestion.response 回传
@@ -4056,6 +4075,26 @@ function register(context, log, opts) {
     vscode.commands.registerCommand(viewId + ".createRule", () => provider._handleCustomizationCreate("rule")),
     vscode.commands.registerCommand(viewId + ".createWorkflow", () => provider._handleCustomizationCreate("workflow")),
     vscode.commands.registerCommand(viewId + ".createGlobalWorkflow", () => provider._handleCustomizationCreate("gworkflow")),
+    // 官方 Auto-Run 策略(jUs 真源 Off/Allowlist/Auto/Turbo; 官方释义: auto-runs allowlisted
+    // commands and asks before denylisted ones, with the deny list taking precedence)
+    vscode.commands.registerCommand(viewId + ".autoRunPolicy", async () => {
+      const cur = context.globalState.get("cascadeAutoExecutionPolicy") || "Off";
+      const pick = await vscode.window.showQuickPick([
+        { label: "Off", description: cur === "Off" ? "✓ 当前" : "", detail: "每条命令均需审批" },
+        { label: "Allowlist", description: cur === "Allowlist" ? "✓ 当前" : "", detail: "Cascade auto-runs allowlisted commands and asks before denylisted ones, with the deny list taking precedence" },
+        { label: "Auto", description: cur === "Auto" ? "✓ 当前" : "", detail: "LS 判定安全(shouldAutoRun)的命令自动放行" },
+        { label: "Turbo", description: cur === "Turbo" ? "✓ 当前" : "", detail: "全部命令自动放行(官方 EAGER 档)" },
+      ], { placeHolder: "Auto-Run 策略 · 当前: " + cur });
+      if (pick) await context.globalState.update("cascadeAutoExecutionPolicy", pick.label);
+    }),
+    vscode.commands.registerCommand(viewId + ".allowlist", async () => {
+      const cur = (context.globalState.get("cascadeAllowedCommands") || []).join(" ");
+      const v = await vscode.window.showInputBox({ prompt: "Allowed commands(空格分隔命令头, 官方 cascadeAllowedCommands 同名)", value: cur });
+      if (v != null) await context.globalState.update("cascadeAllowedCommands", v.split(/\s+/).filter(Boolean));
+      const cd = (context.globalState.get("cascadeDeniedCommands") || []).join(" ");
+      const d = await vscode.window.showInputBox({ prompt: "Denied commands(空格分隔, 拒绝清单优先, 官方 cascadeDeniedCommands 同名)", value: cd });
+      if (d != null) await context.globalState.update("cascadeDeniedCommands", d.split(/\s+/).filter(Boolean));
+    }),
     // 官方 View Account / Open Changelog
     vscode.commands.registerCommand(viewId + ".openProfile", () =>
       vscode.env.openExternal(vscode.Uri.parse("https://app.devin.ai/settings/profile"))),
@@ -4079,6 +4118,8 @@ function register(context, log, opts) {
         sep,
         { label: "$(comment-discussion) 打开 Cascade 面板", _cmd: viewId + ".open" },
         { label: "$(gear) Devin Settings", _cmd: viewId + ".openSettings" },
+        { label: "$(play) Auto-Run 策略", description: "Off / Allowlist / Auto / Turbo", _cmd: viewId + ".autoRunPolicy" },
+        { label: "$(checklist) Allow / Deny List", _cmd: viewId + ".allowlist" },
         { label: "$(book) Customizations", _cmd: viewId + ".customizations" },
         sep,
         { label: "$(graph) Usage", _url: "https://windsurf.com/subscription/usage" },
