@@ -2745,3 +2745,15 @@ test("R205: 模型过滤行官方占位 + magnifying-glass 同源 SVG", () => {
   assert.ok(src.includes('id="modelFilterRow"'), "过滤行容器在位(图标+输入)");
   assert.ok(src.includes("M10.207 3.043"), "官方 magnifying-glass path 同源");
 });
+
+// R206 · 模型行计价/推荐官方同源(反提 workbench 真源: 0→Free/“No credits used”, N→Nx/“Nx credits”, 默认排序 Recommended)。
+test("R206: 模型行官方计价标签 + 推荐前置 + 去 emoji 徽标", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("function creditBadge"), "官方计价标签函数在位");
+  assert.ok(src.includes('"No credits used"'), "Free 态官方 tooltip 同文");
+  assert.ok(src.includes('"x credits"'), "Nx 态官方 tooltip 同文");
+  assert.ok(src.includes("credit: m.credit"), "credit 原值直通 webview(不再拼入名称)");
+  assert.ok(!src.includes('o.recommended?"⭐'), "⭐ 推荐 emoji 已去(官方无)");
+  assert.ok(!src.includes('o.disabled?"🔒'), "🔒 门控 emoji 已去(官方用灰置+tooltip)");
+  assert.ok(src.includes("(b.recommended?1:0)-(a.recommended?1:0)"), "官方默认 Recommended 排序前置");
+});

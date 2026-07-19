@@ -264,7 +264,8 @@ class CascadePanelProvider {
         id: "model", category: "model", currentValue: this._cascadeModel,
         options: models.map((m) => ({
           value: m.uid,
-          name: m.label + (m.credit != null ? " · " + m.credit + "x" : ""),
+          name: m.label,
+          credit: m.credit,
           disabled: !!m.disabled,
           description: [
             (mStatus[m.uid] && (mStatus[m.uid].message || mStatus[m.uid].status)) || "",
@@ -2787,7 +2788,9 @@ class CascadePanelProvider {
   // 官方式富模型下拉: 自定义弹层(分族分组 + 搜索 + 徽标 + 价目副行), 替代 native select(R61 局限)
   let modelCur=null;
   const stripCredit=(s)=>String(s||"").replace(/\\s*·\\s*[\\d.]+x\\s*$/,"");
-  function modelLabel(o){ return (o.recommended?"⭐ ":"")+(o.disabled?"🔒 ":"")+stripCredit(o.name||o.value)+(o.images?" 🖼":""); }
+  function modelLabel(o){ return stripCredit(o.name||o.value); }
+  // 官方计价标签(反提 workbench 真源): 0→Free(“No credits used”), N→“Nx”(“Nx credits”)
+  function creditBadge(c){ if(c==null) return null; if(c===0) return {label:"Free",tip:"No credits used"}; const n=parseFloat(Number(c).toFixed(3)); return {label:n+"x",tip:n+"x credits"}; }
   function modelBtnSync(s){
     const o=(s.options||[]).find(x=>x.value===s.currentValue);
     // 官方 1:1: composer 按钮显模型名+倍率(与官方右栏实机一致, 徽标仅留下拉列表行)
@@ -2802,8 +2805,8 @@ class CascadePanelProvider {
       const it=document.createElement("div"); it.className="mit"+(o.disabled?" dis":"")+(o.value===s.currentValue?" sel":"");
       const row=document.createElement("div"); row.className="mrow";
       const nm=document.createElement("span"); nm.className="mnm"; nm.textContent=modelLabel(o); row.appendChild(nm);
-      const mx=((o.name||"")+" "+(o.description||"")).match(/·\\s*([\\d.]+x)/);
-      if(mx){ const x=document.createElement("span"); x.className="mx"; x.textContent=mx[1]; row.appendChild(x); }
+      const cb=creditBadge(o.credit);
+      if(cb){ const x=document.createElement("span"); x.className="mx"; x.textContent=cb.label; x.title=cb.tip; row.appendChild(x); }
       it.appendChild(row);
       if(o.description){ const ds=document.createElement("div"); ds.className="mds"; ds.textContent=o.description; it.appendChild(ds); }
       if(!o.disabled) it.onclick=()=>{ modelMenuClose();
@@ -2811,7 +2814,8 @@ class CascadePanelProvider {
         modelCur=Object.assign({},s,{currentValue:o.value}); modelBtnSync(modelCur);
         const grp=curGroup(); if(cfgStore[grp]&&cfgStore[grp].model) cfgStore[grp].model.currentValue=o.value; };
       return it; };
-    const opts=(s.options||[]).filter(match); let any=false;
+    // 官方默认排序 Recommended: 推荐项前置(同组内稳定序)
+    const opts=(s.options||[]).filter(match).slice().sort((a,b)=>(b.recommended?1:0)-(a.recommended?1:0)); let any=false;
     const groups=new Map(); const flat=[];
     for(const o of opts){ const gl=o.familyLabel||""; if(gl){ if(!groups.has(gl)) groups.set(gl,[]); groups.get(gl).push(o); } else flat.push(o); }
     for(const o of flat){ modelList.appendChild(mkIt(o)); any=true; }

@@ -583,3 +583,11 @@ fillRule:evenodd fill:currentColor, lde 组件), 非 emoji。插件此前 tryClo
 fillRule:evenodd fill:currentColor) + 占位 "Search all models"。插件此前为无图标裸输入 +
 中文占位"搜索模型…"。本轮: 反提官方 path 同源落位 modelFilterRow(图标+输入 flex 行),
 占位官方同文。113/113 测试, v1.5.40。
+
+## R206 · 模型行计价/推荐官方同源(反提 workbench 真源)
+
+官方模型行计价标签: multiplier===0 → "Free"(tooltip "No credits used"); N →
+`${parseFloat(N.toFixed(3))}x`(tooltip "Nx credits"); 默认排序 Recommended。插件此前把
+" · Nx" 拼入名称再正则回提, 且用 ⭐/🔒/🖼 emoji 徽标(官方无)。本轮: credit 原值直通
+webview, creditBadge 官方同式渲染 Free/Nx + 官方 tooltip, 推荐项官方默认排序前置,
+emoji 徽标全去(门控走灰置+tooltip)。114/114 测试, v1.5.41。
