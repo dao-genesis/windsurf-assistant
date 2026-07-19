@@ -2958,3 +2958,10 @@ test("R226: Rename/Delete conversation + Model Selector 官方同文", () => {
   assert.ok(src.includes('a.title="Delete conversation"'), "删除官方同文");
   assert.ok(src.includes('id="modelWrap" title="Model Selector"'), "模型选择器官方同文");
 });
+
+// R227 · Search sessions 官方同文占位。
+test("R227: Search sessions... 官方同文占位", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('placeHolder: "Search sessions..."'), "官方同文占位在位");
+  assert.ok(!src.includes('"加载历史会话"'), "自撰占位已替换");
+});
