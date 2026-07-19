@@ -3056,3 +3056,12 @@ test("R238: Accept all → ResolveOutstandingSteps", () => {
   assert.ok(src.includes('m.type==="cx-acked-all"'), "批量回执在位");
   assert.ok(src.includes('"cx-accept-all"'), "消息通道在位");
 });
+
+// R239 · Continue response 续写条。
+test("R239: Continue response 官方同文 + 上限判据", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('sp.textContent="Continue response"'), "官方同文在位");
+  assert.ok(src.includes("tj.numGeneratorInvocations") && src.includes("tj.maxGeneratorInvocations"), "上限判据真源");
+  assert.ok(src.includes('inputEl.value="Continue"'), "官方 handleContinue 同语义");
+  assert.ok(src.includes("cut short due to length limits"), "官方 tooltip 同文");
+});

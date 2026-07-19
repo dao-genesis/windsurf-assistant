@@ -2543,6 +2543,11 @@ class CascadePanelProvider {
           else if (grew && allDone && ++stable >= 3) { this._cascadeSeen = steps.length; break; }
         }
         this._post({ type: "assistant-done", id: msg.id, text: grew ? undefined : "(Cascade 无输出)" });
+        // 官方式 Continue response: 生成器调用达上限而停(num>=max) → 续写条(点击即发 "Continue")
+        try { const tr2 = await ls.call("GetCascadeTrajectory", { cascadeId: this._cascadeLsId });
+          const tj = (tr2 && tr2.trajectory) || {};
+          const ni = Number(tj.numGeneratorInvocations || 0), mi = Number(tj.maxGeneratorInvocations || 0);
+          if (mi > 0 && ni >= mi) this._post({ type: "continue-bar" }); } catch (_) {}
         if (grew) { try { const gs = await this._cxGenStats(this._cascadeLsId); if (gs.last) this._post({ type: "msg-stats", id: msg.id, text: gs.last }); } catch (_) {} }
         return;
       } catch (e) {
@@ -3874,6 +3879,17 @@ class CascadePanelProvider {
       else if(m.act==="toggleMode") modeBtn.click();
       else if(m.act==="agentPicker") agentBtn.click();
       else if(m.act==="nextModel") document.dispatchEvent(new KeyboardEvent("keydown",{ctrlKey:true,shiftKey:true,key:"?",cancelable:true}));
+    }
+    else if(m.type==="continue-bar"){
+      // 官方同文续写条: "Continue response" + 官方 tooltip, 点击即发 "Continue"
+      if(document.getElementById("contBar")) return;
+      const el=document.createElement("div"); el.id="contBar";
+      el.style.cssText="display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:6px;background:rgba(128,128,128,.15);padding:6px 8px;font-size:12px;";
+      el.title="Cascade's response was cut short due to length limits. Continue to generate the full response. This will consume the selected model's cost.";
+      const sp=document.createElement("span"); sp.textContent="Continue response"; el.appendChild(sp);
+      const b=document.createElement("button"); b.className="qchip"; b.style.cursor="pointer"; b.textContent="Continue";
+      b.onclick=()=>{ el.remove(); inputEl.value="Continue"; autoGrow(); send(); }; el.appendChild(b);
+      logEl.appendChild(el); logEl.scrollTop=logEl.scrollHeight;
     }
     else if(m.type==="ls-conn"){ const b=document.getElementById("lsConn"); if(b) b.style.display=m.ok?"none":"block"; }
     else if(m.type==="thought-delta"){
