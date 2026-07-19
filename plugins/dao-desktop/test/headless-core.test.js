@@ -3106,3 +3106,11 @@ test("R243: Conversation Tags 官方 RPC 真源", () => {
   assert.ok(src.includes('"session-tags"') && src.includes("_handleSessionTags"), "双端通道在位");
   assert.ok(src.includes('tg.title="Edit tags"'), "会话行 tag 钮在位");
 });
+
+// R244 · Background Commands 列表。
+test("R244: backgroundCommands 聚合 + Stop 直通", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes(".backgroundCommands || []"), "proto 真源字段在位");
+  assert.ok(src.includes('type: "bg-cmds"') && src.includes('m.type==="bg-cmds"'), "双端通道在位");
+  assert.ok(src.includes('"bg-cmd-cancel"') && src.includes("stepIndices: [Number(msg.stepIndex || 0)]"), "Stop 直通 CancelCascadeSteps");
+});
