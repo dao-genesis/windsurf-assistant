@@ -3010,3 +3010,14 @@ test("R233: Stop command 运行中停止钮 + stepIndex 载荷", () => {
   assert.ok(src.includes('m.status==="in_progress"&&m.exitCode==null&&typeof m.stepIndex==="number"'), "运行中判据在位");
   assert.ok(src.includes("stepIndex: k,\n      status: /DONE/"), "cmd-card stepIndex 载荷在位");
 });
+
+// R234 · web 请求审批官方语义。
+test("R234: Allow web request? 三档官方 action", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('header: "Allow web request?"'), "官方同文头");
+  assert.ok(src.includes("Cascade wants to fetch this URL"), "官方同文副文");
+  for (const a of ["READ_URL_CONTENT_ACTION_ALLOW_ONCE", "READ_URL_CONTENT_ACTION_ALWAYS_ALLOW_ORIGIN", "READ_URL_CONTENT_ACTION_REJECT"])
+    assert.ok(src.includes(a), a + " 在位");
+  assert.ok(src.includes("readUrlContent: { action }"), "回传字段在位");
+  assert.ok(src.includes('ex.title="Export"'), "导出官方同文");
+});

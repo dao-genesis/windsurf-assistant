@@ -766,3 +766,10 @@ Settings 页 Auto-Run 策略"更改"钮加官方同文 tooltip "Auto-run setting
 corpus MISS 消化: RUN_COMMAND 步运行中(in_progress·无退出码)终端卡头新增停止钮(官方同文
 tooltip "Stop command"), 直通 CancelCascadeSteps 单步取消; cmd-card 载荷带 stepIndex。
 另: sync-official 对账重跑(官方 3.4.27 无漂移, 计数重写)。141/141 测试, v1.5.68。
+
+## R234 · web 请求审批官方语义 Allow web request?
+
+READ_URL_CONTENT 待确认步 → 官方同文审批卡 "Allow web request?" + 副文 "Cascade wants to
+fetch this URL", 三档官方 action: Allow(ALLOW_ONCE) / Always allow origin(ALWAYS_ALLOW_ORIGIN)
+/ Reject(REJECT), 经 HandleCascadeUserInteraction.readUrlContent 回传。会话行导出钮 tooltip
+官方同文 "Export"。142/142 测试, v1.5.69。
