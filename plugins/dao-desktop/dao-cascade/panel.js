@@ -582,6 +582,14 @@ class CascadePanelProvider {
     if (st.runCommand) return this._cxCmdCard(st, k, id);
     if (st.listDirectory) return this._cxBrowseCard(st, k, id);
     if (st.grepSearch) return this._cxBrowseCard(st, k, id);
+    // 官方式检索族补全: FIND 文件系统检索 / MQUERY 语义检索(官方转写同文)
+    if (st.find) { const fd = st.find;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: "Searched filesystem" + (fd.pattern ? " for " + fd.pattern : "")
+          + (fd.totalResults != null ? " · " + fd.totalResults + " results" : "") }; }
+    if (st.mquery) { const mq = st.mquery;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: "Semantic searched codebase" + (mq.input ? " for " + mq.input : "") }; }
     if (st.viewFile) return this._cxBrowseCard(st, k, id);
     if (st.searchWeb || st.readUrlContent) return this._cxWebCard(st, k, id);
     // 官方式建议回复: suggestedResponses.suggestions[] → 点击即发 chips

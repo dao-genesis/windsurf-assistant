@@ -905,3 +905,9 @@ from queue) + 新增队列 Edit message 钮: RemoveFromQueue 后回填 composer(
 ContextScope{items} / ContextScopeItem.file=PathScopeItem): composer 新增 pin
 官方图标钮 → 打开文档 QuickPick 选钉 → pinned chips(📌 文件名 + ✕ 解钉)常驻
 composer 上方, 每次增删全量回写。160/160 测试, v1.5.89。
+
+## R255 · P2: 检索族补全(FIND / MQUERY)
+
+官方 proto 真源 CortexStepFind{pattern,total_results} / CortexStepMquery{input}:
+FIND → "Searched filesystem for <pattern> · N results", MQUERY → 官方转写同文
+"Semantic searched codebase for <input>"。161/161 测试, v1.5.90。
