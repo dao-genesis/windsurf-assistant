@@ -568,3 +568,11 @@ new-chat/megaplan/conversation-mention 同属提示项枚举)误当作 placehold
 Planning=Plan changes before implementing.; Testing=Build and validate…end-to-end.)。
 插件此前标题不加粗、副题恒为 Code 态。本轮: 标题 <b>Cascade</b> + 模式词(picker label
 "Plan" 空态呈官方 "Planning"), 副题随模式官方同文切换。111/111 测试, v1.5.38。
+
+## R204 · 云标官方 cloud-simple SVG 化(反提 workbench 真源)
+
+官方 Try Devin Cloud 钮图标为 cloud-simple SVG(GDs 容器 viewBox 24 · path stroke:none
+fillRule:evenodd fill:currentColor, lde 组件), 非 emoji。插件此前 tryCloud 钮/agent 选择器
+云图标/Agent 看板卡片云标均为 ☁ emoji。本轮: 反提官方 path 全量落 CLOUD_SVG, 三处同源替换
+(panel tryCloud/AGENT_ICONS + agent-board 卡片云标), 图标含 <svg 时走 innerHTML 渲染。
+112/112 测试, v1.5.39。
