@@ -3077,3 +3077,13 @@ test("R240: Auto Web Requests 官方同名键 + 三档自动放行", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.webAutoRunPolicy"), "命令注册在位");
 });
+
+// R241 · 记忆卡族 + 提交卡。
+test("R241: memory-card / git-card 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('type: "memory-card"') && src.includes('m.type==="memory-card"'), "memory-card 双端在位");
+  assert.ok(src.includes("Updated memory from ") && src.includes("Archived memory "), "官方四动作同文");
+  assert.ok(src.includes("auto-generated ") && src.includes("No auto-generated memories found"), "检索卡官方同文");
+  assert.ok(src.includes('type: "git-card"') && src.includes('m.type==="git-card"'), "git-card 双端在位");
+  assert.ok(src.includes("Updated to commit ") && src.includes("gc.commitHash"), "提交卡官方同文 + proto 真源");
+});

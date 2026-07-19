@@ -592,6 +592,24 @@ class CascadePanelProvider {
       initial: !!st.todoList.isInitialCreation,
       todos: (st.todoList.todos || []).map((t2) => ({ content: t2.content || "",
         state: /COMPLETED/.test(t2.status || "") ? "done" : /IN_PROGRESS/.test(t2.status || "") ? "doing" : "todo" })) };
+    // 官方式记忆卡: memory{action,memory{title},prevMemory{title}}(官方同文 Created/Updated/Deleted/Archived memory)
+    if (st.memory) { const me = st.memory, ti = (me.memory || {}).title || "Untitled",
+        pv = (me.prevMemory || {}).title || "", ac = me.action || "";
+      const title = /CREATE/.test(ac) ? 'Created memory "' + ti + '"'
+        : /UPDATE/.test(ac) ? (pv && pv !== ti ? 'Updated memory from "' + pv + '" to "' + ti + '"' : 'Updated memory "' + ti + '"')
+        : /DELETE/.test(ac) ? 'Deleted memory "' + ti + '"'
+        : /ARCHIVE/.test(ac) ? 'Archived memory "' + ti + '"' : 'Memory action "' + ti + '"';
+      return { type: "memory-card", id, toolCallId: "cx" + k, title }; }
+    // 官方式记忆检索卡: retrieveMemory → Listed N auto-generated memories / No auto-generated memories found
+    if (st.retrieveMemory) { const rm = st.retrieveMemory,
+        n = ((rm.retrievedMemories || rm.memories || [])).length;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: n ? "Listed " + n + " auto-generated " + (n === 1 ? "memory" : "memories")
+          : "No auto-generated memories found" }; }
+    // 官方式提交卡: gitCommit{commitMessage,commitHash}(官方同文 Updated to commit <hash7>: <msg>)
+    if (st.gitCommit) { const gc = st.gitCommit;
+      return { type: "git-card", id, toolCallId: "cx" + k,
+        hash: (gc.commitHash || "").slice(0, 7), message: gc.commitMessage || "" }; }
     // EXIT_PLAN_MODE 步(Plan 模式产物): exitPlanMode{planFile,userRequested} → 计划就绪卡
     if (st.exitPlanMode) {
       const pf = st.exitPlanMode.planFile || "";
@@ -2934,7 +2952,7 @@ class CascadePanelProvider {
   const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12), globe: OI.svg("globe", 12), toolbox: OI.svg("toolbox", 12), checklist: OI.svg("checklist", 12),
     "commits": OI.svg("commits", 11), "bubble-5": OI.svg("bubble-5", 11), "devin-logo": OI.svg("devin-logo", 11), "file-text": OI.svg("file-text", 11),
     "magnifying-glass": OI.svg("magnifying-glass", 11), "pencil": OI.svg("pencil", 11), "flag-1": OI.svg("flag-1", 11), "exclamation-triangle": OI.svg("exclamation-triangle", 11),
-    trash: OI.svg("trash-can-simple", 11), download: OI.svg("arrow-inbox", 11), book: OI.svg("book", 11) })};
+    trash: OI.svg("trash-can-simple", 11), download: OI.svg("arrow-inbox", 11), book: OI.svg("book", 11), brain: OI.svg("brain", 12) })};
   let agent = AGENTS[0].id;
   const state = vscode.getState() || { history: [] };
   const $ = (id) => document.getElementById(id);
@@ -3797,6 +3815,29 @@ class CascadePanelProvider {
         if(t.state==="done") r.style.opacity=".65"; bd.appendChild(r); }
       hd.onclick=()=>{ const open=bd.style.display==="none"; bd.style.display=open?"":"none"; ch.textContent=open?"▾":"▸"; };
       el.appendChild(hd); el.appendChild(bd); logEl.scrollTop=logEl.scrollHeight;
+    }
+    else if(m.type==="memory-card"){
+      // 官方式记忆卡: brain 图标 + 官方同文标题(无 CTA)
+      let el=logEl.querySelector('[data-tc="'+m.toolCallId+'"]');
+      if(!el){ if(emptyEl) emptyEl.remove(); el=document.createElement("div"); el.dataset.tc=m.toolCallId; logEl.appendChild(el); }
+      el.className="cmdcard"; el.innerHTML="";
+      const hd=document.createElement("div"); hd.className="chead";
+      const ic=document.createElement("span"); ic.innerHTML=OICONS.brain;
+      const cm=document.createElement("span"); cm.className="cmd"; cm.textContent=m.title||"";
+      hd.appendChild(ic); hd.appendChild(cm); el.appendChild(hd); logEl.scrollTop=logEl.scrollHeight;
+    }
+    else if(m.type==="git-card"){
+      // 官方式提交卡: commits 图标 + Updated to commit <hash7>: <msg>
+      let el=logEl.querySelector('[data-tc="'+m.toolCallId+'"]');
+      if(!el){ if(emptyEl) emptyEl.remove(); el=document.createElement("div"); el.dataset.tc=m.toolCallId; logEl.appendChild(el); }
+      el.className="cmdcard"; el.innerHTML="";
+      const hd=document.createElement("div"); hd.className="chead";
+      const ic=document.createElement("span"); ic.innerHTML=OICONS.commits;
+      const cm=document.createElement("span"); cm.className="cmd";
+      const pre=document.createElement("code"); pre.textContent=m.hash||"";
+      cm.appendChild(document.createTextNode("Updated to commit "));
+      cm.appendChild(pre); cm.appendChild(document.createTextNode(": "+(m.message||"")));
+      hd.appendChild(ic); hd.appendChild(cm); el.appendChild(hd); logEl.scrollTop=logEl.scrollHeight;
     }
     else if(m.type==="browse-card"){
       // 官方式检索/浏览卡: Analyzed/Searched/Read + 官方同源图标(folder-open/magnifying-glass/file-text) + 计数徽标, 点击展开明细, 文件名可点开
