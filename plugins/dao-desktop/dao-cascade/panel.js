@@ -2740,7 +2740,7 @@ class CascadePanelProvider {
     <div id="agentMenu"><div id="agentList"></div></div>
     <div class="card">
       <div id="imgStrip" class="imgstrip"></div>
-      <textarea id="input" rows="1" placeholder="Focus input (Ctrl+L)"></textarea>
+      <textarea id="input" rows="1" placeholder="Ask anything - use '@' to mention code blocks"></textarea>
       <input type="file" id="imgFile" accept="image/*" multiple style="display:none">
       <div class="row">
         <button id="plusBtn" title="附加上下文"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
@@ -3005,9 +3005,11 @@ class CascadePanelProvider {
   if(tryCloudBtn) tryCloudBtn.onclick=()=>{ agent="devin-cloud"; onAgentChange(); inputEl.focus(); };
   // 官方式麦克风: 官方真源路径 GetTranscription{audioData}→transcribedText——录音(MediaRecorder)
   // 送 LS 转写入 composer; getUserMedia 不可用时回退 Web Speech, 两者皆不可用则隐藏(不留死按钮)。
-  // 官方同文: 失焦 "Focus input (Ctrl+L)" / 聚焦 "Ask anything"(workbench 真源双态)
-  inputEl.addEventListener("focus",()=>{ inputEl.placeholder="Ask anything"; });
-  inputEl.addEventListener("blur",()=>{ inputEl.placeholder="Focus input (Ctrl+L)"; });
+  // 官方同文(反提 workbench 真源): composer 占位为单一静态串
+  // pe.placeholder ?? "Ask anything - use '@' to mention code blocks" —— 官方不做失焦/聚焦切换,
+  // 亦不是 "Focus input"(那是 chat-client 快捷键提示项 focus-input.text, 非 placeholder)。
+  const OFFICIAL_PLACEHOLDER="Ask anything - use '@' to mention code blocks";
+  inputEl.placeholder=OFFICIAL_PLACEHOLDER;
   const micBtn=document.getElementById("micBtn");
   (function(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
