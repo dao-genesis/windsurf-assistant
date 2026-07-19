@@ -755,3 +755,8 @@ corpus MISS 消化: 用户消息气泡悬停新增 ✎ 编辑钮(官方同文 to
 corpus MISS 消化: 步卡取消钮 "取消此步骤(CancelCascadeSteps)" → 官方同文 "Cancel step";
 Settings 页 Auto-Run 策略"更改"钮加官方同文 tooltip "Auto-run settings"(btn 支持 tip 参)。
 139/139 测试, v1.5.66。
+
+## R232 · LS 连接丢失横幅官方同文
+
+心跳节拍(60s→15s)并入 probeAlive 探活, 状态翻转即推 webview: 丢失展示官方同文横幅
+"Connection to language server lost. Reconnecting...", 恢复自动隐去。140/140 测试, v1.5.67。
