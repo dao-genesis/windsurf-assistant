@@ -3132,3 +3132,11 @@ test("R247: Cascade/Terminal 官方 UserSettings 七键", () => {
     "enableSoundsForSpecialEvents"]) assert.ok(sp.includes(k), k + " 在位");
   assert.ok(sp.includes('["terminal", "Terminal"]') && sp.includes('id="s-terminal"'), "Terminal 分区在位");
 });
+
+// R248 · 会话行状态徽标。
+test("R248: summary 徽标真源字段", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  for (const k of ["renamedTitle", "waitingSteps", "diffLinesAdded", "diffLinesRemoved"])
+    assert.ok(src.includes(k), k + " proto 真源在位");
+  assert.ok(src.includes('b.textContent="Waiting"') && src.includes('b.textContent="Running"'), "状态徽标在位");
+});

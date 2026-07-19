@@ -807,11 +807,17 @@ class CascadePanelProvider {
       const m = (r && r.trajectorySummaries) || {};
       const names = this._ctx.globalState.get("dao.cxNames") || {};
       // 官方式归档: summary.isArchived 为真的不入列表(LS 不在服务端过滤, 客户端自筛)
+      // 官方 summary proto 真源: renamedTitle 优先, status/waitingSteps/errored/diff 徽标随行
       return Object.keys(m).filter((cid) => !m[cid].isArchived).map((cid) => ({
         sessionId: "cx:" + cid,
-        title: "🌊 " + (names[cid] || m[cid].summary || cid),
+        title: "🌊 " + (names[cid] || m[cid].renamedTitle || m[cid].summary || cid),
         updatedAt: m[cid].lastModifiedTime,
         cwd: ((m[cid].workspaces || [])[0] || {}).workspaceFolderAbsoluteUri || "",
+        status: m[cid].status || "",
+        waiting: (m[cid].waitingSteps || []).length > 0,
+        errored: !!m[cid].errored,
+        added: Number(m[cid].diffLinesAdded || 0),
+        removed: Number(m[cid].diffLinesRemoved || 0),
       }));
     } catch (e) { this._log("[cascade-sessions] " + e.message); return []; }
   }
@@ -3686,7 +3692,14 @@ class CascadePanelProvider {
       for(const s of rs){ const it=document.createElement("div"); it.className="item";
         const t=document.createElement("span"); t.textContent=(s.title||s.sessionId).slice(0,48);
         const w=document.createElement("span"); w.className="when"; w.textContent=rel(s.updatedAt);
-        it.appendChild(t); it.appendChild(w);
+        it.appendChild(t);
+        // 官方式状态徽标: Waiting(等待审批) / Running / errored / +N -N 变更行数
+        if(s.waiting){ const b=document.createElement("span"); b.className="ec"; b.style.color="#e2b93d"; b.textContent="Waiting"; it.appendChild(b); }
+        else if(/RUNNING|ACTIVE/.test(s.status||"")){ const b=document.createElement("span"); b.className="ec"; b.textContent="Running"; it.appendChild(b); }
+        if(s.errored){ const b=document.createElement("span"); b.className="ec"; b.style.color="#e25d5d"; b.textContent="!"; b.title="Errored"; it.appendChild(b); }
+        if(s.added||s.removed){ const d=document.createElement("span"); d.style.cssText="font-size:10px;opacity:.75;";
+          d.innerHTML=(s.added?'<span style="color:#4cc38a">+'+s.added+'</span>':'')+(s.removed?' <span style="color:#e25d5d">-'+s.removed+'</span>':''); it.appendChild(d); }
+        it.appendChild(w);
         if((s.sessionId||"").startsWith("cx:")){
           const rn=document.createElement("span"); rn.className="arch"; rn.title="Rename conversation"; rn.innerHTML=OICONS.pencil;
           rn.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-rename", sessionId:s.sessionId}); };

@@ -862,3 +862,9 @@ N"; DEPLOY_WEB_APP{subdomain,deployment{projectUrl}} → 进行中 "Deploying ap
 Browser previews / Auto-generate memories(反相 usetInv); 新增 Terminal 分区
 (Terminal completion / Command Cascade mode / Sounds for special events)。
 154/154 测试, v1.5.82。
+
+## R248 · P1: 会话行状态徽标(summary proto 真源)
+
+官方 CascadeTrajectorySummary 真源字段接线: renamedTitle 优先标题、waitingSteps
+→ Waiting 徽标、status RUNNING → Running、errored → ! 、diffLinesAdded/Removed
+→ +N/-N 变更行数徽标, Recent sessions 行内随行渲染。155/155 测试, v1.5.83。
