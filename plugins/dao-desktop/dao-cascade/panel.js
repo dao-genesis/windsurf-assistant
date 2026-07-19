@@ -143,6 +143,9 @@ class CascadePanelProvider {
         if (msg.type === "session-archive") return this._handleSessionArchive(msg.sessionId);
         if (msg.type === "session-rename") return this._handleSessionRename(msg.sessionId);
         if (msg.type === "session-tags") return this._handleSessionTags(msg.sessionId);
+        if (msg.type === "bg-cmd-cancel") { const ls = require("./ls-bridge");
+          return ls.call("CancelCascadeSteps", { cascadeId: String(msg.cascadeId || ""),
+            stepIndices: [Number(msg.stepIndex || 0)] }).catch(() => {}); }
         if (msg.type === "session-export") return this._handleSessionExport(msg.sessionId);
         if (msg.type === "share-conversation") return this._handleShareConversation();
         if (msg.type === "transcribe") return this._handleTranscribe(msg.b64);
@@ -852,6 +855,20 @@ class CascadePanelProvider {
     const cx = await this._cascadeSessions();
     const all = acp.concat(cx).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
     this._post({ type: "sessions", sessions: all, current: this._acp && this._acp.sessionId });
+    // 官方式 Background Commands: summary.backgroundCommands(GlobalBackgroundCommand proto 真源)聚合推送
+    try { const ls2 = require("./ls-bridge");
+      if (ls2.ready() && ls2.apiKey()) {
+        const r2 = await ls2.call("GetAllCascadeTrajectories", {});
+        const mp2 = (r2 && r2.trajectorySummaries) || {};
+        const bg = [];
+        for (const cid of Object.keys(mp2)) {
+          for (const c of (mp2[cid].backgroundCommands || [])) {
+            if (/RUNNING|ACTIVE/.test(c.status || "")) bg.push({ cascadeId: cid,
+              commandLine: c.commandLine || "", stepIndex: Number(c.stepIndex || 0) });
+          }
+        }
+        this._post({ type: "bg-cmds", commands: bg.slice(0, 8) });
+      } } catch (_) {}
     this._autoBackup();
   }
 
@@ -3677,6 +3694,22 @@ class CascadePanelProvider {
         it.onclick=()=>vscode.postMessage({type:"session-load", sessionId:s.sessionId});
         recentList.appendChild(it); }
       recentEl.classList.toggle("show", rs.length>0);
+    }
+    else if(m.type==="bg-cmds"){
+      // 官方式 Background Commands 列表: 运行中后台命令 + Stop command 钮
+      let el=document.getElementById("bgCmds");
+      const cs=m.commands||[];
+      if(!cs.length){ if(el) el.remove(); return; }
+      if(!el){ el=document.createElement("div"); el.id="bgCmds";
+        el.style.cssText="border-radius:6px;background:rgba(128,128,128,.12);padding:4px 8px;font-size:11.5px;";
+        logEl.appendChild(el); }
+      el.innerHTML="";
+      const hd=document.createElement("div"); hd.style.opacity=".7"; hd.textContent="Background commands"; el.appendChild(hd);
+      for(const c of cs){ const r=document.createElement("div"); r.style.cssText="display:flex;align-items:center;gap:6px;";
+        const t=document.createElement("code"); t.textContent=c.commandLine.slice(0,60); r.appendChild(t);
+        const b=document.createElement("button"); b.className="qchip"; b.style.cursor="pointer"; b.title="Stop command"; b.textContent="Stop";
+        b.onclick=()=>{ b.disabled=true; vscode.postMessage({type:"bg-cmd-cancel", cascadeId:c.cascadeId, stepIndex:c.stepIndex}); };
+        r.appendChild(b); el.appendChild(r); }
     }
     else if(m.type==="session-current"){ /* 当前会话 id — 标题栏动作接管,无需内嵌 UI */ }
     else if(m.type==="session-info"){ /* 会话标题由 ACP 自动生成,历史 QuickPick 展示 */ }

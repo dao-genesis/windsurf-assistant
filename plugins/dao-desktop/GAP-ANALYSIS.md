@@ -836,3 +836,9 @@ commit <hash7>: <msg>, commits 官方图标; proto 真源 commitMessage/commitHa
 官方 RPC 真源 GetConversationTags(map cascadeId→tags) / UpdateConversationTags
 {cascadeId,tags[]}: Recent sessions 行新增 tag 官方图标钮 → 现值回显 → 空格分隔
 编辑写回。151/151 测试, v1.5.78。
+
+## R244 · P1: Background Commands 列表
+
+官方 proto 真源 GlobalBackgroundCommand(summary.backgroundCommands): 会话列表
+刷新时聚合全部运行中后台命令 → 面板内 "Background commands" 列表(命令行 +
+Stop 钮, 直通 CancelCascadeSteps{cascadeId,stepIndices})。152/152 测试, v1.5.79。
