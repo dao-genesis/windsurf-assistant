@@ -3195,3 +3195,15 @@ test("R256: brainUpdate/annotation/资源族官方同文", () => {
   assert.ok(src.includes("Found references to ") && src.includes("st.findAllReferences.symbol"), "references 真源");
   assert.ok(src.includes('"Fetched knowledge"') && src.includes("Listed resources from ") && src.includes("Read resource from "), "知识/资源族同文");
 });
+
+// R258 · 可见转写卡全量收官。
+test("R258: 可见转写步型清零", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  for (const s of ["Broadcasted to user", "Checked deploy status", "Found all clusters",
+    "Checked command status", "Workflow recipe name: ", "Reviewed codebase structure",
+    "Proposed code", "Ran preview", "Analyzed deployment config", "Read terminal output: ",
+    "Resolved task", "Searched trajectory", "Ran task subagent: "]) {
+    assert.ok(src.includes('"' + s + '"'), s + " 官方同文在位");
+  }
+  assert.ok(src.includes("st.planInput") && src.includes("st.exploreResponse") && src.includes("st.skill"), "结构步型在位");
+});

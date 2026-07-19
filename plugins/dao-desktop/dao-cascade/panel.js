@@ -639,6 +639,28 @@ class CascadePanelProvider {
     if (st.readResource) return { type: "memory-card", id, toolCallId: "cx" + k,
       title: "Read resource from " + (st.readResource.uri || "") };
     if (st.viewContentChunk) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Viewed content chunk" };
+    if (st.autoCascadeBroadcast) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Broadcasted to user" };
+    if (st.checkDeployStatus) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Checked deploy status" };
+    if (st.clusterQuery) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Found all clusters" };
+    if (st.commandStatus) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Checked command status" };
+    if (st.customTool) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Workflow recipe name: " + (st.customTool.recipeName || "") };
+    if (st.listClusters) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Reviewed codebase structure" };
+    if (st.planInput) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Goal: " + ((st.planInput.planInput || {}).goal || "") };
+    if (st.proposeCode) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Proposed code" };
+    if (st.proxyWebServer) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Ran preview" };
+    if (st.readDeploymentConfig) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Analyzed deployment config" };
+    if (st.readTerminal) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Read terminal output: " + (st.readTerminal.name || "") };
+    if (st.resolveTask) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Resolved task" };
+    if (st.trajectorySearch) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Searched trajectory" };
+    if (st.exploreResponse) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Explore Response", body: st.exploreResponse.response || "" };
+    if (st.skill) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Used skill " + (st.skill.skillName || "") };
+    if (st.taskSubagent) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Ran task subagent: " + (st.taskSubagent.description || "") };
     // 官方式 notebook/检索/лint 族卡(官方 workbench 转写同文)
     if (st.readNotebook) { const rn = st.readNotebook;
       return { type: "memory-card", id, toolCallId: "cx" + k,

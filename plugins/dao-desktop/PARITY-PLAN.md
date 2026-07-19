@@ -131,7 +131,11 @@ Memories / Plugins / Account。插件 settings-page.js 已覆盖 General(Auto-Ru
 - **P2 — 主体落地(R246–R256)**: Checkpoint 卡(R246) · Deploy 卡(R246) ·
   Codemap 卡(R249) · notebook 族/find code context/lint 卡(R250) · 拖拽上下文 +
   Revert 官方同文(R253) · 检索族补全 FIND/MQUERY(R255) · 转写同文九卡
-  brainUpdate/annotation/资源族(R256)。余: 遥测类 RPC 甄别 · 长尾步型/图标补遗。
+  brainUpdate/annotation/资源族(R256) · 可见转写卡全量收官(R258, 17 卡清零)。
+- **对账快照(R258 实测)**: RPC 169 官方 / 100 接入(余 69 为废弃/遥测/补全域/
+  正交项, 见 official/GAP.md 分域甄别); 官方步型 oneof 85 种, 用户可见转写
+  41 种已 100% 覆盖, 余 44 种为内部/评测/补全域(dummy·eval·supercomplete 等)。
+  余: 遥测类 RPC 甄别 · 长尾图标补遗。
 - **不做(定位正交)**: Tab/Supercomplete 补全域、University Sandbox、组织管理后台大宗。
 
 *道法自然 · 无为而无不为*
