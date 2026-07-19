@@ -3187,3 +3187,11 @@ test("R255: find / mquery 官方同文", () => {
   assert.ok(src.includes("st.find") && src.includes('"Searched filesystem"') && src.includes("fd.totalResults"), "FIND 卡真源");
   assert.ok(src.includes("st.mquery") && src.includes('"Semantic searched codebase"'), "MQUERY 官方转写同文");
 });
+
+// R256 · 转写同文九卡。
+test("R256: brainUpdate/annotation/资源族官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"Planned for action"') && src.includes('"Added annotation"'), "brain/annotation 同文");
+  assert.ok(src.includes("Found references to ") && src.includes("st.findAllReferences.symbol"), "references 真源");
+  assert.ok(src.includes('"Fetched knowledge"') && src.includes("Listed resources from ") && src.includes("Read resource from "), "知识/资源族同文");
+});

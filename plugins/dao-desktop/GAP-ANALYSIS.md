@@ -911,3 +911,11 @@ composer 上方, 每次增删全量回写。160/160 测试, v1.5.89。
 官方 proto 真源 CortexStepFind{pattern,total_results} / CortexStepMquery{input}:
 FIND → "Searched filesystem for <pattern> · N results", MQUERY → 官方转写同文
 "Semantic searched codebase for <input>"。161/161 测试, v1.5.90。
+
+## R256 · P2: 转写同文九卡(brainUpdate/annotation/资源族)
+
+官方 workbench transcribe switch 真源九卡: BRAIN_UPDATE "Planned for action"、
+ADD_ANNOTATION "Added annotation"、VIEW_CODE_ITEM、RELATED_FILES、
+FIND_ALL_REFERENCES、READ_KNOWLEDGE_BASE_ITEM "Fetched knowledge"、
+LIST_RESOURCES/READ_RESOURCE(MCP 资源族)、VIEW_CONTENT_CHUNK。
+162/162 测试, v1.5.91。
