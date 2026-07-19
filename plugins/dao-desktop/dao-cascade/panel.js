@@ -184,6 +184,7 @@ class CascadePanelProvider {
         if (msg.type === "mcp-tool-toggle") return this._handleMcpToolToggle(msg.server, msg.tool);
         if (msg.type === "mcp-prompt-run") return this._handleMcpPromptRun(msg.server, msg.prompt, msg.args);
         if (msg.type === "account-status") { this._acctPopOpen = true; return this._handleAccountStatus(); }
+        if (msg.type === "avatar-cmd") return this._handleAvatarCmd(msg.id);
         if (msg.type === "account-close") { this._acctPopOpen = false; return; }
         if (msg.type === "token-query") return this._handleTokenQuery(msg.reqId, msg.text);
         if (msg.type === "memory-delete") return this._handleMemoryDelete(msg.id);
@@ -1582,6 +1583,36 @@ class CascadePanelProvider {
         flexCredits: num(ps.availableFlexCredits) });
       this._watchPanelState();
     } catch (e) { this._post({ type: "error", text: "读取账户状态失败: " + e.message }); }
+  }
+
+  // 官方头像菜单命令路由(反提官方 extension.js OPEN_* registerCommand 真源):
+  // Docs→docs.windsurf.com?referrer=extension / Community→windsurf.com/redirect/windsurf/community /
+  // Changelog→windsurf.com/changelog / Usage→getDevinViewUsageUrl 同构(auth/devin/start?redirect_uri=
+  // app.devin.ai/auth/windsurf/continue&prompt=none&intent=website); 编辑器组直通宿主原生命令。
+  async _handleAvatarCmd(id) {
+    const open = (u) => void vscode.env.openExternal(vscode.Uri.parse(u)).then(undefined, () => {});
+    const WEB = "https://windsurf.com";
+    const cmd = (c, ...a) => void vscode.commands.executeCommand(c, ...a).then(undefined, () => {});
+    switch (id) {
+      case "account": this._acctPopOpen = true; return this._handleAccountStatus();
+      case "settings": return cmd("dao.cascade.openSettings");
+      case "usage": {
+        const q = new URLSearchParams({ redirect_uri: "https://app.devin.ai/auth/windsurf/continue", prompt: "none", intent: "website" });
+        return open(WEB + "/auth/devin/start?" + q.toString());
+      }
+      case "signout": return cmd(this._viewId + ".logout");
+      case "editor-settings": return cmd("workbench.action.openSettings");
+      case "keybindings": return cmd("workbench.action.openGlobalKeybindings");
+      case "extensions": return cmd("workbench.view.extensions");
+      case "snippets": return cmd("workbench.action.openSnippets");
+      case "tasks": return cmd("workbench.action.tasks.configureTaskRunner");
+      case "themes": return cmd("workbench.action.selectTheme");
+      case "updates": return cmd("workbench.extensions.action.checkForUpdates");
+      case "docs": return open("https://docs.windsurf.com?referrer=extension");
+      case "community": return open(WEB + "/redirect/windsurf/community");
+      case "changelog": return open(WEB + "/changelog");
+      case "diagnostics": return this._handleStatusInfo();
+    }
   }
 
   // 官方式实时面板状态: StreamCascadePanelReactiveUpdates{protocolVersion:1,id:<apiKey>}
@@ -3250,9 +3281,31 @@ class CascadePanelProvider {
         const nm=(m.windsurf&&m.windsurf.authSignedIn&&m.windsurf.authName)||(m.loggedIn&&m.userName)||"";
         if(nm){ ch.textContent=nm.replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?";
           ch.style.display="inline-block";
-          ch.onclick=()=>{ const ex=document.getElementById("acctPop");
-            if(ex){ ex.remove(); vscode.postMessage({type:"account-close"}); }
-            else vscode.postMessage({type:"account-status"}); };
+          // 官方头像下拉菜单同构(官方 GlobalActivity 菜单实机反提: Devin Account/Settings/Usage/
+          // Sign Out ┃ Editor Settings/Keyboard Shortcuts/Extensions/Snippets/Tasks/Themes ┃
+          // Check for Updates/Docs/Join the Community/Changelog/Download Diagnostics)
+          ch.onclick=(ev)=>{ ev.stopPropagation();
+            const ex=document.getElementById("avMenu"); if(ex){ ex.remove(); return; }
+            const items=[
+              ["account","Devin Account ("+nm+")"],["settings","Devin Settings"],["usage","Devin Usage"],["signout","Sign Out"],null,
+              ["editor-settings","Editor Settings"],["keybindings","Open Keyboard Shortcuts"],["extensions","Extensions"],
+              ["snippets","Configure Snippets"],["tasks","Tasks"],["themes","Themes"],null,
+              ["updates","Check for Updates..."],["docs","Docs"],["community","Join the Community"],
+              ["changelog","Changelog"],["diagnostics","Download Diagnostics"]];
+            const mn=document.createElement("div"); mn.id="avMenu";
+            mn.style.cssText="position:fixed;top:26px;right:6px;z-index:9999;min-width:210px;background:var(--vscode-menu-background,#252526);color:var(--vscode-menu-foreground,#ccc);border:1px solid var(--vscode-menu-border,#454545);border-radius:6px;padding:4px 0;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4)";
+            for(const it of items){
+              if(!it){ const hr=document.createElement("div"); hr.style.cssText="height:1px;background:var(--vscode-menu-separatorBackground,#454545);margin:4px 0"; mn.appendChild(hr); continue; }
+              const d=document.createElement("div"); d.textContent=it[1];
+              d.style.cssText="padding:4px 14px;cursor:pointer;white-space:nowrap";
+              d.onmouseenter=()=>d.style.background="var(--vscode-menu-selectionBackground,#04395e)";
+              d.onmouseleave=()=>d.style.background="";
+              d.onclick=()=>{ mn.remove(); vscode.postMessage({type:"avatar-cmd",id:it[0]}); };
+              mn.appendChild(d);
+            }
+            document.body.appendChild(mn);
+            setTimeout(()=>document.addEventListener("click",function h(){ mn.remove(); document.removeEventListener("click",h); }),0);
+          };
         } else ch.style.display="none"; })();
       envEl.style.cursor="pointer"; envEl.onclick=()=>{ const ex=document.getElementById("acctPop");
         if(ex){ ex.remove(); vscode.postMessage({type:"account-close"}); } else vscode.postMessage({type:"account-status"}); };

@@ -2700,3 +2700,15 @@ test("R200: Agent 看板官方同文(Ready 列/英文标签/Search sessions)", (
   assert.ok(src.includes('finished: "Ready"'), "状态标签英文化");
   assert.ok(!src.includes("已完成"), "中文状态标签已移除");
 });
+
+test("R201: 头像菜单官方同构(实机反提菜单项/官方 URL 真源)", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  for (const item of ['"Devin Settings"', '"Devin Usage"', '"Sign Out"', '"Editor Settings"',
+    '"Open Keyboard Shortcuts"', '"Extensions"', '"Configure Snippets"', '"Tasks"', '"Themes"',
+    '"Check for Updates..."', '"Docs"', '"Join the Community"', '"Changelog"', '"Download Diagnostics"'])
+    assert.ok(src.includes(item), "官方菜单项: " + item);
+  assert.ok(src.includes("redirect/windsurf/community"), "Community 官方 redirect URL");
+  assert.ok(src.includes("docs.windsurf.com?referrer=extension"), "Docs 官方 URL 同参");
+  assert.ok(src.includes("/auth/windsurf/continue"), "Usage 官方 getDevinViewUsageUrl 同构");
+  assert.ok(src.includes('_handleAvatarCmd'), "宿主侧命令路由在位");
+});
