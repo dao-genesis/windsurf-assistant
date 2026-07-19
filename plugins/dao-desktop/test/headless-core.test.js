@@ -3098,3 +3098,11 @@ test("R242: 后台三开关官方同源键 + 完轮通知接线", () => {
   const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
   assert.ok(src.includes("us.enableCascadeAlwaysNotifyOnFinish"), "完轮通知按官方键接线");
 });
+
+// R243 · 会话标签。
+test("R243: Conversation Tags 官方 RPC 真源", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"GetConversationTags"') && src.includes('"UpdateConversationTags"'), "官方双 RPC 在位");
+  assert.ok(src.includes('"session-tags"') && src.includes("_handleSessionTags"), "双端通道在位");
+  assert.ok(src.includes('tg.title="Edit tags"'), "会话行 tag 钮在位");
+});

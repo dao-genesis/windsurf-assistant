@@ -142,6 +142,7 @@ class CascadePanelProvider {
         if (msg.type === "session-new") return this._handleSessionNew();
         if (msg.type === "session-archive") return this._handleSessionArchive(msg.sessionId);
         if (msg.type === "session-rename") return this._handleSessionRename(msg.sessionId);
+        if (msg.type === "session-tags") return this._handleSessionTags(msg.sessionId);
         if (msg.type === "session-export") return this._handleSessionExport(msg.sessionId);
         if (msg.type === "share-conversation") return this._handleShareConversation();
         if (msg.type === "transcribe") return this._handleTranscribe(msg.b64);
@@ -820,6 +821,23 @@ class CascadePanelProvider {
       });
     };
     loop();
+  }
+
+  // 官方式会话标签: GetConversationTags → 现值回显; UpdateConversationTags{cascadeId,tags[]} 写回
+  async _handleSessionTags(sessionId) {
+    if (!sessionId || !sessionId.startsWith("cx:")) return;
+    const cid = sessionId.slice(3);
+    try {
+      const ls = require("./ls-bridge");
+      let cur = [];
+      try { const r = await ls.call("GetConversationTags", {});
+        const mp = (r && r.conversationTags) || {};
+        cur = ((mp[cid] || {}).tags) || []; } catch (_) {}
+      const v = await vscode.window.showInputBox({ prompt: "Conversation tags(空格分隔, 官方 UpdateConversationTags 同源)", value: cur.join(" ") });
+      if (v == null) return;
+      await ls.call("UpdateConversationTags", { cascadeId: cid, tags: v.split(/\s+/).filter(Boolean) });
+    } catch (e) { this._post({ type: "error", text: "标签更新失败: " + e.message }); }
+    this._handleSessionsList();
   }
 
   async _handleSessionsList() {
@@ -2958,7 +2976,7 @@ class CascadePanelProvider {
   const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12), globe: OI.svg("globe", 12), toolbox: OI.svg("toolbox", 12), checklist: OI.svg("checklist", 12),
     "commits": OI.svg("commits", 11), "bubble-5": OI.svg("bubble-5", 11), "devin-logo": OI.svg("devin-logo", 11), "file-text": OI.svg("file-text", 11),
     "magnifying-glass": OI.svg("magnifying-glass", 11), "pencil": OI.svg("pencil", 11), "flag-1": OI.svg("flag-1", 11), "exclamation-triangle": OI.svg("exclamation-triangle", 11),
-    trash: OI.svg("trash-can-simple", 11), download: OI.svg("arrow-inbox", 11), book: OI.svg("book", 11), brain: OI.svg("brain", 12) })};
+    trash: OI.svg("trash-can-simple", 11), download: OI.svg("arrow-inbox", 11), book: OI.svg("book", 11), brain: OI.svg("brain", 12), tag: OI.svg("tag", 11) })};
   let agent = AGENTS[0].id;
   const state = vscode.getState() || { history: [] };
   const $ = (id) => document.getElementById(id);
@@ -3646,6 +3664,9 @@ class CascadePanelProvider {
           const rn=document.createElement("span"); rn.className="arch"; rn.title="Rename conversation"; rn.innerHTML=OICONS.pencil;
           rn.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-rename", sessionId:s.sessionId}); };
           it.appendChild(rn);
+          const tg=document.createElement("span"); tg.className="arch"; tg.title="Edit tags"; tg.innerHTML=OICONS.tag;
+          tg.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-tags", sessionId:s.sessionId}); };
+          it.appendChild(tg);
           const ex=document.createElement("span"); ex.className="arch"; ex.title="Export"; ex.innerHTML=OICONS.download;
           ex.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-export", sessionId:s.sessionId}); };
           it.appendChild(ex);
