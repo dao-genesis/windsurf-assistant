@@ -787,3 +787,10 @@ PARITY-PLAN P0 首批: SEARCH_WEB{query,webDocuments[],webSearchUrl} / READ_URL_
 {url,resolvedUrl,webDocument}(字段反提 CortexStep* proto 真源)→ globe 官方图标 web 步卡
 (Searched web for … / Read <url> + 文档清单点击外开); SUGGESTED_RESPONSES.suggestions[]
 → 官方式点击即发 chips。144/144 测试, v1.5.71。
+
+## R237 · P0: MCP 工具卡 + 待办清单卡
+
+MCP_TOOL{serverName,toolCall{name,argumentsJson},resultString} → toolbox 官方图标 MCP
+卡(server·tool + 展开参数/结果); TODO_LIST{todos[]{content,status 三态},isInitial
+Creation} → checklist 官方图标待办卡(✓/◐/○ 行 + done/total 徽标)。字段均反提官方
+CortexStep* proto 真源。145/145 测试, v1.5.72。
