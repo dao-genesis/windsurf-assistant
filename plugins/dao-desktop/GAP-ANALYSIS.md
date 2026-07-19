@@ -830,3 +830,9 @@ commit <hash7>: <msg>, commits 官方图标; proto 真源 commitMessage/commitHa
 (官方同文 "Notify when Cascade finishes while running in the background", 已接线:
 面板不可见完轮即系统通知)、disableAutoOpenEditedFiles(反相开关 usetInv)。
 150/150 测试, v1.5.77。
+
+## R243 · P1: 会话标签(Conversation Tags)
+
+官方 RPC 真源 GetConversationTags(map cascadeId→tags) / UpdateConversationTags
+{cascadeId,tags[]}: Recent sessions 行新增 tag 官方图标钮 → 现值回显 → 空格分隔
+编辑写回。151/151 测试, v1.5.78。
