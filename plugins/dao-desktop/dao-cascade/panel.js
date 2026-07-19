@@ -2680,7 +2680,10 @@ class CascadePanelProvider {
   #modelBtn, #modeBtn, #agentBtn { background:transparent; border:none; color:inherit; font:inherit; cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0; }
   #modelMenu, #modeMenu, #agentMenu { display:none; margin:0 0 6px; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   #modelMenu.show, #modeMenu.show, #agentMenu.show { display:block; }
-  #modelMenu #modelFilter { width:100%; box-sizing:border-box; background:transparent; border:none; border-bottom:1px solid var(--line); color:var(--vscode-foreground); font:12px var(--vscode-font-family); padding:6px 10px; outline:none; }
+  #modelFilterRow { display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--line); padding:0 10px; }
+  #modelFilterRow svg { flex-shrink:0; color:var(--dim); }
+  #modelMenu #modelFilter { flex:1; min-width:0; box-sizing:border-box; background:transparent; border:none; color:var(--vscode-foreground); font:12px var(--vscode-font-family); padding:6px 0; outline:none; }
+  #modelMenu #modelFilter::placeholder { color:var(--dim); }
   #modelList, #modeList, #agentList { max-height:260px; overflow-y:auto; }
   #modeList .mit, #agentList .mit { padding:5px 10px; cursor:pointer; }
   #modeList .mit:hover, #modeList .mit.sel, #modeList .mit.kbd, #agentList .mit:hover, #agentList .mit.sel, #agentList .mit.kbd { background:var(--pill-hover); }
@@ -2735,7 +2738,7 @@ class CascadePanelProvider {
   <div class="composer">
     <div id="slashMenu"></div>
     <div id="atMenu"></div>
-    <div id="modelMenu"><input id="modelFilter" type="text" placeholder="搜索模型…"><div id="modelList"></div></div>
+    <div id="modelMenu"><div id="modelFilterRow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.207 3.043 C 8.656 3.193,7.096 3.846,5.900 4.847 C 4.985 5.612,4.307 6.477,3.800 7.529 C 2.453 10.317,2.837 13.625,4.789 16.040 C 5.075 16.394,5.761 17.067,6.100 17.326 C 7.743 18.581,9.834 19.176,11.832 18.958 C 13.289 18.798,14.736 18.220,15.883 17.337 L 16.106 17.166 17.943 19.007 C 19.169 20.236,19.833 20.873,19.940 20.923 C 20.243 21.065,20.552 21.004,20.788 20.755 C 21.013 20.516,21.060 20.233,20.923 19.940 C 20.873 19.833,20.236 19.169,19.007 17.943 L 17.166 16.106 17.337 15.883 C 18.220 14.736,18.798 13.289,18.958 11.832 C 19.176 9.834,18.579 7.737,17.325 6.100 C 17.055 5.747,16.510 5.190,16.100 4.847 C 14.483 3.494,12.337 2.837,10.207 3.043 M11.940 4.577 C 14.094 4.908,15.858 6.196,16.838 8.153 C 17.493 9.462,17.661 11.157,17.283 12.629 C 16.641 15.130,14.538 17.031,11.980 17.423 C 11.467 17.502,10.533 17.502,10.020 17.423 C 7.461 17.031,5.360 15.132,4.717 12.629 C 4.451 11.596,4.451 10.404,4.717 9.371 C 5.361 6.863,7.431 4.993,10.020 4.580 C 10.456 4.511,11.498 4.509,11.940 4.577 " stroke="none" fill-rule="evenodd" fill="currentColor"/></svg><input id="modelFilter" type="text" placeholder="Search all models"></div><div id="modelList"></div></div>
     <div id="modeMenu"><div id="modeList"></div></div>
     <div id="agentMenu"><div id="agentList"></div></div>
     <div class="card">

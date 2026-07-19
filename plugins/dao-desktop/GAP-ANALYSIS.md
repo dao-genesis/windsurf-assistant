@@ -576,3 +576,10 @@ fillRule:evenodd fill:currentColor, lde 组件), 非 emoji。插件此前 tryClo
 云图标/Agent 看板卡片云标均为 ☁ emoji。本轮: 反提官方 path 全量落 CLOUD_SVG, 三处同源替换
 (panel tryCloud/AGENT_ICONS + agent-board 卡片云标), 图标含 <svg 时走 innerHTML 渲染。
 112/112 测试, v1.5.39。
+
+## R205 · 模型选择器过滤行官方同源(反提 workbench 真源)
+
+官方模型弹层顶部过滤行(wMs 组件): magnifying-glass 搜索图标(eA, viewBox 24 · stroke:none
+fillRule:evenodd fill:currentColor) + 占位 "Search all models"。插件此前为无图标裸输入 +
+中文占位"搜索模型…"。本轮: 反提官方 path 同源落位 modelFilterRow(图标+输入 flex 行),
+占位官方同文。113/113 测试, v1.5.40。
