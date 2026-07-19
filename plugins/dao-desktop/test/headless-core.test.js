@@ -2824,3 +2824,16 @@ test("R212: official-icons 图标库 + 顶栏/发送/状态条官方同源接线
   assert.ok(src.includes('OI.svg("macbook"'), "Local 段官方同源接线");
   assert.ok(src.includes('OI.svg("folder-1"'), "folder 段官方同源接线");
 });
+
+// R213 · 终端卡官方动作 + tooltip 批量同文(corpus 缺口首批)。
+test("R213: Copy command/Insert in terminal + Accept file/Reject file 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('title="Copy command"'), "Copy command 官方同文");
+  assert.ok(src.includes('title="Insert in terminal"'), "Insert in terminal 官方同文");
+  assert.ok(src.includes('"insert-terminal"'), "host 终端注入通路在位");
+  assert.ok(src.includes('ok.title="Accept file"'), "Accept file 官方 tooltip 同文");
+  assert.ok(src.includes('no.title="Reject file"'), "Reject file 官方 tooltip 同文");
+  assert.ok(src.includes('title="Previous (Shift+Enter)"'), "查找上一处官方同文");
+  assert.ok(src.includes('title="Close (Escape)"'), "查找关闭官方同文");
+  assert.ok(src.includes("OICONS.terminal"), "终端卡头官方 console-simple 接线");
+});

@@ -163,6 +163,9 @@ class CascadePanelProvider {
         if (msg.type === "custom-list") return this._handleCustomizationsList();
         if (msg.type === "custom-create") return this._handleCustomizationCreate(msg.kind);
         if (msg.type === "custom-wf-copy") return this._handleWorkflowCopy(msg.name);
+        if (msg.type === "insert-terminal") { // 官方 Insert in terminal 同义: 送入活动终端不回车
+          const t = vscode.window.activeTerminal || vscode.window.createTerminal("dao");
+          t.show(false); t.sendText(String(msg.text || ""), false); return; }
         if (msg.type === "cx-ack") return this._handleCxAck(msg.file, !!msg.accept, !!msg.created);
         if (msg.type === "mcp-list") return this._handleMcpList();
         if (msg.type === "mcp-refresh") return this._handleMcpRefresh();
@@ -2667,6 +2670,8 @@ class CascadePanelProvider {
   .cmdcard .chead { display:flex; gap:6px; align-items:center; padding:4px 8px; cursor:pointer; }
   .cmdcard .cmd { font:11px var(--vscode-editor-font-family,monospace); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cmdcard .cwd { color:var(--dim); font-size:10px; white-space:nowrap; }
+  .cmdcard .cmi { background:transparent; border:none; color:var(--dim); cursor:pointer; padding:1px 3px; border-radius:4px; display:inline-flex; align-items:center; }
+  .cmdcard .cmi:hover { background:var(--pill-hover); color:var(--vscode-foreground); }
   .cmdcard .ec { margin-left:auto; font-size:10px; }
   .cmdcard .ec.ok { color:var(--vscode-testing-iconPassed,#4caf50); }
   .cmdcard .ec.bad { color:var(--vscode-errorForeground,#f44); }
@@ -2731,7 +2736,7 @@ class CascadePanelProvider {
     <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("settings-gear-1",13)}</button>
     <button id="acctChip" title="账号 · 点击查看账户卡(官方顶栏头像同位)" style="display:none;border:none;background:#2ea3ff;color:#fff;cursor:pointer;width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:600;line-height:18px;padding:0;margin-left:4px;align-self:center;text-align:center;"></button>
   </div>
-  <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="上一处 (Shift+Enter)">↑</button><button id="cfNext" title="下一处 (Enter)">↓</button><button id="cfClose" title="关闭 (Esc)">✕</button></div>
+  <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="Previous (Shift+Enter)">↑</button><button id="cfNext" title="Next (Enter)">↓</button><button id="cfClose" title="Close (Escape)">✕</button></div>
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
@@ -2788,6 +2793,8 @@ class CascadePanelProvider {
 <script nonce="${n}">
   const vscode = acquireVsCodeApi();
   const AGENTS = ${agentsJson};
+  // 官方图标(反提 workbench 真源): 终端卡头 console-simple / Copy command / Insert in terminal
+  const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12) })};
   let agent = AGENTS[0].id;
   const state = vscode.getState() || { history: [] };
   const $ = (id) => document.getElementById(id);
@@ -3481,9 +3488,15 @@ class CascadePanelProvider {
       el.className="cmdcard "+(m.status||""); el.innerHTML="";
       const hd=document.createElement("div"); hd.className="chead";
       const ch=document.createElement("span"); ch.className="chev"; ch.textContent="▸";
-      const ic=document.createElement("span"); ic.textContent="⌘";
+      const ic=document.createElement("span"); ic.innerHTML=OICONS.terminal;
       const cm=document.createElement("span"); cm.className="cmd"; cm.textContent=m.command||""; cm.title=m.command||"";
       hd.appendChild(ch); hd.appendChild(ic); hd.appendChild(cm);
+      // 官方同文 tooltip: Copy command / Insert in terminal
+      const cpb=document.createElement("button"); cpb.className="cmi"; cpb.title="Copy command"; cpb.innerHTML=OICONS.copy;
+      cpb.onclick=(ev)=>{ ev.stopPropagation(); navigator.clipboard.writeText(m.command||""); };
+      const inb=document.createElement("button"); inb.className="cmi"; inb.title="Insert in terminal"; inb.innerHTML=OICONS.insert;
+      inb.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"insert-terminal", text:m.command||""}); };
+      hd.appendChild(cpb); hd.appendChild(inb);
       if(m.cwd){ const w=document.createElement("span"); w.className="cwd"; w.textContent="in "+m.cwd; hd.appendChild(w); }
       if(m.exitCode!=null){ const e2=document.createElement("span"); e2.className="ec "+(m.exitCode===0?"ok":"bad");
         e2.textContent=m.exitCode===0?"✓":"exit "+m.exitCode; hd.appendChild(e2); }
@@ -3507,9 +3520,9 @@ class CascadePanelProvider {
       if(nd){ const b=document.createElement("span"); b.className="del"; b.textContent="−"+nd; hd.appendChild(b); }
       if(m.status==="completed"&&!el.dataset.acked){
         // 官方同文(反提 workbench 真源): Accept / Reject 文字钮
-        const ok=document.createElement("span"); ok.className="mi"; ok.title="接受此文件变更"; ok.textContent="Accept"; ok.style.cssText="cursor:pointer;color:#4c4;font-size:11px;";
+        const ok=document.createElement("span"); ok.className="mi"; ok.title="Accept file"; ok.textContent="Accept"; ok.style.cssText="cursor:pointer;color:#4c4;font-size:11px;";
         ok.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"cx-ack", file:m.file, accept:true, created:!!m.created}); };
-        const no=document.createElement("span"); no.className="mi"; no.title="拒绝此文件变更"; no.textContent="Reject"; no.style.cssText="cursor:pointer;color:#c55;font-size:11px;";
+        const no=document.createElement("span"); no.className="mi"; no.title="Reject file"; no.textContent="Reject"; no.style.cssText="cursor:pointer;color:#c55;font-size:11px;";
         no.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"cx-ack", file:m.file, accept:false, created:!!m.created}); };
         hd.appendChild(ok); hd.appendChild(no); }
       const bd=document.createElement("div"); bd.className="dbody"; bd.style.display="none";
