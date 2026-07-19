@@ -551,3 +551,12 @@ windsurf/community、Changelog→windsurf.com/changelog、Usage→getDevinViewUs
 编辑器组直通宿主原生命令(openSettings/openGlobalKeybindings/view.extensions/openSnippets/
 tasks/selectTheme/checkForUpdates); Sign Out 走插件 logout; Diagnostics 走 status-info。
 110/110 测试, v1.5.36 实机装回复验(菜单三段结构与官方逐项同文同序)。
+
+## R202 · composer 占位官方真源纠偏(反者道之动·workbench 反提)
+
+反提官方 3.4.27 workbench 真源: composer 输入框占位为**单一静态串**
+`pe.placeholder ?? "Ask anything - use '@' to mention code blocks"`——官方**不做失焦/聚焦切换**。
+R196 曾把 chat-client 快捷键提示项 `{id:"focus-input",text:"Focus input"}`(与 ask-anything/
+new-chat/megaplan/conversation-mention 同属提示项枚举)误当作 placeholder, 造成插件失焦显
+"Focus input (Ctrl+L)"、聚焦显 "Ask anything" 的双态错位。本轮纠偏: 占位统一为官方同文静态串,
+去除 focus/blur 切换监听。110/110 测试, v1.5.37。

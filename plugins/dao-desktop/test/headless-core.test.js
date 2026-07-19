@@ -2676,10 +2676,13 @@ test("R194: GetProfileData 官方同路与甄别收敛在位", () => {
 });
 
 // R196 · 双 IDE 实机 UI 对照: composer 官方双态占位/图标化 target 行(反提 workbench 真源字串)。
-test("R196: composer 官方双态占位与 target 行图标化在位", () => {
+test("R202: composer 官方静态占位(反提 workbench 真源)与 target 行图标化在位", () => {
   const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
-  assert.ok(src.includes('placeholder="Focus input (Ctrl+L)"'), "失焦态官方同文占位");
-  assert.ok(src.includes('inputEl.placeholder="Ask anything"'), "聚焦态官方同文占位");
+  // 官方 workbench 真源: 单一静态 placeholder = "Ask anything - use '@' to mention code blocks"
+  // (pe.placeholder ?? 默认串), 无失焦/聚焦切换; "Focus input" 系快捷键提示项非 placeholder。
+  assert.ok(src.includes("Ask anything - use '@' to mention code blocks"), "官方静态占位同文");
+  assert.ok(!src.includes('placeholder="Focus input (Ctrl+L)"'), "去除非官方失焦态占位");
+  assert.ok(!src.includes('inputEl.placeholder="Ask anything";'), "去除非官方聚焦态占位切换");
   assert.ok(src.includes('id="folderName"'), "target 行 SVG 图标化(去 emoji)");
   assert.ok(!src.includes('"📁 "+m.folder'), "emoji 文件夹已替换");
 });
