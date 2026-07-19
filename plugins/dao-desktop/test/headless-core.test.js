@@ -2919,7 +2919,7 @@ test("R221: 会话行内钮 + DeepWiki 头官方图标同源", () => {
 // R222 · composer 图像附件钮官方同源化。
 test("R222: imgBtn 官方 images-1 同源", () => {
   const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
-  assert.ok(src.includes('id="imgBtn" title="附加图片（支持粘贴）">${OI.svg("images-1",13)}'), "官方 images-1 接线");
+  assert.ok(src.includes('id="imgBtn" title="Attachment">${OI.svg("images-1",13)}'), "官方 images-1 接线");
 });
 
 // R223 · Auto-Run 策略官方四档语义。
@@ -2970,4 +2970,11 @@ test("R227: Search sessions... 官方同文占位", () => {
 test("R228: Share Conversation 官方逐字同文", () => {
   const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
   assert.ok(src.includes('id="mtShare" title="Share Conversation"'), "官方同文在位");
+});
+
+// R229 · composer 钮官方同文 tooltip。
+test("R229: Add Context / Attachment 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('id="plusBtn" title="Add Context"'), "Add Context 官方同文");
+  assert.ok(src.includes('id="imgBtn" title="Attachment"'), "Attachment 官方同文");
 });
