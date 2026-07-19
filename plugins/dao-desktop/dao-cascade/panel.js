@@ -167,6 +167,7 @@ class CascadePanelProvider {
           const t = vscode.window.activeTerminal || vscode.window.createTerminal("dao");
           t.show(false); t.sendText(String(msg.text || ""), false); return; }
         if (msg.type === "cx-ack") return this._handleCxAck(msg.file, !!msg.accept, !!msg.created);
+        if (msg.type === "cx-accept-all") return this._handleCxAcceptAll();
         if (msg.type === "mcp-list") return this._handleMcpList();
         if (msg.type === "mcp-refresh") return this._handleMcpRefresh();
         if (msg.type === "mcp-add") return this._handleMcpAdd();
@@ -550,6 +551,15 @@ class CascadePanelProvider {
       this._log("[files-query] " + e.message);
       this._post({ type: "files", reqId: msg.reqId, files: [], docs, syms });
     }
+  }
+
+  // 官方式批量清算: ResolveOutstandingSteps{cascadeId} 一次性接受全部待决变更(Accept all)
+  async _handleCxAcceptAll() {
+    if (!this._cascadeLsId) return;
+    const ls = require("./ls-bridge");
+    try { await ls.call("ResolveOutstandingSteps", { cascadeId: this._cascadeLsId });
+      this._post({ type: "cx-acked-all" }); }
+    catch (e) { this._post({ type: "error", text: "Accept all 失败: " + e.message }); }
   }
 
   // 官方式步级撤销: CancelCascadeSteps{cascadeId,stepIndices[]} 取消指定进行中步骤(不停整轮)
@@ -3672,12 +3682,29 @@ class CascadePanelProvider {
         ok.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"cx-ack", file:m.file, accept:true, created:!!m.created}); };
         const no=document.createElement("span"); no.className="mi"; no.title="Reject file"; no.textContent="Reject"; no.style.cssText="cursor:pointer;color:#c55;font-size:11px;";
         no.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"cx-ack", file:m.file, accept:false, created:!!m.created}); };
-        hd.appendChild(ok); hd.appendChild(no); }
+        hd.appendChild(ok); hd.appendChild(no);
+        // 官方同文 Accept all: ≥2 张待清算变更卡时展示批量钮(ResolveOutstandingSteps)
+        setTimeout(()=>{ let bar=document.getElementById("acceptAllBar");
+          const pend=[...logEl.querySelectorAll(".diffcard")].filter(d=>!d.dataset.acked).length;
+          if(pend>=2){ if(!bar){ bar=document.createElement("div"); bar.id="acceptAllBar";
+              bar.style.cssText="display:flex;justify-content:flex-end;padding:2px 0;";
+              const b=document.createElement("button"); b.textContent="Accept all"; b.className="qchip"; b.style.cursor="pointer";
+              b.onclick=()=>vscode.postMessage({type:"cx-accept-all"}); bar.appendChild(b); logEl.appendChild(bar); }
+            else logEl.appendChild(bar); bar.style.display="flex"; } },0); }
       const bd=document.createElement("div"); bd.className="dbody"; bd.style.display="none";
       for(const l of (m.lines||[])){ const r=document.createElement("div"); r.className="dl"+(l.t==="+"?" i":l.t==="-"?" d":"");
         r.textContent=(l.t==="+"?"+ ":l.t==="-"?"− ":"  ")+(l.text||""); bd.appendChild(r); }
       hd.onclick=()=>{ const open=bd.style.display==="none"; bd.style.display=open?"":"none"; ch.textContent=open?"▾":"▸"; };
       el.appendChild(hd); el.appendChild(bd); logEl.scrollTop=logEl.scrollHeight;
+    }
+    else if(m.type==="cx-acked-all"){
+      // 官方式 Accept all 回执: 全部未清算变更卡标记 Accepted
+      for(const el of logEl.querySelectorAll(".diffcard")){
+        if(el.dataset.acked) continue; el.dataset.acked="1";
+        for(const b of el.querySelectorAll(".mi")) b.remove();
+        const tag=document.createElement("span"); tag.className="ec ok"; tag.textContent="Accepted";
+        el.querySelector(".dhead").appendChild(tag); }
+      const bar=document.getElementById("acceptAllBar"); if(bar) bar.style.display="none";
     }
     else if(m.type==="cx-acked"){
       // 存档回执: 变更卡标记 Accepted/Rejected(官方同文), 隐藏 Accept/Reject 钮

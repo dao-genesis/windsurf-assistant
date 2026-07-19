@@ -3047,3 +3047,12 @@ test("R237: mcp-card / todo-card 在位", () => {
   assert.ok(src.includes('type: "todo-card"') && src.includes('m.type==="todo-card"'), "todo-card 双端在位");
   assert.ok(src.includes("st.todoList.isInitialCreation") && src.includes("/IN_PROGRESS/"), "todoList 三态真源");
 });
+
+// R238 · Accept all 批量清算。
+test("R238: Accept all → ResolveOutstandingSteps", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"ResolveOutstandingSteps", { cascadeId: this._cascadeLsId }'), "官方 RPC 真源");
+  assert.ok(src.includes('b.textContent="Accept all"'), "官方同文钮");
+  assert.ok(src.includes('m.type==="cx-acked-all"'), "批量回执在位");
+  assert.ok(src.includes('"cx-accept-all"'), "消息通道在位");
+});
