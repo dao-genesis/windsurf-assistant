@@ -626,3 +626,13 @@ better, more personalized experience."。插件 QuickPick 此前 placeholder 为
 (Recommended/Provider/Cost, groups 按 modelLabels 官方序)。本轮: ls-bridge 新增
 listModelSorts(), host 直通 sorts 至 webview, 过滤行右端官方同源 slider 图标钮 + 排序菜单,
 选中排序时按官方 groups 分组渲染。119/119 测试, v1.5.46。
+
+## R212 · 官方全量本源反挖 + 官方图标库整合(反者道之动·先拿到底)
+
+一次性全量反提官方 workbench 本源: 115 枚官方图标(ariaLabel→viewBox+paths+fillRule 逐字同源)
+落 dao-cascade/official-icons.js(svg(name,size) 同构官方容器); 官方 UI 文案全量清单
+(placeholder/tooltip/children/title/label/description 共 1800+ 串)与插件覆盖对账落
+official-corpus/(strings.json/strings-ext.json/strings-coverage.tsv/icons-missing.txt/
+doc-urls.txt/rpc-ext.txt/rpc-wb.txt)。首批接线: mtShare→share-os, mtCustom→book,
+mtSettings→settings-gear-1, send→arrow-up, Local→macbook, folder→folder-1(全数官方同源
+替换 lucide 近似图标)。120/120 测试, v1.5.47。

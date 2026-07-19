@@ -1,0 +1,35 @@
+{
+ "placeholder": [],
+ "title": [
+  "Chat with Code",
+  "Enter your Devin authentication token",
+  "Open URL",
+  "Retry",
+  "Select Lifeguard Dataset File",
+  "Show Plan Info",
+  "Unable to connect to Devin. Some AI features may not work.",
+  "Waiting for Devin authentication",
+  "string"
+ ],
+ "tooltip": [
+  "Click to log in to Devin"
+ ],
+ "label": [
+  "Most recent",
+  "Open in current window",
+  "Open in workspace: ",
+  "Open last 10"
+ ],
+ "description": [
+  "Continue conversation in the current workspace",
+  "Duration of HTTP client requests.",
+  "Duration of HTTP server requests.",
+  "Duration of database client operations.",
+  "Measures the duration of inbound HTTP requests.",
+  "Measures the duration of outbound HTTP requests.",
+  "Open last 10 completions",
+  "Open the most recent completion",
+  "The number of current pending requests for an open connection.",
+  "string"
+ ]
+}

@@ -1,0 +1,435 @@
+placeholder	ACUs per cycle	MISS
+placeholder	Content	HAVE
+placeholder	Describe the codemap you want (optional)	MISS
+placeholder	E.g. 'Before refactoring' (max 64 chars)	MISS
+placeholder	EXAMPLE_API_KEY	MISS
+placeholder	Enter Auth Token	MISS
+placeholder	Find	HAVE
+placeholder	Loading	MISS
+placeholder	Optional context for Devin	MISS
+placeholder	Paste or type ID here	MISS
+placeholder	Search	HAVE
+placeholder	Search agents...	MISS
+placeholder	Search all models	HAVE
+placeholder	Search memories	MISS
+placeholder	Search organizations...	MISS
+placeholder	Search sessions...	MISS
+placeholder	Search users by name or email	MISS
+placeholder	Select a repository	MISS
+placeholder	Something else...	MISS
+placeholder	Tags (comma-separated)	MISS
+placeholder	Title	HAVE
+placeholder	Value	HAVE
+placeholder	Variable name	MISS
+placeholder	What is this secret for? (optional)	MISS
+tooltip	ACP Dev Panel	MISS
+tooltip	Accept file	MISS
+tooltip	Actions	MISS
+tooltip	Add Context	MISS
+tooltip	Add as context	MISS
+tooltip	Archived	HAVE
+tooltip	Attachment	MISS
+tooltip	Auto-run settings	MISS
+tooltip	Background Commands	MISS
+tooltip	Background command running	MISS
+tooltip	Billed at API pricing	MISS
+tooltip	Cancel 	MISS
+tooltip	Cancel command	MISS
+tooltip	Cancel step	MISS
+tooltip	Check your internet connection. Devin is best when online.	MISS
+tooltip	Click to retry.	MISS
+tooltip	Close (Escape)	MISS
+tooltip	Close Cascade	MISS
+tooltip	Connection to language server lost. Reconnecting...	MISS
+tooltip	Copy command	MISS
+tooltip	Create a Codemap	MISS
+tooltip	Delete conversation	MISS
+tooltip	Edit	HAVE
+tooltip	Edit Source Tracking	MISS
+tooltip	Edit message	MISS
+tooltip	Go to Definition	MISS
+tooltip	Go to Test	MISS
+tooltip	Has child sessions	MISS
+tooltip	Insert in terminal	MISS
+tooltip	Linear	MISS
+tooltip	Manually set Cascade ID	MISS
+tooltip	Match Case	MISS
+tooltip	Match Whole Word	MISS
+tooltip	Model	HAVE
+tooltip	Model Selector	MISS
+tooltip	Native Storage Dev Panel	MISS
+tooltip	Next (Enter)	MISS
+tooltip	No credits used	HAVE
+tooltip	Open in New Window	MISS
+tooltip	Open trajectory dashboard	MISS
+tooltip	Other actions	MISS
+tooltip	Previous (Shift+Enter)	MISS
+tooltip	Quick review	MISS
+tooltip	Reconnecting to remote authority.	MISS
+tooltip	Refresh trajectory list	MISS
+tooltip	Reject	HAVE
+tooltip	Reject file	MISS
+tooltip	Relative cost	MISS
+tooltip	Remove from queue	MISS
+tooltip	Rename conversation	MISS
+tooltip	Respond in Devin webapp	MISS
+tooltip	Revert to this snapshot	MISS
+tooltip	Save for future Devin Cloud sessions	MISS
+tooltip	Scheduled session	MISS
+tooltip	Show arenas in split-screen	MISS
+tooltip	Slack	HAVE
+tooltip	Stop command	MISS
+tooltip	Switch agent location	MISS
+tooltip	Syncing	MISS
+tooltip	The date and time when this user first logged into Windsurf.	MISS
+tooltip	Toggle Debug Mode	MISS
+tooltip	Triggered by automation	MISS
+tooltip	Use Regular Expression	MISS
+tooltip	User Implicit Trajectories	MISS
+tooltip	Uses your API key	MISS
+tooltip	View all changes	MISS
+tooltip	View response statistics	MISS
+children	ACP Dev Panel	MISS
+children	ACU Cycle Limit	MISS
+children	ACU usage	MISS
+children	Accept all	MISS
+children	Actions	MISS
+children	Add agents	MISS
+children	Add custom MCP	MISS
+children	Add filters	MISS
+children	Add variable	MISS
+children	After sending the IDE logs, reload your window to resume Cascade use.	MISS
+children	Agent	HAVE
+children	Agents can be instantiated through the Agent Client Protocol	MISS
+children	All-In Compensation:	MISS
+children	Allow web request?	MISS
+children	Allowlist	MISS
+children	Alternative names:	MISS
+children	An error ID that helps the team investigate the error.	MISS
+children	An error was thrown.	MISS
+children	Answered	MISS
+children	Archived	HAVE
+children	Arena	HAVE
+children	Ask questions. Get suggestions. Plan your next move.	HAVE
+children	Auto Execution	MISS
+children	Auto Web Requests	MISS
+children	Auto-continued	MISS
+children	Auto-fix	MISS
+children	Automations	MISS
+children	Available	HAVE
+children	BETA	MISS
+children	Back to sign in	MISS
+children	Board	HAVE
+children	Bool	HAVE
+children	Build and validate. Test your changes automatically end-to-end.	HAVE
+children	CREATE A SNAPSHOT	MISS
+children	Cancel	HAVE
+children	Cancel (esc)	MISS
+children	Canceled	MISS
+children	Cascade	HAVE
+children	Cascade wants to fetch this URL	MISS
+children	Characters Accepted:	MISS
+children	Checkout branch	MISS
+children	Choose a color theme	MISS
+children	Choose keybinding preferences	MISS
+children	Claim here	MISS
+children	Clear	HAVE
+children	Clear All	MISS
+children	Clear Custom Limit	MISS
+children	Clear filter	MISS
+children	Close	HAVE
+children	Clusters	MISS
+children	Code Block Redacted	MISS
+children	Codemap from this Cascade	MISS
+children	Command Awaiting Approval	MISS
+children	Command errored	MISS
+children	Command:	HAVE
+children	Configuration	HAVE
+children	Configure	HAVE
+children	Configure Auto-Run	MISS
+children	Connect to an existing conversation	MISS
+children	Connect your Netlify account to deploy to your own Netlify teams.	MISS
+children	Connecting	MISS
+children	Connecting to server	MISS
+children	Connections	MISS
+children	Content unavailable	MISS
+children	Continue response	MISS
+children	Copy branch name	MISS
+children	Cost	HAVE
+children	Create PR	MISS
+children	Created	MISS
+children	Created time	MISS
+children	Created:	MISS
+children	Creating PR...	MISS
+children	Current	HAVE
+children	Current plan	MISS
+children	Deleted	MISS
+children	Deploy	MISS
+children	Deploy failed	MISS
+children	Deployment is live.	MISS
+children	Devin MCP Marketplace	MISS
+children	Diffs in this space will appear here	MISS
+children	Disable Devin Desktop Access (Will not consume a seat)	MISS
+children	Discord	MISS
+children	Dismiss	HAVE
+children	Dist files will be uploaded, this is not recommended.	MISS
+children	Double	MISS
+children	Drop to add to agent	MISS
+children	Edit User	MISS
+children	Email	MISS
+children	Enable	HAVE
+children	Enable ACP	MISS
+children	Enable auto-refill	MISS
+children	Enable in Settings	MISS
+children	Enabled	HAVE
+children	Env files	MISS
+children	Environment variables	MISS
+children	Error	HAVE
+children	Error finding references to	MISS
+children	Error while editing	MISS
+children	Error while viewing	MISS
+children	Error:	MISS
+children	Exclude automations	MISS
+children	Export	HAVE
+children	Ext Server: 	MISS
+children	Extra usage balance	MISS
+children	Failed to load MCP servers from the registry.	MISS
+children	Failed to load screenshot	MISS
+children	Failed to load video	MISS
+children	Feedback sent	MISS
+children	Feedback submitted	MISS
+children	Files to edit:	MISS
+children	Filter	HAVE
+children	Fix lint errors	MISS
+children	Framework	MISS
+children	Full name	MISS
+children	Gather IDE logs	MISS
+children	Generate	HAVE
+children	Getting manager feedback...	MISS
+children	Global	HAVE
+children	Group	HAVE
+children	Group by	MISS
+children	Having trouble? Enter your auth token manually	MISS
+children	Hourly Wage:	MISS
+children	Hours Saved:	MISS
+children	Ignore files	MISS
+children	Import	HAVE
+children	Import from Cursor	MISS
+children	Import settings & extensions	MISS
+children	In-IDE	MISS
+children	Inspected commit	MISS
+children	Installed	MISS
+children	Kick off a new project. Make changes across your entire codebase.	HAVE
+children	Last updated	MISS
+children	Learn more	MISS
+children	Less	MISS
+children	List	HAVE
+children	Loading config...	MISS
+children	Loading output...	MISS
+children	Loading...	MISS
+children	Log in / Sign up	MISS
+children	MCP management not supported	MISS
+children	MCP servers disabled	MISS
+children	Manage organizations	MISS
+children	Merge	HAVE
+children	Merge changes	MISS
+children	Merge with Conflicts	MISS
+children	Metadata	HAVE
+children	Missing callbacks	MISS
+children	Missing configuration	MISS
+children	Missing files	MISS
+children	Modified	HAVE
+children	More	MISS
+children	Name	HAVE
+children	Native Storage Dev Panel	MISS
+children	New Space	MISS
+children	New deployment will be created	MISS
+children	New session	HAVE
+children	Next	HAVE
+children	No agents connected	MISS
+children	No changes yet	MISS
+children	No commands yet	MISS
+children	No connectors	MISS
+children	No content available for this resource	MISS
+children	No data available	MISS
+children	No desktop screenshots available yet.	MISS
+children	No environment variables	MISS
+children	No file changes to revert. Conversation will be forked from this step.	MISS
+children	No items	MISS
+children	No lint errors found	MISS
+children	No logs yet	MISS
+children	No organizations found	MISS
+children	No registry info attached	MISS
+children	No relevant context found	MISS
+children	No repos detected	MISS
+children	No resources available	MISS
+children	No results found.	MISS
+children	No sessions	MISS
+children	No sessions yet	MISS
+children	No shortcut	MISS
+children	No spaces	MISS
+children	No statistics available for this turn.	MISS
+children	No tools found.	MISS
+children	No trajectories available	MISS
+children	No trajectory steps available	MISS
+children	No values	MISS
+children	No values found in either source	MISS
+children	No workspaces available	MISS
+children	Node modules will be uploaded, this is not recommended.	MISS
+children	Note	MISS
+children	Number of Acceptances:	MISS
+children	Only organization admins can authenticate MCP servers.	MISS
+children	Open	HAVE
+children	Open PR	MISS
+children	Open a GitHub pull request	MISS
+children	Open editor settings	MISS
+children	Open in system default browser	MISS
+children	Open settings	MISS
+children	Open video URL directly	MISS
+children	Optional	MISS
+children	Order by	HAVE
+children	Organization usage limit reached. Please contact your admin to raise the limit.	MISS
+children	Output:	MISS
+children	Overwrite Merged Files	MISS
+children	PNG, JPG, or other image formats	MISS
+children	PR created	MISS
+children	Parity Check	MISS
+children	Paste secrets	MISS
+children	Plan	HAVE
+children	Plan changes before implementing.	HAVE
+children	Please ask your admin to increase your credit allocation.	MISS
+children	Portal URL	MISS
+children	Possible merge conflicts detected. Would you like to resolve them now?	MISS
+children	Preview upcoming features	MISS
+children	Previous	MISS
+children	Project ID	MISS
+children	Project path	MISS
+children	Provide Secret	MISS
+children	Pull Request	MISS
+children	Purchase credits	MISS
+children	Purchase extra usage	MISS
+children	Purchase more credits	MISS
+children	QR code detected	MISS
+children	Question	HAVE
+children	Question answered	MISS
+children	Question skipped	MISS
+children	Quick review requested	MISS
+children	RESPONSE STATISTICS	MISS
+children	Reconnect	MISS
+children	Recording	MISS
+children	Refer a friend to a paid plan to get 250 bonus add-on credits	MISS
+children	Refresh	HAVE
+children	Reject all	MISS
+children	Rejected	HAVE
+children	Reload window	MISS
+children	Renew your subscription	MISS
+children	Reply Logo	MISS
+children	Repository	MISS
+children	Reset filters	MISS
+children	Response	HAVE
+children	Retry	MISS
+children	Revert to	MISS
+children	Review	MISS
+children	Reviewed codebase structure	MISS
+children	Role	MISS
+children	Save	HAVE
+children	Save for	MISS
+children	Save to environment	MISS
+children	Savings Breakdown	MISS
+children	Screenshots will appear here as Devin interacts with the desktop.	MISS
+children	Searched for files related to	MISS
+children	Secrets marked as Sensitive are redacted from the UI	MISS
+children	See more	MISS
+children	Select a trajectory	MISS
+children	Select the team to deploy to	MISS
+children	Send Devin a message to wake it up and view its desktop.	MISS
+children	Send IDE Logs	MISS
+children	Sensitive	MISS
+children	Session	HAVE
+children	Share Conversation	MISS
+children	Shell commands in this space will appear here	MISS
+children	Show More	MISS
+children	Show more	MISS
+children	Show spaces	MISS
+children	Sign Up Time	MISS
+children	Single	MISS
+children	Skip	HAVE
+children	Skip for now	MISS
+children	Skipped	MISS
+children	Slack	HAVE
+children	Some non-image binary content was truncated.	MISS
+children	Something went wrong	MISS
+children	Sorry, this agent does not support reloading sessions	MISS
+children	Sort	HAVE
+children	Sort by	MISS
+children	Source:	MISS
+children	SpaceManager	MISS
+children	Split into new space	MISS
+children	Stash and Overwrite	MISS
+children	Step:	HAVE
+children	Store	HAVE
+children	String	HAVE
+children	Submission preview	MISS
+children	Suggested Actions	MISS
+children	Suggestions	HAVE
+children	Switch Devin account	MISS
+children	Switch to editor mode	MISS
+children	System Browser	MISS
+children	TOTP / 2FA Secret	MISS
+children	Take trajectory snapshot	MISS
+children	Team default	MISS
+children	Teams	MISS
+children	Terminal command	MISS
+children	The desktop will be available once the session has resumed.	MISS
+children	The file should contain one secret per line in Key=Value format.	MISS
+children	The name of your snapshot must be at most 64 characters long.	MISS
+children	This is a personal MCP connection. You will authenticate with your own account.	MISS
+children	This is taking a long time. Click to retry if it seems stuck.	MISS
+children	This link will expire in approximately 5 minutes.	MISS
+children	This session is asleep.	MISS
+children	This will deploy to a new app:	MISS
+children	This will deploy to an existing app.	MISS
+children	Time savings approximated based on the following statistics:	MISS
+children	Total Characters:	MISS
+children	Total Estimated Value Saved	MISS
+children	Total Lines:	MISS
+children	Trigger Banners	MISS
+children	Type your answer below	MISS
+children	Undo Merge	MISS
+children	Updating session	MISS
+children	Upgrade to Pro	MISS
+children	Upgrade to a paid plan	MISS
+children	Upload a different image	MISS
+children	Upload file	MISS
+children	Upload the screenshot of the QR below	MISS
+children	Usage	HAVE
+children	Used playbook: 	MISS
+children	User API Key	MISS
+children	VS Code: 	MISS
+children	Value	HAVE
+children	Value Saved:	MISS
+children	Video could not be loaded	MISS
+children	View	HAVE
+children	View Annotation	MISS
+children	View Created Links	MISS
+children	View Deployment	MISS
+children	View Leaderboard	MISS
+children	View Logs	MISS
+children	View PR	MISS
+children	View Plan	MISS
+children	View Status	MISS
+children	View all	HAVE
+children	View diff	MISS
+children	View docs	MISS
+children	View history	MISS
+children	View logs	MISS
+children	View snapshot	MISS
+children	View usage	MISS
+children	When shown the QR code, take a screenshot	MISS
+children	Work with Async Cascade	MISS
+children	Workspace	HAVE
+children	You can log in or create a free account to unlock AI-powered coding assistance.	MISS
+children	You're running low on credits. Upgrade to access more credits.	MISS
+children	Your app will be deployed to the following domain.	MISS
+children	Your modified files: 	MISS
+children	Your recent terminal commands: 	MISS
