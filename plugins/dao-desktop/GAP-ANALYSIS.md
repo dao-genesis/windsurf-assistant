@@ -718,3 +718,8 @@ dao.cascade.autoRunPolicy / .allowlist 命令与账号菜单入口。131/131 测
 Settings 整页 General 区新增 Auto-Run 策略行: 现值徽标(cascadeAutoExecutionPolicy 官方同名
 globalState) + 更改/Allow·Deny List 入口(直通 R223 命令)。载荷新增 autoRunPolicy 字段。
 132/132 测试, v1.5.59。
+
+## R225 · 运行占位官方同文 "Running..."
+
+发送后等待首帧的 "…" 占位 → 官方同文 "Running..."(官方 workbench 运行态状态文), 呼吸脉冲
+样式; 首个 thought-delta/assistant-delta 抵达即移除。133/133 测试, v1.5.60。

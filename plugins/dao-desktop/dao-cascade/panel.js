@@ -2758,6 +2758,8 @@ class CascadePanelProvider {
   #modelSortMenu .smi:hover { background:var(--pill-hover); }
   #modelSortMenu .smi.on { color:var(--vscode-textLink-foreground); }
   #modelSortMenu .smsep { height:1px; background:var(--line); margin:4px 0; }
+  .runp { color:var(--dim); font-size:12px; animation:runpulse 1.2s ease-in-out infinite; }
+  @keyframes runpulse { 0%,100%{opacity:.45} 50%{opacity:1} }
   .mbadge { color:var(--vscode-textLink-foreground); font-size:10.5px; margin-left:4px; }
   #modelSortMenu .sminfo { padding:4px 10px; font-size:11px; color:var(--dim); max-width:200px; }
 </style></head><body>
@@ -3300,7 +3302,8 @@ class CascadePanelProvider {
     inputEl.value=""; autoGrow(); pendingImages=[]; renderThumbs();
     addMsg("user",text,images);
     state.history.push({role:"user",content:text}); vscode.setState(state);
-    const id="m"+Date.now(); const node=addMsg("assistant","…");
+    const id="m"+Date.now(); const node=addMsg("assistant",""); // 官方同文运行占位
+    const runp=document.createElement("span"); runp.className="runp"; runp.textContent="Running..."; node.appendChild(runp);
     node.dataset.id=id; node.dataset.acc=""; setBusy(true);
     const arena=arenaOn&&agent==="cascade";
     if(arena){ arenaOn=false; arenaBtn.classList.remove("on"); vscode.postMessage({type:"set-user-setting", patch:{lastArenaModeEnabled:false}}); }
@@ -3704,6 +3707,7 @@ class CascadePanelProvider {
       else if(m.act==="nextModel") document.dispatchEvent(new KeyboardEvent("keydown",{ctrlKey:true,shiftKey:true,key:"?",cancelable:true}));
     }
     else if(m.type==="thought-delta"){
+      { const n0=findNode(m.id); if(n0){ const rp=n0.querySelector(".runp"); if(rp) rp.remove(); } }
       // 官方式可折叠思考块:流式中展开计时,答复开始后自动收起为「Thought for Ns」
       const node=findNode(m.id);
       if(node){ let t=node.querySelector(".thought");
@@ -3720,6 +3724,7 @@ class CascadePanelProvider {
     }
     else if(m.type==="assistant-delta"){
       const node=findNode(m.id);
+      if(node){ const rp=node.querySelector(".runp"); if(rp) rp.remove(); }
       if(node){ let body=node.querySelector(".body");
         if(!body){ body=document.createElement("span"); const th=node.querySelector(".thought");
           if(!th) node.textContent="";
