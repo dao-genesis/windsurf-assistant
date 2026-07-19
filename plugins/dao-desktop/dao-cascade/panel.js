@@ -613,6 +613,7 @@ class CascadePanelProvider {
       cwd: rc.cwd || "",
       exitCode: typeof rc.exitCode === "number" ? rc.exitCode : null,
       output: ((rc.combinedOutput || {}).full) || "",
+      stepIndex: k,
       status: /DONE/.test(st.status || "") ? "completed" : /ERROR/.test(st.status || "") ? "failed" : "in_progress" };
   }
 
@@ -3577,6 +3578,11 @@ class CascadePanelProvider {
       const inb=document.createElement("button"); inb.className="cmi"; inb.title="Insert in terminal"; inb.innerHTML=OICONS.insert;
       inb.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"insert-terminal", text:m.command||""}); };
       hd.appendChild(cpb); hd.appendChild(inb);
+      if(m.status==="in_progress"&&m.exitCode==null&&typeof m.stepIndex==="number"){
+        const sp=document.createElement("button"); sp.className="cmi"; sp.title="Stop command"; // 官方同文 tooltip
+        sp.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+        sp.onclick=(ev)=>{ ev.stopPropagation(); sp.disabled=true; vscode.postMessage({type:"cx-step-cancel", stepIndex:m.stepIndex}); };
+        hd.appendChild(sp); }
       if(m.cwd){ const w=document.createElement("span"); w.className="cwd"; w.textContent="in "+m.cwd; hd.appendChild(w); }
       if(m.exitCode!=null){ const e2=document.createElement("span"); e2.className="ec "+(m.exitCode===0?"ok":"bad");
         e2.textContent=m.exitCode===0?"✓":"exit "+m.exitCode;
