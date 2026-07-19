@@ -3021,3 +3021,10 @@ test("R234: Allow web request? 三档官方 action", () => {
   assert.ok(src.includes("readUrlContent: { action }"), "回传字段在位");
   assert.ok(src.includes('ex.title="Export"'), "导出官方同文");
 });
+
+// R235 · PARITY-PLAN 审计文档落库。
+test("R235: PARITY-PLAN 全量审计文档在位", () => {
+  const t = fs.readFileSync(path.join(ROOT, "PARITY-PLAN.md"), "utf8");
+  for (const s of ["RPC 面(169 官方", "步卡面(86 官方步型", "字符串面(337 MISS", "路线图", "ResolveOutstandingSteps", "Continue response"])
+    assert.ok(t.includes(s), s + " 在位");
+});
