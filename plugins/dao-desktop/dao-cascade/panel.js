@@ -2810,7 +2810,7 @@ class CascadePanelProvider {
       <div class="row">
         <button id="plusBtn" title="附加上下文"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
         <span class="pill" id="modeWrap" title="Session Mode (Ctrl+.)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg><button id="modeBtn" type="button"></button></span>
-        <span class="pill" id="modelWrap" title="Model"><button id="modelBtn" type="button"></button></span>
+        <span class="pill" id="modelWrap" title="Model Selector"><button id="modelBtn" type="button"></button></span>
         <button id="imgBtn" title="附加图片（支持粘贴）">${OI.svg("images-1",13)}</button>
         <button id="arenaBtn" title="Arena 模式：同题双轨候选，择优续行（新会话/会话中途均可）">⚔</button>
         <button id="wtBtn" title="Worktree 模式：新会话在隔离 git worktree 中运行，改动不直接落入主工作区，可随后合并">⎇</button>
@@ -3518,13 +3518,13 @@ class CascadePanelProvider {
         const w=document.createElement("span"); w.className="when"; w.textContent=rel(s.updatedAt);
         it.appendChild(t); it.appendChild(w);
         if((s.sessionId||"").startsWith("cx:")){
-          const rn=document.createElement("span"); rn.className="arch"; rn.title="重命名会话"; rn.innerHTML=OICONS.pencil;
+          const rn=document.createElement("span"); rn.className="arch"; rn.title="Rename conversation"; rn.innerHTML=OICONS.pencil;
           rn.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-rename", sessionId:s.sessionId}); };
           it.appendChild(rn);
           const ex=document.createElement("span"); ex.className="arch"; ex.title="导出会话转录"; ex.innerHTML=OICONS.download;
           ex.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-export", sessionId:s.sessionId}); };
           it.appendChild(ex);
-          const a=document.createElement("span"); a.className="arch"; a.title="移除会话"; a.innerHTML=OICONS.trash;
+          const a=document.createElement("span"); a.className="arch"; a.title="Delete conversation"; a.innerHTML=OICONS.trash;
           a.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-archive", sessionId:s.sessionId}); };
           it.appendChild(a);
         }

@@ -723,3 +723,8 @@ globalState) + 更改/Allow·Deny List 入口(直通 R223 命令)。载荷新增
 
 发送后等待首帧的 "…" 占位 → 官方同文 "Running..."(官方 workbench 运行态状态文), 呼吸脉冲
 样式; 首个 thought-delta/assistant-delta 抵达即移除。133/133 测试, v1.5.60。
+
+## R226 · 会话行内钮/模型选择器 tooltip 官方同文
+
+corpus MISS 消化: 重命名会话 → "Rename conversation", 移除会话 → "Delete conversation",
+模型 pill title "Model" → "Model Selector"(均官方 tooltip 逐字同文)。134/134 测试, v1.5.61。

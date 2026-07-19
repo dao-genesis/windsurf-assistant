@@ -2950,3 +2950,11 @@ test("R225: Running... 运行占位官方同文", () => {
   assert.ok(src.includes('.runp'), "占位样式在位");
   assert.ok((src.match(/querySelector\(".runp"\)/g) || []).length >= 2, "双渠首帧移除在位");
 });
+
+// R226 · 会话行内钮/模型选择器 tooltip 官方同文。
+test("R226: Rename/Delete conversation + Model Selector 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('rn.title="Rename conversation"'), "重命名官方同文");
+  assert.ok(src.includes('a.title="Delete conversation"'), "删除官方同文");
+  assert.ok(src.includes('id="modelWrap" title="Model Selector"'), "模型选择器官方同文");
+});
