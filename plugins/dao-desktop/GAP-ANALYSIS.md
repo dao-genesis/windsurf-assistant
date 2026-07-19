@@ -919,3 +919,8 @@ ADD_ANNOTATION "Added annotation"、VIEW_CODE_ITEM、RELATED_FILES、
 FIND_ALL_REFERENCES、READ_KNOWLEDGE_BASE_ITEM "Fetched knowledge"、
 LIST_RESOURCES/READ_RESOURCE(MCP 资源族)、VIEW_CONTENT_CHUNK。
 162/162 测试, v1.5.91。
+
+## R257 · 路线图对账刷新(P1 全量收官 R241–R254 · P2 主体落地 R246–R256)
+
+在案五项(Queued 同文/拖拽/Pinned/检索族/Revert 同文)全部清账入路线图;
+余项仅长尾: 遥测类 RPC 甄别 · 长尾步型/图标补遗。v1.5.92。
