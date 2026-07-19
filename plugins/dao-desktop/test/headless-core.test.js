@@ -3038,3 +3038,12 @@ test("R236: web-card / suggest-chips 在位", () => {
   assert.ok(src.includes('type: "suggest-chips"') && src.includes('m.type==="suggest-chips"'), "chips 双端在位");
   assert.ok(src.includes("Searched web for "), "官方式文案在位");
 });
+
+// R237 · MCP 工具卡 + 待办清单卡。
+test("R237: mcp-card / todo-card 在位", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('type: "mcp-card"') && src.includes('m.type==="mcp-card"'), "mcp-card 双端在位");
+  assert.ok(src.includes("mt.serverName") && src.includes("mt.resultString"), "mcpTool proto 字段真源");
+  assert.ok(src.includes('type: "todo-card"') && src.includes('m.type==="todo-card"'), "todo-card 双端在位");
+  assert.ok(src.includes("st.todoList.isInitialCreation") && src.includes("/IN_PROGRESS/"), "todoList 三态真源");
+});
