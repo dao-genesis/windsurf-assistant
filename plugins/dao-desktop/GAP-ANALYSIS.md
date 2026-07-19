@@ -924,3 +924,13 @@ LIST_RESOURCES/READ_RESOURCE(MCP 资源族)、VIEW_CONTENT_CHUNK。
 
 在案五项(Queued 同文/拖拽/Pinned/检索族/Revert 同文)全部清账入路线图;
 余项仅长尾: 遥测类 RPC 甄别 · 长尾步型/图标补遗。v1.5.92。
+
+## R258 · P2: 可见转写卡全量收官(17 步型清零)
+
+对照官方 workbench transcribe switch 全量对账: 用户可见转写步型 41 种此前已覆盖
+27, 本轮补齐余 14 + skill/taskSubagent + exploreResponse = 17 卡(官方同文:
+Broadcasted to user / Checked deploy status / Found all clusters / Checked
+command status / Workflow recipe name / Reviewed codebase structure / Goal: /
+Proposed code / Ran preview / Analyzed deployment config / Read terminal
+output: / Resolved task / Searched trajectory / Explore Response /
+Ran task subagent: 等)。可见转写覆盖率 100%。163/163 测试, v1.5.93。
