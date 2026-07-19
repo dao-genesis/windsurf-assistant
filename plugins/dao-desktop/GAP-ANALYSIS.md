@@ -800,3 +800,9 @@ CortexStep* proto 真源。145/145 测试, v1.5.72。
 ≥2 张待清算变更卡时展示官方同文 "Accept all" 批量钮, 直通 ResolveOutstandingSteps
 {cascadeId}(官方 proto 真源: 仅 cascade_id 一字段), 回执后全部卡标记 Accepted 并收起
 批量条。146/146 测试, v1.5.73。
+
+## R239 · P0: Continue response 续写条
+
+生成器调用达上限(numGeneratorInvocations>=maxGeneratorInvocations, 字段反提官方
+trajectory proto)而停轮时, 展示官方同文续写条 "Continue response"(官方 tooltip 同文),
+点击即发 "Continue"(官方 handleContinue 同语义)。147/147 测试, v1.5.74。
