@@ -780,3 +780,10 @@ fetch this URL", 三档官方 action: Allow(ALLOW_ONCE) / Always allow origin(AL
 14 结构化 72 通用卡(P0/P1/P2 分级)、字符串 337 MISS 七域聚类、图标 100 缺口、设置页
 分区对照、功能级模块缺口与 P0–P2 路线图, 全部落 PARITY-PLAN.md(活文档)。
 143/143 测试, v1.5.70。
+
+## R236 · P0: web 步卡 + 建议回复 chips
+
+PARITY-PLAN P0 首批: SEARCH_WEB{query,webDocuments[],webSearchUrl} / READ_URL_CONTENT
+{url,resolvedUrl,webDocument}(字段反提 CortexStep* proto 真源)→ globe 官方图标 web 步卡
+(Searched web for … / Read <url> + 文档清单点击外开); SUGGESTED_RESPONSES.suggestions[]
+→ 官方式点击即发 chips。144/144 测试, v1.5.71。

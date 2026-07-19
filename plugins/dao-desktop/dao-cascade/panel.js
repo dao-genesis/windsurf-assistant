@@ -567,6 +567,10 @@ class CascadePanelProvider {
     if (st.listDirectory) return this._cxBrowseCard(st, k, id);
     if (st.grepSearch) return this._cxBrowseCard(st, k, id);
     if (st.viewFile) return this._cxBrowseCard(st, k, id);
+    if (st.searchWeb || st.readUrlContent) return this._cxWebCard(st, k, id);
+    // 官方式建议回复: suggestedResponses.suggestions[] → 点击即发 chips
+    if (st.suggestedResponses) return { type: "suggest-chips", id, toolCallId: "cx" + k,
+      suggestions: (st.suggestedResponses.suggestions || []).slice(0, 6) };
     // EXIT_PLAN_MODE 步(Plan 模式产物): exitPlanMode{planFile,userRequested} → 计划就绪卡
     if (st.exitPlanMode) {
       const pf = st.exitPlanMode.planFile || "";
@@ -615,6 +619,22 @@ class CascadePanelProvider {
       output: ((rc.combinedOutput || {}).full) || "",
       stepIndex: k,
       status: /DONE/.test(st.status || "") ? "completed" : /ERROR/.test(st.status || "") ? "failed" : "in_progress" };
+  }
+
+  // 官方式 web 步卡: SEARCH_WEB{query,webDocuments[],webSearchUrl} / READ_URL_CONTENT{url,webDocument}
+  _cxWebCard(st, k, id) {
+    const status = /DONE/.test(st.status || "") ? "completed" : /ERROR/.test(st.status || "") ? "failed" : "in_progress";
+    if (st.searchWeb) {
+      const sw = st.searchWeb;
+      const docs = (sw.webDocuments || []).map((d) => ({ title: d.title || d.url || "", url: d.url || "" }));
+      return { type: "web-card", id, toolCallId: "cx" + k, kind: "web", status,
+        query: sw.query || "", url: sw.webSearchUrl || "", count: docs.length, docs };
+    }
+    const ru = st.readUrlContent;
+    const doc = ru.webDocument || {};
+    return { type: "web-card", id, toolCallId: "cx" + k, kind: "url", status,
+      query: doc.title || "", url: ru.resolvedUrl || ru.url || "",
+      count: null, docs: doc.url ? [{ title: doc.title || doc.url, url: doc.url }] : [] };
   }
 
   // 官方式检索/浏览卡: LIST_DIRECTORY / GREP_SEARCH / VIEW_FILE 步 →
@@ -2871,7 +2891,7 @@ class CascadePanelProvider {
   const vscode = acquireVsCodeApi();
   const AGENTS = ${agentsJson};
   // 官方图标(反提 workbench 真源): 终端卡头 console-simple / Copy command / Insert in terminal
-  const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12),
+  const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12), globe: OI.svg("globe", 12),
     "commits": OI.svg("commits", 11), "bubble-5": OI.svg("bubble-5", 11), "devin-logo": OI.svg("devin-logo", 11), "file-text": OI.svg("file-text", 11),
     "magnifying-glass": OI.svg("magnifying-glass", 11), "pencil": OI.svg("pencil", 11), "flag-1": OI.svg("flag-1", 11), "exclamation-triangle": OI.svg("exclamation-triangle", 11),
     trash: OI.svg("trash-can-simple", 11), download: OI.svg("arrow-inbox", 11), book: OI.svg("book", 11) })};
@@ -3656,6 +3676,35 @@ class CascadePanelProvider {
         for(const b of el.querySelectorAll(".mi")) b.remove();
         const tag=document.createElement("span"); tag.className="ec "+(m.accept?"ok":"bad");
         tag.textContent=m.accept?"Accepted":"Rejected"; el.querySelector(".dhead").appendChild(tag); }
+    }
+    else if(m.type==="web-card"){
+      // 官方式 web 步卡: globe 图标 + Searched web/Read URL + 文档清单(点击外开)
+      let el=logEl.querySelector('[data-tc="'+m.toolCallId+'"]');
+      if(!el){ if(emptyEl) emptyEl.remove(); el=document.createElement("div"); el.dataset.tc=m.toolCallId; logEl.appendChild(el); }
+      el.className="cmdcard "+(m.status||""); el.innerHTML="";
+      const hd=document.createElement("div"); hd.className="chead";
+      const ch=document.createElement("span"); ch.className="chev"; ch.textContent="▸";
+      const ic=document.createElement("span"); ic.innerHTML=OICONS.globe;
+      const cm=document.createElement("span"); cm.className="cmd";
+      cm.textContent=m.kind==="web"?("Searched web for "+(m.query||"")):("Read "+(m.url||m.query||""));
+      cm.title=m.url||""; hd.appendChild(ch); hd.appendChild(ic); hd.appendChild(cm);
+      if(m.count!=null){ const b=document.createElement("span"); b.className="ec ok"; b.textContent=m.count+" 项"; hd.appendChild(b); }
+      const bd=document.createElement("div"); bd.className="cbody"; bd.style.display="none";
+      for(const d of (m.docs||[])){ const r=document.createElement("div"); r.textContent=d.title||d.url; r.title=d.url;
+        r.style.cursor="pointer"; r.onclick=()=>vscode.postMessage({type:"store-open", url:d.url}); bd.appendChild(r); }
+      if(!(m.docs||[]).length) bd.textContent="(无结果)";
+      hd.onclick=()=>{ const open=bd.style.display==="none"; bd.style.display=open?"":"none"; ch.textContent=open?"▾":"▸"; };
+      el.appendChild(hd); el.appendChild(bd); logEl.scrollTop=logEl.scrollHeight;
+    }
+    else if(m.type==="suggest-chips"){
+      // 官方式建议回复 chips: 点击即发
+      let el=logEl.querySelector('[data-tc="'+m.toolCallId+'"]');
+      if(!el){ if(emptyEl) emptyEl.remove(); el=document.createElement("div"); el.dataset.tc=m.toolCallId;
+        el.style.cssText="display:flex;flex-wrap:wrap;gap:6px;"; logEl.appendChild(el); }
+      el.innerHTML="";
+      for(const s of (m.suggestions||[])){ const c=document.createElement("button"); c.className="qchip"; c.style.cursor="pointer";
+        c.textContent=s; c.onclick=()=>{ inputEl.value=s; autoGrow(); send(); el.remove(); }; el.appendChild(c); }
+      logEl.scrollTop=logEl.scrollHeight;
     }
     else if(m.type==="browse-card"){
       // 官方式检索/浏览卡: Analyzed/Searched/Read + 官方同源图标(folder-open/magnifying-glass/file-text) + 计数徽标, 点击展开明细, 文件名可点开
