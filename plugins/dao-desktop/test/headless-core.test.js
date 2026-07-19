@@ -2915,3 +2915,9 @@ test("R221: 会话行内钮 + DeepWiki 头官方图标同源", () => {
   assert.ok(src.includes("OICONS.book+' DeepWiki"), "DeepWiki 头官方 book");
   assert.ok(!src.includes('rn.textContent="✎"') && !src.includes('a.textContent="🗑"'), "行内 emoji 已替换");
 });
+
+// R222 · composer 图像附件钮官方同源化。
+test("R222: imgBtn 官方 images-1 同源", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('id="imgBtn" title="附加图片（支持粘贴）">${OI.svg("images-1",13)}'), "官方 images-1 接线");
+});
