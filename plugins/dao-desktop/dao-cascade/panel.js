@@ -624,6 +624,21 @@ class CascadePanelProvider {
     if (st.gitCommit) { const gc = st.gitCommit;
       return { type: "git-card", id, toolCallId: "cx" + k,
         hash: (gc.commitHash || "").slice(0, 7), message: gc.commitMessage || "" }; }
+    // 官方式转写同文九卡(官方 workbench transcribe switch 真源)
+    if (st.brainUpdate) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Planned for action" };
+    if (st.addAnnotation) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Added annotation" };
+    if (st.viewCodeItem) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Viewed code item" + (((st.viewCodeItem.nodePaths || [])[0]) ? " " + st.viewCodeItem.nodePaths[0] : "") };
+    if (st.relatedFiles) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Searched for files related to " + ((st.relatedFiles.absoluteUri || "").split("/").pop() || "") };
+    if (st.findAllReferences) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Found references to " + (st.findAllReferences.symbol || "") };
+    if (st.readKnowledgeBaseItem) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Fetched knowledge" };
+    if (st.listResources) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Listed resources from " + (st.listResources.serverName || "") };
+    if (st.readResource) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Read resource from " + (st.readResource.uri || "") };
+    if (st.viewContentChunk) return { type: "memory-card", id, toolCallId: "cx" + k, title: "Viewed content chunk" };
     // 官方式 notebook/检索/лint 族卡(官方 workbench 转写同文)
     if (st.readNotebook) { const rn = st.readNotebook;
       return { type: "memory-card", id, toolCallId: "cx" + k,
