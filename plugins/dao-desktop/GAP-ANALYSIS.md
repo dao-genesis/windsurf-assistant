@@ -644,3 +644,10 @@ mtSettings→settings-gear-1, send→arrow-up, Local→macbook, folder→folder-
 (square-behind-square-2 / arrow-corner-down-left 官方同源图标); ②变更卡 Accept/Reject
 tooltip → 官方同文 "Accept file"/"Reject file"; ③会话内查找钮 tooltip → 官方同文
 "Previous (Shift+Enter)"/"Next (Enter)"/"Close (Escape)"。121/121 测试, v1.5.48。
+
+## R214 · 空态/计数/发送钮官方同文批量(corpus 缺口消化二批)
+
+①模型弹层空态 "无匹配模型" → 官方同文 "No results"(options.length===0 分支真源);
+②会话查找计数 "N/M" → 官方 "`${E+1} of ${I}`" 格式即 "N of M", 零命中 "0/0" → 官方 "No results";
+③发送/停止钮 tooltip → 官方同文 "Send"/"Cancel step"(workbench 真源 tooltip:"Cancel step",
+title:qe(5515,"Send"))。122/122 测试, v1.5.49。

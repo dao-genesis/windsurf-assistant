@@ -2878,7 +2878,7 @@ class CascadePanelProvider {
       for(const [gl,items] of groups){ const h=document.createElement("div"); h.className="mgrp"; h.textContent=gl; modelList.appendChild(h);
         for(const o of items){ modelList.appendChild(mkIt(o)); any=true; } }
     }
-    if(!any){ const e=document.createElement("div"); e.className="empty3"; e.textContent="无匹配模型"; modelList.appendChild(e); }
+    if(!any){ const e=document.createElement("div"); e.className="empty3"; e.textContent="No results"; modelList.appendChild(e); }
   }
   function modelMenuClose(){ modelMenu.classList.remove("show"); }
   modelBtn.onclick=(e)=>{ e.stopPropagation();
@@ -2906,7 +2906,7 @@ class CascadePanelProvider {
   // 发送钮在回合进行中变为停止钮(官方式)
   let busy=false;
   const SEND_SVG=sendEl.innerHTML;
-  function setBusy(b){ busy=b; sendEl.innerHTML=b?'<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>':SEND_SVG; sendEl.title=b?"中断当前回合":"发送 (Enter)"; }
+  function setBusy(b){ busy=b; sendEl.innerHTML=b?'<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>':SEND_SVG; sendEl.title=b?"Cancel step":"Send"; } // 官方同文 tooltip(反提 workbench 真源)
 
   loginBtn.onclick=()=>{ authmsg.textContent="正在拉起登录…"; vscode.postMessage({type:"login"}); };
   authsubmit.onclick=()=>{ if(authcode.value.trim()){ vscode.postMessage({type:"login-code", code:authcode.value.trim()}); authmsg.textContent="校验中…"; } };
@@ -3045,11 +3045,11 @@ class CascadePanelProvider {
   const convFind=$("convFind"), cfIn=$("cfIn"), cfCnt=$("cfCnt");
   let cfHits=[], cfIdx=-1;
   function cfClear(){ cfHits.forEach(el=>el.classList.remove("cfHit","cfCur")); cfHits=[]; cfIdx=-1; cfCnt.textContent=""; }
-  function cfMark(){ cfHits.forEach((el,i)=>el.classList.toggle("cfCur",i===cfIdx)); cfCnt.textContent=(cfIdx+1)+"/"+cfHits.length; if(cfHits[cfIdx]) cfHits[cfIdx].scrollIntoView({block:"center"}); }
+  function cfMark(){ cfHits.forEach((el,i)=>el.classList.toggle("cfCur",i===cfIdx)); cfCnt.textContent=(cfIdx+1)+" of "+cfHits.length; if(cfHits[cfIdx]) cfHits[cfIdx].scrollIntoView({block:"center"}); }
   function cfRun(){ cfClear(); const q=cfIn.value.trim().toLowerCase(); if(!q) return;
     for(const el of logEl.children){ if(el.id==="empty") continue;
       if((el.textContent||"").toLowerCase().includes(q)){ el.classList.add("cfHit"); cfHits.push(el); } }
-    if(cfHits.length){ cfIdx=0; cfMark(); } else cfCnt.textContent="0/0"; }
+    if(cfHits.length){ cfIdx=0; cfMark(); } else cfCnt.textContent="No results"; }
   function cfStep(d){ if(!cfHits.length) return; cfIdx=(cfIdx+d+cfHits.length)%cfHits.length; cfMark(); }
   function cfOpen(){ convFind.classList.add("show"); cfIn.focus(); cfIn.select(); if(cfIn.value) cfRun(); }
   function cfCloseFn(){ convFind.classList.remove("show"); cfClear(); inputEl.focus(); }
