@@ -2757,3 +2757,15 @@ test("R206: 模型行官方计价标签 + 推荐前置 + 去 emoji 徽标", () =
   assert.ok(!src.includes('o.disabled?"🔒'), "🔒 门控 emoji 已去(官方用灰置+tooltip)");
   assert.ok(src.includes("(b.recommended?1:0)-(a.recommended?1:0)"), "官方默认 Recommended 排序前置");
 });
+
+// R207 · 检索/浏览步卡图标官方同源(反提 workbench 真源: folder-open / magnifying-glass / file-text)。
+test("R207: browse-card 图标去 emoji → 官方三源 SVG", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("BROWSE_ICONS"), "三态图标映射在位");
+  assert.ok(src.includes("const FOLDER_SVG"), "官方 folder-open SVG 在位");
+  assert.ok(src.includes("const FILE_SVG"), "官方 file-text SVG 在位");
+  assert.ok(src.includes("M4.270 3.040"), "folder-open path 逐字同源");
+  assert.ok(src.includes("M6.270 2.041"), "file-text path 逐字同源");
+  assert.ok(!src.includes('m.kind==="grep"?"🔍"'), "browse-card emoji 三元已替换");
+  assert.ok(!src.includes('it.isDir?"🗀 "'), "目录项 🗀 emoji 已替换");
+});
