@@ -733,3 +733,8 @@ corpus MISS 消化: 重命名会话 → "Rename conversation", 移除会话 → 
 
 corpus MISS 消化: 历史会话 QuickPick 占位 "加载历史会话" → 官方同文 "Search sessions..."
 (matchOnDescription 同启)。135/135 测试, v1.5.62。
+
+## R228 · Share Conversation 官方同文大小写
+
+corpus MISS 消化: 分享钮 tooltip "Share conversation · 生成团队分享链接并复制" → 官方逐字
+同文 "Share Conversation"。136/136 测试, v1.5.63。
