@@ -614,6 +614,12 @@ class CascadePanelProvider {
     if (st.gitCommit) { const gc = st.gitCommit;
       return { type: "git-card", id, toolCallId: "cx" + k,
         hash: (gc.commitHash || "").slice(0, 7), message: gc.commitMessage || "" }; }
+    // 官方式 Codemap 卡: upsertCodemap{output{title,description},runningStatus}
+    if (st.upsertCodemap) { const uc = st.upsertCodemap, out = uc.output || {};
+      const done = !!out.title;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: done ? ("Codemap from this Cascade: " + out.title)
+          : (uc.editingCodemapTitle || "Generating codemap…") }; }
     // 官方式检查点卡: checkpoint{checkpointIndex}(官方同文 Created checkpoint N)
     if (st.checkpoint) return { type: "memory-card", id, toolCallId: "cx" + k,
       title: "Created checkpoint " + (st.checkpoint.checkpointIndex != null ? st.checkpoint.checkpointIndex : "") };
