@@ -898,3 +898,10 @@ from queue) + 新增队列 Edit message 钮: RemoveFromQueue 后回填 composer(
 官方同文遮罩 "Drop to add to agent": 文件拖入面板 → @路径入 composer(text/uri-list
 兜底); 回退钮 tooltip 官方同文 "Revert to this snapshot"(RevertToCascadeStep 真源
 已在位)。159/159 测试, v1.5.88。
+
+## R254 · P1 尾项: Pinned context(SetPinnedContext 真源)
+
+官方 RPC 真源 SetPinnedContext{pinnedScope{items[{file{absoluteUri}}]}}(proto:
+ContextScope{items} / ContextScopeItem.file=PathScopeItem): composer 新增 pin
+官方图标钮 → 打开文档 QuickPick 选钉 → pinned chips(📌 文件名 + ✕ 解钉)常驻
+composer 上方, 每次增删全量回写。160/160 测试, v1.5.89。

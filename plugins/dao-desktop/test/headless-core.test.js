@@ -3171,3 +3171,12 @@ test("R253: Drop to add to agent + Revert 同文", () => {
   assert.ok(src.includes('addEventListener("drop"') && src.includes("text/uri-list"), "drop 通道在位");
   assert.ok(src.includes('rv.title="Revert to this snapshot"'), "回退官方同文");
 });
+
+// R254 · Pinned context。
+test("R254: SetPinnedContext 官方真源 + chips", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"SetPinnedContext"') && src.includes("pinnedScope: { items }"), "官方 RPC 真源");
+  assert.ok(src.includes("file: { absoluteUri: u }"), "ContextScopeItem.file 真源形");
+  assert.ok(src.includes('"pin-context"') && src.includes('"unpin-context"'), "双端通道在位");
+  assert.ok(src.includes('m.type==="pinned"') && src.includes('id="pinBtn"'), "chips + pin 钮在位");
+});

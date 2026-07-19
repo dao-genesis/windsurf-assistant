@@ -143,6 +143,8 @@ class CascadePanelProvider {
         if (msg.type === "session-archive") return this._handleSessionArchive(msg.sessionId);
         if (msg.type === "session-rename") return this._handleSessionRename(msg.sessionId);
         if (msg.type === "session-tags") return this._handleSessionTags(msg.sessionId);
+        if (msg.type === "pin-context") return this._handlePinContext();
+        if (msg.type === "unpin-context") return this._handleUnpinContext(String(msg.uri || ""));
         if (msg.type === "bg-cmd-cancel") { const ls = require("./ls-bridge");
           return ls.call("CancelCascadeSteps", { cascadeId: String(msg.cascadeId || ""),
             stepIndices: [Number(msg.stepIndex || 0)] }).catch(() => {}); }
@@ -860,6 +862,33 @@ class CascadePanelProvider {
       });
     };
     loop();
+  }
+
+  // 官方式 Pinned context: SetPinnedContext{pinnedScope{items[{file{absoluteUri}}]}}
+  // (官方 proto 真源: ContextScopeItem.file=PathScopeItem, ContextScope{items})
+  async _syncPinned() {
+    const ls = require("./ls-bridge");
+    const items = (this._pinnedUris || []).map((u) => ({ file: { absoluteUri: u } }));
+    await ls.call("SetPinnedContext", { pinnedScope: { items } });
+    this._post({ type: "pinned", uris: this._pinnedUris || [] });
+  }
+
+  async _handlePinContext() {
+    try {
+      const open = vscode.workspace.textDocuments
+        .filter((d) => d.uri.scheme === "file")
+        .map((d) => d.uri.toString());
+      const pick = await vscode.window.showQuickPick(open.length ? open : [], {
+        placeHolder: "Pin context: 选择要常驻的文件(官方 SetPinnedContext 同源)" });
+      if (!pick) return;
+      this._pinnedUris = (this._pinnedUris || []).filter((u) => u !== pick).concat([pick]);
+      await this._syncPinned();
+    } catch (e) { this._post({ type: "error", text: "Pin 失败: " + e.message }); }
+  }
+
+  async _handleUnpinContext(uri) {
+    this._pinnedUris = (this._pinnedUris || []).filter((u) => u !== uri);
+    try { await this._syncPinned(); } catch (_) {}
   }
 
   // 官方式会话标签: GetConversationTags → 现值回显; UpdateConversationTags{cascadeId,tags[]} 写回
@@ -2825,11 +2854,11 @@ class CascadePanelProvider {
   .pill select { appearance:none; -webkit-appearance:none; background:transparent; color:inherit; border:none; font:inherit; cursor:pointer; outline:none; max-width:110px; text-overflow:ellipsis; }
   .pill select option { background:var(--vscode-dropdown-background); color:var(--vscode-dropdown-foreground); }
   /* 官方真源: ＋钮 radius 6px · bg rgba(255,255,255,.05) */
-  #plusBtn, #imgBtn, #arenaBtn, #wtBtn { width:24px; height:24px; border-radius:6px; border:none; background:rgba(255,255,255,.05); color:var(--dim); cursor:pointer; font-size:14px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  #plusBtn, #imgBtn, #pinBtn, #arenaBtn, #wtBtn { width:24px; height:24px; border-radius:6px; border:none; background:rgba(255,255,255,.05); color:var(--dim); cursor:pointer; font-size:14px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
   #imgBtn, #arenaBtn, #wtBtn { background:transparent; }
   #micBtn.bare { width:24px; height:24px; border:none; background:transparent; color:var(--dim); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
   #micBtn.bare:hover { background:var(--pill-hover); }
-  #plusBtn:hover, #imgBtn:hover, #arenaBtn:hover, #wtBtn:hover { background:var(--pill-hover); }
+  #plusBtn:hover, #imgBtn:hover, #pinBtn:hover, #arenaBtn:hover, #wtBtn:hover { background:var(--pill-hover); }
   /* 官方空态无此行: 静息隐去, 悬停 Recent 区即现(功能不减) */
   #autoOpenRow { opacity:0; transition:opacity .15s; }
   #recent:hover #autoOpenRow { opacity:1; }
@@ -3012,6 +3041,7 @@ class CascadePanelProvider {
         <span class="pill" id="modeWrap" title="Session Mode (Ctrl+.)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg><button id="modeBtn" type="button"></button></span>
         <span class="pill" id="modelWrap" title="Model Selector"><button id="modelBtn" type="button"></button></span>
         <button id="imgBtn" title="Attachment">${OI.svg("images-1",13)}</button>
+        <button id="pinBtn" title="Pin context">${OI.svg("pin",13)}</button>
         <button id="arenaBtn" title="Arena 模式：同题双轨候选，择优续行（新会话/会话中途均可）">⚔</button>
         <button id="wtBtn" title="Worktree 模式：新会话在隔离 git worktree 中运行，改动不直接落入主工作区，可随后合并">⎇</button>
         <span class="spacer"></span>
@@ -3451,6 +3481,7 @@ class CascadePanelProvider {
   })();
 
   // 官方式图像附件: 粘贴 / 🖼 选择 → dataURL 暂存, composer 内缩略图预览, 发送随消息带出
+  const pinBtn=$("pinBtn"); pinBtn.onclick=()=>vscode.postMessage({type:"pin-context"});
   const imgStrip=$("imgStrip"), imgBtn=$("imgBtn"), imgFile=$("imgFile");
   let pendingImages=[];
   function renderThumbs(){ imgStrip.innerHTML="";
@@ -4114,6 +4145,24 @@ class CascadePanelProvider {
             th.querySelector(".tbody2").style.display="none"; th.querySelector(".chev").textContent="▸"; }
           body.className="body"; node.appendChild(body); }
         node.dataset.acc=(node.dataset.acc||"")+m.text; body.innerHTML=md(node.dataset.acc); logEl.scrollTop=logEl.scrollHeight; }
+    } else if(m.type==="pinned"){
+      // 官方式 pinned 常驻上下文 chips: 文件名 + ✕ 解钉
+      let bar=document.getElementById("pinnedBar");
+      const us=m.uris||[];
+      if(!us.length){ if(bar) bar.remove(); }
+      else{
+        if(!bar){ bar=document.createElement("div"); bar.id="pinnedBar";
+          bar.style.cssText="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0;";
+          inputEl.parentElement.insertBefore(bar, inputEl); }
+        bar.innerHTML="";
+        for(const u of us){ const c=document.createElement("span"); c.className="qchip";
+          c.style.cssText="display:inline-flex;align-items:center;gap:4px;font-size:11px;";
+          const t=document.createElement("span"); t.textContent="📌 "+(u.split("/").pop()||u); t.title=u; c.appendChild(t);
+          const x=document.createElement("button"); x.textContent="✕"; x.title="Unpin";
+          x.style.cssText="background:none;border:none;cursor:pointer;color:inherit;padding:0;";
+          x.onclick=()=>vscode.postMessage({type:"unpin-context", uri:u}); c.appendChild(x);
+          bar.appendChild(c); }
+      }
     } else if(m.type==="composer-fill"){
       inputEl.value=m.text||""; autoGrow(); inputEl.focus();
     } else if(m.type==="cx-queue"){
