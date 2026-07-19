@@ -2808,3 +2808,19 @@ test("R211: Order by 排序菜单 + clientModelSorts 同源", () => {
   assert.ok(src.includes("sorts: mSorts"), "sorts 直通 webview");
   assert.ok(src.includes("modelSortCur===n)?null:n"), "官方点选中项复位语义");
 });
+
+// R212 · 官方图标库全量整合(反提 workbench 真源 115 枚) + 首批接线。
+test("R212: official-icons 图标库 + 顶栏/发送/状态条官方同源接线", () => {
+  const oi = require("../dao-cascade/official-icons");
+  assert.ok(oi.names().length >= 115, "官方图标 ≥115 枚全量在库");
+  assert.ok(oi.svg("magnifying-glass", 13).includes("M10.207 3.043"), "search path 逐字同源");
+  assert.ok(oi.svg("share-os", 13).includes("<path"), "share-os 在库");
+  assert.ok(oi.svg("settings-gear-1", 13).includes("<path"), "settings-gear-1 在库");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('OI.svg("share-os"'), "mtShare 官方同源接线");
+  assert.ok(src.includes('OI.svg("book"'), "mtCustom 官方同源接线");
+  assert.ok(src.includes('OI.svg("settings-gear-1"'), "mtSettings 官方同源接线");
+  assert.ok(src.includes('OI.svg("arrow-up"'), "send 官方同源接线");
+  assert.ok(src.includes('OI.svg("macbook"'), "Local 段官方同源接线");
+  assert.ok(src.includes('OI.svg("folder-1"'), "folder 段官方同源接线");
+});

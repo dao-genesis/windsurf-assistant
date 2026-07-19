@@ -1,0 +1,100 @@
+arrow-down
+bubble-crossed, comment, feedback
+bubble-5, message, chat
+checklist, list
+code
+commits
+console-simple, terminal
+globe, network, translate
+hammer-2, crafting, building
+plugin-2, build
+map, paper
+notebook, cover
+pencil, edit, write
+pull-request, pr-create
+rocket, startup, launch
+server, data, storage
+toolbox
+check-circle-2, done, confirm, save, success
+exclamation-circle, info, warning
+exclamation-triangle, error, warning, alert
+draft
+merged
+request-closed
+loading-circle, quarter, spinner
+chevron-down-medium
+arrow-inbox, download, file, down, save
+cross-medium, crossed medium, close
+eye-open, show, see, reveal, look, visible
+git
+key-1, password
+chevron-right-medium
+circle-x, close, checkbox, remove, failed, cancel
+checkmark-1
+square-behind-square-6, layers, copy 6, pages
+brain, thinking, human, clever
+stop
+arrow-up,arrow-top
+branch
+pin
+chevron-grabber-vertical
+macbook, laptop, computer
+trash-can-simple, delete, remove, garbage, waste
+paperclip-1, attachment
+robot-3, agent, scout
+plus-large, add large
+devin-logo
+buildings, company, workspace
+checkmark-2-small
+minus-small, remove, delete
+loader
+arrow-right
+chart-4, statistics, graph
+circle-info, info circle, tooltip, information
+dot-grid-1x3-horizontal, menu, drag, grab
+share-os
+circle-dashed
+form-circle
+cross-large, crossed large, close
+images-1, photos, pictures, shot
+circle-ban-sign, circle, block, ads
+bubble-2, message, chat
+flag-1, priority
+trash-can, delete, remove, garbage, waste
+floppy-disk-1, save
+square-cursor, cursor box, arrow
+shield, security, protection
+square-checklist-magnifying-glass, checklist box, check, list, search
+cross-small, crossed small, delete, remove
+play, go
+circle-check, check radio, circle, checkbox, check, checkmark, confirm
+test-tube
+settings-gear-1, preferences
+square-behind-square-2, copy 2, layers, pages
+cloud-download
+arrow-corner-down-left
+arrow-left
+cmd, command, apple, key
+opt, option, key
+shift
+chevron-left
+chevron-right
+arrow-out-of-box, upload, share
+clock, time, timer
+archive-1, inbox, file
+calendar-1, date
+code-tree, file-tree
+timeslot, time, clock
+arrow-up-right
+chain-link-1,url
+arrow-bottom-top, sort 2, switch vertical
+bolt
+cute-robot
+layout-grid-2, grid
+square-circle-top-right, notifications, badge
+agent, flow, diagram, org
+bubble-quotes
+changes, plus-minus, compare
+console, terminal
+page-search-lines
+window-2, browser, app, desktop

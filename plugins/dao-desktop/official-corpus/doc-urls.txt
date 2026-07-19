@@ -1,0 +1,14 @@
+https://docs.devin.ai/cli/extensibility/rules
+https://docs.devin.ai/cli/extensibility/skills/overview
+https://docs.devin.ai/essential-guidelines/instructing-devin-effectively
+https://docs.windsurf.com
+https://docs.windsurf.com).
+https://docs.windsurf.com/troubleshooting/windsurf-common-issues#what-domains-should-i-whitelist-for-network-filters%2Ffirewalls%2C-vpns%2C-or-proxies%3F
+https://docs.windsurf.com/windsurf/cascade/app-deploys
+https://docs.windsurf.com/windsurf/cascade/app-deploys#troubleshooting
+https://docs.windsurf.com/windsurf/cascade/mcp
+https://docs.windsurf.com/windsurf/cascade/memories
+https://docs.windsurf.com/windsurf/cascade/memories)
+https://docs.windsurf.com/windsurf/cascade/workflows
+https://docs.windsurf.com/windsurf/cascade/workflows)
+https://docs.windsurf.com/windsurf/models
