@@ -892,3 +892,9 @@ P1 七项(R241–R248)全量收官入账; P2 四批(R246/R249/R250)落地入账;
 官方同文 tooltip 三则(Enter to send queued message (⏎) / Edit message / Remove
 from queue) + 新增队列 Edit message 钮: RemoveFromQueue 后回填 composer(官方取回
 编辑同语义)。158/158 测试, v1.5.87。
+
+## R253 · P2: 拖拽上下文 + Revert 官方同文
+
+官方同文遮罩 "Drop to add to agent": 文件拖入面板 → @路径入 composer(text/uri-list
+兜底); 回退钮 tooltip 官方同文 "Revert to this snapshot"(RevertToCascadeStep 真源
+已在位)。159/159 测试, v1.5.88。

@@ -3163,3 +3163,11 @@ test("R252: 队列官方同文 tooltip + Edit 回填", () => {
   assert.ok(src.includes('"cx-queue-edit"') && src.includes('type: "composer-fill"'), "Edit 通道在位");
   assert.ok(src.includes('m.type==="composer-fill"'), "回填在位");
 });
+
+// R253 · 拖拽上下文 + Revert 官方同文。
+test("R253: Drop to add to agent + Revert 同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"Drop to add to agent"'), "官方同文遮罩在位");
+  assert.ok(src.includes('addEventListener("drop"') && src.includes("text/uri-list"), "drop 通道在位");
+  assert.ok(src.includes('rv.title="Revert to this snapshot"'), "回退官方同文");
+});
