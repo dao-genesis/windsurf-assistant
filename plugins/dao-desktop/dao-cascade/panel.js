@@ -1942,7 +1942,9 @@ class CascadePanelProvider {
     items.push({ label: "$(add) 新建 Skill…", _create: "skill" });
     sect("Memories");
     items.push({ label: "$(database) 查看 Memories(面板)", _memories: true });
-    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Customizations · Rules / Workflows / Skills / Memories(官方同源)", matchOnDescription: true });
+    // 官方 Customizations 页头同文(反提 workbench 真源): title + description
+    const pick = await vscode.window.showQuickPick(items, { title: "Customizations",
+      placeHolder: "Customize Cascade to get a better, more personalized experience.", matchOnDescription: true });
     if (!pick) return;
     if (pick._create) return this._handleCustomizationCreate(pick._create);
     if (pick._memories) { await vscode.commands.executeCommand(this._viewId + ".open").then(undefined, () => {}); return this._handleMemoriesList(); }

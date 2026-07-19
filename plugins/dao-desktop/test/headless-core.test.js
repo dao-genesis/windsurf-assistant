@@ -2788,3 +2788,10 @@ test("R209: 反馈钮官方 thumbs-up/down path 同源", () => {
   assert.ok(src.includes('"Bad response"'), "Bad response 官方 tooltip 同文");
   assert.ok(!src.includes('d="M7 10v12"'), "非官方 lucide 描边路径已替换");
 });
+
+// R210 · Customizations 页头官方同文(反提 workbench 真源)。
+test("R210: Customizations QuickPick 官方 title/description 同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('title: "Customizations"'), "官方 title 同文");
+  assert.ok(src.includes("Customize Cascade to get a better, more personalized experience."), "官方 description 同文");
+});
