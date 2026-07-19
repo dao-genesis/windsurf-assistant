@@ -2905,3 +2905,13 @@ test("R220: Learn about models 链接官方同文 + docs 官方 URL", () => {
   assert.ok(src.includes('lm.textContent="Learn about models"'), "官方同文在位");
   assert.ok(src.includes("docs.windsurf.com/windsurf/models"), "官方文档 URL 同源");
 });
+
+// R221 · Recent sessions/DeepWiki 图标官方同源化。
+test("R221: 会话行内钮 + DeepWiki 头官方图标同源", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("rn.innerHTML=OICONS.pencil"), "重命名官方 pencil");
+  assert.ok(src.includes("ex.innerHTML=OICONS.download"), "导出官方 arrow-inbox");
+  assert.ok(src.includes("a.innerHTML=OICONS.trash"), "移除官方 trash-can-simple");
+  assert.ok(src.includes("OICONS.book+' DeepWiki"), "DeepWiki 头官方 book");
+  assert.ok(!src.includes('rn.textContent="✎"') && !src.includes('a.textContent="🗑"'), "行内 emoji 已替换");
+});

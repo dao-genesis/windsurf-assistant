@@ -2813,7 +2813,8 @@ class CascadePanelProvider {
   // 官方图标(反提 workbench 真源): 终端卡头 console-simple / Copy command / Insert in terminal
   const OICONS = ${JSON.stringify({ terminal: OI.svg("console-simple", 12), copy: OI.svg("square-behind-square-2", 12), insert: OI.svg("arrow-corner-down-left", 12),
     "commits": OI.svg("commits", 11), "bubble-5": OI.svg("bubble-5", 11), "devin-logo": OI.svg("devin-logo", 11), "file-text": OI.svg("file-text", 11),
-    "magnifying-glass": OI.svg("magnifying-glass", 11), "pencil": OI.svg("pencil", 11), "flag-1": OI.svg("flag-1", 11), "exclamation-triangle": OI.svg("exclamation-triangle", 11) })};
+    "magnifying-glass": OI.svg("magnifying-glass", 11), "pencil": OI.svg("pencil", 11), "flag-1": OI.svg("flag-1", 11), "exclamation-triangle": OI.svg("exclamation-triangle", 11),
+    trash: OI.svg("trash-can-simple", 11), download: OI.svg("arrow-inbox", 11), book: OI.svg("book", 11) })};
   let agent = AGENTS[0].id;
   const state = vscode.getState() || { history: [] };
   const $ = (id) => document.getElementById(id);
@@ -3495,13 +3496,13 @@ class CascadePanelProvider {
         const w=document.createElement("span"); w.className="when"; w.textContent=rel(s.updatedAt);
         it.appendChild(t); it.appendChild(w);
         if((s.sessionId||"").startsWith("cx:")){
-          const rn=document.createElement("span"); rn.className="arch"; rn.title="重命名会话"; rn.textContent="✎";
+          const rn=document.createElement("span"); rn.className="arch"; rn.title="重命名会话"; rn.innerHTML=OICONS.pencil;
           rn.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-rename", sessionId:s.sessionId}); };
           it.appendChild(rn);
-          const ex=document.createElement("span"); ex.className="arch"; ex.title="导出会话转录"; ex.textContent="⤓";
+          const ex=document.createElement("span"); ex.className="arch"; ex.title="导出会话转录"; ex.innerHTML=OICONS.download;
           ex.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-export", sessionId:s.sessionId}); };
           it.appendChild(ex);
-          const a=document.createElement("span"); a.className="arch"; a.title="移除会话"; a.textContent="🗑";
+          const a=document.createElement("span"); a.className="arch"; a.title="移除会话"; a.innerHTML=OICONS.trash;
           a.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"session-archive", sessionId:s.sessionId}); };
           it.appendChild(a);
         }
@@ -3524,7 +3525,7 @@ class CascadePanelProvider {
       // 官方式 DeepWiki 解释卡: 📖 符号头 + 流式 markdown 正文
       let el=logEl.querySelector('[data-dw="'+m.id+'"]');
       if(!el){ if(emptyEl) emptyEl.remove(); el=document.createElement("div"); el.dataset.dw=m.id; el.className="msg assistant"; logEl.appendChild(el); }
-      el.innerHTML='<div style="color:var(--dim);font-size:11px;margin-bottom:4px;">\u{1F4D6} DeepWiki \u00b7 '+esc(m.symbol||"")+(m.inProgress?" \u2026":"")+'</div>'+md(m.text||"");
+      el.innerHTML='<div style="color:var(--dim);font-size:11px;margin-bottom:4px;">'+OICONS.book+' DeepWiki \u00b7 '+esc(m.symbol||"")+(m.inProgress?" \u2026":"")+'</div>'+md(m.text||"");
       logEl.scrollTop=logEl.scrollHeight;
     }
     else if(m.type==="cmd-card"){
