@@ -3155,3 +3155,11 @@ test("R250: notebook/findCodeContext/lint 官方同文", () => {
   assert.ok(src.includes('"Found code context"') && src.includes("fc.searchTerm"), "检索卡同文 + 真源");
   assert.ok(src.includes('"Found lint errors"') && src.includes("lf.lintErrors"), "lint 卡同文 + 真源");
 });
+
+// R252 · Queued messages 官方同文 + Edit message。
+test("R252: 队列官方同文 tooltip + Edit 回填", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"Remove from queue"') && src.includes("Enter to send queued message"), "官方同文 tooltip");
+  assert.ok(src.includes('"cx-queue-edit"') && src.includes('type: "composer-fill"'), "Edit 通道在位");
+  assert.ok(src.includes('m.type==="composer-fill"'), "回填在位");
+});

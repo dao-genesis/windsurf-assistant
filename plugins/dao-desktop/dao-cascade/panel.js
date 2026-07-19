@@ -129,7 +129,7 @@ class CascadePanelProvider {
         if (msg.type === "cx-feedback") return this._handleCxFeedback(msg);
         if (msg.type === "cx-step-cancel") return this._handleCxStepCancel(msg.stepIndex);
         if (msg.type === "cx-branch") return this._handleCxBranch(msg.stepIndex, msg.text);
-        if (msg.type === "cx-queue-remove" || msg.type === "cx-queue-front" || msg.type === "cx-queue-now") return this._handleCxQueueOp(msg);
+        if (msg.type === "cx-queue-remove" || msg.type === "cx-queue-front" || msg.type === "cx-queue-now" || msg.type === "cx-queue-edit") return this._handleCxQueueOp(msg);
         if (msg.type === "worktree-merge") return this._handleWorktreeMerge();
         if (msg.type === "worktree-undo") return this._handleWorktreeUndo();
         if (msg.type === "worktree-open") return this._handleWorktreeOpen();
@@ -1846,6 +1846,12 @@ class CascadePanelProvider {
       } else if (msg.type === "cx-queue-front") {
         await ls.call("MoveQueuedMessage", { cascadeId: this._cascadeLsId, queueId: msg.queueId, toIndex: 0 });
         this._cxQueue.unshift(this._cxQueue.splice(qi, 1)[0]);
+      } else if (msg.type === "cx-queue-edit") {
+        // 官方式 Edit message: 移出队列并回填 composer(官方从队列取回编辑同语义)
+        const it = this._cxQueue[qi];
+        await ls.call("RemoveFromQueue", { cascadeId: this._cascadeLsId, queueId: msg.queueId });
+        this._cxQueue.splice(qi, 1);
+        this._post({ type: "composer-fill", text: it.text || "" });
       } else {
         await ls.call("InterruptWithQueuedMessage", { cascadeId: this._cascadeLsId, queueId: msg.queueId });
         this._cxQueue.splice(qi, 1);
@@ -4091,12 +4097,15 @@ class CascadePanelProvider {
             th.querySelector(".tbody2").style.display="none"; th.querySelector(".chev").textContent="▸"; }
           body.className="body"; node.appendChild(body); }
         node.dataset.acc=(node.dataset.acc||"")+m.text; body.innerHTML=md(node.dataset.acc); logEl.scrollTop=logEl.scrollHeight; }
+    } else if(m.type==="composer-fill"){
+      inputEl.value=m.text||""; autoGrow(); inputEl.focus();
     } else if(m.type==="cx-queue"){
       const qb=document.getElementById("queuebar"); qb.innerHTML=""; const q=m.queue||[];
       qb.className=q.length?"show":"";
       for(const it of q){ const c=document.createElement("div"); c.className="qchip";
         const tx=document.createElement("span"); tx.className="qtxt"; tx.textContent="⏳ "+it.text; c.appendChild(tx);
-        for(const [sym,ty,tip] of [["⚡","cx-queue-now","立即发送(打断当前轮)"],["↑","cx-queue-front","移到队首"],["✕","cx-queue-remove","移出队列"]]){
+        // 官方同文 tooltip: Enter to send queued message (⏎) / Edit message / Remove from queue
+        for(const [sym,ty,tip] of [["⚡","cx-queue-now","Enter to send queued message (⏎)"],["↑","cx-queue-front","Move to front"],["✎","cx-queue-edit","Edit message"],["✕","cx-queue-remove","Remove from queue"]]){
           const b=document.createElement("button"); b.textContent=sym; b.title=tip;
           b.onclick=()=>vscode.postMessage({type:ty, queueId:it.queueId}); c.appendChild(b); }
         qb.appendChild(c); }
