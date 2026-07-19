@@ -3180,3 +3180,10 @@ test("R254: SetPinnedContext 官方真源 + chips", () => {
   assert.ok(src.includes('"pin-context"') && src.includes('"unpin-context"'), "双端通道在位");
   assert.ok(src.includes('m.type==="pinned"') && src.includes('id="pinBtn"'), "chips + pin 钮在位");
 });
+
+// R255 · 检索族补全。
+test("R255: find / mquery 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("st.find") && src.includes('"Searched filesystem"') && src.includes("fd.totalResults"), "FIND 卡真源");
+  assert.ok(src.includes("st.mquery") && src.includes('"Semantic searched codebase"'), "MQUERY 官方转写同文");
+});
