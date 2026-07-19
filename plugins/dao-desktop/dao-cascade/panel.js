@@ -614,6 +614,20 @@ class CascadePanelProvider {
     if (st.gitCommit) { const gc = st.gitCommit;
       return { type: "git-card", id, toolCallId: "cx" + k,
         hash: (gc.commitHash || "").slice(0, 7), message: gc.commitMessage || "" }; }
+    // 官方式 notebook/检索/лint 族卡(官方 workbench 转写同文)
+    if (st.readNotebook) { const rn = st.readNotebook;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: "Read Jupyter notebook " + ((rn.absolutePathUri || "").split("/").pop() || "") }; }
+    if (st.editNotebook) { const en = st.editNotebook;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: "Edited Jupyter notebook " + ((en.absolutePathUri || "").split("/").pop() || "") }; }
+    if (st.findCodeContext) { const fc = st.findCodeContext;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: "Found code context" + (fc.searchTerm ? ": " + fc.searchTerm : "") }; }
+    if (st.lintFixMessage) { const lf = st.lintFixMessage;
+      const n = (lf.lintErrors || []).length;
+      return { type: "memory-card", id, toolCallId: "cx" + k,
+        title: "Found lint errors" + (n ? " (" + n + ")" : "") }; }
     // 官方式 Codemap 卡: upsertCodemap{output{title,description},runningStatus}
     if (st.upsertCodemap) { const uc = st.upsertCodemap, out = uc.output || {};
       const done = !!out.title;

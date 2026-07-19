@@ -3147,3 +3147,11 @@ test("R249: upsertCodemap 官方同文", () => {
   assert.ok(src.includes("st.upsertCodemap") && src.includes("uc.editingCodemapTitle"), "proto 真源在位");
   assert.ok(src.includes('"Generating codemap…"') && src.includes("Codemap from this Cascade: "), "官方同文在位");
 });
+
+// R250 · notebook/检索/lint 族卡。
+test("R250: notebook/findCodeContext/lint 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("Read Jupyter notebook ") && src.includes("Edited Jupyter notebook "), "notebook 双卡同文");
+  assert.ok(src.includes('"Found code context"') && src.includes("fc.searchTerm"), "检索卡同文 + 真源");
+  assert.ok(src.includes('"Found lint errors"') && src.includes("lf.lintErrors"), "lint 卡同文 + 真源");
+});
