@@ -251,6 +251,9 @@ class CascadePanelProvider {
       // 官方式模型健康位: GetModelStatuses → {statuses:{uid:{status,message}}}(当前多为空, 防御式合入)
       let mStatus = {};
       try { const st = await ls.call("GetModelStatuses", {}); mStatus = (st && st.statuses) || {}; } catch (_) {}
+      // 官方排序菜单同源(clientModelSorts: Recommended/Provider/Cost)
+      let mSorts = [];
+      try { mSorts = await ls.listModelSorts(); } catch (_) {}
       this._cxImageModels = new Set(models.filter((m) => m.images).map((m) => m.uid));
       this._cxModelLabels = {};
       for (const m of models) this._cxModelLabels[m.uid] = m.label;
@@ -262,6 +265,7 @@ class CascadePanelProvider {
       this._sbSet({ modelLabel: this._cxModelLabels[this._cascadeModel] || null, mode: this._cascadeMode || "write" });
       this._post({ type: "config-options", agent: "cascade", configOptions: [{
         id: "model", category: "model", currentValue: this._cascadeModel,
+        sorts: mSorts,
         options: models.map((m) => ({
           value: m.uid,
           name: m.label,
@@ -2683,6 +2687,7 @@ class CascadePanelProvider {
   #modelBtn, #modeBtn, #agentBtn { background:transparent; border:none; color:inherit; font:inherit; cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0; }
   #modelMenu, #modeMenu, #agentMenu { display:none; margin:0 0 6px; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   #modelMenu.show, #modeMenu.show, #agentMenu.show { display:block; }
+  #modelMenu { position:relative; }
   #modelFilterRow { display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--line); padding:0 10px; }
   #modelFilterRow svg { flex-shrink:0; color:var(--dim); }
   #modelMenu #modelFilter { flex:1; min-width:0; box-sizing:border-box; background:transparent; border:none; color:var(--vscode-foreground); font:12px var(--vscode-font-family); padding:6px 0; outline:none; }
@@ -2705,6 +2710,16 @@ class CascadePanelProvider {
   #modelList .mit .mx { color:var(--dim); font-size:11px; flex-shrink:0; }
   #modelList .mit .mds { color:var(--dim); font-size:10.5px; margin-top:1px; line-height:1.35; }
   #modelList .empty3 { padding:8px 10px; font-size:11.5px; color:var(--dim); }
+  #modelSort { border:none; background:transparent; color:var(--dim); cursor:pointer; padding:2px; display:inline-flex; align-items:center; }
+  #modelSort.on { color:var(--vscode-foreground); }
+  #modelSortMenu { display:none; position:absolute; right:6px; top:30px; min-width:140px; background:var(--card); border:1px solid var(--line); border-radius:6px; z-index:30; padding:4px 0; }
+  #modelSortMenu.show { display:block; }
+  #modelSortMenu .sml { padding:3px 10px; font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.4px; }
+  #modelSortMenu .smi { padding:4px 10px; font-size:12px; cursor:pointer; }
+  #modelSortMenu .smi:hover { background:var(--pill-hover); }
+  #modelSortMenu .smi.on { color:var(--vscode-textLink-foreground); }
+  #modelSortMenu .smsep { height:1px; background:var(--line); margin:4px 0; }
+  #modelSortMenu .sminfo { padding:4px 10px; font-size:11px; color:var(--dim); max-width:200px; }
 </style></head><body>
   <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
     <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
@@ -2741,7 +2756,7 @@ class CascadePanelProvider {
   <div class="composer">
     <div id="slashMenu"></div>
     <div id="atMenu"></div>
-    <div id="modelMenu"><div id="modelFilterRow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.207 3.043 C 8.656 3.193,7.096 3.846,5.900 4.847 C 4.985 5.612,4.307 6.477,3.800 7.529 C 2.453 10.317,2.837 13.625,4.789 16.040 C 5.075 16.394,5.761 17.067,6.100 17.326 C 7.743 18.581,9.834 19.176,11.832 18.958 C 13.289 18.798,14.736 18.220,15.883 17.337 L 16.106 17.166 17.943 19.007 C 19.169 20.236,19.833 20.873,19.940 20.923 C 20.243 21.065,20.552 21.004,20.788 20.755 C 21.013 20.516,21.060 20.233,20.923 19.940 C 20.873 19.833,20.236 19.169,19.007 17.943 L 17.166 16.106 17.337 15.883 C 18.220 14.736,18.798 13.289,18.958 11.832 C 19.176 9.834,18.579 7.737,17.325 6.100 C 17.055 5.747,16.510 5.190,16.100 4.847 C 14.483 3.494,12.337 2.837,10.207 3.043 M11.940 4.577 C 14.094 4.908,15.858 6.196,16.838 8.153 C 17.493 9.462,17.661 11.157,17.283 12.629 C 16.641 15.130,14.538 17.031,11.980 17.423 C 11.467 17.502,10.533 17.502,10.020 17.423 C 7.461 17.031,5.360 15.132,4.717 12.629 C 4.451 11.596,4.451 10.404,4.717 9.371 C 5.361 6.863,7.431 4.993,10.020 4.580 C 10.456 4.511,11.498 4.509,11.940 4.577 " stroke="none" fill-rule="evenodd" fill="currentColor"/></svg><input id="modelFilter" type="text" placeholder="Search all models"></div><div id="modelList"></div></div>
+    <div id="modelMenu"><div id="modelFilterRow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.207 3.043 C 8.656 3.193,7.096 3.846,5.900 4.847 C 4.985 5.612,4.307 6.477,3.800 7.529 C 2.453 10.317,2.837 13.625,4.789 16.040 C 5.075 16.394,5.761 17.067,6.100 17.326 C 7.743 18.581,9.834 19.176,11.832 18.958 C 13.289 18.798,14.736 18.220,15.883 17.337 L 16.106 17.166 17.943 19.007 C 19.169 20.236,19.833 20.873,19.940 20.923 C 20.243 21.065,20.552 21.004,20.788 20.755 C 21.013 20.516,21.060 20.233,20.923 19.940 C 20.873 19.833,20.236 19.169,19.007 17.943 L 17.166 16.106 17.337 15.883 C 18.220 14.736,18.798 13.289,18.958 11.832 C 19.176 9.834,18.579 7.737,17.325 6.100 C 17.055 5.747,16.510 5.190,16.100 4.847 C 14.483 3.494,12.337 2.837,10.207 3.043 M11.940 4.577 C 14.094 4.908,15.858 6.196,16.838 8.153 C 17.493 9.462,17.661 11.157,17.283 12.629 C 16.641 15.130,14.538 17.031,11.980 17.423 C 11.467 17.502,10.533 17.502,10.020 17.423 C 7.461 17.031,5.360 15.132,4.717 12.629 C 4.451 11.596,4.451 10.404,4.717 9.371 C 5.361 6.863,7.431 4.993,10.020 4.580 C 10.456 4.511,11.498 4.509,11.940 4.577 " stroke="none" fill-rule="evenodd" fill="currentColor"/></svg><input id="modelFilter" type="text" placeholder="Search all models"><button id="modelSort" title="Order by"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.700 3.076 C 6.506 3.165,6.384 3.292,6.302 3.489 C 6.254 3.604,6.240 3.798,6.240 4.356 L 6.240 5.074 6.110 5.101 C 5.371 5.258,4.488 5.792,3.979 6.388 C 2.197 8.477,2.961 11.662,5.493 12.696 C 5.673 12.770,5.915 12.852,6.030 12.879 L 6.240 12.928 6.240 16.656 L 6.240 20.383 6.330 20.559 C 6.379 20.656,6.489 20.790,6.574 20.858 C 6.711 20.967,6.756 20.980,7.000 20.980 C 7.244 20.980,7.289 20.967,7.426 20.858 C 7.511 20.790,7.620 20.656,7.670 20.559 L 7.760 20.383 7.760 16.656 L 7.760 12.928 7.970 12.878 C 8.260 12.808,8.785 12.593,9.044 12.436 C 10.487 11.567,11.250 9.860,10.921 8.243 C 10.721 7.264,10.197 6.415,9.438 5.843 C 8.976 5.495,8.365 5.202,7.890 5.101 L 7.760 5.074 7.759 4.347 C 7.758 3.726,7.747 3.597,7.684 3.460 C 7.503 3.068,7.077 2.902,6.700 3.076 M16.700 3.076 C 16.506 3.165,16.384 3.292,16.302 3.489 C 16.247 3.620,16.240 4.187,16.240 8.356 L 16.240 13.074 16.110 13.101 C 15.371 13.258,14.488 13.792,13.979 14.388 C 12.196 16.478,12.957 19.649,15.495 20.699 C 17.525 21.539,19.876 20.541,20.704 18.488 C 20.994 17.769,21.070 16.977,20.921 16.243 C 20.721 15.264,20.197 14.415,19.438 13.843 C 18.976 13.495,18.365 13.202,17.890 13.101 L 17.760 13.074 17.759 8.347 C 17.758 3.837,17.755 3.613,17.684 3.460 C 17.503 3.068,17.077 2.902,16.700 3.076 M7.817 6.633 C 8.521 6.888,9.103 7.469,9.370 8.183 C 9.446 8.388,9.458 8.499,9.458 9.000 C 9.458 9.501,9.446 9.612,9.370 9.817 C 9.231 10.187,9.044 10.473,8.736 10.785 C 8.515 11.008,8.377 11.108,8.116 11.232 C 7.695 11.432,7.447 11.490,7.000 11.490 C 6.553 11.490,6.305 11.432,5.884 11.232 C 5.334 10.970,4.852 10.425,4.634 9.817 C 4.526 9.518,4.488 8.830,4.559 8.470 C 4.730 7.598,5.497 6.796,6.371 6.575 C 6.699 6.492,7.520 6.525,7.817 6.633 M17.817 14.633 C 18.521 14.888,19.103 15.469,19.370 16.183 C 19.446 16.388,19.458 16.499,19.458 17.000 C 19.458 17.501,19.446 17.612,19.370 17.817 C 19.231 18.187,19.044 18.473,18.736 18.785 C 18.515 19.008,18.377 19.108,18.116 19.232 C 17.695 19.432,17.447 19.490,17.000 19.490 C 16.553 19.490,16.305 19.432,15.884 19.232 C 15.334 18.970,14.852 18.425,14.634 17.817 C 14.526 17.518,14.488 16.830,14.559 16.470 C 14.730 15.598,15.497 14.796,16.371 14.575 C 16.699 14.492,17.520 14.525,17.817 14.633 " stroke="none" fill-rule="evenodd" fill="currentColor"/></svg></button></div><div id="modelSortMenu"></div><div id="modelList"></div></div>
     <div id="modeMenu"><div id="modeList"></div></div>
     <div id="agentMenu"><div id="agentList"></div></div>
     <div class="card">
@@ -2788,7 +2803,27 @@ class CascadePanelProvider {
   viewAll.onclick=()=>vscode.postMessage({type:"history-open"});
 
   // 官方式富模型下拉: 自定义弹层(分族分组 + 搜索 + 徽标 + 价目副行), 替代 native select(R61 局限)
-  let modelCur=null;
+  let modelCur=null, modelSortCur=null;
+  // 官方排序菜单(反提 workbench 真源 wMs): Order by + clientModelSorts 选项(点选中项复位),
+  // 底部官方同文 "All models draw from your Devin ACU balance"(usesACUs 态)
+  const modelSortBtn=$("modelSort"), modelSortMenu=$("modelSortMenu");
+  function sortDefaultName(){ const ss=(modelCur&&modelCur.sorts)||[]; const d=ss.find(x=>x.isDefault); return (d&&d.name)||(ss[0]&&ss[0].name)||""; }
+  function modelSortMenuRender(){
+    modelSortMenu.innerHTML=""; const ss=(modelCur&&modelCur.sorts)||[]; const def=sortDefaultName();
+    const opts=ss.map(x=>x.name).filter(n=>n!==def);
+    if(opts.length){ const l=document.createElement("div"); l.className="sml"; l.textContent="Order by"; modelSortMenu.appendChild(l);
+      for(const n of opts){ const it=document.createElement("div"); it.className="smi"+(modelSortCur===n?" on":"");
+        it.textContent=n;
+        it.onclick=()=>{ modelSortCur=(modelSortCur===n)?null:n; modelSortBtn.classList.toggle("on",!!modelSortCur);
+          modelSortMenu.classList.remove("show"); modelMenuRender(modelFilter.value); };
+        modelSortMenu.appendChild(it); }
+      const sep=document.createElement("div"); sep.className="smsep"; modelSortMenu.appendChild(sep); }
+    const info=document.createElement("div"); info.className="sminfo";
+    info.textContent="All models draw from your Devin ACU balance"; modelSortMenu.appendChild(info);
+  }
+  modelSortBtn.onclick=(e)=>{ e.stopPropagation();
+    if(modelSortMenu.classList.contains("show")) return modelSortMenu.classList.remove("show");
+    modelSortMenuRender(); modelSortMenu.classList.add("show"); };
   const stripCredit=(s)=>String(s||"").replace(/\\s*·\\s*[\\d.]+x\\s*$/,"");
   function modelLabel(o){ return stripCredit(o.name||o.value); }
   // 官方计价标签(反提 workbench 真源): 0→Free(“No credits used”), N→“Nx”(“Nx credits”)
@@ -2816,13 +2851,25 @@ class CascadePanelProvider {
         modelCur=Object.assign({},s,{currentValue:o.value}); modelBtnSync(modelCur);
         const grp=curGroup(); if(cfgStore[grp]&&cfgStore[grp].model) cfgStore[grp].model.currentValue=o.value; };
       return it; };
-    // 官方默认排序 Recommended: 推荐项前置(同组内稳定序)
-    const opts=(s.options||[]).filter(match).slice().sort((a,b)=>(b.recommended?1:0)-(a.recommended?1:0)); let any=false;
-    const groups=new Map(); const flat=[];
-    for(const o of opts){ const gl=o.familyLabel||""; if(gl){ if(!groups.has(gl)) groups.set(gl,[]); groups.get(gl).push(o); } else flat.push(o); }
-    for(const o of flat){ modelList.appendChild(mkIt(o)); any=true; }
-    for(const [gl,items] of groups){ const h=document.createElement("div"); h.className="mgrp"; h.textContent=gl; modelList.appendChild(h);
-      for(const o of items){ modelList.appendChild(mkIt(o)); any=true; } }
+    let any=false;
+    // 官方排序菜单选中态: 按 clientModelSorts 的 groups(modelLabels 官方序)分组渲染
+    const srt=modelSortCur&&((s.sorts||[]).find(x=>x.name===modelSortCur));
+    if(srt){
+      const byLabel=new Map(); for(const o of (s.options||[])) byLabel.set(stripCredit(o.name||o.value),o);
+      for(const g of (srt.groups||[])){
+        const items=(g.labels||[]).map(l=>byLabel.get(l)).filter(o=>o&&match(o));
+        if(!items.length) continue;
+        if(g.name){ const h=document.createElement("div"); h.className="mgrp"; h.textContent=g.name; modelList.appendChild(h); }
+        for(const o of items){ modelList.appendChild(mkIt(o)); any=true; } }
+    } else {
+      // 官方默认排序 Recommended: 推荐项前置(同组内稳定序)
+      const opts=(s.options||[]).filter(match).slice().sort((a,b)=>(b.recommended?1:0)-(a.recommended?1:0));
+      const groups=new Map(); const flat=[];
+      for(const o of opts){ const gl=o.familyLabel||""; if(gl){ if(!groups.has(gl)) groups.set(gl,[]); groups.get(gl).push(o); } else flat.push(o); }
+      for(const o of flat){ modelList.appendChild(mkIt(o)); any=true; }
+      for(const [gl,items] of groups){ const h=document.createElement("div"); h.className="mgrp"; h.textContent=gl; modelList.appendChild(h);
+        for(const o of items){ modelList.appendChild(mkIt(o)); any=true; } }
+    }
     if(!any){ const e=document.createElement("div"); e.className="empty3"; e.textContent="无匹配模型"; modelList.appendChild(e); }
   }
   function modelMenuClose(){ modelMenu.classList.remove("show"); }
@@ -2845,6 +2892,7 @@ class CascadePanelProvider {
     items[i].classList.add("kbd"); items[i].scrollIntoView({block:"nearest"});
   });
   document.addEventListener("click",(e)=>{ if(!modelMenu.contains(e.target)&&e.target!==modelBtn) modelMenuClose();
+    if(!modelSortMenu.contains(e.target)&&!modelSortBtn.contains(e.target)) modelSortMenu.classList.remove("show");
     if(!modeMenu.contains(e.target)&&e.target!==modeBtn) modeMenuClose();
     if(!agentMenu.contains(e.target)&&e.target!==agentBtn) agentMenuClose(); });
   // 发送钮在回合进行中变为停止钮(官方式)

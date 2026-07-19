@@ -2795,3 +2795,16 @@ test("R210: Customizations QuickPick 官方 title/description 同文", () => {
   assert.ok(src.includes('title: "Customizations"'), "官方 title 同文");
   assert.ok(src.includes("Customize Cascade to get a better, more personalized experience."), "官方 description 同文");
 });
+
+// R211 · 模型弹层 Order by 排序菜单官方同源(clientModelSorts + settings-slider-ver)。
+test("R211: Order by 排序菜单 + clientModelSorts 同源", () => {
+  const lsSrc = fs.readFileSync(path.join(ROOT, "dao-cascade", "ls-bridge.js"), "utf8");
+  assert.ok(lsSrc.includes("function listModelSorts"), "listModelSorts 在位");
+  assert.ok(lsSrc.includes("clientModelSorts"), "官方 clientModelSorts 真源直通");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('textContent="Order by"'), "Order by 官方同文");
+  assert.ok(src.includes("All models draw from your Devin ACU balance"), "ACU 官方同文");
+  assert.ok(src.includes("M6.700 3.076"), "settings-slider-ver path 逐字同源");
+  assert.ok(src.includes("sorts: mSorts"), "sorts 直通 webview");
+  assert.ok(src.includes("modelSortCur===n)?null:n"), "官方点选中项复位语义");
+});
