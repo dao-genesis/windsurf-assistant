@@ -886,3 +886,9 @@ errors (N)"。157/157 测试, v1.5.85。
 
 P1 七项(R241–R248)全量收官入账; P2 四批(R246/R249/R250)落地入账; 剩余项
 (Pinned context/Queued 同文/检索族合并/拖拽上下文/Revert 交互)在案。v1.5.86。
+
+## R252 · P1 尾项: Queued messages 官方同文补强 + Edit message
+
+官方同文 tooltip 三则(Enter to send queued message (⏎) / Edit message / Remove
+from queue) + 新增队列 Edit message 钮: RemoveFromQueue 后回填 composer(官方取回
+编辑同语义)。158/158 测试, v1.5.87。
