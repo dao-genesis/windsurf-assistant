@@ -2507,6 +2507,18 @@ class CascadePanelProvider {
   #convFind .cfc { font-size:11px; color:var(--dim); min-width:30px; text-align:center; }
   #convFind button { background:transparent; border:none; color:var(--dim); cursor:pointer; padding:1px 4px; font-size:12px; border-radius:4px; }
   #convFind button:hover { background:var(--pill-hover); color:var(--vscode-foreground); }
+  #tlPanel { display:none; position:absolute; top:32px; right:12px; left:12px; z-index:39; background:var(--card); border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.3); max-height:60%; overflow:hidden; flex-direction:column; }
+  #tlPanel.show { display:flex; }
+  #tlPanel .tlh { display:flex; align-items:center; gap:6px; padding:5px 8px; border-bottom:1px solid var(--line); font-size:12px; }
+  #tlPanel .tlh #tlBranch { color:var(--dim); font-size:10.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #tlPanel .tlh button { margin-left:auto; background:transparent; border:none; color:var(--dim); cursor:pointer; padding:1px 4px; border-radius:4px; font-size:12px; }
+  #tlPanel .tlh button:hover { background:var(--pill-hover); color:var(--vscode-foreground); }
+  #tlPanel .tlh button+button { margin-left:0; }
+  #tlBody { overflow-y:auto; padding:4px 0; }
+  #tlBody .tli { display:flex; gap:6px; padding:3px 10px; font-size:11.5px; align-items:baseline; }
+  #tlBody .tli .tlt { color:var(--dim); font-size:10px; white-space:nowrap; }
+  #tlBody .tli .tlx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #tlBody .tlempty { padding:10px; text-align:center; color:var(--dim); font-size:11.5px; }
   .cfHit { outline:1px solid var(--vscode-editor-findMatchHighlightBorder, rgba(86,156,214,.45)); border-radius:4px; }
   .cfCur { outline:2px solid var(--vscode-focusBorder, rgba(86,156,214,.9)); border-radius:4px; }
   #log { flex:1; overflow:auto; padding:10px 12px; display:flex; flex-direction:column; gap:10px; }
@@ -2730,13 +2742,15 @@ class CascadePanelProvider {
   <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
     <button id="mtAgent" title="打开 Agent 看板(Devin Cloud 会话 Board/List)" style="border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px 0 0 6px;padding:2px 12px;cursor:pointer;">Agent</button>
     <button id="mtEditor" title="Editor 模式(当前)" style="border:1px solid var(--line);background:var(--pill-hover);color:var(--vscode-foreground);border-radius:0 6px 6px 0;padding:2px 12px;cursor:default;margin-left:-2px;">Editor</button>
-    <button id="mtShare" title="Share conversation · 生成团队分享链接并复制" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("share-os",13)}</button>
+    <button id="mtTimeline" title="Open trajectory dashboard" style="margin-left:auto;border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("timeslot",13)}</button>
+    <button id="mtShare" title="Share conversation · 生成团队分享链接并复制" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("share-os",13)}</button>
     <button id="mtBug" title="Submit bug report · 官方同路提交 bug 报告" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg></button>
     <button id="mtCustom" title="Customizations · Rules/Workflows/Skills/Memories" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("book",13)}</button>
     <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("settings-gear-1",13)}</button>
     <button id="acctChip" title="账号 · 点击查看账户卡(官方顶栏头像同位)" style="display:none;border:none;background:#2ea3ff;color:#fff;cursor:pointer;width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:600;line-height:18px;padding:0;margin-left:4px;align-self:center;text-align:center;"></button>
   </div>
   <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="Previous (Shift+Enter)">↑</button><button id="cfNext" title="Next (Enter)">↓</button><button id="cfClose" title="Close (Escape)">✕</button></div>
+  <div id="tlPanel"><div class="tlh"><span id="tlTitle">Timeline</span><span id="tlBranch"></span><button id="tlRefresh" title="Refresh trajectory list">⟳</button><button id="tlClose" title="Close (Escape)">✕</button></div><div id="tlBody"></div></div>
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
@@ -3081,6 +3095,13 @@ class CascadePanelProvider {
   if(mtSettings) mtSettings.onclick=()=>vscode.postMessage({type:"open-devin-settings"});
   const mtCustom=document.getElementById("mtCustom");
   if(mtCustom) mtCustom.onclick=()=>vscode.postMessage({type:"open-customizations"});
+  // 轨迹 timeline 宿主→webview 接线修复: mtTimeline 开面板并拉取, type:"timeline" 渲染
+  const tlPanel=document.getElementById("tlPanel"), tlBody=document.getElementById("tlBody"), tlBranch=document.getElementById("tlBranch");
+  const mtTimeline=document.getElementById("mtTimeline");
+  function tlOpen(){ tlPanel.classList.add("show"); tlBody.innerHTML='<div class="tlempty">Loading...</div>'; vscode.postMessage({type:"timeline-list"}); }
+  if(mtTimeline) mtTimeline.onclick=()=>{ if(tlPanel.classList.contains("show")) tlPanel.classList.remove("show"); else tlOpen(); };
+  document.getElementById("tlRefresh").onclick=()=>tlOpen();
+  document.getElementById("tlClose").onclick=()=>tlPanel.classList.remove("show");
   const mtShare=document.getElementById("mtShare");
   if(mtShare) mtShare.onclick=()=>vscode.postMessage({type:"share-conversation"});
   const mtBug=document.getElementById("mtBug");
@@ -3439,6 +3460,18 @@ class CascadePanelProvider {
         else if(co.category==="mode"||co.id==="mode") cfgStore[grp].mode=co;
       }
       renderConfigFor(curGroup());
+    }
+    else if(m.type==="timeline"){
+      // 用户主线轨迹步列(GetUserTrajectory), 断链修复: 宿主 items{ts,icon,text} 直渲
+      tlBranch.textContent=m.branch?("⎇ "+m.branch):"";
+      tlBody.innerHTML="";
+      const its=m.items||[];
+      for(const it of its){ const r=document.createElement("div"); r.className="tli";
+        const t=document.createElement("span"); t.className="tlt"; t.textContent=it.ts||"";
+        const i=document.createElement("span"); i.textContent=it.icon||"";
+        const x=document.createElement("span"); x.className="tlx"; x.textContent=it.text||""; x.title=it.text||"";
+        r.appendChild(t); r.appendChild(i); r.appendChild(x); tlBody.appendChild(r); }
+      if(!its.length){ const e=document.createElement("div"); e.className="tlempty"; e.textContent="No trajectory steps available"; tlBody.appendChild(e); }
     }
     else if(m.type==="sessions"){
       // 官方首页式 Recent sessions 列表(空态时展示,点击载入)

@@ -2847,3 +2847,15 @@ test("R214: No results / N of M / Send / Cancel step 官方同文", () => {
   assert.ok(src.includes('sendEl.title=b?"Cancel step":"Send"'), "发送/停止 tooltip 官方同文");
   assert.ok(!src.includes("无匹配模型"), "自撰空态文案已替换");
 });
+
+// R215 · timeline 断链修复: 触发者 + 渲染者双端在位。
+test("R215: timeline 宿主→webview 接线 + 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('id="mtTimeline"'), "mtTimeline 触发钮在位");
+  assert.ok(src.includes('title="Open trajectory dashboard"'), "官方 tooltip 同文");
+  assert.ok(src.includes('title="Refresh trajectory list"'), "刷新钮官方 tooltip 同文");
+  assert.ok(src.includes('vscode.postMessage({type:"timeline-list"})'), "webview 触发 timeline-list");
+  assert.ok(src.includes('m.type==="timeline"'), "webview timeline 渲染器在位");
+  assert.ok(src.includes("No trajectory steps available"), "空态官方同文");
+  assert.ok(src.includes('OI.svg("timeslot"'), "官方 timeslot 图标接线");
+});

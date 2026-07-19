@@ -651,3 +651,12 @@ tooltip → 官方同文 "Accept file"/"Reject file"; ③会话内查找钮 tool
 ②会话查找计数 "N/M" → 官方 "`${E+1} of ${I}`" 格式即 "N of M", 零命中 "0/0" → 官方 "No results";
 ③发送/停止钮 tooltip → 官方同文 "Send"/"Cancel step"(workbench 真源 tooltip:"Cancel step",
 title:qe(5515,"Send"))。122/122 测试, v1.5.49。
+
+## R215 · 轨迹 timeline 宿主→webview 渲染断链修复
+
+此前宿主 _handleTimelineList 已产出 type:"timeline"(GetUserTrajectory 步列 items{ts,icon,text}
++ branch), 且分发器认 "timeline-list", 但 webview 既无触发者也无渲染者(死链)。修复: 顶栏新增
+mtTimeline 钮(官方 timeslot 同源图标, tooltip 官方同文 "Open trajectory dashboard") → 开
+#tlPanel 面板并发 timeline-list; 新增 type:"timeline" 渲染器(branch 头 + 步行列表), 刷新钮
+tooltip 官方同文 "Refresh trajectory list", 空态官方同文 "No trajectory steps available"。
+123/123 测试, v1.5.50。
