@@ -171,7 +171,7 @@ const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">
 let D=null;
 const $=s=>document.querySelector(s);
 function row(k,v,d){return '<div class="row"><span class="k">'+k+(d?'<div class="d">'+d+'</div>':"")+'</span><span class="v">'+v+'</span></div>';}
-function btn(t,act,arg){return '<button data-act="'+act+'" data-arg="'+E(arg||"")+'">'+t+'</button>';}
+function btn(t,act,arg,tip){return '<button data-act="'+act+'" data-arg="'+E(arg||"")+'"'+(tip?' title="'+E(tip)+'"':'')+'>'+t+'</button>';}
 function sw(on,act,arg){return '<span class="sw'+(on?" on":"")+'" data-act="'+act+'" data-arg="'+E(arg||"")+'" data-on="'+(on?1:0)+'"></span>';}
 function pct(p){return p==null?"—":'<span class="bar"><i style="width:'+Math.max(0,Math.min(100,p))+'%"></i></span> '+Math.round(p)+"%";}
 function render(){
@@ -183,7 +183,7 @@ function render(){
   h+=row("登录/登出",btn("Log in","cmd","dao.cascade.login")+" "+btn("Log Out","cmd","dao.cascade.logout"));
   h+=row("账户页",btn("Profile","cmd","dao.cascade.openProfile")+" "+btn("Changelog","cmd","dao.cascade.openChangelog"));
   h+=row("启动时打开最近会话",sw(!!st.openMostRecentChatConversation,"uset","openMostRecentChatConversation"),"官方 openMostRecentChatConversation 同源");
-  h+=row("Auto-Run 策略",'<span class="tag">'+E(D.autoRunPolicy||"Off")+'</span> '+btn("更改","cmd","dao.cascade.autoRunPolicy")+" "+btn("Allow/Deny List","cmd","dao.cascade.allowlist"),"官方档位 Off/Allowlist/Auto/Turbo · cascadeAutoExecutionPolicy 同名 · deny list 优先");
+  h+=row("Auto-Run 策略",'<span class="tag">'+E(D.autoRunPolicy||"Off")+'</span> '+btn("更改","cmd","dao.cascade.autoRunPolicy","Auto-run settings")+" "+btn("Allow/Deny List","cmd","dao.cascade.allowlist"),"官方档位 Off/Allowlist/Auto/Turbo · cascadeAutoExecutionPolicy 同名 · deny list 优先");
   h+='</div>';
   h+='<h2 id="s-plan">Plan</h2><div class="sub">套餐与配额(与官方账户卡同源)</div><div class="card">';
   h+=row("套餐",E(pi.planName||"—")+(pi.isTrial?' <span class="tag">Trial</span>':""));

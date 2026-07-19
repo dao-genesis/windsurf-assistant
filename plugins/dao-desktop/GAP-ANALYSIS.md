@@ -749,3 +749,9 @@ composer 附加钮官方同文: 附加上下文 → "Add Context", 附加图片 
 
 corpus MISS 消化: 用户消息气泡悬停新增 ✎ 编辑钮(官方同文 tooltip "Edit message"),
 点击回填 composer 并聚焦, 与回退/开分支钮同排。138/138 测试, v1.5.65。
+
+## R231 · 步卡取消钮/Auto-Run 设置入口 tooltip 官方同文
+
+corpus MISS 消化: 步卡取消钮 "取消此步骤(CancelCascadeSteps)" → 官方同文 "Cancel step";
+Settings 页 Auto-Run 策略"更改"钮加官方同文 tooltip "Auto-run settings"(btn 支持 tip 参)。
+139/139 测试, v1.5.66。
