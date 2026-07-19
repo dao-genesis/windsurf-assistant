@@ -842,3 +842,9 @@ commit <hash7>: <msg>, commits 官方图标; proto 真源 commitMessage/commitHa
 官方 proto 真源 GlobalBackgroundCommand(summary.backgroundCommands): 会话列表
 刷新时聚合全部运行中后台命令 → 面板内 "Background commands" 列表(命令行 +
 Stop 钮, 直通 CancelCascadeSteps{cascadeId,stepIndices})。152/152 测试, v1.5.79。
+
+## R245 · PARITY-PLAN 路线图对账刷新
+
+P0 七项(R236–R240)全量落地、P1 五项(R241–R244)落地对账入路线图, 剩余项
+(Pinned context/Settings 分区/agent-board 徽标/Queued 同文)与 P2 保持在案。
+v1.5.80。
