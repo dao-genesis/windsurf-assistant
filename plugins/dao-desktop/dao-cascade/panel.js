@@ -614,6 +614,16 @@ class CascadePanelProvider {
     if (st.gitCommit) { const gc = st.gitCommit;
       return { type: "git-card", id, toolCallId: "cx" + k,
         hash: (gc.commitHash || "").slice(0, 7), message: gc.commitMessage || "" }; }
+    // 官方式检查点卡: checkpoint{checkpointIndex}(官方同文 Created checkpoint N)
+    if (st.checkpoint) return { type: "memory-card", id, toolCallId: "cx" + k,
+      title: "Created checkpoint " + (st.checkpoint.checkpointIndex != null ? st.checkpoint.checkpointIndex : "") };
+    // 官方式部署卡: deployWebApp{subdomain,framework,deployment{projectUrl}}(官方同文 Deployment is live.)
+    if (st.deployWebApp) { const dw = st.deployWebApp, dep = dw.deployment || {};
+      const live = !!dep.projectUrl && /DONE/.test(st.status || "");
+      return { type: "deploy-card", id, toolCallId: "cx" + k,
+        title: live ? "Deployment is live." : ("Deploying app - " + (dw.subdomain || dw.projectPath || "")),
+        url: dep.projectUrl || "",
+        status: /DONE/.test(st.status || "") ? "completed" : /ERROR/.test(st.status || "") ? "failed" : "in_progress" }; }
     // EXIT_PLAN_MODE 步(Plan 模式产物): exitPlanMode{planFile,userRequested} → 计划就绪卡
     if (st.exitPlanMode) {
       const pf = st.exitPlanMode.planFile || "";
@@ -3885,6 +3895,20 @@ class CascadePanelProvider {
       const ic=document.createElement("span"); ic.innerHTML=OICONS.brain;
       const cm=document.createElement("span"); cm.className="cmd"; cm.textContent=m.title||"";
       hd.appendChild(ic); hd.appendChild(cm); el.appendChild(hd); logEl.scrollTop=logEl.scrollHeight;
+    }
+    else if(m.type==="deploy-card"){
+      // 官方式部署卡: Deployment is live. + View Deployment 钮
+      let el=logEl.querySelector('[data-tc="'+m.toolCallId+'"]');
+      if(!el){ if(emptyEl) emptyEl.remove(); el=document.createElement("div"); el.dataset.tc=m.toolCallId; logEl.appendChild(el); }
+      el.className="cmdcard "+(m.status||""); el.innerHTML="";
+      const hd=document.createElement("div"); hd.className="chead";
+      const ic=document.createElement("span"); ic.innerHTML=OICONS.globe;
+      const cm=document.createElement("span"); cm.className="cmd"; cm.textContent=m.title||"";
+      hd.appendChild(ic); hd.appendChild(cm);
+      if(m.url){ const b=document.createElement("button"); b.className="qchip"; b.style.cursor="pointer";
+        b.textContent="View Deployment"; b.onclick=()=>vscode.postMessage({type:"store-open", url:m.url});
+        hd.appendChild(b); }
+      el.appendChild(hd); logEl.scrollTop=logEl.scrollHeight;
     }
     else if(m.type==="git-card"){
       // 官方式提交卡: commits 图标 + Updated to commit <hash7>: <msg>
