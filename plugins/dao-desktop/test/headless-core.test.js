@@ -2942,3 +2942,11 @@ test("R224: Settings 页 Auto-Run 策略行 + 载荷字段", () => {
   assert.ok(src.includes("dao.cascade.autoRunPolicy") && src.includes("dao.cascade.allowlist"), "命令入口在位");
   assert.ok(src.includes('autoRunPolicy: (this._ctx && this._ctx.globalState.get("cascadeAutoExecutionPolicy"))'), "载荷字段在位");
 });
+
+// R225 · 运行占位官方同文。
+test("R225: Running... 运行占位官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('runp.textContent="Running..."'), "官方同文占位");
+  assert.ok(src.includes('.runp'), "占位样式在位");
+  assert.ok((src.match(/querySelector\(".runp"\)/g) || []).length >= 2, "双渠首帧移除在位");
+});
