@@ -712,3 +712,9 @@ cascadeAutoExecutionPolicy / cascadeAllowedCommands / cascadeDeniedCommands, 官
 list taking precedence"。RUN_COMMAND 待审步先过策略: 拒绝清单优先; Turbo 全放行; Auto 依
 LS shouldAutoRun; Allowlist 依允许清单命令头; 否则官方 Run/Skip 审批。新增
 dao.cascade.autoRunPolicy / .allowlist 命令与账号菜单入口。131/131 测试, v1.5.58。
+
+## R224 · Settings 页 General 区 Auto-Run 策略行
+
+Settings 整页 General 区新增 Auto-Run 策略行: 现值徽标(cascadeAutoExecutionPolicy 官方同名
+globalState) + 更改/Allow·Deny List 入口(直通 R223 命令)。载荷新增 autoRunPolicy 字段。
+132/132 测试, v1.5.59。
