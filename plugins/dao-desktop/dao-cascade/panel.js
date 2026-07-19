@@ -2587,6 +2587,8 @@ class CascadePanelProvider {
   .msg.user { position:relative; }
   .msgrevert { position:absolute; top:-8px; right:-6px; font-size:11px; padding:0 5px; border-radius:5px; border:1px solid var(--line); background:var(--vscode-sideBar-background); color:var(--dim); cursor:pointer; opacity:0; transition:opacity .12s; }
   .msg.user:hover .msgrevert { opacity:.9; }
+  .msgedit { position:absolute; top:-8px; right:46px; font-size:11px; padding:0 5px; border-radius:5px; border:1px solid var(--line); background:var(--vscode-sideBar-background); color:var(--dim); cursor:pointer; opacity:0; transition:opacity .12s; }
+  .msg.user:hover .msgedit { opacity:.9; }
   .msgbranch { position:absolute; top:-8px; right:20px; font-size:11px; padding:0 5px; border-radius:5px; border:1px solid var(--line); background:var(--vscode-sideBar-background); color:var(--dim); cursor:pointer; opacity:0; transition:opacity .12s; }
   .msg.user:hover .msgbranch { opacity:.9; }
   .msgcopy.done { color:var(--vscode-testing-iconPassed,#4caf50); }
@@ -3225,6 +3227,8 @@ class CascadePanelProvider {
     return Math.round(s/86400)+"d ago"; }
   function addMsg(role,text,images){ if(emptyEl) emptyEl.remove();
     const d=document.createElement("div"); d.className="msg "+role; d.textContent=text;
+    if(role==="user"&&text){ const ed=document.createElement("button"); ed.className="msgedit"; ed.title="Edit message"; ed.textContent="✎";
+      ed.onclick=(e)=>{ e.stopPropagation(); inputEl.value=text; autoGrow(); inputEl.focus(); }; d.appendChild(ed); }
     if(images&&images.length){ const strip=document.createElement("div"); strip.className="imgstrip";
       for(const u of images){ const t=document.createElement("div"); t.className="imgthumb";
         const im=document.createElement("img"); im.src=(typeof u==="string"?u:u.dataUrl); t.appendChild(im); strip.appendChild(t); }

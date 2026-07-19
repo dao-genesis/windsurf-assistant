@@ -2978,3 +2978,11 @@ test("R229: Add Context / Attachment 官方同文", () => {
   assert.ok(src.includes('id="plusBtn" title="Add Context"'), "Add Context 官方同文");
   assert.ok(src.includes('id="imgBtn" title="Attachment"'), "Attachment 官方同文");
 });
+
+// R230 · 用户消息 Edit message 官方同文钮。
+test("R230: Edit message 悬停钮 + 回填 composer", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('ed.title="Edit message"'), "官方同文 tooltip");
+  assert.ok(src.includes("inputEl.value=text; autoGrow(); inputEl.focus();"), "回填 composer 在位");
+  assert.ok(src.includes(".msg.user:hover .msgedit"), "悬停样式在位");
+});
