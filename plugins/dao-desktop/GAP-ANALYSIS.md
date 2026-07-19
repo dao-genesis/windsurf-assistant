@@ -617,3 +617,12 @@ UP/DN 常量, 渲染属性与官方容器一致。117/117 测试, v1.5.44。
 官方 Customizations 页头: title "Customizations" + description "Customize Cascade to get a
 better, more personalized experience."。插件 QuickPick 此前 placeholder 为自撰中文混排。
 本轮: QuickPick title/placeholder 官方同文。118/118 测试, v1.5.45。
+
+## R211 · 模型弹层 Order by 排序菜单官方同源(反提 workbench + LS 真源)
+
+官方 wMs 过滤行右端 settings-slider-ver 钮开排序菜单: "Order by" + clientModelSorts 选项
+(默认项不列, 点选中项复位), 分隔线下官方同文 "All models draw from your Devin ACU balance"
+(usesACUs 态)。数据真源: GetUserStatus → cascadeModelConfigData.clientModelSorts
+(Recommended/Provider/Cost, groups 按 modelLabels 官方序)。本轮: ls-bridge 新增
+listModelSorts(), host 直通 sorts 至 webview, 过滤行右端官方同源 slider 图标钮 + 排序菜单,
+选中排序时按官方 groups 分组渲染。119/119 测试, v1.5.46。

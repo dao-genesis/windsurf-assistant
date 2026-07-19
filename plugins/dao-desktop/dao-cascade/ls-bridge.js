@@ -445,6 +445,17 @@ async function callStream(method, body, onMessage, timeoutMs, cancelRef) {
 // disabled=false 者可用; 另回 creditMultiplier(倍率)与 disabledReason(Pro 门控原因)以 1:1 复刻官方模型选择器。
 // 每项本身即携 modelInfo.modelFamilyUid / modelFamilyMetadata(族标签+Effort/Thinking/Fast Mode/1M Context 维度)
 // / isRecommended / supportsImages —— 据此在选择器里按「模型族」分组并标注推荐/图像/维度(官方两级选择器同构)。
+// 官方排序菜单同源: GetUserStatus → cascadeModelConfigData.clientModelSorts(Recommended/Provider/Cost, groups 按 modelLabels)
+async function listModelSorts() {
+  const r = await call("GetUserStatus", {});
+  const sorts = (((r || {}).userStatus || {}).cascadeModelConfigData || {}).clientModelSorts || [];
+  return sorts.map((s) => ({
+    name: s.name || "",
+    isDefault: !!s.isDefault,
+    groups: (s.groups || []).map((g) => ({ name: g.groupName || "", labels: g.modelLabels || [] })),
+  }));
+}
+
 async function listModels() {
   const r = await call("GetUserStatus", {});
   const cfgs = (((r || {}).userStatus || {}).cascadeModelConfigData || {}).clientModelConfigs || [];
@@ -477,4 +488,4 @@ async function listModels() {
   });
 }
 
-module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels, seatCall, apiServerCall, devinSessionToken };
+module.exports = { call, callStream, ready, metadata, apiKey, apiKeyCandidates, setApiKey, isAuthError, isStaleEndpointError, refreshAuth, cascadeAuth, probeAlive, aliveSync, stateDbCandidates, driveStream, listModels, listModelSorts, seatCall, apiServerCall, devinSessionToken };
