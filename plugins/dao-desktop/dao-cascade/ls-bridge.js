@@ -480,6 +480,12 @@ async function listModels() {
       familyUid: ((c.modelInfo || {}).modelFamilyUid) || "",
       familyLabel: fm.modelFamilyLabel || "",
       recommended: !!c.isRecommended,
+      // 官方徽标真源: isBeta→Beta(带 betaWarningMessage tooltip), 否则 isNew→New; fastStatus.isActive→Fast
+      beta: !!c.isBeta,
+      betaMsg: c.betaWarningMessage || "",
+      isNew: !!c.isNew,
+      fast: !!((c.fastStatus || {}).isActive),
+      fastTip: ((c.fastStatus || {}).tooltip) || "",
       defaultInFamily: !!c.isDefaultModelInFamily,
       images: !!c.supportsImages,
       dims,

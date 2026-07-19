@@ -284,6 +284,7 @@ class CascadePanelProvider {
           family: m.familyUid || "",
           familyLabel: m.familyLabel || "",
           recommended: !!m.recommended,
+          beta: !!m.beta, betaMsg: m.betaMsg || "", isNew: !!m.isNew, fast: !!m.fast, fastTip: m.fastTip || "",
           images: !!m.images,
         })),
       }, {
@@ -2737,6 +2738,7 @@ class CascadePanelProvider {
   #modelSortMenu .smi:hover { background:var(--pill-hover); }
   #modelSortMenu .smi.on { color:var(--vscode-textLink-foreground); }
   #modelSortMenu .smsep { height:1px; background:var(--line); margin:4px 0; }
+  .mbadge { color:var(--vscode-textLink-foreground); font-size:10.5px; margin-left:4px; }
   #modelSortMenu .sminfo { padding:4px 10px; font-size:11px; color:var(--dim); max-width:200px; }
 </style></head><body>
   <div id="modetabs" style="display:flex;gap:2px;padding:4px 10px 0;font-size:11px;">
@@ -2864,6 +2866,10 @@ class CascadePanelProvider {
       const it=document.createElement("div"); it.className="mit"+(o.disabled?" dis":"")+(o.value===s.currentValue?" sel":"");
       const row=document.createElement("div"); row.className="mrow";
       const nm=document.createElement("span"); nm.className="mnm"; nm.textContent=modelLabel(o); row.appendChild(nm);
+      // 官方徽标语义(反提 workbench 真源): isBeta→Beta(betaWarningMessage tooltip), 否则 isNew→New; fastStatus→Fast(tooltip)
+      const badges=[]; if(o.beta) badges.push(["Beta",o.betaMsg]); else if(o.isNew) badges.push(["New",""]);
+      if(o.fast) badges.push(["Fast",o.fastTip]);
+      for(const [bl,bt] of badges){ const b=document.createElement("span"); b.className="mbadge"; b.textContent=bl; if(bt) b.title=bt; row.appendChild(b); }
       const cb=creditBadge(o.credit);
       if(cb){ const x=document.createElement("span"); x.className="mx"; x.textContent=cb.label; x.title=cb.tip; row.appendChild(x); }
       it.appendChild(row);
