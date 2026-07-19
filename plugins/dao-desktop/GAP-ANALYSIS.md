@@ -728,3 +728,8 @@ globalState) + 更改/Allow·Deny List 入口(直通 R223 命令)。载荷新增
 
 corpus MISS 消化: 重命名会话 → "Rename conversation", 移除会话 → "Delete conversation",
 模型 pill title "Model" → "Model Selector"(均官方 tooltip 逐字同文)。134/134 测试, v1.5.61。
+
+## R227 · 历史会话 QuickPick 官方同文占位 "Search sessions..."
+
+corpus MISS 消化: 历史会话 QuickPick 占位 "加载历史会话" → 官方同文 "Search sessions..."
+(matchOnDescription 同启)。135/135 测试, v1.5.62。

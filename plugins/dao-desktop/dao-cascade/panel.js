@@ -990,7 +990,7 @@ class CascadePanelProvider {
         description: s.updatedAt ? new Date(s.updatedAt).toLocaleString() : "",
         detail: s.cwd || "",
         sessionId: s.sessionId,
-      })), { placeHolder: "加载历史会话" });
+      })), { placeHolder: "Search sessions...", matchOnDescription: true }); // 官方同文占位
       if (pick) await this._handleSessionLoad(pick.sessionId);
     } catch (e) { vscode.window.showErrorMessage("历史会话加载失败: " + e.message); }
   }
