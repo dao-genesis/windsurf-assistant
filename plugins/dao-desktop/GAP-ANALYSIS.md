@@ -703,3 +703,12 @@ DeepWiki 卡头 📖 → 官方 book 同源 SVG(均经 OICONS/official-icons 全
 
 composer 🖼 emoji → 官方 images-1 逐字同源 SVG(official-icons)。麦克风钮官方 115 枚图标库
 无 mic 同源项, 诚实保留现状待后续官方源定位。130/130 测试, v1.5.57。
+
+## R223 · Auto-Run 策略官方四档语义(Off/Allowlist/Auto/Turbo)
+
+官方真源: jUs={DISABLED:"Off",OFF:"Allowlist",AUTO:"Auto",EAGER:"Turbo"}, 设置项官方同名
+cascadeAutoExecutionPolicy / cascadeAllowedCommands / cascadeDeniedCommands, 官方释义
+"Cascade auto-runs allowlisted commands and asks before denylisted ones, with the deny
+list taking precedence"。RUN_COMMAND 待审步先过策略: 拒绝清单优先; Turbo 全放行; Auto 依
+LS shouldAutoRun; Allowlist 依允许清单命令头; 否则官方 Run/Skip 审批。新增
+dao.cascade.autoRunPolicy / .allowlist 命令与账号菜单入口。131/131 测试, v1.5.58。
