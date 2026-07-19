@@ -2986,3 +2986,11 @@ test("R230: Edit message 悬停钮 + 回填 composer", () => {
   assert.ok(src.includes("inputEl.value=text; autoGrow(); inputEl.focus();"), "回填 composer 在位");
   assert.ok(src.includes(".msg.user:hover .msgedit"), "悬停样式在位");
 });
+
+// R231 · 步卡取消钮/Auto-Run 设置入口 tooltip 官方同文。
+test("R231: Cancel step / Auto-run settings 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('cx.title="Cancel step"'), "步卡取消官方同文");
+  const sp = fs.readFileSync(path.join(ROOT, "dao-cascade", "settings-page.js"), "utf8");
+  assert.ok(sp.includes('"Auto-run settings"'), "设置入口官方同文");
+});

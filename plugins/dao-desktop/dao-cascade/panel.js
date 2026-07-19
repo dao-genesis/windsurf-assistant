@@ -3654,7 +3654,7 @@ class CascadePanelProvider {
       const ti=document.createElement("span"); ti.className="tt"; ti.textContent=(el.dataset.kn?"["+el.dataset.kn+"] ":"")+(el.dataset.ti||m.toolCallId);
       hd.appendChild(st); hd.appendChild(ti);
       if(m.kindName==="cascade"&&m.status==="in_progress"&&typeof m.stepIndex==="number"){
-        const cx=document.createElement("button"); cx.className="stepcancel"; cx.textContent="✕"; cx.title="取消此步骤(CancelCascadeSteps)";
+        const cx=document.createElement("button"); cx.className="stepcancel"; cx.textContent="✕"; cx.title="Cancel step";
         cx.style.cssText="margin-left:auto;cursor:pointer;background:none;border:none;color:#8b949e;font-size:11px;";
         cx.onclick=(e)=>{ e.stopPropagation(); cx.remove(); vscode.postMessage({type:"cx-step-cancel", stepIndex:m.stepIndex}); };
         hd.appendChild(cx); }
