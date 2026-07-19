@@ -184,6 +184,9 @@ function render(){
   h+=row("登录/登出",btn("Log in","cmd","dao.cascade.login")+" "+btn("Log Out","cmd","dao.cascade.logout"));
   h+=row("账户页",btn("Profile","cmd","dao.cascade.openProfile")+" "+btn("Changelog","cmd","dao.cascade.openChangelog"));
   h+=row("启动时打开最近会话",sw(!!st.openMostRecentChatConversation,"uset","openMostRecentChatConversation"),"官方 openMostRecentChatConversation 同源");
+  h+=row("Allow Cascade in background",sw(!!st.allowCascadeInBackground,"uset","allowCascadeInBackground"),"官方同文 · Cascade keeps running when you switch conversations. Terminal commands may run in the background depending on your auto execution setting");
+  h+=row("Notify when Cascade finishes while running in the background",sw(!!st.enableCascadeAlwaysNotifyOnFinish,"uset","enableCascadeAlwaysNotifyOnFinish"),"官方 enableCascadeAlwaysNotifyOnFinish 同源");
+  h+=row("Auto-open edited files",sw(!st.disableAutoOpenEditedFiles,"usetInv","disableAutoOpenEditedFiles"),"官方 disableAutoOpenEditedFiles 反相同源 · Open files in the background if Cascade creates or edits them");
   h+=row("Auto-Run 策略",'<span class="tag">'+E(D.autoRunPolicy||"Off")+'</span> '+btn("更改","cmd","dao.cascade.autoRunPolicy","Auto-run settings")+" "+btn("Allow/Deny List","cmd","dao.cascade.allowlist"),"官方档位 Off/Allowlist/Auto/Turbo · cascadeAutoExecutionPolicy 同名 · deny list 优先");
   h+=row("Auto Web Requests",'<span class="tag">'+E(D.webAutoRunPolicy||"Disabled")+'</span> '+btn("更改","cmd","dao.cascade.webAutoRunPolicy","Auto Web Requests"),"官方档位 Disabled/Allowlist/Turbo · cascadeWebRequestsAutoExecutionPolicy 官方同名 · Always allow origin 入 cascadeUserAllowedWebOrigins");
   h+='</div>';
@@ -242,6 +245,7 @@ document.addEventListener("click",e=>{
   else if(act==="diag")vs.postMessage({type:"diagnostics"});
   else if(act==="btok")vs.postMessage({type:"bridge-token"});
   else if(act==="uset")vs.postMessage({type:"set-user-setting",key:arg,value:el.getAttribute("data-on")!=="1"});
+  else if(act==="usetInv")vs.postMessage({type:"set-user-setting",key:arg,value:el.getAttribute("data-on")==="1"});
   else if(act==="cfg")vs.postMessage({type:"set-config",key:arg,value:el.getAttribute("data-on")!=="1"});
 });
 window.addEventListener("message",e=>{const m=e.data;

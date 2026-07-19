@@ -822,3 +822,11 @@ memory "T", brain 官方图标)、RETRIEVE_MEMORY 检索卡(Listed N auto-genera
 memories / No auto-generated memories found)、GIT_COMMIT 提交卡(Updated to
 commit <hash7>: <msg>, commits 官方图标; proto 真源 commitMessage/commitHash)。
 149/149 测试, v1.5.76。
+
+## R242 · P1: Cascade 后台三开关(官方 UserSettings 真源)
+
+官方 UserSettings proto 真源三开关入设置页: allowCascadeInBackground(官方同文
+"Allow Cascade in background" + 官方 tooltip 同文)、enableCascadeAlwaysNotifyOnFinish
+(官方同文 "Notify when Cascade finishes while running in the background", 已接线:
+面板不可见完轮即系统通知)、disableAutoOpenEditedFiles(反相开关 usetInv)。
+150/150 测试, v1.5.77。

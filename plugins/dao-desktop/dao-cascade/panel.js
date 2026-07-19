@@ -2575,6 +2575,12 @@ class CascadePanelProvider {
           else if (grew && allDone && ++stable >= 3) { this._cascadeSeen = steps.length; break; }
         }
         this._post({ type: "assistant-done", id: msg.id, text: grew ? undefined : "(Cascade 无输出)" });
+        // 官方 enableCascadeAlwaysNotifyOnFinish: 后台完轮通知(面板不可见时)
+        try { if (!(this._view && this._view.visible)) {
+          const us = (await ls.call("GetUserSettings", {})).userSettings || {};
+          if (us.enableCascadeAlwaysNotifyOnFinish)
+            vscode.window.showInformationMessage("Cascade finished running in the background.");
+        } } catch (_) {}
         // 官方式 Continue response: 生成器调用达上限而停(num>=max) → 续写条(点击即发 "Continue")
         try { const tr2 = await ls.call("GetCascadeTrajectory", { cascadeId: this._cascadeLsId });
           const tj = (tr2 && tr2.trajectory) || {};
