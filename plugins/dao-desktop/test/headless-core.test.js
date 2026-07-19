@@ -2736,3 +2736,12 @@ test("R204: Try Devin Cloud 钮/云标官方 SVG 化", () => {
   assert.ok(p.includes("CLOUD_SVG"), "官方 cloud-simple SVG 常量在位");
   assert.ok(p.includes('fill-rule="evenodd"'), "官方路径属性同源(evenodd/currentColor)");
 });
+
+// R205 · 模型选择器过滤行官方同源(反提 workbench wMs/eA 真源)。
+test("R205: 模型过滤行官方占位 + magnifying-glass 同源 SVG", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('placeholder="Search all models"'), "官方占位 Search all models 同文");
+  assert.ok(!src.includes("搜索模型"), "非官方中文占位已替换");
+  assert.ok(src.includes('id="modelFilterRow"'), "过滤行容器在位(图标+输入)");
+  assert.ok(src.includes("M10.207 3.043"), "官方 magnifying-glass path 同源");
+});
