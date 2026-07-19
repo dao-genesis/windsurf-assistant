@@ -636,3 +636,11 @@ official-corpus/(strings.json/strings-ext.json/strings-coverage.tsv/icons-missin
 doc-urls.txt/rpc-ext.txt/rpc-wb.txt)。首批接线: mtShare→share-os, mtCustom→book,
 mtSettings→settings-gear-1, send→arrow-up, Local→macbook, folder→folder-1(全数官方同源
 替换 lucide 近似图标)。120/120 测试, v1.5.47。
+
+## R213 · 终端卡官方动作 + 官方 tooltip 批量同文(corpus 缺口首批消化)
+
+按 R212 corpus 缺口清单批量整合: ①终端卡 ⌘ emoji → 官方 console-simple 图标, 新增官方同文
+"Copy command"(剪贴板) 与 "Insert in terminal"(host 活动终端 sendText 不回车) 动作钮
+(square-behind-square-2 / arrow-corner-down-left 官方同源图标); ②变更卡 Accept/Reject
+tooltip → 官方同文 "Accept file"/"Reject file"; ③会话内查找钮 tooltip → 官方同文
+"Previous (Shift+Enter)"/"Next (Enter)"/"Close (Escape)"。121/121 测试, v1.5.48。
