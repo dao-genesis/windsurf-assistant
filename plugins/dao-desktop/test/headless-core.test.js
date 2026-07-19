@@ -3028,3 +3028,13 @@ test("R235: PARITY-PLAN 全量审计文档在位", () => {
   for (const s of ["RPC 面(169 官方", "步卡面(86 官方步型", "字符串面(337 MISS", "路线图", "ResolveOutstandingSteps", "Continue response"])
     assert.ok(t.includes(s), s + " 在位");
 });
+
+// R236 · web 步卡 + 建议回复 chips。
+test("R236: web-card / suggest-chips 在位", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("_cxWebCard(st, k, id)"), "宿主 web 卡在位");
+  assert.ok(src.includes('type: "web-card"') && src.includes('m.type==="web-card"'), "web-card 双端在位");
+  assert.ok(src.includes("sw.webSearchUrl") && src.includes("ru.resolvedUrl || ru.url"), "proto 字段真源");
+  assert.ok(src.includes('type: "suggest-chips"') && src.includes('m.type==="suggest-chips"'), "chips 双端在位");
+  assert.ok(src.includes("Searched web for "), "官方式文案在位");
+});
