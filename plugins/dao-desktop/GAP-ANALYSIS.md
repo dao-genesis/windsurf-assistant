@@ -760,3 +760,9 @@ Settings 页 Auto-Run 策略"更改"钮加官方同文 tooltip "Auto-run setting
 
 心跳节拍(60s→15s)并入 probeAlive 探活, 状态翻转即推 webview: 丢失展示官方同文横幅
 "Connection to language server lost. Reconnecting...", 恢复自动隐去。140/140 测试, v1.5.67。
+
+## R233 · 终端卡运行中 Stop command 官方同文钮
+
+corpus MISS 消化: RUN_COMMAND 步运行中(in_progress·无退出码)终端卡头新增停止钮(官方同文
+tooltip "Stop command"), 直通 CancelCascadeSteps 单步取消; cmd-card 载荷带 stepIndex。
+另: sync-official 对账重跑(官方 3.4.27 无漂移, 计数重写)。141/141 测试, v1.5.68。

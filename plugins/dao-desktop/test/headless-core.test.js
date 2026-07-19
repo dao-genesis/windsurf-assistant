@@ -3002,3 +3002,11 @@ test("R232: LS 连接横幅官方同文 + 探活推送", () => {
   assert.ok(src.includes('this._post({ type: "ls-conn", ok })'), "探活推送在位");
   assert.ok(src.includes('m.type==="ls-conn"'), "webview 处理在位");
 });
+
+// R233 · 终端卡 Stop command 官方同文钮。
+test("R233: Stop command 运行中停止钮 + stepIndex 载荷", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('sp.title="Stop command"'), "官方同文 tooltip");
+  assert.ok(src.includes('m.status==="in_progress"&&m.exitCode==null&&typeof m.stepIndex==="number"'), "运行中判据在位");
+  assert.ok(src.includes("stepIndex: k,\n      status: /DONE/"), "cmd-card stepIndex 载荷在位");
+});
