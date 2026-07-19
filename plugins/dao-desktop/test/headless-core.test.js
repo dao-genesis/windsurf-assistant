@@ -2778,3 +2778,13 @@ test("R208: 变更卡 Accept/Reject/Accepted/Rejected 官方同文", () => {
   assert.ok(src.includes('m.accept?"Accepted":"Rejected"'), "回执标签官方同文");
   assert.ok(!src.includes('m.accept?"已接受":"已拒绝"'), "中文回执标签已替换");
 });
+
+// R209 · 回合尾反馈钮官方同源(反提 workbench 真源: thumbs-up/thumbs-down)。
+test("R209: 反馈钮官方 thumbs-up/down path 同源", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("M11.170 2.062"), "thumbs-up path 逐字同源");
+  assert.ok(src.includes("M6.000 3.047"), "thumbs-down path 逐字同源");
+  assert.ok(src.includes('"Good response"'), "Good response 官方 tooltip 同文");
+  assert.ok(src.includes('"Bad response"'), "Bad response 官方 tooltip 同文");
+  assert.ok(!src.includes('d="M7 10v12"'), "非官方 lucide 描边路径已替换");
+});
