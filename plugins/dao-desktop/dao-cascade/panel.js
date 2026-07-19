@@ -3541,8 +3541,10 @@ class CascadePanelProvider {
       hd.appendChild(cpb); hd.appendChild(inb);
       if(m.cwd){ const w=document.createElement("span"); w.className="cwd"; w.textContent="in "+m.cwd; hd.appendChild(w); }
       if(m.exitCode!=null){ const e2=document.createElement("span"); e2.className="ec "+(m.exitCode===0?"ok":"bad");
-        e2.textContent=m.exitCode===0?"✓":"exit "+m.exitCode; hd.appendChild(e2); }
-      const bd=document.createElement("div"); bd.className="cbody"; bd.style.display="none"; bd.textContent=m.output||"(无输出)";
+        e2.textContent=m.exitCode===0?"✓":"exit "+m.exitCode;
+        e2.title=m.exitCode===0?"Ran terminal command":"Error running terminal command"; // 官方同文(Ddr 真源)
+        hd.appendChild(e2); }
+      const bd=document.createElement("div"); bd.className="cbody"; bd.style.display="none"; bd.textContent=m.output||"No output was captured."; // 官方同文
       hd.onclick=()=>{ const open=bd.style.display==="none"; bd.style.display=open?"":"none"; ch.textContent=open?"▾":"▸"; };
       el.appendChild(hd); el.appendChild(bd); logEl.scrollTop=logEl.scrollHeight;
     }

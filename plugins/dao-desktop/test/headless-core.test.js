@@ -2889,3 +2889,12 @@ test("R218: timeline emoji 全清 → 官方图标键", () => {
   assert.ok(src.includes("OICONS[it.icon]"), "webview 官方 SVG 渲染在位");
   assert.ok(!src.includes('icon: "⎇"') && !src.includes('icon: "💬"'), "timeline emoji 已全清");
 });
+
+// R219 · 终端卡结果语义官方同文。
+test("R219: Ran/Error running terminal command + No output was captured 官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"Ran terminal command"'), "done 官方同文");
+  assert.ok(src.includes('"Error running terminal command"'), "error 官方同文");
+  assert.ok(src.includes('"No output was captured."'), "空输出官方同文");
+  assert.ok(!src.includes("(无输出)"), "自撰空输出文案已替换");
+});

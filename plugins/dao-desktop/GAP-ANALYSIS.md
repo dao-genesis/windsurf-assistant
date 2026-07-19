@@ -681,3 +681,9 @@ isBeta/betaWarningMessage/isNew/fastStatus 四源, host config-options 透传, w
 轨迹 timeline 步列 8 类 emoji(⎇💬✦📄🔍✎⚑⚠) → 官方图标键(commits/bubble-5/devin-logo/
 file-text/magnifying-glass/pencil/flag-1/exclamation-triangle), 宿主发 icon 键, webview 经
 OICONS(official-icons 全量库)渲官方 SVG, 未知键回退文本。126/126 测试, v1.5.53。
+
+## R219 · 终端卡结果语义官方同文
+
+官方 Ddr 真源: done→"Ran terminal command", error→"Error running terminal command"。终端卡
+退出码徽标 tooltip 采官方同文; 空输出 "(无输出)" → 官方同文 "No output was captured."。
+127/127 测试, v1.5.54。
