@@ -2994,3 +2994,11 @@ test("R231: Cancel step / Auto-run settings 官方同文", () => {
   const sp = fs.readFileSync(path.join(ROOT, "dao-cascade", "settings-page.js"), "utf8");
   assert.ok(sp.includes('"Auto-run settings"'), "设置入口官方同文");
 });
+
+// R232 · LS 连接丢失横幅官方同文。
+test("R232: LS 连接横幅官方同文 + 探活推送", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes("Connection to language server lost. Reconnecting..."), "官方同文横幅");
+  assert.ok(src.includes('this._post({ type: "ls-conn", ok })'), "探活推送在位");
+  assert.ok(src.includes('m.type==="ls-conn"'), "webview 处理在位");
+});

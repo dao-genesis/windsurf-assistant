@@ -236,10 +236,15 @@ class CascadePanelProvider {
   _startHeartbeat() {
     if (this._hbTimer) return;
     const beat = () => {
-      try { const ls = require("./ls-bridge"); if (ls.ready()) ls.call("Heartbeat", {}).catch(() => {}); } catch (_) {}
+      try {
+        const ls = require("./ls-bridge");
+        if (ls.ready()) ls.call("Heartbeat", {}).catch(() => {});
+        // 官方式 LS 连接横幅: 探活结果推送 webview(丢失→"Connection to language server lost. Reconnecting...")
+        ls.probeAlive().then((ok) => { if (ok !== this._lsConnOk) { this._lsConnOk = ok; this._post({ type: "ls-conn", ok }); } }).catch(() => {});
+      } catch (_) {}
     };
     beat();
-    this._hbTimer = setInterval(beat, 60000);
+    this._hbTimer = setInterval(beat, 15000);
     if (this._view) this._view.onDidDispose(() => { clearInterval(this._hbTimer); this._hbTimer = null; });
   }
 
@@ -2582,6 +2587,7 @@ class CascadePanelProvider {
   code.fchip:hover { text-decoration:underline; color:var(--vscode-textLink-foreground); }
   /* 助手气泡悬停复制 */
   .msg.assistant { position:relative; }
+  #lsConn { font-size:11.5px; color:var(--vscode-inputValidation-warningForeground,#d7ba7d); background:var(--vscode-inputValidation-warningBackground,rgba(215,186,125,.12)); border-bottom:1px solid var(--line); padding:3px 10px; }
   .msgcopy { position:absolute; top:0; right:0; font-size:10px; padding:1px 6px; border-radius:5px; border:1px solid var(--line); background:var(--vscode-sideBar-background); color:var(--dim); cursor:pointer; opacity:0; transition:opacity .12s; }
   .msg.assistant:hover .msgcopy { opacity:.9; }
   .msg.user { position:relative; }
@@ -2775,6 +2781,7 @@ class CascadePanelProvider {
     <button id="mtSettings" title="Devin Settings 整页" style="border:none;background:transparent;color:var(--dim);cursor:pointer;padding:2px 6px;display:inline-flex;align-items:center;">${OI.svg("settings-gear-1",13)}</button>
     <button id="acctChip" title="账号 · 点击查看账户卡(官方顶栏头像同位)" style="display:none;border:none;background:#2ea3ff;color:#fff;cursor:pointer;width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:600;line-height:18px;padding:0;margin-left:4px;align-self:center;text-align:center;"></button>
   </div>
+  <div id="lsConn" style="display:none;">Connection to language server lost. Reconnecting...</div>
   <div id="convFind"><input id="cfIn" placeholder="Search conversation"><span class="cfc" id="cfCnt"></span><button id="cfPrev" title="Previous (Shift+Enter)">↑</button><button id="cfNext" title="Next (Enter)">↓</button><button id="cfClose" title="Close (Escape)">✕</button></div>
   <div id="tlPanel"><div class="tlh"><span id="tlTitle">Timeline</span><span id="tlBranch"></span><button id="tlRefresh" title="Refresh trajectory list">⟳</button><button id="tlClose" title="Close (Escape)">✕</button></div><div id="tlBody"></div></div>
   <div id="log">
@@ -3710,6 +3717,7 @@ class CascadePanelProvider {
       else if(m.act==="agentPicker") agentBtn.click();
       else if(m.act==="nextModel") document.dispatchEvent(new KeyboardEvent("keydown",{ctrlKey:true,shiftKey:true,key:"?",cancelable:true}));
     }
+    else if(m.type==="ls-conn"){ const b=document.getElementById("lsConn"); if(b) b.style.display=m.ok?"none":"block"; }
     else if(m.type==="thought-delta"){
       { const n0=findNode(m.id); if(n0){ const rp=n0.querySelector(".runp"); if(rp) rp.remove(); } }
       // 官方式可折叠思考块:流式中展开计时,答复开始后自动收起为「Thought for Ns」
