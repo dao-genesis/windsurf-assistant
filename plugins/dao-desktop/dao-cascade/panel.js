@@ -2847,6 +2847,10 @@ class CascadePanelProvider {
       const sep=document.createElement("div"); sep.className="smsep"; modelSortMenu.appendChild(sep); }
     const info=document.createElement("div"); info.className="sminfo";
     info.textContent="All models draw from your Devin ACU balance"; modelSortMenu.appendChild(info);
+    // 官方同文链接(非 ACU 态官方露出; 同菜单尾): Learn about models → docs.windsurf.com/windsurf/models
+    const lm=document.createElement("div"); lm.className="smi"; lm.textContent="Learn about models";
+    lm.onclick=()=>{ modelSortMenu.classList.remove("show"); vscode.postMessage({type:"store-open", url:"https://docs.windsurf.com/windsurf/models"}); };
+    modelSortMenu.appendChild(lm);
   }
   modelSortBtn.onclick=(e)=>{ e.stopPropagation();
     if(modelSortMenu.classList.contains("show")) return modelSortMenu.classList.remove("show");
