@@ -2,7 +2,7 @@
   "name": "dao-desktop",
   "displayName": "Devin Desktop",
   "description": "把官方 Devin Desktop 本体全量做成单一 VSIX 插件: 直接复用官方 codeium.windsurf(displayName \"Devin\")扩展本体 + Cascade 三模式面板(Cascade / Devin Cloud / Devin Local), 装进任意 VS Code 系 IDE 即得与官方一致的体感。与官方唯一差别: 从 IDE 本体降为一个插件, 功能 / 账号 / 模块 / 底层交互完全一致。",
-  "version": "1.5.74",
+  "version": "1.5.75",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "icon": "media/icon.png",
@@ -155,6 +155,10 @@
       {
         "command": "dao.cascade.autoRunPolicy",
         "title": "Devin Desktop: Auto-Run Policy (Off / Allowlist / Auto / Turbo)"
+      },
+      {
+        "command": "dao.cascade.webAutoRunPolicy",
+        "title": "DAO Cascade: Auto Web Requests 策略"
       },
       {
         "command": "dao.cascade.allowlist",

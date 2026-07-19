@@ -806,3 +806,11 @@ CortexStep* proto 真源。145/145 测试, v1.5.72。
 生成器调用达上限(numGeneratorInvocations>=maxGeneratorInvocations, 字段反提官方
 trajectory proto)而停轮时, 展示官方同文续写条 "Continue response"(官方 tooltip 同文),
 点击即发 "Continue"(官方 handleContinue 同语义)。147/147 测试, v1.5.74。
+
+## R240 · P0: Auto Web Requests 三档策略
+
+官方 CASCADE_WEB_REQUESTS_AUTO_EXECUTION_* 真源三档 Disabled/Allowlist/Turbo:
+webAutoRunPolicy 命令 + 设置页行(官方同名键 cascadeWebRequestsAutoExecutionPolicy);
+web 审批流按档自动放行(Turbo 全放行 / Allowlist 按 origin 清单, 官方同名键
+cascadeUserAllowedWebOrigins); "Always allow origin" 选项即时入清单持久化。
+148/148 测试, v1.5.75。

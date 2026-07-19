@@ -2496,6 +2496,17 @@ class CascadePanelProvider {
                 const url = (st.readUrlContent && (st.readUrlContent.url || st.readUrlContent.proposedUrl)) || "";
                 this._permPending = this._permPending || new Map();
                 const cid = this._cascadeLsId, kk = k;
+                // 官方 Auto Web Requests 三档: Disabled/Allowlist/Turbo(允许 origin 清单官方同名键)
+                const wpol = this._ctx.globalState.get("cascadeWebRequestsAutoExecutionPolicy") || "Disabled";
+                let origin = ""; try { origin = new URL(url).origin; } catch (_) {}
+                const worigins = this._ctx.globalState.get("cascadeUserAllowedWebOrigins") || [];
+                if (wpol === "Turbo" || (wpol === "Allowlist" && origin && worigins.includes(origin))) {
+                  ls.call("GetCascadeTrajectory", { cascadeId: cid }).then((tr) =>
+                    ls.call("HandleCascadeUserInteraction", { cascadeId: cid,
+                      interaction: { trajectoryId: ((tr && tr.trajectory) || {}).trajectoryId || "",
+                        stepIndex: kk, readUrlContent: { action: "READ_URL_CONTENT_ACTION_ALLOW_ONCE" } } }))
+                    .catch((e) => this._log("cascade: web 自动放行回传失败 " + e.message));
+                } else {
                 new Promise((resolve) => {
                   this._permPending.set(reqId, resolve);
                   // 官方同文: "Allow web request?" · 副文 "Cascade wants to fetch this URL"
@@ -2507,11 +2518,14 @@ class CascadePanelProvider {
                   const action = opt === "allow" ? "READ_URL_CONTENT_ACTION_ALLOW_ONCE"
                     : opt === "always" ? "READ_URL_CONTENT_ACTION_ALWAYS_ALLOW_ORIGIN"
                     : "READ_URL_CONTENT_ACTION_REJECT";
+                  if (opt === "always" && origin && !worigins.includes(origin))
+                    await this._ctx.globalState.update("cascadeUserAllowedWebOrigins", worigins.concat([origin]));
                   const tr = await ls.call("GetCascadeTrajectory", { cascadeId: cid });
                   const tid = ((tr && tr.trajectory) || {}).trajectoryId || "";
                   return ls.call("HandleCascadeUserInteraction", { cascadeId: cid,
                     interaction: { trajectoryId: tid, stepIndex: kk, readUrlContent: { action } } });
                 }).catch((e) => this._log("cascade: web 请求审批回传失败 " + e.message));
+                }
               }
             }
             // 官方式提问交互: ASK_USER_QUESTION 待答步 → 选项按钮 → askUserQuestion.response 回传
@@ -4277,6 +4291,16 @@ function register(context, log, opts) {
         { label: "Turbo", description: cur === "Turbo" ? "✓ 当前" : "", detail: "全部命令自动放行(官方 EAGER 档)" },
       ], { placeHolder: "Auto-Run 策略 · 当前: " + cur });
       if (pick) await context.globalState.update("cascadeAutoExecutionPolicy", pick.label);
+    }),
+    // 官方 Auto Web Requests 策略(CASCADE_WEB_REQUESTS_AUTO_EXECUTION_* 真源: Disabled/Allowlist/Turbo)
+    vscode.commands.registerCommand(viewId + ".webAutoRunPolicy", async () => {
+      const cur = context.globalState.get("cascadeWebRequestsAutoExecutionPolicy") || "Disabled";
+      const pick = await vscode.window.showQuickPick([
+        { label: "Disabled", description: cur === "Disabled" ? "✓ 当前" : "", detail: "每次 web 请求均需审批" },
+        { label: "Allowlist", description: cur === "Allowlist" ? "✓ 当前" : "", detail: "允许清单内 origin 自动放行(cascadeUserAllowedWebOrigins 官方同名)" },
+        { label: "Turbo", description: cur === "Turbo" ? "✓ 当前" : "", detail: "Allow all requests(全部自动放行)" },
+      ], { placeHolder: "Auto Web Requests · 当前: " + cur });
+      if (pick) await context.globalState.update("cascadeWebRequestsAutoExecutionPolicy", pick.label);
     }),
     vscode.commands.registerCommand(viewId + ".allowlist", async () => {
       const cur = (context.globalState.get("cascadeAllowedCommands") || []).join(" ");
