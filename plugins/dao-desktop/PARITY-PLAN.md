@@ -124,12 +124,13 @@ Memories / Plugins / Account。插件 settings-page.js 已覆盖 General(Auto-Ru
   (ResolveOutstandingSteps, R238) · web 步卡(R236) · MCP_TOOL 卡(R237) ·
   SUGGESTED_RESPONSES chips(R236) · TODO_LIST 卡(R237) · Auto Web Requests
   设置档(R240)。
-- **P1 — 大部落地(R241–R244)**: 记忆卡族(R241) · GIT_COMMIT 卡(R241) · Tags(R243) ·
-  Background Commands(R244) · Cascade 后台三开关(R242)。余: Pinned context
-  (需结构化 contextItems 改造) · Settings Tab/Terminal 区 · agent-board 徽标/筛选批 ·
-  Queued messages 官方同文补强。
-- **P2**: Codemap · Deploy · Checkpoint/Snapshot · 检索族卡合并 · notebook 族 ·
-  拖拽上下文 · 图标随卡入库 · 遥测类 RPC 甄别。
+- **P1 — 已全量落地(R241–R248)**: 记忆卡族(R241) · GIT_COMMIT 卡(R241) · Tags(R243) ·
+  Background Commands(R244) · Cascade 后台三开关(R242) · Settings Cascade 行为族 +
+  Terminal 分区(R247) · 会话行状态徽标(R248)。余: Pinned context(需结构化
+  contextItems 改造) · Queued messages 官方同文补强。
+- **P2 — 部分落地(R246·R249·R250)**: Checkpoint 卡(R246) · Deploy 卡(R246) ·
+  Codemap 卡(R249) · notebook 族/find code context/lint 卡(R250)。余: 检索族卡
+  合并 · 拖拽上下文 · Revert to this snapshot 交互 · 遥测类 RPC 甄别。
 - **不做(定位正交)**: Tab/Supercomplete 补全域、University Sandbox、组织管理后台大宗。
 
 *道法自然 · 无为而无不为*

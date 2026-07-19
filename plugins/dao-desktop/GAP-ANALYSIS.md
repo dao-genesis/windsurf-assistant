@@ -881,3 +881,8 @@ title,running_status}: 生成中官方同文 "Generating codemap…"(editingCode
 notebook <file>"、EDIT_NOTEBOOK "Edited Jupyter notebook <file>"、
 FIND_CODE_CONTEXT "Found code context: <term>"、LINT_FIX_MESSAGE "Found lint
 errors (N)"。157/157 测试, v1.5.85。
+
+## R251 · 路线图对账刷新(P1 全量收官 · P2 部分落地)
+
+P1 七项(R241–R248)全量收官入账; P2 四批(R246/R249/R250)落地入账; 剩余项
+(Pinned context/Queued 同文/检索族合并/拖拽上下文/Revert 交互)在案。v1.5.86。
