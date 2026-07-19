@@ -814,3 +814,11 @@ webAutoRunPolicy 命令 + 设置页行(官方同名键 cascadeWebRequestsAutoExe
 web 审批流按档自动放行(Turbo 全放行 / Allowlist 按 origin 清单, 官方同名键
 cascadeUserAllowedWebOrigins); "Always allow origin" 选项即时入清单持久化。
 148/148 测试, v1.5.75。
+
+## R241 · P1: 记忆卡族 + GIT_COMMIT 提交卡
+
+官方 workbench 真源同文: MEMORY 四动作卡(Created/Updated from-to/Deleted/Archived
+memory "T", brain 官方图标)、RETRIEVE_MEMORY 检索卡(Listed N auto-generated
+memories / No auto-generated memories found)、GIT_COMMIT 提交卡(Updated to
+commit <hash7>: <msg>, commits 官方图标; proto 真源 commitMessage/commitHash)。
+149/149 测试, v1.5.76。
