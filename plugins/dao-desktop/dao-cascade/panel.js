@@ -3455,9 +3455,10 @@ class CascadePanelProvider {
       if(na){ const b=document.createElement("span"); b.className="add"; b.textContent="+"+na; hd.appendChild(b); }
       if(nd){ const b=document.createElement("span"); b.className="del"; b.textContent="−"+nd; hd.appendChild(b); }
       if(m.status==="completed"&&!el.dataset.acked){
-        const ok=document.createElement("span"); ok.className="mi"; ok.title="接受此文件变更"; ok.textContent="✓"; ok.style.cssText="cursor:pointer;color:#4c4;";
+        // 官方同文(反提 workbench 真源): Accept / Reject 文字钮
+        const ok=document.createElement("span"); ok.className="mi"; ok.title="接受此文件变更"; ok.textContent="Accept"; ok.style.cssText="cursor:pointer;color:#4c4;font-size:11px;";
         ok.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"cx-ack", file:m.file, accept:true, created:!!m.created}); };
-        const no=document.createElement("span"); no.className="mi"; no.title="拒绝此文件变更"; no.textContent="✗"; no.style.cssText="cursor:pointer;color:#c55;";
+        const no=document.createElement("span"); no.className="mi"; no.title="拒绝此文件变更"; no.textContent="Reject"; no.style.cssText="cursor:pointer;color:#c55;font-size:11px;";
         no.onclick=(ev)=>{ ev.stopPropagation(); vscode.postMessage({type:"cx-ack", file:m.file, accept:false, created:!!m.created}); };
         hd.appendChild(ok); hd.appendChild(no); }
       const bd=document.createElement("div"); bd.className="dbody"; bd.style.display="none";
@@ -3467,13 +3468,13 @@ class CascadePanelProvider {
       el.appendChild(hd); el.appendChild(bd); logEl.scrollTop=logEl.scrollHeight;
     }
     else if(m.type==="cx-acked"){
-      // 存档回执: 变更卡标记 已接受/已拒绝, 隐藏 ✓/✗
+      // 存档回执: 变更卡标记 Accepted/Rejected(官方同文), 隐藏 Accept/Reject 钮
       for(const el of logEl.querySelectorAll(".diffcard")){
         const fn=el.querySelector(".fn"); if(!fn||fn.title!==m.file) continue;
         el.dataset.acked="1";
         for(const b of el.querySelectorAll(".mi")) b.remove();
         const tag=document.createElement("span"); tag.className="ec "+(m.accept?"ok":"bad");
-        tag.textContent=m.accept?"已接受":"已拒绝"; el.querySelector(".dhead").appendChild(tag); }
+        tag.textContent=m.accept?"Accepted":"Rejected"; el.querySelector(".dhead").appendChild(tag); }
     }
     else if(m.type==="browse-card"){
       // 官方式检索/浏览卡: Analyzed/Searched/Read + 官方同源图标(folder-open/magnifying-glass/file-text) + 计数徽标, 点击展开明细, 文件名可点开
