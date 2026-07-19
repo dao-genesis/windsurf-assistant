@@ -2859,3 +2859,16 @@ test("R215: timeline 宿主→webview 接线 + 官方同文", () => {
   assert.ok(src.includes("No trajectory steps available"), "空态官方同文");
   assert.ok(src.includes('OI.svg("timeslot"'), "官方 timeslot 图标接线");
 });
+
+// R216 · Beta/New/Fast 官方徽标同源。
+test("R216: 模型徽标 isBeta/isNew/fastStatus 真源直通 + 官方语义渲染", () => {
+  const lsSrc = fs.readFileSync(path.join(ROOT, "dao-cascade", "ls-bridge.js"), "utf8");
+  assert.ok(lsSrc.includes("beta: !!c.isBeta"), "isBeta 直通");
+  assert.ok(lsSrc.includes("betaMsg: c.betaWarningMessage"), "betaWarningMessage 直通");
+  assert.ok(lsSrc.includes("isNew: !!c.isNew"), "isNew 直通");
+  assert.ok(lsSrc.includes("fastStatus"), "fastStatus 直通");
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('badges.push(["Beta",o.betaMsg]); else if(o.isNew) badges.push(["New",""])'), "官方 Beta 优先于 New 语义");
+  assert.ok(src.includes('if(o.fast) badges.push(["Fast",o.fastTip])'), "Fast 徽标 + tooltip 同源");
+  assert.ok(src.includes(".mbadge"), "徽标样式在位");
+});

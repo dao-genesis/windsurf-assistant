@@ -660,3 +660,11 @@ mtTimeline 钮(官方 timeslot 同源图标, tooltip 官方同文 "Open trajecto
 #tlPanel 面板并发 timeline-list; 新增 type:"timeline" 渲染器(branch 头 + 步行列表), 刷新钮
 tooltip 官方同文 "Refresh trajectory list", 空态官方同文 "No trajectory steps available"。
 123/123 测试, v1.5.50。
+
+## R216 · 模型弹层 Beta/New/Fast 官方徽标同源
+
+官方真源(反提 workbench): xMs/kMs/TMs 徽标配置 {label:"Beta"|"New"|"Fast",
+className:"text-text-accent-primary"}; 语义 isBeta→Beta(betaWarningMessage 为 tooltip),
+否则 isNew→New; fastStatus.isActive→Fast(fastStatus.tooltip)。ls-bridge listModels 直通
+isBeta/betaWarningMessage/isNew/fastStatus 四源, host config-options 透传, webview mkIt
+渲 .mbadge(accent 色)徽标, tooltip 同源。124/124 测试, v1.5.51。
