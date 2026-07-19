@@ -2713,8 +2713,8 @@ class CascadePanelProvider {
   <div id="log">
     <div class="empty" id="empty">
       <div class="logo"><svg width="64" height="37" viewBox="0 0 512 297" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M507.28 0.142623H502.4C476.721 0.10263 455.882 20.899 455.882 46.5745V150.416C455.882 171.153 438.743 187.95 418.344 187.95C406.224 187.95 394.125 181.851 386.945 171.613L280.889 20.1391C272.089 7.56133 257.77 0.0626373 242.271 0.0626373C218.091 0.0626373 196.332 20.6191 196.332 45.9946V150.436C196.332 171.173 179.333 187.97 158.794 187.97C146.634 187.97 134.555 181.871 127.375 171.633L8.69966 2.12228C6.01976 -1.71705 0 0.182617 0 4.8618V95.426C0 100.005 1.39995 104.444 4.01984 108.204L120.815 274.995C127.715 284.853 137.895 292.172 149.634 294.831C179.013 301.51 206.052 278.894 206.052 250.079V145.697C206.052 124.961 222.851 108.164 243.59 108.164H243.65C256.15 108.164 267.87 114.263 275.049 124.501L381.125 275.955C389.945 288.552 403.524 296.031 419.724 296.031C444.443 296.031 465.622 275.455 465.622 250.099V145.677C465.622 124.941 482.421 108.144 503.16 108.144H507.3C509.9 108.144 512 106.044 512 103.445V4.8418C512 2.24226 509.9 0.142623 507.3 0.142623H507.28Z"/></svg></div>
-      <div class="ttl" id="emptyTtl">Cascade Code <span style="white-space:nowrap"><span class="kbd">Ctrl</span><span class="kbd">.</span></span></div>
-      <div class="sub">Kick off a new project. Make changes across your entire codebase.</div>
+      <div class="ttl" id="emptyTtl"><b>Cascade</b> <span id="emptyModeName">Code</span> <span style="white-space:nowrap"><span class="kbd">Ctrl</span><span class="kbd">.</span></span></div>
+      <div class="sub" id="emptySub">Kick off a new project. Make changes across your entire codebase.</div>
       <button id="tryCloud" class="trycloud" title="切换到 Devin Cloud agent">☁ Try Devin Cloud</button>
       <div id="recent">
         <div class="rhead"><span>Recent sessions</span><span class="va" id="viewAll">View all</span></div>
@@ -2848,11 +2848,19 @@ class CascadePanelProvider {
   authcode.addEventListener("keydown",(e)=>{ if(e.key==="Enter") authsubmit.onclick(); });
   // 官方式模式下拉(同 R100 模型弹层): 行=名称 + description 副行
   let modeOpts=[], modeVal=null;
-  const emptyTtl=document.getElementById("emptyTtl");
+  const emptyModeName=document.getElementById("emptyModeName"), emptySub=document.getElementById("emptySub");
+  // 官方空态副题随模式同文(反提 workbench Ydr 真源: DEFAULT/READ_ONLY/PLANNING/AUTO 四态)
+  const MODE_SUBS={Code:"Kick off a new project. Make changes across your entire codebase.",
+    Ask:"Ask questions. Get suggestions. Plan your next move.",
+    Plan:"Plan changes before implementing.",Planning:"Plan changes before implementing.",
+    Testing:"Build and validate. Test your changes automatically end-to-end."};
   function modeBtnSync(){ const o=modeOpts.find(x=>x.value===modeVal);
     modeBtn.textContent=o?(o.name||o.value):(modeVal||"模式"); modeBtn.title=o&&o.description?o.description:"Session Mode";
-    // 官方式空态标题随模式同步: "Cascade Code" / "Cascade Ask" / "Cascade Plan"
-    if(emptyTtl&&agent==="cascade"&&o) emptyTtl.firstChild.textContent="Cascade "+(o.name||"")+" "; }
+    // 官方式空态标题/副题随模式同步: <b>Cascade</b> Code|Ask|Planning|Testing + 各态官方同文副题
+    // (官方 picker label "Plan" 在空态标题呈 "Planning", Ydr 真源)
+    if(agent==="cascade"&&o){ const tw={Plan:"Planning"}[o.name]||o.name||"";
+      if(emptyModeName) emptyModeName.textContent=tw;
+      if(emptySub&&MODE_SUBS[o.name]) emptySub.textContent=MODE_SUBS[o.name]; } }
   function modeSet(opts,cur){ modeOpts=opts; modeVal=cur; modeBtnSync(); }
   function modeMenuClose(){ modeMenu.classList.remove("show"); }
   function modeMenuRender(){ modeList.innerHTML="";

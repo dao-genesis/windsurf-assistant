@@ -560,3 +560,11 @@ R196 曾把 chat-client 快捷键提示项 `{id:"focus-input",text:"Focus input"
 new-chat/megaplan/conversation-mention 同属提示项枚举)误当作 placeholder, 造成插件失焦显
 "Focus input (Ctrl+L)"、聚焦显 "Ask anything" 的双态错位。本轮纠偏: 占位统一为官方同文静态串,
 去除 focus/blur 切换监听。110/110 测试, v1.5.37。
+
+## R203 · 空态标题/副题官方四态同文(反提 workbench Ydr 真源)
+
+官方空态(Ydr)按模式四态: **Cascade**(粗体) Code/Ask/Planning/Testing + 各态专属副题
+(Code=Kick off a new project…; Ask=Ask questions. Get suggestions. Plan your next move.;
+Planning=Plan changes before implementing.; Testing=Build and validate…end-to-end.)。
+插件此前标题不加粗、副题恒为 Code 态。本轮: 标题 <b>Cascade</b> + 模式词(picker label
+"Plan" 空态呈官方 "Planning"), 副题随模式官方同文切换。111/111 测试, v1.5.38。

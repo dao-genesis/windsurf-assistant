@@ -2715,3 +2715,14 @@ test("R201: 头像菜单官方同构(实机反提菜单项/官方 URL 真源)", 
   assert.ok(src.includes("/auth/windsurf/continue"), "Usage 官方 getDevinViewUsageUrl 同构");
   assert.ok(src.includes('_handleAvatarCmd'), "宿主侧命令路由在位");
 });
+
+// R203 · 空态标题/副题官方四态同文(反提 workbench Ydr 真源)。
+test("R203: 空态标题粗体 Cascade + 副题随模式官方同文", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('<b>Cascade</b> <span id="emptyModeName">'), "标题 Cascade 粗体 + 模式词分离");
+  assert.ok(src.includes('id="emptySub"'), "副题元素可随模式更新");
+  assert.ok(src.includes("Ask questions. Get suggestions. Plan your next move."), "Ask 态官方同文副题");
+  assert.ok(src.includes("Plan changes before implementing."), "Plan 态官方同文副题");
+  assert.ok(src.includes("Build and validate. Test your changes automatically end-to-end."), "Testing 态官方同文副题");
+  assert.ok(src.includes('{Plan:"Planning"}'), "Plan→Planning 官方空态标题词映射");
+});
