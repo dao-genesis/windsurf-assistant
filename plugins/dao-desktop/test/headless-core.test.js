@@ -3065,3 +3065,15 @@ test("R239: Continue response 官方同文 + 上限判据", () => {
   assert.ok(src.includes('inputEl.value="Continue"'), "官方 handleContinue 同语义");
   assert.ok(src.includes("cut short due to length limits"), "官方 tooltip 同文");
 });
+
+// R240 · Auto Web Requests 三档策略。
+test("R240: Auto Web Requests 官方同名键 + 三档自动放行", () => {
+  const src = fs.readFileSync(path.join(ROOT, "dao-cascade", "panel.js"), "utf8");
+  assert.ok(src.includes('"cascadeWebRequestsAutoExecutionPolicy"'), "官方同名策略键");
+  assert.ok(src.includes('"cascadeUserAllowedWebOrigins"'), "官方同名 origin 清单键");
+  assert.ok(src.includes('wpol === "Turbo" || (wpol === "Allowlist"'), "三档自动放行判据");
+  const sp = fs.readFileSync(path.join(ROOT, "dao-cascade", "settings-page.js"), "utf8");
+  assert.ok(sp.includes('"Auto Web Requests"'), "设置页行在位");
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  assert.ok(pkg.contributes.commands.some((c) => c.command === "dao.cascade.webAutoRunPolicy"), "命令注册在位");
+});

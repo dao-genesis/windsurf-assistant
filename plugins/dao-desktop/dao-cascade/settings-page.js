@@ -126,6 +126,7 @@ class SettingsPagePanel {
       config: { autoBackup: !!cfg.get("dao.cascade.autoBackup"), backupDir: cfg.get("dao.cascade.backupDir") || "" },
       cloudReady, version, lsPort,
       autoRunPolicy: (this._ctx && this._ctx.globalState.get("cascadeAutoExecutionPolicy")) || "Off",
+      webAutoRunPolicy: (this._ctx && this._ctx.globalState.get("cascadeWebRequestsAutoExecutionPolicy")) || "Disabled",
     });
   }
 
@@ -184,6 +185,7 @@ function render(){
   h+=row("账户页",btn("Profile","cmd","dao.cascade.openProfile")+" "+btn("Changelog","cmd","dao.cascade.openChangelog"));
   h+=row("启动时打开最近会话",sw(!!st.openMostRecentChatConversation,"uset","openMostRecentChatConversation"),"官方 openMostRecentChatConversation 同源");
   h+=row("Auto-Run 策略",'<span class="tag">'+E(D.autoRunPolicy||"Off")+'</span> '+btn("更改","cmd","dao.cascade.autoRunPolicy","Auto-run settings")+" "+btn("Allow/Deny List","cmd","dao.cascade.allowlist"),"官方档位 Off/Allowlist/Auto/Turbo · cascadeAutoExecutionPolicy 同名 · deny list 优先");
+  h+=row("Auto Web Requests",'<span class="tag">'+E(D.webAutoRunPolicy||"Disabled")+'</span> '+btn("更改","cmd","dao.cascade.webAutoRunPolicy","Auto Web Requests"),"官方档位 Disabled/Allowlist/Turbo · cascadeWebRequestsAutoExecutionPolicy 官方同名 · Always allow origin 入 cascadeUserAllowedWebOrigins");
   h+='</div>';
   h+='<h2 id="s-plan">Plan</h2><div class="sub">套餐与配额(与官方账户卡同源)</div><div class="card">';
   h+=row("套餐",E(pi.planName||"—")+(pi.isTrial?' <span class="tag">Trial</span>':""));
