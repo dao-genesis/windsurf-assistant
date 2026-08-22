@@ -1,0 +1,6 @@
+*.vsix
+*.bak
+*.bak-*
+_pack_vsix.ps1
+_verify_vsix.ps1
+.vscodeignore

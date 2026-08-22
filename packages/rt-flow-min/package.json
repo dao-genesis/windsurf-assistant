@@ -1,0 +1,476 @@
+{
+  "name": "rt-flow-min",
+  "displayName": "RT Flow · Min · 道法自然 · 专一版",
+  "description": "v3.16.2 之专一版 · 万法归宗 · 大部分功能 · 局部运行 · 双环境适配 (Windsurf + Devin Desktop) · 多账号轮转 / 对话追踪 / 标题实时 / 全量备份 / 卡住通知 · 软编码一切 · 道并行而不相悖",
+  "version": "3.16.2",
+  "publisher": "devaid",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dao-genesis/windsurf-assistant",
+    "directory": "packages/rt-flow-min"
+  },
+  "homepage": "https://github.com/dao-genesis/windsurf-assistant",
+  "icon": "media/icon.png",
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "windsurf",
+    "devin",
+    "cascade",
+    "wam",
+    "rt-flow",
+    "dao",
+    "account",
+    "rotate",
+    "stuck-detect",
+    "backup",
+    "minimal",
+    "道法自然",
+    "专一"
+  ],
+  "activationEvents": [
+    "*",
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "rt-flow-min runs in all workspaces"
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wam-container",
+          "title": "RT Flow",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "wam-container": [
+        {
+          "id": "wam.panel",
+          "name": "Manager",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "wam.openEditor",
+        "title": "Open Panel",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.status",
+        "title": "Status",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.switchAccount",
+        "title": "Switch Account",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.panicSwitch",
+        "title": "Emergency Switch",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.refreshAll",
+        "title": "Refresh All",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.addAccount",
+        "title": "Add Account",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.injectToken",
+        "title": "Inject Token (auth1/session/JWT/email-pair · loginViaToken 全栈)",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.addToken",
+        "title": "Add Token (万法归一·任意 token/凭据·入完整管理流)",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.verifyAll",
+        "title": "Verify & Clean",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.scanExpiry",
+        "title": "Scan Expiry",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.healthCheck",
+        "title": "Health Check",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.clearBlacklist",
+        "title": "Clear Blacklist",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.clearAllInUse",
+        "title": "Clear All In-Use Locks",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.clearAllHealth",
+        "title": "Clear All Health Data",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.endpointHealth",
+        "title": "Show Quota Endpoint Health",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.toggleAutoRotate",
+        "title": "Toggle Auto-Rotate",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.show",
+        "title": "Show Output Log",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.setModeWam",
+        "title": "WAM Mode",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.setModeOfficial",
+        "title": "Official Login Mode",
+        "category": "RT Flow"
+      }
+    ],
+    "configuration": {
+      "title": "RT Flow Min",
+      "properties": {
+        "wam.accountsFile": {
+          "type": "string",
+          "default": "",
+          "description": "账号库文件路径 (默认 ~/.wam/accounts.md · 每行一个账号 email password)"
+        },
+        "wam.autoRotate": {
+          "type": "boolean",
+          "default": true,
+          "description": "自动轮转 (发消息后自动切到下一健康号)"
+        },
+        "wam.autoSwitchThreshold": {
+          "type": "number",
+          "default": 5,
+          "description": "自动切号阈值 (effQuota < 此值触发)"
+        },
+        "wam.scanIntervalMs": {
+          "type": "number",
+          "default": 10000,
+          "description": "扫描间隔 (ms)"
+        },
+        "wam.preferYi": {
+          "type": "boolean",
+          "default": false,
+          "description": "优先 Yi 模型"
+        },
+        "wam.notifyLevel": {
+          "type": "string",
+          "default": "notify",
+          "enum": [
+            "silent",
+            "notify",
+            "warn",
+            "critical"
+          ],
+          "description": "通知级别"
+        },
+        "wam.startupDelayMs": {
+          "type": "number",
+          "default": 3500,
+          "description": "启动延迟 (ms)"
+        },
+        "wam.invisible": {
+          "type": "boolean",
+          "default": false,
+          "description": "隐身模式 (不显示状态栏)"
+        },
+        "wam.rotatePeriodMs": {
+          "type": "number",
+          "default": 0,
+          "description": "定时轮转周期 (ms · 0=禁用)"
+        },
+        "wam.verify.parallel": {
+          "type": "number",
+          "default": 3,
+          "description": "并行验证数"
+        },
+        "wam.verify.gapMs": {
+          "type": "number",
+          "default": 250,
+          "description": "验证间隔 (ms)"
+        },
+        "wam.verify.staleMin": {
+          "type": "number",
+          "default": 30,
+          "description": "验证结果过期分钟数"
+        },
+        "wam.autoVerifyOnStartupMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "启动后自动验证延迟 (ms)"
+        },
+        "wam.autoVerifyPeriodMs": {
+          "type": "number",
+          "default": 1800000,
+          "description": "周期自动验证 (ms)"
+        },
+        "wam.predictiveThreshold": {
+          "type": "number",
+          "default": 25,
+          "description": "预测切号阈值"
+        },
+        "wam.switchCooldownMs": {
+          "type": "number",
+          "default": 15000,
+          "description": "两次自动切号最小间隔 (ms)"
+        },
+        "wam.waitResetHours": {
+          "type": "number",
+          "default": 3,
+          "description": "距重置 N 小时内等待重置而非切号"
+        },
+        "wam.rotateOnEveryMessage": {
+          "type": "boolean",
+          "default": true,
+          "description": "每条消息自动切号"
+        },
+        "wam.inUseLockMs": {
+          "type": "number",
+          "default": 120000,
+          "description": "In-Use 锁时长 (ms)"
+        },
+        "wam.quotaPulseMinDelta": {
+          "type": "number",
+          "default": 0.3,
+          "description": "额度脉冲最小变化"
+        },
+        "wam.quotaPulsePriorityMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "额度脉冲优先级窗口 (ms)"
+        },
+        "wam.walDetect": {
+          "type": "boolean",
+          "default": true,
+          "description": "WAL 检测 (vscdb 高水位保护)"
+        },
+        "wam.walEdgeMinBytes": {
+          "type": "number",
+          "default": 512,
+          "description": "WAL 边缘最小字节"
+        },
+        "wam.walPollMs": {
+          "type": "number",
+          "default": 300,
+          "description": "WAL 轮询间隔 (ms)"
+        },
+        "wam.quotaDeltaEnable": {
+          "type": "boolean",
+          "default": true,
+          "description": "额度增量检测"
+        },
+        "wam.quotaDeltaCreditsMin": {
+          "type": "number",
+          "default": 1,
+          "description": "额度增量最小 credits"
+        },
+        "wam.quotaDeltaDailyMin": {
+          "type": "number",
+          "default": 0.3,
+          "description": "额度增量最小日百分比"
+        },
+        "wam.perMessageMinIntervalMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "每消息最小间隔 (ms)"
+        },
+        "wam.walEdgeCooldownMs": {
+          "type": "number",
+          "default": 2000,
+          "description": "WAL 边缘冷却 (ms)"
+        },
+        "wam.walWarmupMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "WAL 预热 (ms)"
+        },
+        "wam.preferOverageFirst": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extra Usage 账号绝对优先"
+        },
+        "wam.expiryFirst": {
+          "type": "boolean",
+          "default": true,
+          "description": "临期账号 (<60天) 加分优先消耗"
+        },
+        "wam.creditsThreshold": {
+          "type": "number",
+          "default": 1000,
+          "description": "credits 阈值"
+        },
+        "wam.creditsInScore": {
+          "type": "boolean",
+          "default": true,
+          "description": "credits 计入评分"
+        },
+        "wam.hubNotifyCooldownMs": {
+          "type": "number",
+          "default": 300000,
+          "description": "Hub 通知冷却 (ms)"
+        },
+        "wam.hubNotifyGlobalCdMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "Hub 通知全局冷却 (ms)"
+        },
+        "wam.hubRenotifyIntervalMs": {
+          "type": "number",
+          "default": 300000,
+          "description": "Hub 重复通知间隔 (ms)"
+        },
+        "wam.hubDataStaleMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "Hub 数据过期 (ms)"
+        },
+        "wam.autoBackupStartDelayMs": {
+          "type": "number",
+          "default": 8000,
+          "description": "自动备份启动延迟 (ms)"
+        },
+        "wam.incrementalBackupDebounceMs": {
+          "type": "number",
+          "default": 3000,
+          "description": "增量备份防抖 (ms)"
+        },
+        "wam.stuckNotify": {
+          "type": "boolean",
+          "default": true,
+          "description": "卡住通知开关"
+        },
+        "wam.conversationBackupDir": {
+          "type": "string",
+          "default": "",
+          "description": "对话备份目录 (默认 ~/.wam/conversation_backups/)"
+        },
+        "wam.autoSwitchDailyMin": {
+          "type": "number",
+          "default": 5,
+          "description": "日额度最低门槛 (D<5% 不进候选池)"
+        },
+        "wam.autoSwitchWeeklyMin": {
+          "type": "number",
+          "default": 3,
+          "description": "周额度最低门槛 (W≤3% 非干旱不进候选)"
+        },
+        "wam.zeroQuotaRetickMs": {
+          "type": "number",
+          "default": 300,
+          "description": "零额度账号紧急重触延迟 (ms)"
+        },
+        "wam.creditsBypassQuotaGate": {
+          "type": "boolean",
+          "default": false,
+          "description": "credits 绕过额度门 (false=Cascade 模式 W=0 必切)"
+        },
+        "wam.hardExhaustWatchdogMs": {
+          "type": "number",
+          "default": 2000,
+          "description": "硬耗尽看门狗周期 (ms · 0=禁用)"
+        },
+        "wam.streamStaleMaxSec": {
+          "type": "number",
+          "default": 1800,
+          "description": "streaming 真死透剔除阈值 (s · 0=永不剔除)"
+        },
+        "wam.notifyOnStaleStream": {
+          "type": "boolean",
+          "default": true,
+          "description": "陈旧 streaming 通知"
+        },
+        "wam.notifyOnAwaitingUser": {
+          "type": "boolean",
+          "default": false,
+          "description": "等待用户通知"
+        },
+        "wam.broadcastDebounceMs": {
+          "type": "number",
+          "default": 200,
+          "description": "广播防抖 (ms)"
+        },
+        "wam.engineSingletonAgeMs": {
+          "type": "number",
+          "default": 90000,
+          "description": "引擎单实例老化窗口 (ms)"
+        },
+        "wam.engineHeartbeatMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "引擎心跳周期 (ms)"
+        },
+        "wam.recentConvWindowMs": {
+          "type": "number",
+          "default": 300000,
+          "description": "近期对话窗口 (ms)"
+        },
+        "wam.streamingFreshMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "streaming 新鲜窗口 (ms)"
+        },
+        "wam.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "显式 Python 路径 (空=自动探测 · 适配万家系统)"
+        },
+        "wam.multiInstance": {
+          "type": "boolean",
+          "default": false,
+          "description": "多实例隔离 (道生一一生二 · 邻邦相望·鸡狗之声相闻)"
+        },
+        "wam.wamHome": {
+          "type": "string",
+          "default": "",
+          "description": "WAM 数据目录 (默认 ~/.wam)"
+        },
+        "wam.codeiumDataDir": {
+          "type": "string",
+          "default": "",
+          "description": "Codeium 数据目录 (多实例 cascade 隔离)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "pack": "powershell -ExecutionPolicy Bypass -File _pack_vsix.ps1",
+    "verify": "powershell -ExecutionPolicy Bypass -File _verify_vsix.ps1"
+  }
+}
