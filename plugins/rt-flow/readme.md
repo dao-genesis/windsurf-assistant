@@ -302,10 +302,15 @@ LICENSE.txt             MIT
 
 ## 九 · 版本历史（精要）
 
-> 当前版本 `3.16.0`；下表为早期里程碑摘要，完整历史见 [changelog.md](changelog.md)。
+> 当前版本 `4.32.1`；下表为里程碑摘要，完整历史见 [changelog.md](changelog.md)。
 
 | 版本 | 日期 | 核心 |
 |------|------|------|
+| **v4.32.1** | 2026-08-25 | ★★ 切换账号根治 8-25 实证：命令检测不缓存 + devin.* 优先 + 路丁直写前备份 + 600s 追踪窗口 + OLD_REACTIVE + _pbGrowthActive + helper v3.16.1 |
+| v4.30.0 | 2026-08 | 守柔·止血：破坏性自动化一律默认关 · 出库唯归零 $0 |
+| v4.26.12 | 2026-07-11 | 下载位置可配置 wam.downloadDir · 富媒体本地化 · 备份=不可变档案 |
+| v3.16.4 | 2026-08-25 | Devin Desktop 适配根治：vscdbStatus=unknown + .pb 增长 = 活跃 · 追踪窗口 180s→600s |
+| v3.16.3 | 2026-08 | 命令检测失败不缓存 · devin.* 优先 · 路丁 vscdb 直写前备份 |
 | **v3.11.9** | 2026-05-28 | ★ Python 探测七层兜底（适配 launcher/Python.org/Microsoft Store/Anaconda）+ wam.pythonPath 软编码 |
 | v3.11.8 | 2026-05-28 | 用户主权强化（v15.1）：真实标题 + streamingList X 主权 + 陈旧通知 |
 | v3.11.7 | 2026-05-28 | 对话识别根治（v15.0）：5min 硬过滤 → 30min 软窗 + _isStale 字段 |

@@ -2,6 +2,76 @@
 
 > 反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无. —— 帛书《老子》德经
 
+## v4.32.1 (2026-08-25) · 切换账号根治 8-25 实证修复全量移植 (extension.js + dao_stuck.js + _vscdb_helper.py)
+
+> 2026-08-25 本地部署版实证根治「切换账号失效」系列问题, 全量移植回本源。
+> 天下莫柔弱于水 — .pb 增长是最诚实的活跃证据 · 不依赖 IDE 内部状态。
+
+### 改动
+- **命令检测不缓存** (extension.js `_detectAuthCommands`): 检测失败/异常不再缓存 `windsurf`
+  误判结果, 返回 null 允许后续重试 —— 根治「窗口激活早期内置扩展命令未注册完 → 误判 windsurf
+  → 路丙永远用不存在的 windsurf.* 命令 → 路丁 vscdb 直写破坏登录态」。
+- **devin.\* 优先** (extension.js `_getAuthCommand`): 未确认 (null) 时优先 devin.* 候选
+  (Devin Desktop 实测 `devin.provideWindsurfAuthTokenToAuthProvider` 存在可用)。
+- **路丁直写前备份** (extension.js): vscdb 直写前自动备份 `state.vscdb` 到
+  `~/.wam/vscdb-backups/` · 万一写入不被 IDE 接受可恢复。
+- **OLD_REACTIVE** (dao_stuck.js): 老对话重新活跃 (.pb mtime 更新) → 重置计时归零,
+  根治「用户打开旧对话 → staleSec 巨大 → 误报 WARN_STUCK」。
+- **_pbGrowthActive** (dao_stuck.js): vscdbStatus=unknown 时以 .pb 增长为活跃信号
+  (Devin Desktop 不写 metadataCache → vscdbStatus 恒 unknown → 对话追踪完全失效)。
+- **600s 追踪窗口 + 思考期保护** (dao_stuck.js): 追踪窗口 180s→600s ·
+  180-600s 内更新 = AI 思考期 → 保持 streaming 不报卡住 · 仅 >600s 未更新才进卡住检测。
+- **_vscdb_helper.py v3.16.1**: metadataCache 缺失时扫描 `sessioninfo.session.*` 独立 key
+  兜底 (根治标题全失明 → UI 显示「对话 #短UUID」)。
+
+## v4.31.0 (2026-08-xx) · 归零自动化默认开 (对齐手机 APK)
+
+> 桌面端默认开启「归零账号 备份→清理→出库」自动化, 与手机端同源同逻辑。
+> 闭合「备份→清理→出库」整套循环: 额度彻底归零的账号在全量备份后自动清理出库。
+
+## v4.30.0 (2026-08-xx) · 守柔·止血: 破坏性自动化一律默认关
+
+> 守柔曰强 — 破坏性自动化(自动清理/归零移除/闲置触发)一律默认关·显式勾选才开;
+> 出库唯归零 $0 (手动按钮同阈)。残留 $0.x 有效号不误出。
+
+## v4.29.0 (2026-08-xx) · 出库阈值默认 0
+
+> 守柔·止血: 出库阈值默认 0 (仅额度真正归零 $0 才出库) —— 旧默认对齐清理阈值 ($3)。
+> 用户显式配置仍优先。
+
+## v4.26.12 (2026-07-11) · 下载位置可配置: wam.downloadDir (devin_cloud.js + extension.js · 对齐手机 APK 下载管理)
+
+> 网页内下载此前硬编码落 `~/.dao/downloads`(系统盘)。写盘(out 层 daoSaveDownload)与
+> 读清单(宿主 ⬇下载悬浮窗)分居两处代码, 各自硬编码, 改位置极易失联。
+
+### 改动
+- `resolveDownloadsDir(cfgDir)`: 下载目录单一来源解析器 —— `wam.downloadDir` 配置优先,
+  空则回落 `~/.dao/downloads`(默认不变·不孤立既有下载)。devin_cloud 无 vscode 依赖, 宿主传入配置串。
+- `_daoDownloadsDir()`(extension.js): 悬浮窗清单读取改经同一解析器, 保证「写盘」「读清单」恒同址。
+- 新增 `wam.downloadDir` 配置项(rt-flow 与 dao-vsix 双端)。
+
+## v4.26.11 (2026-07-11) · 富媒体本地化: 修「备份对话图片/视频过期打不开」(devin_cloud.js · 对齐手机 APK 附件预热)
+
+> 对话正文里的图片/视频/音频多为预签 S3/attachments URL —— 会过期或需登录,
+> 备份的 对话.html/对话.md 时过境迁便成死链。对齐手机 APK 附件预热/媒体缓存思路。
+
+### 改动
+- `localizeConvMedia`: 备份时把正文媒体 URL(图/视频/音频·每对话上限 40)下载进 `<对话夹>/media/`,
+  文件名 = URL 指纹前 8 位 + 原名(去重免重下·增量友好); app.devin.ai 域带账号 auth 头。
+- `applyMediaMap`: HTML 按转义形态(`&`→`&amp;`)、MD 按原样把 URL 改指本地相对路径;
+  单条下载失败保留原 URL(不阻备份)。`_meta.json` 记 `mediaFiles` 数。
+
+## v4.26.10 (2026-07-10) · 备份=不可变档案: 修「账号归零/出库后本地备份随账号消失」(devin_cloud.js)
+
+> 实盘取证: 备份本体从未被删, "消失"全在列表侧 `listBackups` 盲区。出库链路本就不碰备份目录。
+
+### 改动
+- `_scanConvEntries`: 无 `_meta.json` 的旧格式对话文件夹凭正文(`对话.md`/`对话.html`)即计入,
+  标题据文件夹名合成、尾段短 ID 反查 devinId; 不再整个跳过。
+- `listBackups`: 聚合主根 + home 旧根(`~/.wam/devin_cloud_backups`) + 历史持久化根
+  (`backup_root.json`), 同名账号跨根合并(对话按 name 去重·主根优先) —— 备份根切盘后旧根永不隐身。
+- 账号目录名含 `@` 且无 `.account.json` 时回填 email, 按号检索(_dvLocalOverview)不再失配。
+
 ## v4.26.5 (2026-06-28) · 近期对话(☁)精简至最近 34 条(项③·对齐手机 APK)
 
 > 「近期对话」tab 此前无上限地渲染整份 `DAO_REC`(宿主已限 80 条),列表过长成负担。
