@@ -1319,6 +1319,23 @@ function scan() {
       state.conversations[uuid] = entry;
     }
 
+    // v3.16.3-wam · 老对话重新活跃: .pb mtime 更新 → 重置 lastGrowth
+    //   缺陷: ignoreAge 过滤的 old 分支不更新 lastGrowth
+    //   → 老对话重新活跃 (用户打开旧对话) → staleSec 巨大 → 误报 WARN_STUCK
+    //   修复: state==="old" 且 .pb mtime 比记录新 → 视为新一轮活跃 · 计时归零
+    if (entry.state === "old" && st.mtimeMs > (entry.mtime || 0)) {
+      entry.lastGrowth = t;
+      entry.stuckTicks = 0;
+      entry.errorTicks = 0;
+      entry._turnGrowth = 0;
+      entry._awaitingUser = false;
+      entry.activeSinceTs = t; // 新一轮 → 保护期重新计时
+      entry.state = "tracking";
+      log(
+        "OLD_REACTIVE uuid=" + shortId(uuid) + " mtimeDelta=" + Math.round((st.mtimeMs - (entry.mtime || 0)) / 1000) + "s",
+      );
+    }
+
     // 更新标题 (vscdb 为准 · 备份缓存兜底)
     if (title) entry.title = title;
     // v13.0: 备份缓存兜底 — vscdb无标题时从预加载缓存补充 (彻底消除UUID显示)
@@ -1370,10 +1387,18 @@ function scan() {
     //   层一: vscdb 确认 active + .pb 停滞 → 真卡住 (100% 确定)
     //   层二: vscdb 确认 end_turn/error → 不是卡住 (已结束)
     //   层三: vscdb=n/a → 不知则不妄为 ("不出于户，以知天下" → 不可能，只有诚实的 "vscdb=n/a 我不知道")
+    // v3.16.4 · Devin Desktop 适配根治 (2026-08-25 实证):
+    //   根因: Devin Desktop 不写 metadataCache (vscdb 无此 key) · sessioninfo 独立 key 无 status 字段
+    //         → vscdbStatus 恒为 "unknown" → active=0 → 对话追踪完全失效 (用户感知: 追踪数 < 实际数)
+    //   治法: vscdbStatus=unknown 时以 .pb 增长为活跃信号 (grew=true = AI 正在流式输出)
+    //         unknown + 停滞 → 不报卡住 (无法确认 AI 是否在响应 · 知不知尚矣)
+    //   道: 天下莫柔弱于水 — .pb 增长是最诚实的活跃证据 · 不依赖 IDE 内部状态
+    const _pbGrowthActive = vscdbStatus === "unknown" && grew;
 
-    if (vscdbStatus === "active") {
+    if (vscdbStatus === "active" || _pbGrowthActive) {
       // Windsurf 确认 AI 应该在响应 → 这是唯一能确认卡住的情况
-      entry.lastKnownVscdbStatus = "active"; // v11: 持久化已知状态 (修复fallback从未生效的bug)
+      // Devin 适配: unknown + .pb 增长 → 同样视为活跃 (AI 在输出)
+      entry.lastKnownVscdbStatus = vscdbStatus === "active" ? "active" : "pb-growth";
       entry.lastVscdbActiveTs = t; // v11: WAL保护时间戳
       entry.errorTicks = 0; // v12.3: 恢复活跃·重置 error 确认计数
       // v12.1: 追踪本轮 turn 开始时刻 (用户发消息 → vscdb 从非active转为active的那一刻)
@@ -1538,11 +1563,87 @@ function scan() {
           newState = "error";
           summary.error++;
         } else {
-          // 无历史 → 保持前态
-          newState = entry.state === "init" ? "streaming" : entry.state;
-          if (grew) {
-            summary.streaming++;
-            entry.stuckTicks = 0;
+          // v3.16.3-wam · Devin 1.126.0 无 metadataCache → 纯 .pb 模式
+          //   原理: .pb mtime 是可靠活跃信号 (AI 响应中 → 持续写入 → mtime 更新)
+          //   活跃判定: .pb 最近 90s 内更新过 或 本轮增长 > 0
+          //   卡住检测: 活跃后停滞 > warn/crit 阈值 → warning/stuck
+          //   防误报: 与 vscdb active 主路径相同的 INITIAL_SEND_GRACE / _awaitingUser 保护
+          // v3.16.4 · 追踪窗口 180s→600s (2026-08-25 实证根治):
+          //   根因: AI 响应间隔常 >3min (思考/工具调用/长任务) · 180s 窗口过窄
+          //         → 同一时刻仅 2-4 个对话在窗口内 → 追踪数 < 实际运行数
+          //   治法: 600s (10min) 追踪窗口 · 180-600s 内更新 = AI 思考期 → 保持 streaming 不报卡住
+          //         仅 >600s 未更新才进入卡住检测 · 正常完成 (AI 输出>4KB) 走 _awaitingUser 永不误报
+          const _pbIdleSec = Math.round((t - st.mtimeMs) / 1000);
+          const _pbActive = _pbIdleSec < 600 || grew; // v3.16.4 · 180s→600s 追踪窗口
+          if (_pbActive) {
+            // v3.16.3-wam · 不设置 lastKnownVscdbStatus (vscdb 专用字段)
+            //   缺陷: 设置后 _cached==="active" → 走 vscdb fallback → 永不卡住检测
+            entry.errorTicks = 0;
+            if (!entry.activeSinceTs) entry.activeSinceTs = t;
+            summary.active++;
+            if (grew || staleSec < CFG.warnThreshold) {
+              newState = "streaming";
+              summary.streaming++;
+              entry.stuckTicks = 0;
+              entry._awaitingUser = false;
+            } else if (entry._awaitingUser) {
+              newState = "streaming";
+              summary.streaming++;
+              entry.stuckTicks = 0;
+            } else if ((entry._turnGrowth || 0) > AWAITING_USER_THRESHOLD) {
+              entry._awaitingUser = true;
+              entry.stuckTicks = 0;
+              newState = "streaming";
+              summary.streaming++;
+            } else if (_pbIdleSec > 180) {
+              // v3.16.4 · 思考期保护: 180-600s 内更新过但当前停滞
+              //   AI 可能正在思考/工具调用/长任务 · 不报卡住 · 保持 streaming
+              //   根因: 旧逻辑 180s 窗口外直接进卡住检测 → AI 思考期误报 warning/stuck
+              newState = "streaming";
+              summary.streaming++;
+              entry.stuckTicks = 0;
+            } else if (staleSec < CFG.critThreshold) {
+              entry.stuckTicks = (entry.stuckTicks || 0) + 1;
+              const inGrace = nowMs() - _startupTs < STARTUP_GRACE;
+              if (entry.stuckTicks >= 2 && !inGrace) {
+                newState = "warning";
+                summary.stuck++;
+              } else {
+                newState = "streaming";
+                summary.streaming++;
+              }
+            } else {
+              entry.stuckTicks = (entry.stuckTicks || 0) + 1;
+              const inGrace = nowMs() - _startupTs < STARTUP_GRACE;
+              if (entry.stuckTicks >= 2 && !inGrace) {
+                newState = "stuck";
+                summary.stuck++;
+              } else {
+                newState = "warning";
+                summary.stuck++;
+              }
+            }
+          } else {
+            // .pb 很久没更新 → 不冻结状态 · 继续按 staleSec 检测卡住
+            //   v3.16.3-wam: 原"保持前态"在窗口外冻结 streaming
+            //   → 保护期 (STARTUP_GRACE) 内未转 stuck 的对话永远不报
+            //   修复: lastGrowth 存在且停滞超 crit → 继续 stuck 检测
+            if (entry.lastGrowth && staleSec > CFG.critThreshold) {
+              entry.stuckTicks = (entry.stuckTicks || 0) + 1;
+              const inGrace = nowMs() - _startupTs < STARTUP_GRACE;
+              if (entry.stuckTicks >= 2 && !inGrace) {
+                newState = "stuck";
+                summary.stuck++;
+              } else {
+                newState = "warning";
+                summary.stuck++;
+              }
+            } else if (grew) {
+              summary.streaming++;
+              entry.stuckTicks = 0;
+            } else {
+              newState = entry.state === "init" ? "streaming" : entry.state;
+            }
           }
         }
       } else {

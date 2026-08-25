@@ -15,6 +15,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const zlib = require("zlib");
+const crypto = require("crypto");
 
 // ── 路径 (与 rt-flow 共用 ~/.wam 根) ──────────────────────────────────────
 const WAM_DIR = path.join(os.homedir(), ".wam");
@@ -131,6 +132,14 @@ function getOptimalBackupRoot() {
     fs.writeFileSync(DC_BACKUP_ROOT_STATE, JSON.stringify({ v: DC_BACKUP_STATE_V, root, chosenAt: Date.now(), sysDrive: sys, freeBytes: cands[0].free }));
   } catch (e) {}
   return (_backupDefaultCache = root);
+}
+// 下载落盘目录解析(单一来源·out 层与 rt-flow 宿主共用, 保证写/读同址):
+//   wam.downloadDir 显式配置优先 → 否则 ~/.dao/downloads (默认不变, 不孤立既有下载)。
+//   宿主各自读 vscode 配置后把字符串传入(devin_cloud 无 vscode 依赖)。
+function resolveDownloadsDir(cfgDir) {
+  const c = String(cfgDir || "").trim();
+  if (c) return c;
+  return path.join(os.homedir(), ".dao", "downloads");
 }
 // 显式记录选择(供迁移后钉住目标盘·使后续启动走快路径不再查盘)。
 function setBackupRoot(root) {
@@ -369,7 +378,8 @@ async function rawRequest(method, targetUrl, headers, body, timeoutMs, agentOver
   let lastErr;
   for (let attempt = 0; attempt <= max; attempt++) {
     try {
-      const res = await _rawRequestOnce(method, targetUrl, headers, body, timeoutMs, agentOverride);
+      // 瞬断重试时钉 IPv4(国内 IPv6 到 AWS 黑洞/TLS 被掐) + 新 socket(不复用被污染连接)
+      const res = await _rawRequestOnce(method, targetUrl, headers, body, timeoutMs, attempt > 0 ? false : agentOverride, attempt > 0);
       // 429/5xx: 状态码层面的暂时性故障 — 退避后重试 (遵从 Retry-After), 而非当作
       // 「请求已失败」直接上抛。这正是多账号预载/普查时 login 误报 LOGIN_FAIL 的根因。
       if (_isRetryableStatus(res.status, method) && attempt < maxRl) {
@@ -385,7 +395,7 @@ async function rawRequest(method, targetUrl, headers, body, timeoutMs, agentOver
   }
   throw lastErr;
 }
-function _rawRequestOnce(method, targetUrl, headers, body, timeoutMs, agentOverride) {
+function _rawRequestOnce(method, targetUrl, headers, body, timeoutMs, agentOverride, forceV4) {
   return new Promise((resolve, reject) => {
     let u;
     try {
@@ -478,7 +488,8 @@ function _rawRequestOnce(method, targetUrl, headers, body, timeoutMs, agentOverr
         path: u.pathname + u.search,
         headers: hdrs,
         timeout: tout,
-        agent: agentOverride || (isHttps ? _httpsAgent : _httpAgent),
+        agent: agentOverride === false ? false : (agentOverride || (isHttps ? _httpsAgent : _httpAgent)),
+        family: forceV4 ? 4 : undefined,
         rejectUnauthorized: false,
       },
       isHttps ? https : http,
@@ -617,6 +628,16 @@ async function createSession(auth, prompt, opts) {
   if (opts.repos) payload.repos = opts.repos;
   if (opts.sessionSecrets) payload.session_secrets = opts.sessionSecrets;
   if (opts.idempotencyKey) payload.idempotency_key = opts.idempotencyKey;
+  // 官方环境模式(逆向自 app.devin.ai SPA): 新对话运行环境 additional_args.platform ∈
+  //   {linux,windows,macos} + 顶层 platform_explicitly_set; 只作用于新建对话, 不动运行中的对话。
+  if (opts.platform) {
+    const s = String(opts.platform).toLowerCase();
+    const pf = (s === "windows" || s === "win") ? "windows"
+      : (s === "macos" || s === "mac" || s === "osx" || s === "darwin") ? "macos" : "linux";
+    payload.additional_args = payload.additional_args || {};
+    payload.additional_args.platform = pf;
+    payload.platform_explicitly_set = true;
+  }
   const r = await jsonRequest("POST", CFG.apiBase + "/sessions", authHeaders(auth), payload);
   if (r.status === 200 || r.status === 201) {
     const j = r.json || {};
@@ -801,9 +822,19 @@ async function getMessageLimit(auth) {
 }
 
 // 从 billing 提取「可用余额(美元)」 · 返回 null = 无法判定(调用方禁止据此做破坏性自动清理)
-// 实测 Devin billing/status 字段: available_credits / overage_credits(可负=已欠) /
-//   has_subscription_or_credits(布尔权威) / is_subscription_valid。
+// 实测 Devin billing/status 字段: available_credits / overage_credits /
+//   has_subscription_or_credits(布尔权威) / is_subscription_valid / billing_error。
 // 旧 v4.4.0 读 prompt_credits/flow_credits(后端根本不返回)→ 健康号被误判 $0 → 误触发 wipe。
+//
+// overage_credits 双符号实证归一(正本清源): ① 正值=可用余额(rioskolton +33.27 实测·v4.4.1);
+//   ② 负值=以负号记账的「Remaining balance」(v3.0 实证: <0 且 billing_error 为空 = 有实际额度·幅值即美金)。
+//   旧法 max(0, overage) 把负值账态的真实余额抹 0 → 满额号被读成小残值 → 单话上限被钉成 $4 类诡异小数。
+//   归一: 幅值即余额 — 负值仅当伴 billing_error(真欠费)才计 0。
+function overageBalance(oc, billingError) {
+  if (typeof oc !== "number" || !isFinite(oc)) return 0;
+  if (oc < 0) return billingError ? 0 : -oc;
+  return oc;
+}
 function billingBalance(billing) {
   if (!billing) return null;
   const b = billing.billing || billing;
@@ -816,7 +847,7 @@ function billingBalance(billing) {
   };
   const avail = num("available_credits", "availableCredits");
   const overage = num("overage_credits", "overageCredits");
-  const dollars = (avail || 0) + Math.max(0, overage || 0);
+  const dollars = (avail || 0) + (overage === null ? 0 : overageBalance(overage, b.billing_error));
   // 权威布尔: 明确有订阅/有额度 → 视为充足, 绝不当作低额触发清理
   if (b.has_subscription_or_credits === true || b.is_subscription_valid === true) {
     return dollars > 0 ? dollars : 9999;
@@ -1748,6 +1779,29 @@ async function backupConversationsBundle(auth, sessList, outDir, opts) {
 }
 
 // 备份某账号全部对话 (增量) → <root>/<账号名>/
+// 非本人「自动化对话」判定 — 与手机 APK devin-cloud.js isAutoConv 同源(唯一真源):
+//   只认可靠结构化信号(onboarding/自动化标签·playbook·automation 字段·样板仓名),
+//   绝不用「动词起头/超短名」等标题启发式(否则本人英文对话被误判)。
+const DC_AUTO_REPO = /\b(blog-drafts|notes|dotfiles|code-snippets|utils-py|learn-cs)-\d+/i;
+const DC_AUTO_TAG = /^(auto|automation|automated|batch|scheduled|schedule|cron|bot|onboarding)\b|自动/i;
+function isAutoConv(x) {
+  try {
+    const s = (x && typeof x === "object") ? x : null;
+    const title = s ? String(s.title || s.name || s.prompt || s.devin_id || s.session_id || s.id || "") : String(x == null ? "" : x);
+    if (s) {
+      const tags = s.tags || s.session_tags || (s.session && s.session.tags) || [];
+      if (Array.isArray(tags)) for (let i = 0; i < tags.length; i++)
+        if (DC_AUTO_TAG.test(String(tags[i] && tags[i].name || tags[i]))) return true;
+      if (s.playbook_id || s.playbookId) return true;
+      if (s.is_automated === true || s.created_by_automation === true || s.origin === "automation" || s.trigger_type === "scheduled" || s.source === "automation") return true;
+    }
+    const t = title.trim();
+    if (!t) return false;
+    if (DC_AUTO_REPO.test(t)) return true;
+    return false;
+  } catch (e) { return false; }
+}
+
 async function backupAccount(auth, opts) {
   opts = opts || {};
   const root = opts.targetDir || DC_BACKUP_DEFAULT;
@@ -1755,10 +1809,12 @@ async function backupAccount(auth, opts) {
   const accountDir = resolveAccountDir(root, auth, opts);
   const r = await listSessions(auth, 1000);
   const sessions = r.sessions || [];
-  const result = { ok: true, account: auth.email, dir: accountDir, total: sessions.length, backedUp: 0, skipped: 0, failed: 0, items: [] };
+  const result = { ok: true, account: auth.email, dir: accountDir, total: sessions.length, backedUp: 0, skipped: 0, skippedAuto: 0, failed: 0, items: [] };
   for (let i = 0; i < sessions.length; i++) {
     prog("备份 " + (i + 1) + "/" + sessions.length + " ...");
     try {
+      // 自动化对话不进新备份, 只跳过不删 —— 历史备份数据一律不动(与手机 APK 同源)。
+      if (isAutoConv(sessions[i])) { result.skippedAuto++; result.skipped++; result.items.push({ devinId: sessions[i] && (sessions[i].session_id || sessions[i].id) || "", skipped: true, reason: "auto-conv" }); continue; }
       const one = await backupOneConversation(auth, sessions[i], accountDir, opts);
       result.items.push(one);
       one.skipped ? result.skipped++ : result.backedUp++;
@@ -2212,6 +2268,61 @@ function _mdToHtml(escaped) {
   return s;
 }
 
+// ── 富媒体本地化 (对齐手机 APK 附件预热/媒体缓存) ────────────────────────────
+//   对话正文里的图片/视频/音频远程 URL(预签 S3/attachments 会过期或需登录)下载进
+//   <对话夹>/media/, HTML 与 MD 同步改指本地相对路径 → 过期/离线后仍可加载显示。
+//   单条失败保留原 URL(不阻备份); 已下载过的按 URL 指纹命中即免重下(增量)。
+const _RE_MEDIA_URL = /https?:\/\/[^\s"'<>()\[\]]+\.(?:png|jpe?g|gif|webp|svg|bmp|avif|ico|mp4|webm|mov|m4v|ogv|mkv|mp3|wav|ogg|m4a|flac|aac)(?:[?#][^\s"'<>)\]]*)?/gi;
+const MEDIA_MAX_PER_CONV = 40; // 每对话本地化媒体上限(防失控 · 对齐手机每页预热上限精神)
+function _mediaLocalName(url) {
+  const clean = String(url).split(/[?#]/)[0];
+  let base = clean.split("/").pop() || "media";
+  try { base = decodeURIComponent(base); } catch {}
+  const h = crypto.createHash("md5").update(clean).digest("hex").slice(0, 8);
+  return h + "_" + (safeName(base, 60) || "media");
+}
+function extractMediaUrls(text) {
+  const seen = new Set();
+  for (const m of String(text || "").match(_RE_MEDIA_URL) || []) {
+    if (!seen.has(m)) seen.add(m);
+    if (seen.size >= MEDIA_MAX_PER_CONV) break;
+  }
+  return Array.from(seen);
+}
+async function localizeConvMedia(auth, convDir, md) {
+  const urls = extractMediaUrls(md);
+  const map = {};
+  if (!urls.length) return map;
+  const mediaDir = path.join(convDir, "media");
+  await runPool(urls, 4, async (url) => {
+    try {
+      const name = _mediaLocalName(url);
+      const dest = path.join(mediaDir, name);
+      if (!fs.existsSync(dest)) {
+        const headers = /^https?:\/\/app\.devin\.ai\//i.test(url) ? authHeaders(auth) : {};
+        const data = await downloadFile(url, headers);
+        if (!data || !data.length) return;
+        ensureDir(mediaDir);
+        fs.writeFileSync(dest, data);
+      }
+      map[url] = "media/" + name;
+    } catch {}
+  });
+  return map;
+}
+// 把 URL→本地相对路径映射应用到正文; escaped=true 时按 HTML 转义形态(& → &amp;)替换。
+function applyMediaMap(text, map, escaped) {
+  let s = String(text || "");
+  // 按 URL 长度降序替换: 防「短 URL 是长 URL 前缀」(如 .../a.png 与 .../a.png?sig=…) 时,
+  //   先替短的会把长 URL 里的前缀段也换掉 → 长 URL 残损。长的先替即互不干扰。
+  const urls = Object.keys(map).sort((a, b) => b.length - a.length);
+  for (const url of urls) {
+    const from = escaped ? url.replace(/&/g, "&amp;") : url;
+    s = s.split(from).join(map[url]);
+  }
+  return s;
+}
+
 // 对话备份为文件夹 (v4.4.0: 替代 ZIP · HTML/MD/JSON/files 四位一体)
 // 文件夹名: <对话名称>_<ID末8位>  (可读 + 唯一)
 // sharedState: 账号级共享的 backup_state 对象 (并行备份时由调用方一次性读写·避免并发读改写竞态)。
@@ -2290,11 +2401,19 @@ async function backupOneConversationFolder(auth, sess, accountDir, opts, sharedS
   }
 
   // HTML 视图 (用户看)
-  const html = buildConversationHtml(title, devinId, events, { account: auth.email });
-  try { fs.writeFileSync(path.join(convDir, "对话.html"), html, "utf8"); } catch {}
+  let html = buildConversationHtml(title, devinId, events, { account: auth.email });
 
   // MD 视图 (AI 看)
-  const md = buildConversationMd(title, devinId, events);
+  let md = buildConversationMd(title, devinId, events);
+
+  // 富媒体本地化: 正文图片/视频/音频落 media/, HTML/MD 改指本地相对路径(失败保留原 URL)
+  let mediaCount = 0;
+  try {
+    const mmap = await localizeConvMedia(auth, convDir, md);
+    mediaCount = Object.keys(mmap).length;
+    if (mediaCount) { html = applyMediaMap(html, mmap, true); md = applyMediaMap(md, mmap, false); }
+  } catch {}
+  try { fs.writeFileSync(path.join(convDir, "对话.html"), html, "utf8"); } catch {}
   try { fs.writeFileSync(path.join(convDir, "对话.md"), md, "utf8"); } catch {}
 
   // Agent JSON (全量机器可读)
@@ -2305,7 +2424,7 @@ async function backupOneConversationFolder(auth, sess, accountDir, opts, sharedS
   const meta = {
     devinId, title, account: auth.email, orgId: auth.orgId,
     convNo: opts.convNum || 0,
-    eventCount: events.length, producedFiles: fileIndex.length,
+    eventCount: events.length, producedFiles: fileIndex.length, mediaFiles: mediaCount,
     backedUpAt: new Date().toISOString(),
   };
   writeJson(path.join(convDir, "_meta.json"), meta);
@@ -2465,29 +2584,45 @@ function _scanConvEntries(base, resolveShort) {
       });
     } else if (e.isDirectory() && !e.name.startsWith("_") && e.name !== "账号信息" && e.name !== "对话" && e.name !== "files") {
       const metaPath = path.join(base, e.name, "_meta.json");
-      if (!fs.existsSync(metaPath)) continue;
-      let mtime = 0, meta = {};
-      try { mtime = fs.statSync(metaPath).mtimeMs; } catch {}
-      try { meta = JSON.parse(fs.readFileSync(metaPath, "utf8")); } catch {}
       const htmlPath = path.join(base, e.name, "对话.html");
+      const mdPath = path.join(base, e.name, "对话.md");
+      const hasMeta = fs.existsSync(metaPath);
+      // 旧格式对话文件夹(无 _meta.json 但有 对话.md/对话.html 正文)同样是备份本体,
+      // 绝不因缺元数据而隐身 —— 备份是不可变档案, 列表必须让它可见。
+      if (!hasMeta && !fs.existsSync(mdPath) && !fs.existsSync(htmlPath)) continue;
+      let mtime = 0, meta = {};
+      if (hasMeta) {
+        try { mtime = fs.statSync(metaPath).mtimeMs; } catch {}
+        try { meta = JSON.parse(fs.readFileSync(metaPath, "utf8")); } catch {}
+      } else {
+        try { mtime = fs.statSync(path.join(base, e.name)).mtimeMs; } catch {}
+      }
       // 文件夹名 = <NNN>_<标题>_<ID末8位> → meta 缺失/损坏时据尾段短 ID 反查
       let did = meta.devinId || "";
       if (!did) { const fm = e.name.match(/_([A-Za-z0-9]{8})$/); if (fm) did = rs(fm[1]); }
       convs.push({
         name: e.name, path: path.join(base, e.name), mtime, type: "folder",
-        title: meta.title || "", devinId: did, eventCount: meta.eventCount || 0, num: meta.convNo || 0,
+        title: meta.title || (hasMeta ? "" : e.name.replace(/_[A-Za-z0-9]{8}$/, "")),
+        devinId: did, eventCount: meta.eventCount || 0, num: meta.convNo || 0,
         hasHtml: fs.existsSync(htmlPath), htmlPath,
       });
     }
   }
   return convs;
 }
-function listBackups(root) {
-  root = root || DC_BACKUP_DEFAULT;
-  const out = { root, accounts: [] };
+// 备份根聚合: 主根之外, home 旧根与历史持久化根上的备份同样是不可变档案 ——
+//   备份根切换(如 home → 数据盘)后, 旧根上的备份绝不能从列表"消失"。
+function _knownBackupRoots(primary) {
+  const roots = [primary];
+  const add = (r) => { try { if (r && fs.existsSync(r) && !roots.some((x) => path.resolve(x) === path.resolve(r))) roots.push(r); } catch {} };
+  add(DC_HOME_BACKUP);
+  try { const j = JSON.parse(fs.readFileSync(DC_BACKUP_ROOT_STATE, "utf8")); if (j && j.root) add(j.root); } catch {}
+  return roots;
+}
+function _scanRootAccounts(root, rs) {
+  const accounts = [];
   let dirs = [];
-  try { dirs = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { return out; }
-  const rs = _shortIdResolver(); // 整树共享一个短ID解析器(state 只读一次)
+  try { dirs = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { return accounts; }
   for (const d of dirs) {
     if (d.name.startsWith("_")) continue;
     const accDir = path.join(root, d.name);
@@ -2500,15 +2635,38 @@ function listBackups(root) {
       // 兼容: 既有 对话/ 又有根级旧文件夹时, 两者合并
       for (const c of _scanConvEntries(accDir, rs)) convs.push(c);
     }
-    convs.sort((a, b) => (a.num && b.num ? a.num - b.num : b.mtime - a.mtime));
     const infoDir = path.join(accDir, "账号信息");
     const hasInfo = fs.existsSync(infoDir);
-    out.accounts.push({
-      account: d.name, email: acctMeta.email || "", accountNo: acctMeta.accountNo || 0,
+    accounts.push({
+      account: d.name, email: acctMeta.email || (d.name.includes("@") ? d.name : ""), accountNo: acctMeta.accountNo || 0,
       dir: accDir, count: convs.length,
       hasAccountInfo: hasInfo, accountInfoPath: hasInfo ? infoDir : "",
       conversations: convs,
     });
+  }
+  return accounts;
+}
+function listBackups(root) {
+  root = root || DC_BACKUP_DEFAULT;
+  const out = { root, accounts: [] };
+  const rs = _shortIdResolver(); // 整树共享一个短ID解析器(state 只读一次)
+  const byName = new Map(); // 同名账号目录跨根合并(对话按 name 去重·主根优先)
+  for (const r of _knownBackupRoots(root)) {
+    for (const acc of _scanRootAccounts(r, rs)) {
+      const prev = byName.get(acc.account);
+      if (!prev) { byName.set(acc.account, acc); continue; }
+      const seen = new Set(prev.conversations.map((c) => c.name));
+      for (const c of acc.conversations) if (!seen.has(c.name)) { prev.conversations.push(c); seen.add(c.name); }
+      prev.count = prev.conversations.length;
+      if (!prev.email) prev.email = acc.email;
+      if (!prev.accountNo) prev.accountNo = acc.accountNo;
+      if (!prev.hasAccountInfo && acc.hasAccountInfo) { prev.hasAccountInfo = true; prev.accountInfoPath = acc.accountInfoPath; }
+    }
+  }
+  for (const acc of byName.values()) {
+    acc.conversations.sort((a, b) => (a.num && b.num ? a.num - b.num : b.mtime - a.mtime));
+    acc.count = acc.conversations.length;
+    out.accounts.push(acc);
   }
   out.accounts.sort((a, b) => (a.accountNo && b.accountNo ? a.accountNo - b.accountNo : b.count - a.count));
   return out;
@@ -2587,7 +2745,7 @@ function isCleanupReady(email, cooldownMs) {
   const st = getCleanupState(email);
   if (!st || !st.backupCompletedAt) return { ready: false, reason: "no_backup" };
   const now = Date.now();
-  const cd = cooldownMs || 24 * 60 * 60 * 1000;
+  const cd = cooldownMs || 72 * 60 * 60 * 1000;
   const sinceBk = now - st.backupCompletedAt;
   if (sinceBk < cd) return { ready: false, reason: "cooldown", remaining: cd - sinceBk };
   if (st.lastConvUpdateAt && (now - st.lastConvUpdateAt) < cd)
@@ -2814,6 +2972,7 @@ module.exports = {
   paths: { WAM_DIR, DC_DIR, DC_AUTH_CACHE, DC_TAGS_FILE, DC_BACKUP_STATE, DC_CLEANUP_STATE, DC_BACKUP_DEFAULT, DC_HOME_BACKUP, DC_BACKUP_ROOT_STATE },
   // 数据盘自动择优 + 迁移 (备份不压系统盘)
   getOptimalBackupRoot,
+  resolveDownloadsDir,
   listDataDrives,
   setBackupRoot,
   migrateBackups,
@@ -2826,6 +2985,7 @@ module.exports = {
   authHeaders,
   // reads
   listSessions,
+  isAutoConv,
   getSessionDetail,
   getEventStream,
   fetchEventStreamDetailed,
@@ -2838,6 +2998,7 @@ module.exports = {
   getGitConnections,
   getBilling,
   billingBalance,
+  overageBalance,
   classifyEvent,
   accountOverview,
   classifySession,
@@ -2867,6 +3028,10 @@ module.exports = {
   backupOneConversationFolder,
   backupAccountFolders,
   archiveSettledConvZips,
+  // 富媒体本地化 (对齐手机 APK 附件预热)
+  extractMediaUrls,
+  localizeConvMedia,
+  applyMediaMap,
   backupAccountFullFolders,
   listBackups,
   unlockBackup,

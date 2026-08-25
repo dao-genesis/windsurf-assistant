@@ -35,6 +35,114 @@ const DEVIN_UA =
 //   复用 socket 后首屏与切页显著提速; maxSockets 适度并行, 空闲 15s 回收。
 const _httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 15000, maxSockets: 64, maxFreeSockets: 16, timeout: 60000 });
 
+// 道·网络软编码(直连优先·代理兜底) — 反代自适配一切网络环境, 零硬编码零前置配置:
+//   ① 直连(keep-alive 池) → ② 瞬断(ECONNRESET/TLS 半握手被掐)换新 socket 直连重试
+//   → ③ 仍不通才探测本机常见代理端口(Clash/v2ray 等·60s 缓存)经 CONNECT 兜底。
+//   任一路成功即记忆偏好(直连恢复自动回归), 国内直连/挂代理/无代理三态皆自愈。
+const _NET_PROXY_PORTS = [7890, 10809, 7891, 1080, 10808, 8080, 8118];
+let _fbProxy = { port: 0, ts: 0 }; // port>0=探到可用代理; -1=探明无; 0=未探测 (60s 缓存)
+let _lastGoodProxy = 0; // 上次经该本机代理成功 → 后续请求先走代理; 直连一成功即清零
+// 软编码·适配一切: 用户显式设的 HTTP(S)_PROXY/ALL_PROXY 本机端口优先于内置常见口清单
+//   (与 dao-vsix detectProxyPort 同源) → SakuraCat 等非标端口也可命中, 不硬编码任何口。
+function _envProxyPort() {
+  const p = process.env.HTTP_PROXY || process.env.HTTPS_PROXY || process.env.ALL_PROXY
+    || process.env.http_proxy || process.env.https_proxy || process.env.all_proxy || "";
+  const m = String(p).match(/(?:127\.0\.0\.1|localhost):(\d+)/i);
+  return m ? (parseInt(m[1], 10) || 0) : 0;
+}
+// 有效探测口 = [env 显式口(若有)] ++ 内置常见口, 去重; env 口排最前先试。
+function _effProxyPorts(base) {
+  const ep = _envProxyPort();
+  const seen = new Set();
+  const out = [];
+  for (const p of (ep ? [ep] : []).concat(base)) {
+    if (p > 0 && !seen.has(p)) { seen.add(p); out.push(p); }
+  }
+  return out;
+}
+function _isTransientNetErr(e) {
+  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up|disconnected|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|ENOTFOUND|handshake|TLS/i.test(String((e && e.message) || e || ""));
+}
+function _probeProxyPort(host, cb) {
+  if (_fbProxy.ts && Date.now() - _fbProxy.ts < 60000) return cb(_fbProxy.port > 0 ? _fbProxy.port : 0);
+  const ports = _effProxyPorts(_NET_PROXY_PORTS);
+  let i = 0;
+  const tryNext = () => {
+    if (i >= ports.length) { _fbProxy = { port: -1, ts: Date.now() }; return cb(0); }
+    const port = ports[i++];
+    let done = false;
+    const s = net.connect({ host: "127.0.0.1", port, timeout: 800 });
+    const fin = (ok) => { if (done) return; done = true; try { s.destroy(); } catch {} if (ok) { _fbProxy = { port, ts: Date.now() }; cb(port); } else tryNext(); };
+    s.once("connect", () => {
+      s.write("CONNECT " + host + ":443 HTTP/1.1\r\nHost: " + host + ":443\r\n\r\n");
+      s.once("data", (d) => fin(/^HTTP\/1\.[01] 200/.test(String(d))));
+      setTimeout(() => fin(false), 4000);
+    });
+    s.once("error", () => fin(false));
+    s.once("timeout", () => fin(false));
+  };
+  tryNext();
+}
+function _tunnelConnect(proxyPort, host, cb) {
+  let done = false;
+  const s = net.connect({ host: "127.0.0.1", port: proxyPort, timeout: 5000 });
+  const fail = (m) => { if (done) return; done = true; try { s.destroy(); } catch {} cb(new Error(m || "tunnel failed")); };
+  s.once("connect", () => {
+    s.write("CONNECT " + host + ":443 HTTP/1.1\r\nHost: " + host + ":443\r\n\r\n");
+    let buf = "";
+    const onData = (d) => {
+      buf += String(d);
+      if (buf.indexOf("\r\n\r\n") < 0) return;
+      s.removeListener("data", onData);
+      if (!/^HTTP\/1\.[01] 200/.test(buf)) return fail("proxy CONNECT " + buf.split("\r\n")[0]);
+      done = true; s.setTimeout(0); cb(null, s);
+    };
+    s.on("data", onData);
+  });
+  s.once("error", (e) => fail(e && e.message));
+  s.once("timeout", () => fail("proxy connect timeout"));
+}
+// 统一上游 HTTPS 请求(自愈三级): onRes(proxyRes) 只会被调一次; 全部尝试失败才 onFail(err)。
+function upstreamRequest(reqOpts, bodyBuf, onRes, onFail, log) {
+  const host = reqOpts.hostname;
+  const viaProxy = (port, origErr) => {
+    _tunnelConnect(port, host, (te, sock) => {
+      if (te) return onFail(origErr || te);
+      const pr = https.request({ ...reqOpts, agent: false, createConnection: () => tls.connect({ socket: sock, servername: host, rejectUnauthorized: false }) }, (r) => { _lastGoodProxy = port; onRes(r); });
+      pr.on("timeout", () => { try { pr.destroy(new Error("upstream timeout(proxy)")); } catch {} });
+      pr.on("error", (e) => onFail(origErr || e));
+      if (bodyBuf && bodyBuf.length) pr.write(bodyBuf);
+      pr.end();
+    });
+  };
+  const direct = (n, extra) => {
+    const pr = https.request({ ...reqOpts, ...extra }, (r) => { _lastGoodProxy = 0; onRes(r); });
+    pr.on("timeout", () => { try { pr.destroy(new Error("upstream timeout")); } catch {} });
+    pr.on("error", (e) => {
+      if (!_isTransientNetErr(e)) return onFail(e);
+      // 瞬断自愈: 池化 socket 可能半闭 → 换新 socket(默认族) → 再换新 socket(IPv4) → 仍死才回落本机代理。
+      if (n === 0) { if (log) try { log("[proxy] direct " + (e && e.message) + " → fresh-socket retry"); } catch {} return direct(1, { agent: false }); }
+      if (n === 1) { if (log) try { log("[proxy] fresh " + (e && e.message) + " → fresh-socket retry(v4)"); } catch {} return direct(2, { agent: false, family: 4 }); }
+      _probeProxyPort(host, (pp) => { if (!pp) return onFail(e); if (log) try { log("[proxy] direct dead → local proxy :" + pp); } catch {} viaProxy(pp, e); });
+    });
+    if (bodyBuf && bodyBuf.length) pr.write(bodyBuf);
+    pr.end();
+  };
+  if (_lastGoodProxy) {
+    // 偏好代理时仍带直连回归: 隧道失败/代理下线 → 清偏好走直连
+    _tunnelConnect(_lastGoodProxy, host, (te, sock) => {
+      if (te) { _lastGoodProxy = 0; _fbProxy = { port: 0, ts: 0 }; return direct(0, {}); }
+      const pr = https.request({ ...reqOpts, agent: false, createConnection: () => tls.connect({ socket: sock, servername: host, rejectUnauthorized: false }) }, (r) => onRes(r));
+      pr.on("timeout", () => { try { pr.destroy(new Error("upstream timeout(proxy)")); } catch {} });
+      pr.on("error", () => { _lastGoodProxy = 0; direct(0, {}); });
+      if (bodyBuf && bodyBuf.length) pr.write(bodyBuf);
+      pr.end();
+    });
+    return;
+  }
+  direct(0, {});
+}
+
 // 逐跳头集合 (RFC 7230 §6.1)。缓存命中重放时须剥之 —— 历史落盘条目 baked 了上游
 //   `Connection: close`, 原样回放即令 webview 每分片后拆 TCP; 剥后显式 keep-alive 复用 socket。
 const _HOP_HEADERS = new Set(["connection", "keep-alive", "proxy-connection", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"]);
@@ -131,7 +239,8 @@ function _streamAttachment(rawUrl, res, cacheKey, hops) {
   try { su = new URL(fixS3DualstackUrl(rawUrl)); } catch { try { res.writeHead(502); res.end(); } catch {} return; }
   let won = false, failCount = 0;
   const cancels = [];
-  const tracks = 1 + _ATT_PROXY_PORTS.length;
+  const _attPorts = _effProxyPorts(_ATT_PROXY_PORTS);
+  const tracks = 1 + _attPorts.length;
   const onFail = () => { if (won) return; if (++failCount >= tracks) { try { res.writeHead(502); res.end(); } catch {} } };
   const onRes = (rs, destroy) => {
     if (won) { try { rs.destroy(); } catch {} return; }
@@ -144,26 +253,53 @@ function _streamAttachment(rawUrl, res, cacheKey, hops) {
       return;
     }
     const ct = rs.headers["content-type"] || "application/octet-stream";
+    const expected = parseInt(rs.headers["content-length"] || "0", 10) || 0;
     const hdrs = { "Content-Type": ct, "Cache-Control": "public, max-age=31536000, immutable" };
     if (rs.headers["content-length"]) hdrs["Content-Length"] = rs.headers["content-length"];
     try { res.writeHead(sc || 200, hdrs); } catch {}
     const chunks = [];
     let total = 0;
     let idle = null;
-    const arm = () => { try { if (idle) clearTimeout(idle); } catch {} idle = setTimeout(() => { try { destroy(); } catch {} try { res.end(); } catch {} }, 60000); };
-    arm();
-    rs.on("data", (c) => { arm(); total += c.length; if (total <= _ATT_BODY_CACHE_MAX) chunks.push(c); try { res.write(c); } catch {} });
-    rs.on("end", () => {
+    let resumes = 0;
+    const finish = () => {
       try { if (idle) clearTimeout(idle); } catch {}
       try { res.end(); } catch {}
-      if (cacheKey && sc >= 200 && sc < 300 && total > 0 && total <= _ATT_BODY_CACHE_MAX) {
+      if (cacheKey && sc >= 200 && sc < 300 && total > 0 && total <= _ATT_BODY_CACHE_MAX && (!expected || total >= expected)) {
         _diskPut(cacheKey, { status: 200, headers: { "Content-Type": ct, "Cache-Control": "public, max-age=31536000, immutable" }, body: Buffer.concat(chunks) }, "");
       }
-    });
-    rs.on("error", () => { try { if (idle) clearTimeout(idle); } catch {} try { res.end(); } catch {} });
+    };
+    // 弱网断点续传(对照手机 APK .part 修法): 中途掐断不作废已吐字节, 以 Range 从断点续取同一响应续写。
+    const resume = (src) => {
+      try { if (idle) clearTimeout(idle); } catch {}
+      if (won !== true || res.writableEnded) return;
+      if (!expected || total >= expected || resumes >= 3) { finish(); return; }
+      resumes++;
+      const delay = Math.pow(2, resumes) * 500;
+      setTimeout(() => {
+        if (res.writableEnded) return;
+        try {
+          const opt = { headers: { Range: "bytes=" + total + "-", "User-Agent": DEVIN_UA }, timeout: 20000, rejectUnauthorized: false, agent: _httpsAgent };
+          const rq = https.request(Object.assign({ hostname: su.hostname, port: su.port || 443, path: su.pathname + su.search, method: "GET" }, opt), (rs2) => {
+            if ((rs2.statusCode || 0) !== 206) { rs2.resume(); finish(); return; }
+            wire(rs2, () => { try { rq.destroy(); } catch {} });
+          });
+          rq.on("error", () => resume());
+          rq.on("timeout", () => { try { rq.destroy(); } catch {} resume(); });
+          rq.end();
+        } catch { finish(); }
+      }, delay);
+    };
+    const wire = (src, kill) => {
+      const arm = () => { try { if (idle) clearTimeout(idle); } catch {} idle = setTimeout(() => { try { kill(); } catch {} resume(src); }, 60000); };
+      arm();
+      src.on("data", (c) => { arm(); total += c.length; if (total <= _ATT_BODY_CACHE_MAX) chunks.push(c); try { res.write(c); } catch {} });
+      src.on("end", () => { if (expected && total < expected) resume(src); else finish(); });
+      src.on("error", () => resume(src));
+    };
+    wire(rs, destroy);
   };
   cancels.push(_attRequest(su, 0, onRes, onFail));
-  for (const p of _ATT_PROXY_PORTS) cancels.push(_attRequest(su, p, onRes, onFail));
+  for (const p of _attPorts) cancels.push(_attRequest(su, p, onRes, onFail));
 }
 
 const _attachCookie = new Map();      // key → { cookie, mintAt }
@@ -558,9 +694,20 @@ function handleUpgrade(req, clientSocket, head, auth, log) {
       upstream.on("close", bail);
       clientSocket.on("close", () => { try { upstream.destroy(); } catch {} });
     };
+    // 直连失败 → 本机代理 CONNECT 兜底(与 HTTP 反代同一软编码策略), 全败才断。
+    const viaProxy = () => {
+      _probeProxyPort(host, (pp) => {
+        if (!pp || done) return bail();
+        _tunnelConnect(pp, host, (te, sock) => {
+          if (te || done) return bail();
+          const sec = tls.connect({ socket: sock, servername: host, rejectUnauthorized: false, ALPNProtocols: ["http/1.1"] }, () => onUpstream(sec));
+          sec.once("error", () => { if (!connected) bail(); });
+        });
+      });
+    };
     const direct = tls.connect({ host, port: 443, servername: host, rejectUnauthorized: false, ALPNProtocols: ["http/1.1"] }, () => onUpstream(direct));
-    direct.once("error", () => { if (!connected) bail(); });
-    direct.setTimeout(20000, () => { if (!connected) { try { direct.destroy(); } catch {} bail(); } });
+    direct.once("error", () => { if (!connected) { try { direct.destroy(); } catch {} viaProxy(); } });
+    direct.setTimeout(20000, () => { if (!connected) { try { direct.destroy(); } catch {} viaProxy(); } });
   } catch (e) {
     if (log) try { log("[proxy] ws upgrade error " + (e && e.message)); } catch {}
     bail();
@@ -718,15 +865,17 @@ async function _prewarmGraph(localBase, auth, log) {
 //     · 前缀模式 (新·公网经主口 9920 隧道): handleRequest(req,res,auth,{rewriteBase:'/i/<accKey>',parsePath,log})
 //       → 改写基址 = 同源相对前缀, 公网手机/电脑浏览器无感同源访问该账号页。
 async function handleRequest(req, res, auth, opts, _log) {
-  let rewriteBase, parsePath, log;
+  let rewriteBase, parsePath, log, ownEmail;
   if (opts && typeof opts === "object") {
     rewriteBase = String(opts.rewriteBase || "");
     parsePath = opts.parsePath != null ? opts.parsePath : (req.url || "/");
     log = opts.log;
+    ownEmail = String(opts.email || "");
   } else {
     rewriteBase = "http://localhost:" + opts; // opts = port (旧签名)
     parsePath = req.url || "/";
     log = _log;
+    ownEmail = "";
   }
   const localBase = rewriteBase; // 下游沿用 localBase 命名 = 改写基址
   const isPrefix = localBase.charAt(0) === "/"; // 同源前缀模式 (/i/<accKey>)
@@ -744,9 +893,9 @@ async function handleRequest(req, res, auth, opts, _log) {
   // 拖拽上传桥 (同源直服本反代端口 → 对齐 /i/ 同源页·根治 IDE 内拖拽无反应)。
   if (_bridgeServe) {
     const bp = reqUrl.pathname;
-    if (bp === "/__daobridge.js" || bp === "/__dlfile" || bp === "/__convmd" || bp === "/__convguide" || bp === "/__convinfo" || bp === "/__convzip") {
+    if (bp === "/__daobridge.js" || bp === "/__dlfile" || bp === "/__convmd" || bp === "/__convguide" || bp === "/__convinfo" || bp === "/__convzip" || bp === "/__daotrans.js" || bp === "/__translate" || bp === "/__translate.js") {
       try {
-        const out = await _bridgeServe(bp, reqUrl);
+        const out = await _bridgeServe(bp, reqUrl, req);
         if (out) {
           const h = Object.assign({ "Content-Type": out.contentType || "application/octet-stream", "Access-Control-Allow-Origin": "*" }, out.headers || {});
           res.writeHead(out.status || 200, h);
@@ -849,7 +998,7 @@ async function handleRequest(req, res, auth, opts, _log) {
     const _ck = await _ensureAttachCookie(auth, !!isRetry);
     if (_ck) fwdHeaders["Cookie"] = _ck;
   }
-  const proxyReq = https.request(
+  upstreamRequest(
     {
       hostname: u.hostname,
       port: 443,
@@ -858,8 +1007,10 @@ async function handleRequest(req, res, auth, opts, _log) {
       headers: fwdHeaders,
       timeout: 20000,
       rejectUnauthorized: false,
-      agent: _httpsAgent,
+      // 顶层页面导航不走共享 keep-alive 池 (半闭池化 socket 会把整页打成 502); 资产仍复用池提速。
+      agent: isPage ? false : _httpsAgent,
     },
+    reqBody,
     (proxyRes) => {
       const status = proxyRes.statusCode || 200;
       const ct = proxyRes.headers["content-type"] || "";
@@ -937,7 +1088,7 @@ async function handleRequest(req, res, auth, opts, _log) {
         sh["Cache-Control"] = "no-cache, no-transform";
         sh["Connection"] = "keep-alive";
         sh["X-Accel-Buffering"] = "no";
-        try { proxyReq.setTimeout(0); } catch {}
+        try { proxyRes.socket && proxyRes.socket.setTimeout(0); } catch {}
         res.writeHead(status, sh);
         let src = proxyRes;
         if (enc === "gzip") src = proxyRes.pipe(zlib.createGunzip());
@@ -947,7 +1098,7 @@ async function handleRequest(req, res, auth, opts, _log) {
         const endS = () => { try { res.end(); } catch {} };
         src.on("end", endS);
         src.on("error", endS);
-        res.on("close", () => { try { proxyReq.destroy(); } catch {} });
+        res.on("close", () => { try { proxyRes.destroy(); } catch {} });
         return;
       }
 
@@ -978,12 +1129,12 @@ async function handleRequest(req, res, auth, opts, _log) {
         if (!ph["Accept-Ranges"] && !ph["accept-ranges"]) ph["Accept-Ranges"] = "bytes";
         ph["Connection"] = "keep-alive";
         _forceKeepAlive(res);
-        try { proxyReq.setTimeout(0); } catch {}
+        try { proxyRes.socket && proxyRes.socket.setTimeout(0); } catch {}
         res.writeHead(status, ph);
         proxyRes.on("data", (c) => { try { res.write(c); } catch {} });
         proxyRes.on("end", () => { try { res.end(); } catch {} });
         proxyRes.on("error", () => { try { res.end(); } catch {} });
-        res.on("close", () => { try { proxyReq.destroy(); } catch {} });
+        res.on("close", () => { try { proxyRes.destroy(); } catch {} });
         return;
       }
 
@@ -1040,6 +1191,17 @@ async function handleRequest(req, res, auth, opts, _log) {
                 else html = dbg + html;
               }
             } catch (e) { /* 守柔: 桥注入失败不阻断反代 */ }
+            // 整页翻译桥: 同为内联 <head> 注入 — 听父窗 {__daoTransToggle} 回 ack 并就地翻译,
+            //   引擎/文本代调经同源 /__translate(.js) 就地服务本反代端口 (与 /__web·主口反代页同构)。
+            try {
+              const _tj = await _bridgeServe("/__daotrans.js", reqUrl);
+              if (_tj && _tj.body) {
+                const tbg = "<script>" + _tj.body + "</script>";
+                if (/<head[^>]*>/i.test(html)) html = html.replace(/(<head[^>]*>)/i, "$1" + tbg);
+                else if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, tbg + "</head>");
+                else html = tbg + html;
+              }
+            } catch (e) { /* 守柔 */ }
           }
           safeHeaders["Content-Type"] = "text/html; charset=utf-8";
           res.writeHead(status, safeHeaders);
@@ -1118,24 +1280,19 @@ async function handleRequest(req, res, auth, opts, _log) {
         res.end(body);
       });
     },
-  );
-
-  proxyReq.on("error", (e) => {
-    if (log) try { log("[proxy] upstream error " + (e && e.message)); } catch {}
-    if (!res.headersSent) {
+    (e) => {
+      if (log) try { log("[proxy] upstream unreachable " + (e && e.message)); } catch {}
+      if (res.headersSent) { try { res.end(); } catch {} return; }
+      if (isPage && (req.method === "GET" || !req.method)) {
+        res.writeHead(502, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+        res.end('<!DOCTYPE html><meta charset="utf-8"><meta http-equiv="refresh" content="3"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:0;background:#0d1117;color:#c9d1d9;font:14px/1.7 -apple-system,Segoe UI,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh"><div style="max-width:460px;padding:26px 30px;text-align:center"><div style="font-size:34px;margin-bottom:10px">\u23f3</div><div style="font-size:16px;color:#e6edf3;font-weight:700;margin-bottom:8px">\u7f51\u7edc\u77ac\u65ad\uff0c\u6b63\u5728\u81ea\u52a8\u91cd\u8bd5\u2026</div><div style="color:#8b949e;font-size:12.5px;margin-bottom:16px">\u5df2\u81ea\u52a8\u5c1d\u8bd5 \u76f4\u8fde\u2192\u91cd\u8fde\u2192\u672c\u673a\u4ee3\u7406 \u5171\u4e09\u8def\uff0c3 \u79d2\u540e\u81ea\u52a8\u5237\u65b0\u91cd\u8bd5\u3002</div><button onclick="location.reload()" style="background:#1f6feb;color:#fff;border:0;border-radius:7px;padding:9px 18px;font-size:13px;cursor:pointer">\u7acb\u5373\u91cd\u8bd5</button></div>');
+        return;
+      }
       res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("proxy error: " + (e && e.message));
-    }
-  });
-  proxyReq.on("timeout", () => {
-    try { proxyReq.destroy(); } catch {}
-    if (!res.headersSent) {
-      res.writeHead(504, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("proxy timeout");
-    }
-  });
-  if (reqBody.length) proxyReq.write(reqBody);
-  proxyReq.end();
+      res.end("upstream unreachable: " + (e && e.message));
+    },
+    log,
+  );
   };
   await fire(false);
 }
@@ -1156,7 +1313,7 @@ async function ensureProxyForAccount(email, auth, log) {
   if (!port) return { ok: false, error: "no-port" };
   const entry = { server: null, port, auth };
   const server = http.createServer((req, res) => {
-    handleRequest(req, res, entry.auth, port, log).catch((e) => {
+    handleRequest(req, res, entry.auth, { rewriteBase: "http://localhost:" + port, parsePath: req.url, log, email: key }).catch((e) => {
       if (!res.headersSent) {
         try {
           res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
