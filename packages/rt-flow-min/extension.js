@@ -4336,7 +4336,7 @@ function _isValidAutoTarget(i) {
 //   ① 直连(keep-alive 池) → ② 瞬断(TLS 半握手被掐/ECONNRESET)换新 socket 直连重试
 //   → ③ 仍不通才探测本机常见代理端口(Clash/v2ray 等·60s 缓存)经 CONNECT 兜底。
 //   任一路成功即记忆偏好(直连恢复自动回归), 国内直连/挂代理/无代理三态皆自愈。
-const _NETP_PORTS = [7890, 10809, 7891, 1080, 10808, 8080, 8118];
+const _NETP_PORTS = [2080, 7890, 10809, 7891, 1080, 10808, 8080, 8118]; // 2080=sing-box 真代理优先; 7890=com.vortex.helper(direct 模式)降级
 let _netpProbe = { port: 0, ts: 0 }; // port>0=探到可用; -1=探明无; 0=未探测 (60s 缓存)
 let _netpGood = 0; // 上次经该本机代理成功 → 后续先走代理; 直连一成功即清零
 // 软编码·适配一切: 用户显式设的 HTTP(S)_PROXY/ALL_PROXY 本机端口优先于内置常见口清单
