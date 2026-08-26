@@ -1696,15 +1696,43 @@ function scan() {
             summary.stuck++;
           }
         } else {
-          // 真孤儿对话: 从未active或已离开vscdb活跃窗口超过90s
-          // v10 根治: 不计入任何统计, 不检测卡住
-          entry.stuckTicks = 0;
-          if (grew && staleSec < 30) {
-            newState = "streaming"; // 极短窗口: 刚创建·正在进入vscdb
-            summary.streaming++;
-            summary.pbOnly++;
-          } else if (staleSec < 300) {
-            newState = "old";
+          // v3.16.5 · 孤儿分支 (道: 不知则不妄为·但不可失明):
+          //   根因: vscdb python 读取器间歇性只返回部分 sessions (100→2) → UUID 缺失
+          //         → 旧逻辑 180s WAL 窗口后直接 state=old → 卡死/运行中对话从面板消失
+          //         (用户感知: 转圈卡死 2-3 分钟后追踪消失 · 无法区分卡死/结束)
+          //   治法: 与纯 .pb 模式同窗口 (600s) — .pb 近期有更新 → 保持 streaming 可见
+          //         停滞超 crit (120s) 且曾真实输出 → warning/stuck (用户可区分卡死/结束)
+          //         仅 .pb 超过 600s 未更新 → 才转 old (真·历史对话·静默)
+          const _orphanPbIdleSec = Math.round((t - st.mtimeMs) / 1000);
+          if (grew || _orphanPbIdleSec < 600) {
+            if (grew || staleSec < CFG.warnThreshold) {
+              newState = "streaming"; // .pb 在增长 = AI 正常流式输出
+              summary.streaming++;
+              entry.stuckTicks = 0;
+              entry._awaitingUser = false;
+            } else if (entry._awaitingUser) {
+              newState = "streaming"; // 等待用户 · 同规则
+              summary.streaming++;
+              entry.stuckTicks = 0;
+            } else if ((entry._turnGrowth || 0) > AWAITING_USER_THRESHOLD) {
+              entry._awaitingUser = true;
+              entry.stuckTicks = 0;
+              newState = "streaming";
+              summary.streaming++;
+            } else if (staleSec < CFG.critThreshold) {
+              entry.stuckTicks = (entry.stuckTicks || 0) + 1;
+              const inGrace = nowMs() - _startupTs < STARTUP_GRACE;
+              newState =
+                entry.stuckTicks >= 2 && !inGrace ? "warning" : "streaming";
+              if (newState === "warning") summary.stuck++;
+              else summary.streaming++;
+            } else {
+              entry.stuckTicks = (entry.stuckTicks || 0) + 1;
+              const inGrace = nowMs() - _startupTs < STARTUP_GRACE;
+              newState =
+                entry.stuckTicks >= 2 && !inGrace ? "stuck" : "warning";
+              summary.stuck++;
+            }
             summary.pbOnly++;
           } else {
             newState = "old"; // 历史对话·静默

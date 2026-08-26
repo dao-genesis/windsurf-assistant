@@ -4171,7 +4171,7 @@ async function _prewarmAuthThrottled(emails, opts) {
 //   ━━━ 道 ━━━
 //   未验号本不该留 · 只是门没开 · 门一开 · 民自化 · 无为而无不为
 //
-const VERSION = "4.9.4";
+const VERSION = "4.32.2";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36";
 const WINDSURF = "https://windsurf.com";
@@ -7695,6 +7695,14 @@ function _startHardExhaustWatchdog() {
     try {
       if (!_engine || !_store || !_store.activeEmail) return;
       if (_switching || _engine.rotating) return;
+      // v3.16.5 · 全锁退避 (道: 尊重用户主权): 上次 _tick 无候选(全锁/全耗) → 30s 内不敲门
+      //   根因: 全锁时每 2s 触发 _tick → 日志风暴 + 网络风暴 + 用户感知"还在自动切号"
+      //   治法: 无候选后静默 30s · 用户解锁时 (toggleSkip) 即时复位退避
+      if (
+        _engine.lastNoCandidateAt &&
+        Date.now() - _engine.lastNoCandidateAt < 30000
+      )
+        return;
       const h = _store.getHealth(_store.activeEmail);
       if (!h || !h.checked) return;
       if (h.overageActive) return; // overage 真金 · 不视为耗尽
@@ -10888,6 +10896,10 @@ function _notifyExhaustOnce(msg) {
   _notifyTimed("warn", msg, 600000); // 10min 自动淡去 · 可手动关 · 不再重弹
 }
 let _broadcastForce = false; // 结构性用户动作(删号等) → 绕过重挂节流·立即回显
+// v3.16.5 · 添加账号输入期截止 (道: 不扰民) — 用户在 addInput 打字时延迟整页重建
+//   根因: 整页重建销毁 textarea DOM → 焦点/光标丢失 → 用户感知"每打几个字就刷新"
+//   治法: 输入停止 3s 后才允许整页重建 · 期间只增量刷对话区 (不影响输入)
+let _uiAddTypingUntil = 0;
 function _computePanelStructSig() {
   if (!_store) return "init";
   const store = _store;
@@ -10940,6 +10952,18 @@ function _broadcastUI(force) {
     _broadcastUITimer = null;
     const _force = _broadcastForce;
     _broadcastForce = false;
+    // v3.16.5 · 输入期让位 (道: 不扰民·民忘于道): 用户在添加账号输入框打字 → 延迟整页重建
+    //   根因: 重建销毁 textarea DOM → 焦点/光标丢失 → 用户感知"每打几个字就刷新"
+    //   治法: 输入停止 3s 后才允许整页重建 · 期间只增量刷对话区 (不影响输入)
+    if (_uiAddTypingUntil > Date.now()) {
+      _broadcastConvSection();
+      updateStatusBar();
+      _broadcastUITimer = setTimeout(() => {
+        _broadcastUITimer = null;
+        _broadcastUI(_force);
+      }, Math.max(100, _uiAddTypingUntil - Date.now()));
+      return;
+    }
     // v4.9.10 · 结构签名门: 结构未变 → 不整页重建 (只增量刷对话区) → 杜绝每几秒整页闪
     const sig = _computePanelStructSig();
     if (sig === _panelStructSig && !_force) {
@@ -11570,6 +11594,11 @@ class WamViewProvider {
   }
   refresh(force) {
     if (!(this._view && this._view.visible)) return;
+    // v3.16.5 · 输入期让位 (道: 不扰民): 用户在添加账号输入框打字 → 延迟整页重建
+    if (_uiAddTypingUntil > Date.now()) {
+      _broadcastConvSection();
+      return;
+    }
     // v4.9.10 · 非强制刷新先过结构签名门: 结构未变只增量刷对话区·不整页重建 (杜绝闪)
     if (!force) {
       const sig = _computePanelStructSig();
@@ -12228,7 +12257,15 @@ function _saveScroll(){if(_scrRestoring)return;try{const el=document.scrollingEl
 window.addEventListener('scroll',function(){if(_scrRestoring)return;if(_scrTimer)clearTimeout(_scrTimer);_scrTimer=setTimeout(_saveScroll,100);},{passive:true});
 function _restoreScroll(){try{const st=vscode.getState()||{};const y=st.scrollTop|0;if(y<=0)return;const el=document.scrollingElement||document.documentElement;_scrRestoring=true;const ap=function(){el.scrollTop=y;};ap();requestAnimationFrame(ap);setTimeout(ap,80);setTimeout(function(){ap();_scrRestoring=false;},240);}catch(e){_scrRestoring=false;}}
 _restoreScroll();
-(function(){const s=vscode.getState()||{};if(s.addText){const ta=document.getElementById('addInput');if(ta)ta.value=s.addText;}const ta=document.getElementById('addInput');if(ta)ta.addEventListener('input',function(){const st=vscode.getState()||{};vscode.setState({...st,addText:this.value});});
+(function(){const s=vscode.getState()||{};const ta=document.getElementById('addInput');if(ta){if(s.addText)ta.value=s.addText;
+// v3.16.5 · 输入焦点/光标保持 (道: 不扰民·民忘于道): 重建后恢复焦点+光标 · 打字不再被打断
+if(s.addFocus&&s.addText){try{ta.focus();const p=s.addCaret|0;if(p>0){try{ta.setSelectionRange(p,p);}catch(e){}}}catch(e){}}
+ta.addEventListener('focus',function(){const st=vscode.getState()||{};vscode.setState({...st,addFocus:true});});
+ta.addEventListener('blur',function(){const st=vscode.getState()||{};vscode.setState({...st,addFocus:false});});
+ta.addEventListener('input',function(){const st=vscode.getState()||{};vscode.setState({...st,addText:this.value,addCaret:this.selectionStart|0});vscode.postMessage({type:'addTyping'});});
+ta.addEventListener('keyup',function(){const st=vscode.getState()||{};vscode.setState({...st,addCaret:this.selectionStart|0});});
+ta.addEventListener('click',function(){const st=vscode.getState()||{};vscode.setState({...st,addCaret:this.selectionStart|0});});
+}});
 // v3.11.2 · 多选持久化复位 — 重建后立即按 email 恢复 checked + .sel + batchBar 计数
 try{_restoreSel();updateBatchBar();}catch(e){}
 // 第五板块: 重建后自动重开之前展开的 Devin Cloud 下拉 + 请求运行状态
@@ -14445,6 +14482,8 @@ async function handleWebviewMessage(msg) {
           if (locked && _predictiveCandidate === i) _predictiveCandidate = -1;
           items.push({ email: acc.email, locked });
         }
+        // v3.16.5 · 解锁即复位看门狗退避 (用户主权变更 → 立即恢复 2s 响应)
+        if (_engine) _engine.lastNoCandidateAt = 0;
         if (items.length === 0) {
           _toast("批量锁定: 0 个 (索引无效)");
           break;
@@ -14480,6 +14519,8 @@ async function handleWebviewMessage(msg) {
         const acc3 = _store.accounts[msg.index];
         if (acc3) {
           acc3.skipAutoSwitch = !acc3.skipAutoSwitch;
+          // v3.16.5 · 解锁即复位看门狗退避 (用户主权变更 → 立即恢复 2s 响应)
+          if (_engine) _engine.lastNoCandidateAt = 0;
           // v17.42.7 锁🔒贯通: 即时联动 — 若刚锁的正是 _predictiveCandidate, 立刻失效
           if (acc3.skipAutoSwitch && _predictiveCandidate === msg.index) {
             _predictiveCandidate = -1;
@@ -14628,6 +14669,11 @@ async function handleWebviewMessage(msg) {
       // 客户端 toggleAdd() 点击时上报 → 服务端记住 → 下次 buildHtml() 正确渲染初始态
       case "setAddOpen": {
         _uiAddOpen = !!msg.open;
+        break;
+      }
+      // v3.16.5 · 添加账号输入期 (道: 不扰民) — 打字时延迟整页重建 · 输入停止 3s 后恢复
+      case "addTyping": {
+        _uiAddTypingUntil = Date.now() + 3000;
         break;
       }
       // v3.4.0 · 对话备份 · 道法自然
@@ -16271,20 +16317,20 @@ class Engine {
         : q.daily <= 0
           ? "Daily耗尽(0%)"
           : "Weekly耗尽(0%)";
-      // v3.9.1 越权日志: 让用户透明看到锁被绕过的真因
-      if (acc.skipAutoSwitch) {
-        log(
-          "🚨 硬耗尽越权 skipAutoSwitch: " +
-            reason +
-            " · 当前号 🔒 已锁 · 但 0% 已无消耗权 · 强制接替救场",
-        );
-      }
       // v3.1.3 守门贯通: 预选 + 候补均需验证有效额度
       let bestI = _isValidAutoTarget(_predictiveCandidate)
         ? _predictiveCandidate
         : this.store.getBestIndex(activeI);
       if (bestI >= 0 && !_isValidAutoTarget(bestI)) bestI = -1;
       if (bestI >= 0) {
+        // v3.9.1 越权日志: 仅在真有候选时记录 (有候选才谈得上"接替救场")
+        if (acc.skipAutoSwitch) {
+          log(
+            "🚨 硬耗尽越权 skipAutoSwitch: " +
+              reason +
+              " · 当前号 🔒 已锁 · 但 0% 已无消耗权 · 强制接替救场",
+          );
+        }
         log(
           "🚨 硬耗尽强切: " +
             reason +
@@ -16295,7 +16341,19 @@ class Engine {
         );
         await this._doAutoSwitch(bestI, activeI, "hard-exhaust");
       } else {
-        log("硬耗尽: " + reason + ", 无可用账号");
+        // v3.16.5 · 无候选: 全部🔒锁定或耗尽 · 尊重用户主权 · 不切号 · 看门狗退避 30s
+        //   根因: 全锁时看门狗每 2s 敲门 _tick → 日志风暴 + 网络风暴 + 用户感知"还在自动切号"
+        //   治法: 记录退避时间戳 (看门狗据此 30s 内不再敲门) · 日志节流 60s 一次
+        this.lastNoCandidateAt = Date.now();
+        const _nowL = Date.now();
+        if (_nowL - (this.lastAllLockedLogAt || 0) > 60000) {
+          this.lastAllLockedLogAt = _nowL;
+          log(
+            "硬耗尽: " +
+              reason +
+              ", 无可用账号 (全部🔒锁定或耗尽) · 尊重锁 · 不切号",
+          );
+        }
         _notifyExhaustOnce("WAM: ⚠️ " + reason + "，全部账号额度已耗尽");
       }
       // ─── 软耗尽: 仍有余量 · 感知 reset 时间 · 尊重冷却 · 尊重用户锁 ───
