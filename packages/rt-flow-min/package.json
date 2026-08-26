@@ -1,0 +1,224 @@
+{
+  "name": "rt-flow-min",
+  "displayName": "RT Flow · Min · 道法自然 · 专一版",
+  "description": "v3.16.2 之专一版 · 万法归宗 · 大部分功能 · 局部运行 · 双环境适配 (Windsurf + Devin Desktop) · 多账号轮转 / 对话追踪 / 标题实时 / 全量备份 / 卡住通知 · 软编码一切 · 道并行而不相悖",
+  "version": "3.16.2",
+  "publisher": "devaid",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dao-genesis/windsurf-assistant",
+    "directory": "packages/rt-flow-min"
+  },
+  "homepage": "https://github.com/dao-genesis/windsurf-assistant",
+  "icon": "media/icon.png",
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "activationEvents": [
+    "*",
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wam-container",
+          "title": "RT Flow",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "wam-container": [
+        {
+          "id": "wam.panel",
+          "name": "Manager",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "wam.openEditor",
+        "title": "Open Panel",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.status",
+        "title": "Status",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.switchAccount",
+        "title": "Switch Account",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.panicSwitch",
+        "title": "Emergency Switch",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.refreshAll",
+        "title": "Refresh All",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.addAccount",
+        "title": "Add Account",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.injectToken",
+        "title": "Inject Token",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.addToken",
+        "title": "Add Token",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.verifyAll",
+        "title": "Verify & Clean",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.scanExpiry",
+        "title": "Scan Expiry",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.healthCheck",
+        "title": "Health Check",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.clearBlacklist",
+        "title": "Clear Blacklist",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.clearAllInUse",
+        "title": "Clear All In-Use Locks",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.clearAllHealth",
+        "title": "Clear All Health Data",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.endpointHealth",
+        "title": "Show Quota Endpoint Health",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.toggleAutoRotate",
+        "title": "Toggle Auto-Rotate",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.show",
+        "title": "Show Output Log",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.setModeWam",
+        "title": "WAM Mode",
+        "category": "RT Flow"
+      },
+      {
+        "command": "wam.setModeOfficial",
+        "title": "Official Login Mode",
+        "category": "RT Flow"
+      }
+    ],
+    "configuration": {
+      "title": "RT Flow",
+      "properties": {
+        "wam.accountsFile": {
+          "type": "string",
+          "default": "",
+          "description": "Account pool file path (empty = auto-detect)"
+        },
+        "wam.autoRotate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-switch when quota drops below threshold"
+        },
+        "wam.autoSwitchThreshold": {
+          "type": "number",
+          "default": 5,
+          "description": "Auto-switch threshold (%)"
+        },
+        "wam.scanIntervalMs": {
+          "type": "number",
+          "default": 10000,
+          "description": "W% polling interval (ms)"
+        },
+        "wam.autoSwitchDailyMin": {
+          "type": "number",
+          "default": 5,
+          "description": "Daily quota minimum for auto-switch candidates"
+        },
+        "wam.autoSwitchWeeklyMin": {
+          "type": "number",
+          "default": 3,
+          "description": "Weekly quota minimum for auto-switch candidates"
+        },
+        "wam.switchCooldownMs": {
+          "type": "number",
+          "default": 15000,
+          "description": "Min interval between auto-switches (ms)"
+        },
+        "wam.rotateOnEveryMessage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Rotate on every user message"
+        },
+        "wam.inUseLockMs": {
+          "type": "number",
+          "default": 120000,
+          "description": "In-use lock duration (ms)"
+        },
+        "wam.hardExhaustWatchdogMs": {
+          "type": "number",
+          "default": 2000,
+          "description": "Hard exhaust watchdog period (ms, 0=off)"
+        },
+        "wam.broadcastDebounceMs": {
+          "type": "number",
+          "default": 200,
+          "description": "UI broadcast debounce (ms)"
+        },
+        "wam.stuckNotify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stuck conversation notifications"
+        },
+        "wam.notifyOnStaleStream": {
+          "type": "boolean",
+          "default": true,
+          "description": "Notify on stale streaming conversations"
+        },
+        "wam.streamStaleMaxSec": {
+          "type": "number",
+          "default": 1800,
+          "description": "Streaming list max retention (sec)"
+        },
+        "wam.multiInstance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Multi-instance mode"
+        }
+      }
+    }
+  }
+}
