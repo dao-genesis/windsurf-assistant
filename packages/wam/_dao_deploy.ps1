@@ -110,11 +110,19 @@ foreach ($t in $targets) {
         continue
     }
 
-    # 3. copy
+    # 3. copy (extension.js + package.json + 子进程引擎 + Python helpers)
     try {
         Copy-Item $srcExt $oldExt -Force -ErrorAction Stop
         Copy-Item $srcPkg (Join-Path $dst 'package.json') -Force -ErrorAction Stop
-        Write-Host '   [2/5] copy OK'
+        # v4.32.2 · 道法自然 · 子进程引擎与 Python helpers 同步部署
+        $auxFiles = @('dao_stuck.js', '_vscdb_helper.py', '_vscdb_inject_helper.py')
+        foreach ($af in $auxFiles) {
+            $srcAf = Join-Path $PSScriptRoot $af
+            if (Test-Path $srcAf) {
+                Copy-Item $srcAf (Join-Path $dst $af) -Force -ErrorAction Stop
+            }
+        }
+        Write-Host '   [2/5] copy OK (ext + pkg + engine + helpers)'
     } catch {
         Write-Host ('   [2/5] copy FAIL: {0}' -f $_.Exception.Message) -ForegroundColor Red
         $results += [pscustomobject]@{ target=$name; ok=$false; reason='copy_fail'; oldVer=$oldVer; sha=''; path=$dst }

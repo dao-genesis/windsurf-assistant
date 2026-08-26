@@ -24,7 +24,7 @@
 @{
     extensionId = 'devaid.rt-flow'
     wamHomeDir  = '.wam'
-    extDirHint  = '.windsurf\extensions'
+    extDirHint  = '.devin\extensions'
 
     # 默认仅本机 · 任何 clone 即可工作 · 万人通用
     targets = @(
