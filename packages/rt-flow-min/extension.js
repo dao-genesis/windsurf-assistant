@@ -4334,9 +4334,10 @@ function _isValidAutoTarget(i) {
 // v3.16.2-netproxy · 道·网络软编码(直连优先·代理兜底) — 与 devin_proxy.upstreamRequest 同策, 覆盖所有
 //   rt-flow 宿主侧 API 调用(planStatus/devinLogin/listSessions 等):
 //   ① 直连(keep-alive 池) → ② 瞬断(TLS 半握手被掐/ECONNRESET)换新 socket 直连重试
-//   → ③ 仍不通才探测本机常见代理端口(Clash/v2ray 等·60s 缓存)经 CONNECT 兜底。
+//   → ③ 仍不通才动态发现本机代理端口(环境变量/常见口/netstat 扫描·60s 缓存)经 CONNECT 兜底。
 //   任一路成功即记忆偏好(直连恢复自动回归), 国内直连/挂代理/无代理三态皆自愈。
-const _NETP_PORTS = [2080, 7890, 10809, 7891, 1080, 10808, 8080, 8118]; // 2080=sing-box 真代理优先; 7890=com.vortex.helper(direct 模式)降级
+//   适配一切: 用户手动开任意 VPN 节点(端口不定) → netstat 扫描本机监听端口自动命中, 零硬编码。
+const _NETP_PORTS = [2080, 7897, 7890, 10809, 7891, 1080, 10808, 8080, 8118, 2081, 8888, 9090];
 let _netpProbe = { port: 0, ts: 0 }; // port>0=探到可用; -1=探明无; 0=未探测 (60s 缓存)
 let _netpGood = 0; // 上次经该本机代理成功 → 后续先走代理; 直连一成功即清零
 // 软编码·适配一切: 用户显式设的 HTTP(S)_PROXY/ALL_PROXY 本机端口优先于内置常见口清单
@@ -4347,43 +4348,89 @@ function _netpEnvPort() {
   const m = String(p).match(/(?:127\.0\.0\.1|localhost):(\d+)/i);
   return m ? (parseInt(m[1], 10) || 0) : 0;
 }
-function _netpEffPorts() {
+// 排除已知系统/非代理监听端口 (netstat 扫描时过滤)
+const _NETP_SKIP = new Set([135, 139, 445, 5040, 5985, 7680, 27017, 3306, 5432, 6379, 8081, 9229, 1433, 1521, 3389, 5900, 49152]);
+// netstat 动态发现本机监听端口 → 适配用户手动开的任意 VPN 节点(端口不定)
+function _netpDiscoverPorts(cb) {
+  const ports = new Set();
   const ep = _netpEnvPort();
-  const seen = new Set();
-  const out = [];
-  for (const p of (ep ? [ep] : []).concat(_NETP_PORTS)) {
-    if (p > 0 && !seen.has(p)) { seen.add(p); out.push(p); }
-  }
-  return out;
+  if (ep) ports.add(ep);
+  for (const p of _NETP_PORTS) ports.add(p);
+  try {
+    require("child_process").exec("netstat -ano -p tcp", { timeout: 3000, windowsHide: true }, (err, stdout) => {
+      if (stdout) {
+        for (const line of String(stdout).split(/\r?\n/)) {
+          const m = line.match(/TCP\s+[\d.]+:(\d+)\s+\S+\s+LISTENING/i);
+          if (m) {
+            const p = parseInt(m[1], 10);
+            if (p > 1024 && p < 65535 && !_NETP_SKIP.has(p)) ports.add(p);
+          }
+        }
+      }
+      cb([...ports]);
+    });
+  } catch (e) { cb([...ports]); }
 }
 function _netTransient(e) {
-  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up|disconnected|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|ENOTFOUND|handshake|TLS/i.test(String((e && e.message) || e || ""));
+  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up|disconnected|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|ENOTFOUND|handshake|TLS|timeout/i.test(String((e && e.message) || e || ""));
 }
 function _netpProbePort(host, cb) {
   if (_netpProbe.ts && Date.now() - _netpProbe.ts < 60000) return cb(_netpProbe.port > 0 ? _netpProbe.port : 0);
-  const ports = _netpEffPorts();
-  let i = 0;
-  const tryNext = () => {
-    if (i >= ports.length) { _netpProbe = { port: -1, ts: Date.now() }; log("netproxy: 探测全部端口失败 → 60s 内不再探测"); return cb(0); }
-    const port = ports[i++];
+  _netpDiscoverPorts((ports) => {
     let done = false;
-    const s = net.connect({ host: "127.0.0.1", port, timeout: 800 });
-    const fin = (ok) => { if (done) return; done = true; try { s.destroy(); } catch (e) {} if (ok) { _netpProbe = { port, ts: Date.now() }; log("netproxy: 探测到可用代理端口 " + port); cb(port); } else tryNext(); };
-    s.once("connect", () => {
-      s.write("CONNECT " + host + ":443 HTTP/1.1\r\nHost: " + host + ":443\r\n\r\n");
-      s.once("data", (d) => fin(/^HTTP\/1\.[01] 200/.test(String(d))));
-      setTimeout(() => fin(false), 4000);
-    });
-    s.once("error", () => fin(false));
-    s.once("timeout", () => fin(false));
-  };
-  tryNext();
+    const fin = (port) => { if (done) return; done = true; _netpProbe = { port, ts: Date.now() }; if (port > 0) log("netproxy: 探测到可用代理端口 " + port); else log("netproxy: 探测全部端口失败 → 60s 内不再探测"); cb(port); };
+    if (ports.length === 0) return fin(0);
+    // 阶段1: 常见端口串行优先 (前 8 个, 2080 第一) — 避免并行淹没真代理
+    const common = ports.slice(0, 8);
+    const rest = ports.slice(8);
+    let i = 0;
+    const tryNext = () => {
+      if (i >= common.length) return probeRest();
+      const port = common[i++];
+      _netpTryPort(port, host, (ok) => { if (ok) fin(port); else tryNext(); });
+    };
+    tryNext();
+    // 阶段2: netstat 发现端口并行兜底
+    function probeRest() {
+      if (rest.length === 0) return fin(0);
+      let pending = 0;
+      for (const port of rest) {
+        pending++;
+        _netpTryPort(port, host, (ok) => { pending--; if (ok) fin(port); else if (pending === 0) fin(0); });
+      }
+    }
+  });
+}
+// 单端口探测: CONNECT 200 后须隧道内 TLS 握手成功才算真代理 (7890 com.vortex.helper direct 假代理 CONNECT 200 但 TLS 黑洞 → 剔除)
+function _netpTryPort(port, host, cb) {
+  let pDone = false;
+  const s = net.connect({ host: "127.0.0.1", port, timeout: 1500 });
+  const pFin = (ok) => { if (pDone) return; pDone = true; try { s.destroy(); } catch (e) {} cb(ok); };
+  s.once("connect", () => {
+    s.setTimeout(0); // 清除 idle 超时(TLS 握手期间可能空闲>700ms 被误杀) → 用独立定时器控制
+    s.write("CONNECT " + host + ":443 HTTP/1.1\r\nHost: " + host + ":443\r\n\r\n");
+    let buf = "";
+    const onData = (d) => {
+      buf += String(d);
+      if (buf.indexOf("\r\n\r\n") < 0) return;
+      s.removeListener("data", onData);
+      if (!/^HTTP\/1\.[01] 200/.test(buf)) return pFin(false);
+      const ts = tls.connect({ socket: s, servername: host, rejectUnauthorized: false, timeout: 0 }, () => { try { ts.destroy(); } catch (e) {} pFin(true); });
+      ts.on("error", () => pFin(false));
+      ts.on("timeout", () => { try { ts.destroy(); } catch (e) {} pFin(false); });
+    };
+    s.on("data", onData);
+    setTimeout(() => pFin(false), 4000);
+  });
+  s.once("error", () => pFin(false));
+  s.once("timeout", () => pFin(false));
 }
 function _netpTunnel(proxyPort, host, cb) {
   let done = false;
   const s = net.connect({ host: "127.0.0.1", port: proxyPort, timeout: 5000 });
   const fail = (m) => { if (done) return; done = true; try { s.destroy(); } catch (e) {} cb(new Error(m || "tunnel failed")); };
   s.once("connect", () => {
+    s.setTimeout(0); // 清除 idle 超时 → 用独立定时器控制
     s.write("CONNECT " + host + ":443 HTTP/1.1\r\nHost: " + host + ":443\r\n\r\n");
     let buf = "";
     const onData = (d) => {
@@ -4423,15 +4470,65 @@ function httpsReq(method, urlStr, headers, body, timeoutMs) {
       res.on("data", (c) => chunks.push(c));
       res.on("end", () => done({ status: res.statusCode, body: Buffer.concat(chunks) }));
     };
+    // 隧道内直接 TLS + 手动 HTTP (https.request+createConnection 的 'connect' 事件错过 → TLS 卡死, 弃用)
+    const httpOverTls = (sock, onOkProxyPort, cb) => {
+      let hsDone = false;
+      const ts = tls.connect({ socket: sock, servername: u.hostname, rejectUnauthorized: false }, () => {
+        if (hsDone) return; hsDone = true;
+        const head =
+          method + " " + u.pathname + u.search + " HTTP/1.1\r\n" +
+          "Host: " + u.hostname + "\r\n" +
+          Object.entries(baseOpts.headers).map(([k, v]) => k + ": " + v).join("\r\n") + "\r\n" +
+          (body ? "Content-Length: " + Buffer.byteLength(body) + "\r\n" : "") +
+          "Connection: close\r\n\r\n" + (body || "");
+        ts.write(head);
+      });
+      let respBuf = Buffer.alloc(0);
+      let settled = false;
+      const fin = (e, r) => { if (settled) return; settled = true; try { ts.destroy(); } catch (x) {} cb(e, r); };
+      ts.on("data", (d) => {
+        respBuf = Buffer.concat([respBuf, d]);
+        const hEnd = respBuf.indexOf("\r\n\r\n");
+        if (hEnd < 0) return;
+        const headStr = respBuf.subarray(0, hEnd).toString("utf8");
+        const status = parseInt(headStr.split(" ")[1], 10) || 0;
+        const clMatch = headStr.match(/content-length:\s*(\d+)/i);
+        if (clMatch) {
+          const cl = parseInt(clMatch[1], 10);
+          if (respBuf.length >= hEnd + 4 + cl) fin(null, { status, body: respBuf.subarray(hEnd + 4, hEnd + 4 + cl) });
+        }
+        // chunked/无长度 → 等 end 再解析
+      });
+      ts.on("end", () => {
+        const hEnd = respBuf.indexOf("\r\n\r\n");
+        if (hEnd < 0) return fin(new Error("no response"));
+        const headStr = respBuf.subarray(0, hEnd).toString("utf8");
+        const status = parseInt(headStr.split(" ")[1], 10) || 0;
+        let body = respBuf.subarray(hEnd + 4);
+        if (/transfer-encoding:\s*chunked/i.test(headStr)) {
+          // 简易 chunked 解码
+          let out = Buffer.alloc(0), pos = 0;
+          while (pos < body.length) {
+            const le = body.indexOf("\r\n", pos);
+            if (le < 0) break;
+            const sz = parseInt(body.subarray(pos, le).toString("utf8").split(";")[0].trim(), 16);
+            if (!sz || isNaN(sz)) break;
+            if (body.length < le + 2 + sz) break;
+            out = Buffer.concat([out, body.subarray(le + 2, le + 2 + sz)]);
+            pos = le + 2 + sz + 2;
+          }
+          if (out.length) body = out;
+        }
+        fin(null, { status, body });
+      });
+      ts.on("error", (e) => fin(e));
+      setTimeout(() => fin(new Error("timeout(proxy)")), timeoutMs || HTTP_TIMEOUT_MS);
+    };
     const viaProxy = (port, origErr) => {
       log("netproxy: 直连失败 → 走代理端口 " + port + " (" + (origErr && origErr.message || "") + ")");
       _netpTunnel(port, u.hostname, (te, sock) => {
         if (te) { log("netproxy: 隧道失败: " + te.message); return fail(origErr || te); }
-        const pr = https.request(Object.assign({}, baseOpts, { agent: false, createConnection: () => tls.connect({ socket: sock, servername: u.hostname, rejectUnauthorized: false }) }), (r) => collect(r, port));
-        pr.on("timeout", () => pr.destroy(new Error("timeout(proxy)")));
-        pr.on("error", (e) => fail(origErr || e));
-        if (body) pr.write(body);
-        pr.end();
+        httpOverTls(sock, port, (e, r) => { if (e) return fail(origErr || e); _netpGood = port; done({ status: r.status, body: r.body }); });
       });
     };
     const direct = (n, extra) => {
@@ -4450,11 +4547,7 @@ function httpsReq(method, urlStr, headers, body, timeoutMs) {
       log("netproxy: 偏好代理 " + _netpGood + " (直连曾失败记忆)");
       _netpTunnel(_netpGood, u.hostname, (te, sock) => {
         if (te) { log("netproxy: 偏好代理隧道失败 → 清偏好走直连: " + te.message); _netpGood = 0; _netpProbe = { port: 0, ts: 0 }; return direct(0, { agent: _httpsAgent }); }
-        const pr = https.request(Object.assign({}, baseOpts, { agent: false, createConnection: () => tls.connect({ socket: sock, servername: u.hostname, rejectUnauthorized: false }) }), (r) => collect(r, _netpGood));
-        pr.on("timeout", () => pr.destroy(new Error("timeout(proxy)")));
-        pr.on("error", () => { _netpGood = 0; direct(0, { agent: _httpsAgent }); });
-        if (body) pr.write(body);
-        pr.end();
+        httpOverTls(sock, _netpGood, (e, r) => { if (e) { _netpGood = 0; return direct(0, { agent: _httpsAgent }); } done({ status: r.status, body: r.body }); });
       });
       return;
     }
