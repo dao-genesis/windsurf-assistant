@@ -72,7 +72,8 @@ function Get-WamSourceVersion {
     if (-not (Test-Path $ExtensionJs)) { return $null }
     # v2.6.9: head 扩至 400 行 · 防 changelog 注释累积推 VERSION 出窗 (v2.6.9 注释 ~46 行 · VERSION 在 220)
     # v2.7.1.1: 再扩至 600 行 · v2.7.x 头注解累至 ~420 行 · 防"知止可以不殆"
-    $head = Get-Content $ExtensionJs -TotalCount 600 -ErrorAction SilentlyContinue
+    # v4.32.2: 再扩至 5000 行 · 头注解累至 4000+ 行 · VERSION 在 4174 · 道法自然·知止可以不殆
+    $head = Get-Content $ExtensionJs -TotalCount 5000 -ErrorAction SilentlyContinue
     $verLine = ($head | Select-String 'const VERSION\s*=\s*"' | Select-Object -First 1)
     if (-not $verLine) { return $null }
     # v2.7.1.1 · 兼容四段 patch 版本号 (如 2.7.1.1) · 子段可选
