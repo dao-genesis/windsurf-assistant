@@ -10884,17 +10884,9 @@ function updateStatusBar() {
 //   结构未变时只增量刷新对话追踪区 (_broadcastConvSection 自带签名去抖) → 永不整页闪。
 let _panelStructSig = null;
 let _wamRebuildThrottleTs = 0;
-// 全池耗尽提醒去抖 (episode 语义) — 根治左下角「全部账号额度已耗尽」删不掉/反复弹:
-//   旧病: _tick(5~10s)+硬耗尽看门狗(2s) 每轮都 _notify → 用户点 × 后几秒内又弹, 强干扰。
-//   治法: 同一耗尽事件(episode)只提醒一次且限时自动消失; 切号成功/有可用号即重置 episode。
-let _exhaustNotifyTs = 0;
-function _resetExhaustEpisode() { _exhaustNotifyTs = 0; }
-function _notifyExhaustOnce(msg) {
-  const gapMs = Math.max(1, +_cfg("exhaustNotifyIntervalMin", 360) || 360) * 60000;
-  if (Date.now() - _exhaustNotifyTs < gapMs) return;
-  _exhaustNotifyTs = Date.now();
-  _notifyTimed("warn", msg, 600000); // 10min 自动淡去 · 可手动关 · 不再重弹
-}
+// v4.32.2 · 删除「全部账号额度已耗尽」提示 (道: 不实之示不如不示)
+//   根因: 该提示基于 parsePlan 的 weekly% omit → 0 误判 · 实际余额可能充裕
+//   治法: 直接删除 _notifyExhaustOnce 定义与调用 · 全锁/全耗仅日志记录不打扰用户
 let _broadcastForce = false; // 结构性用户动作(删号等) → 绕过重挂节流·立即回显
 // v3.16.5 · 添加账号输入期截止 (道: 不扰民) — 用户在 addInput 打字时延迟整页重建
 //   根因: 整页重建销毁 textarea DOM → 焦点/光标丢失 → 用户感知"每打几个字就刷新"
@@ -11155,7 +11147,6 @@ function _maybeTrigger(reason, hint) {
         const sr = await loginAccount(_store, bestI);
         if (sr.ok) {
           _lastSwitchTime = Date.now();
-          _resetExhaustEpisode(); // 切号成功 = 新 episode · 下次全池耗尽可再提醒一次
           _predictiveCandidate = _store.getBestIndex(bestI);
           _notify("verbose", "WAM 直觉: → " + (_store.activeEmail || "?"));
         } else {
@@ -16354,7 +16345,7 @@ class Engine {
               ", 无可用账号 (全部🔒锁定或耗尽) · 尊重锁 · 不切号",
           );
         }
-        _notifyExhaustOnce("WAM: ⚠️ " + reason + "，全部账号额度已耗尽");
+        // v4.32.2 · 不弹「全部账号额度已耗尽」提示 (不实之示 · 道法自然)
       }
       // ─── 软耗尽: 仍有余量 · 感知 reset 时间 · 尊重冷却 · 尊重用户锁 ───
       //   1%-100% 范围内 skipAutoSwitch 守卫保留 (用户主动消耗权 · 道法自然)
@@ -16498,7 +16489,6 @@ class Engine {
         const sr = await loginAccount(this.store, bestI);
         if (sr.ok) {
           _lastSwitchTime = Date.now();
-          _resetExhaustEpisode(); // 切号成功 = 新 episode · 下次全池耗尽可再提醒一次
           _predictiveCandidate = this.store.getBestIndex(bestI);
           if (_predictiveCandidate >= 0)
             log(
@@ -17423,7 +17413,6 @@ async function activate(context) {
             const sr = await loginAccount(_store, bestI);
             if (sr.ok) {
               _lastSwitchTime = Date.now();
-          _resetExhaustEpisode(); // 切号成功 = 新 episode · 下次全池耗尽可再提醒一次
               _predictiveCandidate = _store.getBestIndex(bestI);
               _notify(
                 "verbose",
