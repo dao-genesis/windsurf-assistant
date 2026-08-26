@@ -4364,11 +4364,11 @@ function _netpProbePort(host, cb) {
   const ports = _netpEffPorts();
   let i = 0;
   const tryNext = () => {
-    if (i >= ports.length) { _netpProbe = { port: -1, ts: Date.now() }; return cb(0); }
+    if (i >= ports.length) { _netpProbe = { port: -1, ts: Date.now() }; log("netproxy: 探测全部端口失败 → 60s 内不再探测"); return cb(0); }
     const port = ports[i++];
     let done = false;
     const s = net.connect({ host: "127.0.0.1", port, timeout: 800 });
-    const fin = (ok) => { if (done) return; done = true; try { s.destroy(); } catch (e) {} if (ok) { _netpProbe = { port, ts: Date.now() }; cb(port); } else tryNext(); };
+    const fin = (ok) => { if (done) return; done = true; try { s.destroy(); } catch (e) {} if (ok) { _netpProbe = { port, ts: Date.now() }; log("netproxy: 探测到可用代理端口 " + port); cb(port); } else tryNext(); };
     s.once("connect", () => {
       s.write("CONNECT " + host + ":443 HTTP/1.1\r\nHost: " + host + ":443\r\n\r\n");
       s.once("data", (d) => fin(/^HTTP\/1\.[01] 200/.test(String(d))));
@@ -4424,8 +4424,9 @@ function httpsReq(method, urlStr, headers, body, timeoutMs) {
       res.on("end", () => done({ status: res.statusCode, body: Buffer.concat(chunks) }));
     };
     const viaProxy = (port, origErr) => {
+      log("netproxy: 直连失败 → 走代理端口 " + port + " (" + (origErr && origErr.message || "") + ")");
       _netpTunnel(port, u.hostname, (te, sock) => {
-        if (te) return fail(origErr || te);
+        if (te) { log("netproxy: 隧道失败: " + te.message); return fail(origErr || te); }
         const pr = https.request(Object.assign({}, baseOpts, { agent: false, createConnection: () => tls.connect({ socket: sock, servername: u.hostname, rejectUnauthorized: false }) }), (r) => collect(r, port));
         pr.on("timeout", () => pr.destroy(new Error("timeout(proxy)")));
         pr.on("error", (e) => fail(origErr || e));
@@ -4446,8 +4447,9 @@ function httpsReq(method, urlStr, headers, body, timeoutMs) {
     };
     if (_netpGood) {
       // 偏好代理时仍带直连回归: 隧道失败/代理下线 → 清偏好走直连
+      log("netproxy: 偏好代理 " + _netpGood + " (直连曾失败记忆)");
       _netpTunnel(_netpGood, u.hostname, (te, sock) => {
-        if (te) { _netpGood = 0; _netpProbe = { port: 0, ts: 0 }; return direct(0, { agent: _httpsAgent }); }
+        if (te) { log("netproxy: 偏好代理隧道失败 → 清偏好走直连: " + te.message); _netpGood = 0; _netpProbe = { port: 0, ts: 0 }; return direct(0, { agent: _httpsAgent }); }
         const pr = https.request(Object.assign({}, baseOpts, { agent: false, createConnection: () => tls.connect({ socket: sock, servername: u.hostname, rejectUnauthorized: false }) }), (r) => collect(r, _netpGood));
         pr.on("timeout", () => pr.destroy(new Error("timeout(proxy)")));
         pr.on("error", () => { _netpGood = 0; direct(0, { agent: _httpsAgent }); });
