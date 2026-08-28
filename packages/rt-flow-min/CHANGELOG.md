@@ -1,5 +1,26 @@
 # CHANGELOG · RT Flow Min
 
+## v3.16.3 (2026-08-28)
+
+添加账号列表不显示根治 + 额度机制回归真实 + 耗尽通知静默化
+
+### 添加账号列表不显示根治（核心账号问题）
+
+- **根因**：v3.16.2-fix 的 `_broadcastUI` 防抖回调检查实时 `_uiAddOpen`，而 addBatch 里 `_uiAddOpen=false → _broadcastUI() → 立即恢复 true`，200ms 后回调执行时 `_uiAddOpen` 已是 true → 刷新被跳过 → 新账号永远不显示（第二次添加才提示"已添加过"）
+- **修复**：`_broadcastUI(force)` 参数，force 时无视 `_uiAddOpen` 强制全量刷新；addBatch 调用 `_broadcastUI(true)`
+- 热测试验证：旧时序跳过（bug 复现）+ force 刷新（修复生效）
+
+### 额度机制回归真实（镜像谬之绝 · 用户实证）
+
+- **根因**：v3.16.2-hotfix 的配额制镜像逻辑（Pro/Max/Teams weekly omit → 镜像 daily）过犹不及——官方 UI 显示 weekly usage，配额制也追踪周，omit = proto3 default 0 = 耗尽；镜像导致耗尽号假显 W=daily（如 D47 W47）→ "每天都有额度"假象
+- **修复**：删除镜像逻辑，恢复纯 proto3 语义——omit = 0 = 耗尽（所有 plan 一视同仁）；daily/weekly 独立解析，resetAt 哨兵判定追踪与否
+- 热测试验证：Pro weekly omit → D47 W0（不镜像）；Max 双 omit → D0 W0；Free daily omit → D0 W32；满量 → D100 W100
+
+### 耗尽通知静默化（用户只要真实显示 · 不要提示）
+
+- 硬/软耗尽无可用账号：只 log 不弹窗（删除 `_notify` 调用）
+- UI 列表 D/W 红色真实显示 · 用户自见 · 多言数穷·不如守中
+
 ## v3.16.2-hotfix (2026-08-26)
 
 三患根治 + 网络代理补丁 · 全链路验证版
@@ -10,13 +31,13 @@
 - **全锁越权切号根治**：硬耗尽看门狗检测全部账号锁定即退避（不触发 _tick）· 无可用账号通知 60s 冷却 · 全锁时仅记日志不弹窗
 - **对话追踪丢失根治**：.pb 文件消失 60s 宽限期（_pbMissingSince 时间戳）· 防流式输出时文件临时锁定导致状态被删 · 卡死对话 10 分钟内保持可见
 
-### weekly% 误判根治（三患共同根因）
+### weekly% 误判根治（三患共同根因 · ⚠ v3.16.3 已推翻）
 
-- Pro/Max/Teams 配额制账号 API 恒不返回 weeklyQuotaRemainingPercent（不追踪周）
-- 旧逻辑 omit→0 → 假硬耗尽 → 切号风暴 + 假提示 + 干旱横幅
-- 修复：配额制 omit → 镜像 daily（唯一真实信号）；Free/Trial 保持 omit=0 语义
-- 删除「全部账号额度已耗尽」假提示 + 「Weekly 干旱」横幅
-- drought 判定保守化：checkedCount >= 2 才触发
+- ~~Pro/Max/Teams 配额制账号 API 恒不返回 weeklyQuotaRemainingPercent（不追踪周）~~
+- ~~修复：配额制 omit → 镜像 daily（唯一真实信号）；Free/Trial 保持 omit=0 语义~~
+- **v3.16.3 实证推翻**：官方 UI 显示 weekly usage → 配额制也追踪周 → omit=0=耗尽 → 镜像导致"每天都有额度"假象 → 已删除镜像恢复纯 proto3 语义
+- 删除「全部账号额度已耗尽」假提示 + 「Weekly 干旱」横幅（保留）
+- drought 判定保守化：checkedCount >= 2 才触发（保留）
 
 ### 网络代理补丁（直连优先 · 代理兜底）
 

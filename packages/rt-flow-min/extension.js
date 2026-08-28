@@ -6377,33 +6377,27 @@ function _parsePlanStatusJson(j) {
       ps.weeklyResetAt ||
       0,
   );
-  // v3.16.2-fix · weekly% 误判根治 (三患共同根因 · 实测 API 实证 2026-08-26)
-  //   Pro/Max/Teams 配额制账号响应恒不返回 weeklyQuotaRemainingPercent (不追踪周)
-  //   旧逻辑: omit → 0 → 假硬耗尽 → 切号风暴 + 假提示 + 干旱横幅
-  //   治法: 配额制 omit → 镜像 daily (唯一真实信号); Free/Trial 保持 omit=0 语义
-  //   道: 名可名也·非恒名也 — 同一 omit, Free 是耗尽, Pro 是不追踪. 以 plan 别之, 则万物自化
-  const _quotaPlan = /Pro|Max|Teams|Enterprise|Ultimate/i.test(String(plan));
+  // v3.16.3 · 反者道之动 · 镜像谬之绝 (用户实证 2026-08-28)
+  //   旧 v3.16.2-fix: 配额制(Pro/Max/Teams) weekly omit → 镜像 daily
+  //   实证: 官方 UI 显示 weekly usage → 配额制也追踪周 · omit = proto3 default 0 = 耗尽
+  //   镜像后果: 耗尽号假显 W=daily (如 D47 W47) → "每天都有额度" 假象 · 周/日机制全错
+  //   治法: 恢复纯 proto3 语义 — omit = 0 = 耗尽 (所有 plan 一视同仁 · 名可名也·非恒名也)
+  //   通知: 耗尽不再弹窗 (用户只要真实显示 · 不要提示 · 见 rotateNext 静默化)
   if (weeklyPct == null) {
-    if (_quotaPlan && dailyPct != null) {
-      weeklyPct = Number(dailyPct); // 配额制不追踪周 → 镜像 daily (唯一真实信号)
-      log("  parsePlan: weekly% omit · " + plan + " 配额制不追踪周 · 镜像 daily=" + weeklyPct);
-    } else if (weeklyResetAt > 0 || dailyPct != null) {
-      weeklyPct = 0; // Free/Trial 追踪 weekly · omit = 耗尽
+    if (weeklyResetAt > 0) {
+      weeklyPct = 0; // 追踪 weekly · omit = 耗尽 (proto3 default)
       log("  parsePlan: weekly% omit → 0 (proto3 default · 耗尽)");
     } else {
-      weeklyPct = Number(dailyPct) || 0; // 极罕见: 双周期皆缺 · 兜底
+      weeklyPct = Number(dailyPct) || 0; // 不追踪 weekly · 退化为 daily (兼容)
       log("  parsePlan: weekly% omit & no wrst → fallback daily=" + weeklyPct);
     }
   }
   if (dailyPct == null) {
-    if (_quotaPlan && weeklyPct != null) {
-      dailyPct = Number(weeklyPct); // 配额制 daily omit → 镜像 weekly (双向安全)
-      log("  parsePlan: daily% omit · " + plan + " 配额制 · 镜像 weekly=" + dailyPct);
-    } else if (dailyResetAt > 0) {
-      dailyPct = 0; // 此 plan 追踪 daily · omit = 耗尽 (修复历史镜像谬)
+    if (dailyResetAt > 0) {
+      dailyPct = 0; // 追踪 daily · omit = 耗尽 (proto3 default)
       log("  parsePlan: daily% omit → 0 (proto3 default · 耗尽)");
     } else {
-      // 此 plan 完全不追踪 daily (理论可能 · 实战未见) · 退化为 weekly
+      // 不追踪 daily · 退化为 weekly (兼容)
       dailyPct = Number(weeklyPct) || 0;
       log("  parsePlan: daily% omit & no drst → mirror weekly=" + dailyPct);
     }
@@ -7481,10 +7475,15 @@ function updateStatusBar() {
   ttLines.push("点击 → 打开管理面板");
   _statusBar.tooltip = ttLines.join("\n");
 }
-function _broadcastUI() {
+function _broadcastUI(force) {
   // v3.0.6 · 防抖 · 合并高频调用 · 根治验证/切号期多次全量重建卡顿
   //   verify N个新账号 → N次 broadcastUI → 合并为1次 · 用户无感 · 系统无不为
   // v3.11.3 · 软编码 · 60→200ms (wam.broadcastDebounceMs) · 多选操作时用户手速<200ms·不触发中途重建
+  // v3.16.3 · force 参数 · 根治"添加成功但列表不显示"
+  //   旧 v3.16.2-fix: addBatch 里 _uiAddOpen=false → _broadcastUI() → 立即恢复 true
+  //   但 _broadcastUI 是防抖的 · 200ms 后回调执行时 _uiAddOpen 已是 true → 刷新被跳过
+  //   → 新账号永远不显示 (第二次添加才提示"已添加过")
+  //   治法: force=true 时无视 _uiAddOpen 强制全量刷新 (添加后用户已提交输入 · 重建安全)
   if (_broadcastUITimer) clearTimeout(_broadcastUITimer);
   const _debMs = Math.max(30, +_cfg("broadcastDebounceMs", 200) || 200);
   _broadcastUITimer = setTimeout(() => {
@@ -7494,7 +7493,7 @@ function _broadcastUI() {
     //   用户正在输入时 · 任何 broadcastUI (tick/verify/quota) 都会打断输入 · 造成卡顿/闪烁
     //   治法: _uiAddOpen=true 时仅更新状态栏 · 面板关闭后自然恢复全量刷新
     //   道: 不出于户·以知天下 — 不动则不损 · 无为而治
-    if (!_uiAddOpen) {
+    if (force || !_uiAddOpen) {
       if (_sidebarProvider) _sidebarProvider.refresh();
       if (_editorPanel) {
         try {
@@ -9215,11 +9214,10 @@ async function handleWebviewMessage(msg) {
         if (tks.length > 0) info += " · " + tks.length + " token (注入中…)";
         _toast(info); // ← 立即告知 · 不等 injectToken
         // 不调 reloadAccounts() — addBatch 已直接修改 this.accounts · accounts 已在内存
-        // v3.16.2-fix · 添加账号后强制全量刷新 · 即使面板仍展开也需看到新账号
-        const _wasAddOpen = _uiAddOpen;
-        _uiAddOpen = false;
-        _broadcastUI(); // ← 立即刷新 · 用户即见新账号列表
-        _uiAddOpen = _wasAddOpen;
+        // v3.16.3 · force=true 强制全量刷新 · 根治"添加成功但列表不显示"
+        //   旧 v3.16.2-fix: _uiAddOpen=false → _broadcastUI() → 立即恢复 true
+        //   防抖 200ms 后回调执行时 _uiAddOpen 已是 true → 刷新被跳过 → 新账号不显示
+        _broadcastUI(true); // ← force · 无视面板展开 · 用户即见新账号列表
         // 后台 fire-forget: token 注入 + 3 worker 并行 verify
         (async () => {
           if (tks.length > 0) {
@@ -10102,10 +10100,10 @@ class Engine {
         );
         await this._doAutoSwitch(bestI, activeI, "hard-exhaust");
       } else {
-        // v3.16.2-fix · 无可用账号通知冷却 60s · 防看门狗 2s 循环刷屏
-        //   根因: 硬耗尽看门狗 2s 触发 _tick → bestI=-1 → _notify → 2s 后再 _tick → 循环
-        //   治法: 60s 内只通知一次 · 日志仍记录但不弹窗
-        //   道: 多言数穷·不如守中 — 知止不殆
+        // v3.16.3 · 耗尽通知完全静默 (用户实证 2026-08-28)
+        //   诉求: "实际上这些额度的确是耗尽 · 只是不想要一直提示我就行"
+        //   治法: 只 log 不弹窗 · UI 列表 D/W 红色真实显示 · 用户自见
+        //   道: 知者不言·言者不知 — 多言数穷·不如守中
         const _nowHe = Date.now();
         const _allLocked = this.store.accounts.every(
           (a) => a.skipAutoSwitch,
@@ -10117,8 +10115,7 @@ class Engine {
             _lastNoAvailNotifyAt = _nowHe;
           }
         } else if (_nowHe - _lastNoAvailNotifyAt > 60000) {
-          log("硬耗尽: " + reason + ", 无可用账号");
-          _notify("warn", "WAM: ⚠️ " + reason + "，全部账号额度已耗尽");
+          log("硬耗尽: " + reason + ", 无可用账号 (静默 · 不弹窗)");
           _lastNoAvailNotifyAt = _nowHe;
         }
       }
@@ -10199,11 +10196,10 @@ class Engine {
         );
         await this._doAutoSwitch(bestI, activeI, "exhaust");
       } else {
-        // v3.16.2-fix · 软耗尽无可用账号 · 同样加 60s 通知冷却
+        // v3.16.3 · 软耗尽无可用账号 · 静默 (只 log · 不弹窗 · 用户只要真实显示)
         const _nowSe = Date.now();
         if (_nowSe - _lastNoAvailNotifyAt > 60000) {
-          log("软耗尽: " + reason + ", 无可用账号");
-          _notify("warn", "WAM: " + reason + "，无空闲账号");
+          log("软耗尽: " + reason + ", 无可用账号 (静默 · 不弹窗)");
           _lastNoAvailNotifyAt = _nowSe;
         }
       }
