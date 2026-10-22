@@ -202,7 +202,7 @@ const os = require("os");
 const http = require("http");
 const { spawn, spawnSync } = require("child_process");
 // v3.18.6 · 版本归一: 用户面字符串统一引用 (原 v9/v9.2/v12 混贴)
-const ENGINE_VER = "v12.9-wam";
+const ENGINE_VER = "v13.0-wam";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v9.2 修复 [E]: 引擎永不静默死亡 — 善摄生者, 陆行不遇兕虎
@@ -253,36 +253,66 @@ const APPDATA =
     : process.platform === "darwin"
       ? path.join(os.homedir(), "Library", "Application Support")
       : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-// v3.16.0 · 自适应 Devin Desktop / Windsurf 路径
-function _findPbDir() {
+// v3.18.7 · 全仓枚举 · 单点失明根治
+//   旧法: _findPbDir()/_findVscdb() 各取一仓 → 会话写在别的根 = 追踪/备份全盲
+//   新法: 全 ~/.codeium*/**/cascade + 全 APPDATA/*/User/globalStorage/state.vscdb
+function _allPbDirs() {
   const home = os.homedir();
-  const candidates = [
+  const out = [];
+  const push = (p) => {
+    try {
+      if (fs.statSync(p).isDirectory() && !out.includes(p)) out.push(p);
+    } catch {}
+  };
+  try {
+    for (const d of fs.readdirSync(home, { withFileTypes: true })) {
+      if (!d.isDirectory() || !/^\.codeium(-i\d+)?$/i.test(d.name)) continue;
+      const base = path.join(home, d.name);
+      push(path.join(base, "cascade"));
+      try {
+        for (const s of fs.readdirSync(base, { withFileTypes: true })) {
+          if (s.isDirectory()) push(path.join(base, s.name, "cascade"));
+        }
+      } catch {}
+    }
+  } catch {}
+  if (process.env.CODEIUM_DATA_DIR) {
+    for (const b of ["windsurf", "devin", "Devin"])
+      push(path.join(process.env.CODEIUM_DATA_DIR, b, "cascade"));
+  }
+  for (const p of [
     path.join(home, ".codeium", "devin", "cascade"),
     path.join(home, ".codeium", "Devin", "cascade"),
     path.join(home, ".codeium", "windsurf", "cascade"),
     path.join(home, ".codeium", "windsurf-nightly", "cascade"),
     path.join(home, "AppData", "Local", "codeium", "devin", "cascade"),
     path.join(home, "AppData", "Local", "codeium", "windsurf", "cascade"),
-  ];
-  for (const p of candidates) {
-    try {
-      if (fs.statSync(p).isDirectory()) return p;
-    } catch {}
-  }
-  return path.join(home, ".codeium", "windsurf", "cascade"); // fallback
+  ])
+    push(p);
+  if (!out.length)
+    out.push(path.join(home, ".codeium", "windsurf", "cascade")); // fallback
+  return out;
 }
-function _findVscdb() {
-  const candidates = [
-    path.join(APPDATA, "Devin", "User", "globalStorage", "state.vscdb"),
-    path.join(APPDATA, "Windsurf", "User", "globalStorage", "state.vscdb"),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  return candidates[candidates.length - 1]; // fallback
+function _allVscdbs() {
+  const out = [];
+  try {
+    for (const d of fs.readdirSync(APPDATA)) {
+      const v = path.join(APPDATA, d, "User", "globalStorage", "state.vscdb");
+      try {
+        if (fs.statSync(v).isFile()) out.push(v);
+      } catch {}
+    }
+  } catch {}
+  if (!out.length)
+    out.push(
+      path.join(APPDATA, "Windsurf", "User", "globalStorage", "state.vscdb"),
+    );
+  return out;
 }
-const PB_DIR = _findPbDir();
-const VSCDB = _findVscdb();
+const PB_DIRS = _allPbDirs();
+const VSCDBS = _allVscdbs();
+const PB_DIR = PB_DIRS[0]; // 主仓 (日志/标签兼容)
+const VSCDB = VSCDBS[0];
 // v12.9-wam: 日志/状态全部写入 ~/.wam/stuck-detect/ (不再用 __dirname · 插件目录可能只读)
 const WAM_STUCK_DIR = path.join(os.homedir(), ".wam", "stuck-detect");
 const LOG_DIR = WAM_STUCK_DIR;
@@ -791,11 +821,19 @@ function refreshVscdb() {
   if (nowMs() - lastVscdbRefresh < 3000) return; // 最多3秒刷一次 (加快响应)
   lastVscdbRefresh = nowMs();
 
+  // v3.18.7 · 多 vscdb 合流: 全 IDE 实例 state.vscdb → 并集 (uuid 异集·天然无撞)
   // 尝试主文件; 若 key 缺失且 cache 为空时才用 .backup (避免用陈旧 backup 覆盖新数据)
-  let sessions = tryReadMetadataFromDb(VSCDB);
+  let sessions = null;
+  for (const vdb of VSCDBS) {
+    const s = tryReadMetadataFromDb(vdb);
+    if (s) sessions = (sessions || []).concat(s);
+  }
   if (!sessions && sessionCache.size === 0) {
     // 仅在 cache 完全空时才尝试 backup (首次加载的回退)
-    sessions = tryReadMetadataFromDb(VSCDB + ".backup");
+    for (const vdb of VSCDBS) {
+      const s = tryReadMetadataFromDb(vdb + ".backup");
+      if (s) sessions = (sessions || []).concat(s);
+    }
   }
   if (!sessions) return; // 读取失败 → 保留旧 cache (不知则不妄动)
 
@@ -1238,14 +1276,20 @@ function scan() {
   // SOURCE 1: 刷新 vscdb 会话元数据
   refreshVscdb();
 
-  // SOURCE 2: 扫描 .pb 文件
-  let pbFiles;
-  try {
-    pbFiles = fs.readdirSync(PB_DIR).filter((f) => f.endsWith(".pb"));
-  } catch (e) {
-    log(`SCAN_ERR pb_dir: ${e.message}`);
-    return null;
+  // SOURCE 2: 扫描 .pb 文件 (v3.18.7 全仓: PB_DIRS 每仓收集 {dir,fname})
+  const pbFiles = [];
+  let _pbDirOk = 0;
+  for (const pd of PB_DIRS) {
+    try {
+      for (const f of fs.readdirSync(pd)) {
+        if (f.endsWith(".pb")) pbFiles.push({ dir: pd, fname: f });
+      }
+      _pbDirOk++;
+    } catch (e) {
+      log(`SCAN_ERR pb_dir ${pd}: ${e.message}`);
+    }
   }
+  if (_pbDirOk === 0) return null;
 
   const summary = {
     totalSessions: sessionCache.size,
@@ -1261,9 +1305,10 @@ function scan() {
   const stuckList = [];
   const transitions = [];
 
-  for (const fname of pbFiles) {
+  for (const pf of pbFiles) {
+    const fname = pf.fname;
     const uuid = fname.replace(".pb", "");
-    const fpath = path.join(PB_DIR, fname);
+    const fpath = path.join(pf.dir, fname);
 
     let st;
     try {
@@ -2377,7 +2422,7 @@ function startHttpServer() {
             pid: process.pid,
             version: ENGINE_VER,
             uptime: Math.round(process.uptime()),
-            sources: { pb: PB_DIR, vscdb: VSCDB },
+            sources: { pb: PB_DIRS, vscdb: VSCDBS },
           },
           null,
           2,
@@ -2760,15 +2805,16 @@ function main() {
     // 闸门失败不阻塞启动 · 道法自然 · 兜不住就让它跑
   }
 
-  // 验证 .pb 目录
-  if (!fs.existsSync(PB_DIR)) {
-    console.error(`FATAL: .pb 目录不存在: ${PB_DIR}`);
+  // 验证 .pb 目录 (v3.18.7 全仓: 零活仓才 fatal)
+  const _pbAlive = PB_DIRS.filter((d) => fs.existsSync(d));
+  if (!_pbAlive.length) {
+    console.error(`FATAL: .pb 目录全部不存在: ${PB_DIRS.join(" | ")}`);
     process.exit(1);
   }
 
-  // 验证 vscdb
-  if (!fs.existsSync(VSCDB)) {
-    log(`WARN: vscdb 不存在: ${VSCDB} (将仅依赖 .pb 文件)`);
+  // 验证 vscdb (v3.18.7 全仓: 逐仓告警·零仓不致命)
+  for (const vdb of VSCDBS) {
+    if (!fs.existsSync(vdb)) log(`WARN: vscdb 不存在: ${vdb}`);
   }
 
   if (!Database) {
@@ -2805,8 +2851,10 @@ function main() {
   log(
     `START v13.0 warn=${CFG.warnThreshold}s crit=${CFG.critThreshold}s initial_grace=${INITIAL_SEND_GRACE / 1000}s awaiting_user_threshold=${AWAITING_USER_THRESHOLD}B ignore_age=${CFG.ignoreAge}s dead_expire=${DEAD_EXPIRE_MS / 60000}min poll=${CFG.poll}s port=${CFG.port} pid=${process.pid} user_prompt_idle=30s`,
   );
-  log(`SOURCE1: ${VSCDB} (${Database ? "OK" : "NO better-sqlite3"})`);
-  log(`SOURCE2: ${PB_DIR}`);
+  log(
+    `SOURCE1: ${VSCDBS.length}×vscdb (${Database ? "OK" : "NO better-sqlite3"}) → ${VSCDBS.join(" | ")}`,
+  );
+  log(`SOURCE2: ${PB_DIRS.length}×pb → ${PB_DIRS.join(" | ")}`);
 
   if (CFG.once) {
     const r = scan();

@@ -2,6 +2,36 @@
 
 > 反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无. —— 帛书《老子》德经
 
+## v3.18.7 (2026-10-23) · 单点失明根治 — 全仓枚举
+
+> 本源缺陷: 追踪/备份/侦测三链全挂单一 `PB_DIR`/`VSCDB` —— 会话写在非主仓
+> (Devin Desktop / 多开实例 / 其他 .codeium* 根) 时**整体失明**: 追踪 0 活跃、
+> 备份漏仓、Layer6 新对话侦测漏捕。本版三链并改全仓枚举, 道法自然。
+
+### 引擎 `dao_stuck.js` v12.9→v13.0
+
+- **`_allPbDirs()`**: 枚举全 `~/.codeium*/<backend>/cascade` + 根直落 cascade
+  + `CODEIUM_DATA_DIR` 实例仓 + 旧候选兜底
+- **`_allVscdbs()`**: 枚举全 `APPDATA/*/User/globalStorage/state.vscdb` (全 IDE 实例合流)
+- `scan()`: pbFiles 收集改 `{dir,fname}` 全仓遍历·坏仓跳过不致命
+- `refreshVscdb()`: better-sqlite3 路径多库并集 (uuid 异集天然无撞)
+- `/api/status` `sources` 改数组透真源; `main()` 守卫零活仓才 fatal
+
+### `_vscdb_helper.py` 多库合流
+
+- `_find_vscdb()` 单选 → `_all_vscdbs()` 全枚举, sessions 按 sessionId 去重并集
+
+### `extension.js`
+
+- 新增 `_allPbDirPaths()` / `_pbDirOf()` —— 备份/追踪/探测共用单一真源
+- `_backupConversations` 全仓收 `.pb` (文件名去重) · `_index.json` 记 `srcDir` 来源留痕
+- `_checkCascadeHealth` / `_installIncrementalWatcher` / `_initAutoBackup` 全仓
+- `_doIncrementalBackup(fname, dir)` watcher 直传仓路径·未传全仓反查
+- `_collectAllConversations` sessioninfo-only 会话 pbPath 全仓反查
+- 备份目录 MD `源目录` / `cascadeSet` / restore `inCascade` 全仓判
+- Layer6 `cascadePbDir`→`cascadePbDirs[]`: 全仓快照+全仓 `fs.watch`+30s 轮询
+- `_api.json` `backup.pbDirs` 数组化
+
 ## v3.18.6 (2026-10-22) · 四路审计根治 — 减熵·跨平台·性能·死键
 
 ### 跨平台 (win→mac/linux 归一)

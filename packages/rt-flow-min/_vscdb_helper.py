@@ -26,16 +26,19 @@ elif sys.platform == 'darwin':
 else:
     APPDATA = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
 
-# v3.16.0 · 自适应 vscdb 路径: Devin Desktop 优先 → 回退 Windsurf
-def _find_vscdb():
-    candidates = [
-        os.path.join(APPDATA, 'Devin', 'User', 'globalStorage', 'state.vscdb'),
-        os.path.join(APPDATA, 'Windsurf', 'User', 'globalStorage', 'state.vscdb'),
-    ]
-    for p in candidates:
-        if os.path.isfile(p):
-            return p
-    return candidates[-1]
+# v3.18.7 · 全 vscdb 枚举: APPDATA/*/User/globalStorage/state.vscdb (多 IDE 实例合流)
+def _all_vscdbs():
+    out = []
+    try:
+        for d in os.listdir(APPDATA):
+            v = os.path.join(APPDATA, d, 'User', 'globalStorage', 'state.vscdb')
+            if os.path.isfile(v) and v not in out:
+                out.append(v)
+    except Exception:
+        pass
+    if not out:
+        out.append(os.path.join(APPDATA, 'Windsurf', 'User', 'globalStorage', 'state.vscdb'))
+    return out
 
 # v3.16.0 · 自适应 metadataCache key: Devin Desktop 用 devin.* → 回退 windsurf.*
 def _find_metadata_key(con):
@@ -81,25 +84,31 @@ def _scan_sessioninfo_keys(con):
                 continue
     return sessions
 
-VSCDB = _find_vscdb()
-
-try:
-    uri = 'file:///' + VSCDB.replace('\\', '/') + '?mode=ro'
-    con = sqlite3.connect(uri, uri=True, check_same_thread=False, timeout=5)
-    key = _find_metadata_key(con)
-    row = con.execute("SELECT value FROM ItemTable WHERE key=?", (key,)).fetchone()
-    sessions = []
-    if row:
-        try:
-            data = json.loads(row[0])
-            sessions = data.get('sessions', []) if isinstance(data, dict) else []
-        except Exception:
-            sessions = []
-    # v3.16.1 · metadataCache 空/缺失 → 独立 key 扫描兜底 (根治标题失明)
-    if not sessions:
-        sessions = _scan_sessioninfo_keys(con)
-    sys.stdout.write(json.dumps(sessions, ensure_ascii=True))
-    con.close()
-except Exception as e:
-    sys.stderr.write(str(e) + '\n')
-    sys.stdout.write('[]')
+sessions = []
+seen = set()
+for VSCDB in _all_vscdbs():
+    try:
+        uri = 'file:///' + VSCDB.replace('\\', '/') + '?mode=ro'
+        con = sqlite3.connect(uri, uri=True, check_same_thread=False, timeout=5)
+        key = _find_metadata_key(con)
+        row = con.execute("SELECT value FROM ItemTable WHERE key=?", (key,)).fetchone()
+        ss = []
+        if row:
+            try:
+                data = json.loads(row[0])
+                ss = data.get('sessions', []) if isinstance(data, dict) else []
+            except Exception:
+                ss = []
+        # v3.16.1 · metadataCache 空/缺失 → 独立 key 扫描兜底 (根治标题失明)
+        if not ss:
+            ss = _scan_sessioninfo_keys(con)
+        con.close()
+        for s in ss:
+            sid = s.get('sessionId') or s.get('id')
+            if not sid or sid in seen:
+                continue
+            seen.add(sid)
+            sessions.append(s)
+    except Exception:
+        continue
+sys.stdout.write(json.dumps(sessions, ensure_ascii=True))

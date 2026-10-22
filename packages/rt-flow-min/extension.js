@@ -748,7 +748,7 @@ const daoCost = require("./dao_cost"); // v3.16.3 · 对话级成本追踪 (纯�
 //   ━━━ 道 ━━━
 //   未验号本不该留 · 只是门没开 · 门一开 · 民自化 · 无为而无不为
 //
-const VERSION = "3.18.6";
+const VERSION = "3.18.7";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36";
 const WINDSURF = "https://windsurf.com";
@@ -3069,17 +3069,26 @@ function _initDecryptKey() {
         const b = fs.readFileSync(memPb);
         if (b.length >= 29) sample = b;
       }
-      if (!sample && fs.existsSync(PB_DIR)) {
-        const files = fs.readdirSync(PB_DIR).filter((f) => f.endsWith(".pb"));
-        for (const f of files) {
-          const fp = path.join(PB_DIR, f);
+      // v3.18.7 · 全仓取样: 主仓没有就扫全 pb 仓
+      if (!sample) {
+        for (const pd of _allCascadePbDirs()) {
+          if (sample) break;
+          let files;
           try {
-            const b = fs.readFileSync(fp);
-            if (b.length >= 29) {
-              sample = b;
-              break;
-            }
-          } catch {}
+            files = fs.readdirSync(pd.dir).filter((f) => f.endsWith(".pb"));
+          } catch {
+            continue;
+          }
+          for (const f of files) {
+            const fp = path.join(pd.dir, f);
+            try {
+              const b = fs.readFileSync(fp);
+              if (b.length >= 29) {
+                sample = b;
+                break;
+              }
+            } catch {}
+          }
         }
       }
       if (!sample) {
@@ -3195,11 +3204,18 @@ function _isValidPb(pbPath) {
 // v3.7.3: 启动 cascade/ 健康扫描 — 检测断电导致的损常文件 · 发现则警告用户
 function _checkCascadeHealth() {
   try {
-    if (!fs.existsSync(PB_DIR)) return 0;
-    const pbFiles = fs.readdirSync(PB_DIR).filter((f) => f.endsWith(".pb"));
-    const zeroed = pbFiles.filter((f) => !_isValidPb(path.join(PB_DIR, f)));
+    // v3.18.7 · 全仓健康扫描
+    const pbFiles = [];
+    for (const pd of _allPbDirPaths()) {
+      try {
+        for (const f of fs.readdirSync(pd)) {
+          if (f.endsWith(".pb")) pbFiles.push(path.join(pd, f));
+        }
+      } catch {}
+    }
+    const zeroed = pbFiles.filter((fp) => !_isValidPb(fp));
     if (zeroed.length > 0) {
-      const uuids = zeroed.map((f) => f.substring(0, 8));
+      const uuids = zeroed.map((fp) => path.basename(fp).substring(0, 8));
       log(
         "⚠️ cascade健康扫描: " +
           zeroed.length +
@@ -3235,10 +3251,22 @@ function _backupConversations(targetDir) {
   let copied = 0,
     failed = 0;
   try {
-    if (!fs.existsSync(PB_DIR)) {
-      return { ok: false, error: "Cascade 目录不存在", copied: 0, failed: 0 };
+    // v3.18.7 · 全仓备份: 所有 cascade 根的 .pb 一起收 (按文件名去重)
+    const files = []; // {dir, fname}
+    const _seenF = new Set();
+    for (const pd of _allPbDirPaths()) {
+      try {
+        for (const f of fs.readdirSync(pd)) {
+          if (f.endsWith(".pb") && !_seenF.has(f)) {
+            _seenF.add(f);
+            files.push({ dir: pd, fname: f });
+          }
+        }
+      } catch {}
     }
-    const files = fs.readdirSync(PB_DIR).filter((f) => f.endsWith(".pb"));
+    if (!files.length) {
+      return { ok: false, error: "Cascade 目录无 .pb", copied: 0, failed: 0 };
+    }
     const ts = new Date().toISOString().replace(/[:.]/g, "-").substring(0, 19);
     const batchDir = path.join(dir, "backup_" + ts);
     ensureDir(batchDir);
@@ -3258,9 +3286,10 @@ function _backupConversations(targetDir) {
       }
     }
     const _index = {};
-    for (const f of files) {
+    for (const pf of files) {
+      const f = pf.fname;
       try {
-        const srcPb = path.join(PB_DIR, f);
+        const srcPb = path.join(pf.dir, f);
         // v3.7.3: 跳过损常文件 — 不把断电祝事存入备份库
         if (!_isValidPb(srcPb)) {
           failed++;
@@ -3275,18 +3304,19 @@ function _backupConversations(targetDir) {
         const title =
           _titleMap[uuid] ||
           _titleMap["_pfx_" + short] ||
-          _extractPbTitle(path.join(PB_DIR, f)) ||
+          _extractPbTitle(srcPb) ||
           "";
         const backedUpAt = new Date().toISOString();
         _index[uuid] = {
           title,
           sizeBytes: (() => {
             try {
-              return fs.statSync(path.join(PB_DIR, f)).size;
+              return fs.statSync(srcPb).size;
             } catch {
               return 0;
             }
           })(),
+          srcDir: pf.dir, // v3.18.7 · 多仓来源留痕 (恢复时优先写回原仓)
           backedUpAt,
         };
         // v3.8.2: 同步导出 MD (无为而无不为 · 备份同时即导出可读文档)
@@ -3315,12 +3345,10 @@ function _backupConversations(targetDir) {
             copied,
             failed,
             hubSnapshot: _hubData || null,
-            source: PB_DIR,
+            sources: _allPbDirPaths(),
             // Fix2: @conversation突破提示
             restoreNote:
-              "要使用备份对话: cp {uuid}.pb " +
-              PB_DIR +
-              " 即可被 @conversation 引用",
+              "要使用备份对话: cp {uuid}.pb 到任一 cascade 仓 (见 sources) 即可被 @conversation 引用",
           },
           null,
           2,
@@ -3360,9 +3388,14 @@ function _initAutoBackup(context) {
         if (r.ok) {
           _lastBackupDate = today;
           // 初始化 knownPbs 集合
-          const pbFiles = fs.existsSync(PB_DIR)
-            ? fs.readdirSync(PB_DIR).filter((f) => f.endsWith(".pb"))
-            : [];
+          const pbFiles = [];
+          for (const pd of _allPbDirPaths()) {
+            try {
+              for (const f of fs.readdirSync(pd)) {
+                if (f.endsWith(".pb")) pbFiles.push(f);
+              }
+            } catch {}
+          }
           meta.lastInitDate = today;
           meta.knownPbs = new Set(pbFiles);
           _saveBackupMeta(meta);
@@ -3415,22 +3448,34 @@ function _convDisplayTitle(uuid, ...candidates) {
 }
 
 // 增量监视: 新.pb文件出现时自动备份 (防Windsurf扩展50个对话被官方删除)
+// v3.18.7 · 全仓监视: 每个 cascade 根各挂一个 watcher (多实例/多IDE不漏)
 function _installIncrementalWatcher(context) {
-  if (!fs.existsSync(PB_DIR)) return;
+  const dirs = _allPbDirPaths();
+  if (!dirs.length) return;
   try {
-    const watcher = fs.watch(PB_DIR, { persistent: false }, (event, fname) => {
-      if (!fname || !fname.endsWith(".pb")) return;
-      clearTimeout(_incrementalDebounce);
-      const _debMs = Math.max(
-        500,
-        +_cfg("incrementalBackupDebounceMs", 3000) || 3000,
-      ); // v3.7.1 软编码
-      _incrementalDebounce = setTimeout(
-        () => _doIncrementalBackup(fname),
-        _debMs,
-      );
-    });
-    _convPbWatcher = watcher;
+    const watchers = [];
+    for (const pd of dirs) {
+      try {
+        watchers.push(
+          fs.watch(pd, { persistent: false }, (event, fname) => {
+            if (!fname || !fname.endsWith(".pb")) return;
+            clearTimeout(_incrementalDebounce);
+            const _debMs = Math.max(
+              500,
+              +_cfg("incrementalBackupDebounceMs", 3000) || 3000,
+            ); // v3.7.1 软编码
+            _incrementalDebounce = setTimeout(
+              () => _doIncrementalBackup(fname, pd),
+              _debMs,
+            );
+          }),
+        );
+      } catch {}
+    }
+    if (!watchers.length) return;
+    _convPbWatcher = {
+      close: () => watchers.forEach((w) => w.close()),
+    };
     context.subscriptions.push({
       dispose: () => {
         try {
@@ -3441,16 +3486,18 @@ function _installIncrementalWatcher(context) {
         } catch {}
       },
     });
-    log("auto-backup: 增量监视器已安装 " + PB_DIR);
+    log("auto-backup: 增量监视器已安装 " + dirs.length + "仓");
   } catch (e) {
     log("auto-backup watcher err: " + (e.message || e));
   }
 }
 
 // 增量备份单个新增/变大的.pb文件
-function _doIncrementalBackup(fname) {
+// v3.18.7 · srcDir 由 watcher 仓直传 · 未传则全仓反查 (跨仓同名 uuid 极小概率·取先中)
+function _doIncrementalBackup(fname, srcDir) {
   try {
-    const src = path.join(PB_DIR, fname);
+    const dir = srcDir || _pbDirOf(fname) || PB_DIR;
+    const src = path.join(dir, fname);
     if (!fs.existsSync(src)) return;
     // v3.7.3: 跳过损常文件 — 断电损常的 .pb 不备份入库
     if (!_isValidPb(src)) {
@@ -3554,7 +3601,7 @@ function _writeAgentApi() {
       backup: {
         dir: bkRoot,
         count: backupCount,
-        pbDir: PB_DIR,
+        pbDirs: _allPbDirPaths(),
         // @conversation 突破: 备份 .pb 可通过恢复函数重新进入 Windsurf @引用库
         note: "备份.pb + vscdb注入 = 突破官方50对话限制·历史对话可被@引用",
       },
@@ -3944,7 +3991,30 @@ function _allCascadePbDirs() {
   return out;
 }
 
-// v3.18.5 · .pb 解密回补工作区 · 持久缓存 (每 uuid 只解密一次)
+// v3.18.7 · 全 pb 仓路径数组 (调用时新鲜枚举·单点失明根治)
+//   含 CODEIUM_DATA_DIR 实例仓 + 兜底 PB_DIR —— 备份/追踪/探测共用此源
+function _allPbDirPaths() {
+  const out = _allCascadePbDirs().map((x) => x.dir);
+  if (process.env.CODEIUM_DATA_DIR) {
+    for (const b of ["windsurf", "devin", "Devin"]) {
+      const c = path.join(process.env.CODEIUM_DATA_DIR, b, "cascade");
+      try {
+        if (fs.statSync(c).isDirectory() && !out.includes(c)) out.push(c);
+      } catch {}
+    }
+  }
+  if (!out.length && PB_DIR) out.push(PB_DIR);
+  return out;
+}
+// 反查某 uuid.pb 所在仓 (增量备份/恢复定位用)
+function _pbDirOf(fname) {
+  for (const d of _allPbDirPaths()) {
+    try {
+      if (fs.statSync(path.join(d, fname)).isFile()) return d;
+    } catch {}
+  }
+  return null;
+}
 //   原理: pb 明文内含 file:///c:/... URI · 最短者即工作区根 (其余皆其子路径)
 const _CONV_WS_CACHE_FILE = path.join(
   os.homedir(),
@@ -4183,10 +4253,10 @@ async function _collectAllConversations() {
   for (const s of sessions) {
     if (s.provider === "cascade") {
       s.live = liveUuids.has(String(s.id).toLowerCase());
-      // v3.18.5: pbPath 已由多目录扫描就位 · sessioninfo-only 会话补回 PB_DIR 探测
+      // v3.18.7: pbPath 全仓反查 (sessioninfo-only 会话跨仓定位)
       if (!s.pbPath) {
-        const src = path.join(PB_DIR, s.id + ".pb");
-        if (fs.existsSync(src)) s.pbPath = src;
+        const d = _pbDirOf(s.id + ".pb");
+        if (d) s.pbPath = path.join(d, s.id + ".pb");
       }
       s.srcPath = s.pbPath || "";
       s.backupPath = bkMap.get(s.id) || bkMap.get(String(s.id).toLowerCase()) || "";
@@ -11126,9 +11196,10 @@ function _installLayer6FileWatcher(context) {
     }
 
     // ── 双信号: pb·new(新对话) + pb·send(存量对话用户发消息) (v2.6.1/v2.6.2) ──
-    const cascadePbDir = _resolveCascadePbDir();
-    if (!cascadePbDir) {
-      log("Layer 6 · skip · cascade 目录未找到 (~/.codeium/windsurf/cascade/)");
+    // v3.18.7 · 全仓侦测: 会话写在哪个 codeium 根都能捕到 pb·new (单点失明根治)
+    const cascadePbDirs = _allPbDirPaths();
+    if (!cascadePbDirs.length) {
+      log("Layer 6 · skip · cascade 目录全空 (~/.codeium*/**/cascade)");
       return;
     }
 
@@ -11147,20 +11218,24 @@ function _installLayer6FileWatcher(context) {
     } catch {}
 
     // 激活时记录已有文件 + 初始大小快照 (存量文件不触发·仅建立基准)
-    const knownPbs = new Set();
-    const pbSizes = new Map(); // f → 上次已知 size
+    const knownPbs = new Set(); // key = dir + "»" + fname (跨仓同名隔离)
+    const pbSizes = new Map();
     try {
-      for (const f of fs.readdirSync(cascadePbDir)) {
-        if (!f.endsWith(".pb")) continue;
-        knownPbs.add(f);
-        try {
-          pbSizes.set(f, fs.statSync(path.join(cascadePbDir, f)).size);
-        } catch {}
+      for (const pd of cascadePbDirs) {
+        for (const f of fs.readdirSync(pd)) {
+          if (!f.endsWith(".pb")) continue;
+          knownPbs.add(pd + "»" + f);
+          try {
+            pbSizes.set(pd + "»" + f, fs.statSync(path.join(pd, f)).size);
+          } catch {}
+        }
       }
     } catch {}
     log(
       "Layer 6 · 双信号[pb·new+pb·send] → " +
-        cascadePbDir +
+        cascadePbDirs.length +
+        "仓 " +
+        cascadePbDirs.join(" | ") +
         " · 存量 " +
         knownPbs.size +
         " 个",
@@ -11201,15 +11276,23 @@ function _installLayer6FileWatcher(context) {
     const _l6Scan = () => {
       try {
         let hasNew = false;
-        for (const f of fs.readdirSync(cascadePbDir)) {
+        for (const pd of cascadePbDirs) {
+          let files;
+          try {
+            files = fs.readdirSync(pd);
+          } catch {
+            continue;
+          }
+          for (const f of files) {
           if (!f.endsWith(".pb")) continue;
-          if (knownPbs.has(f)) continue; // v2.6.9: 存量文件不再监增量 (settle 错位本源)
+          const _k = pd + "»" + f;
+          if (knownPbs.has(_k)) continue; // v2.6.9: 存量文件不再监增量 (settle 错位本源)
           // ── 信号①: 新文件 = 新对话 → 立即入队切号 ──
-          const fpath = path.join(cascadePbDir, f);
-          knownPbs.add(f);
+          const fpath = path.join(pd, f);
+          knownPbs.add(_k);
           try {
             const sz = fs.statSync(fpath).size;
-            pbSizes.set(f, sz);
+            pbSizes.set(_k, sz);
             if (sz < 64) continue; // Windsurf 预占位临时文件·跳过
           } catch {
             continue;
@@ -11231,28 +11314,36 @@ function _installLayer6FileWatcher(context) {
           );
           _newConvQueue.push({ f });
           hasNew = true;
+          }
         }
         if (hasNew) _drainQueue().catch(() => {});
       } catch {}
     };
     const timer = setInterval(_l6Scan, POLL_MS);
     // v3.18.6 · fs.watch 事件通道: 新 .pb 落盘 250ms 防抖即扫 (原纯 600ms 轮询)
-    let _fsWatcher = null;
+    // v3.18.7 · 全仓 watcher 数组 (每仓一只·debounce 共享)
+    const _fsWatchers = [];
     let _l6Debounce = null;
-    try {
-      _fsWatcher = fs.watch(cascadePbDir, { persistent: false }, (ev, fn) => {
-        if (!fn || !String(fn).endsWith(".pb")) return;
-        clearTimeout(_l6Debounce);
-        _l6Debounce = setTimeout(_l6Scan, 250);
-      });
-    } catch {}
+    for (const pd of cascadePbDirs) {
+      try {
+        _fsWatchers.push(
+          fs.watch(pd, { persistent: false }, (ev, fn) => {
+            if (!fn || !String(fn).endsWith(".pb")) return;
+            clearTimeout(_l6Debounce);
+            _l6Debounce = setTimeout(_l6Scan, 250);
+          }),
+        );
+      } catch {}
+    }
 
     _layer6Stop = () => {
       clearInterval(timer);
       clearTimeout(_l6Debounce);
-      try {
-        if (_fsWatcher) _fsWatcher.close();
-      } catch {}
+      for (const w of _fsWatchers) {
+        try {
+          w.close();
+        } catch {}
+      }
     };
     if (context && context.subscriptions) {
       context.subscriptions.push({
@@ -11268,7 +11359,8 @@ function _installLayer6FileWatcher(context) {
       "Layer 6 · watch[pb·new only · v2.6.9 损 settle] · " +
         POLL_MS +
         "ms · " +
-        cascadePbDir,
+        cascadePbDirs.length +
+        "仓",
     );
   } catch (e) {
     log("Layer 6 · install fail: " + (e.message || e));
@@ -12055,19 +12147,19 @@ function _exportConversationsMd() {
     const entries = Object.values(allConv).sort((a, b) =>
       (b.backedUpAt || "").localeCompare(a.backedUpAt || ""),
     );
-    // cascade/ 中的 UUID 集合
-    const cascadeSet = new Set(
-      fs.existsSync(PB_DIR)
-        ? fs
-            .readdirSync(PB_DIR)
-            .filter((f) => f.endsWith(".pb"))
-            .map((f) => f.replace(".pb", ""))
-        : [],
-    );
+    // cascade/ 中的 UUID 集合 (v3.18.7 全仓并集)
+    const cascadeSet = new Set();
+    for (const pd of _allPbDirPaths()) {
+      try {
+        for (const f of fs.readdirSync(pd)) {
+          if (f.endsWith(".pb")) cascadeSet.add(f.replace(".pb", ""));
+        }
+      } catch {}
+    }
     // 生成 MD
     let md = "# Windsurf Cascade 对话备份目录\n\n";
     md += "> 生成时间: " + new Date().toISOString() + "\n";
-    md += "> 源目录: `" + PB_DIR + "`\n";
+    md += "> 源目录: `" + _allPbDirPaths().join(" ; ") + "`\n";
     md += "> 备份目录: `" + bkRoot + "`\n";
     md +=
       "> 对话总数: " + entries.length + " | 批次: " + batches.length + "\n\n";
@@ -12187,7 +12279,7 @@ async function _restoreConversationFromBackup() {
         const uuid = f.replace(".pb", "");
         if (seen.has(uuid)) continue;
         seen.add(uuid);
-        const inCascade = fs.existsSync(path.join(PB_DIR, f));
+        const inCascade = _pbDirOf(f) != null; // v3.18.7 · 全仓判在
         if (!inCascade) {
           const title = (idxData[uuid] && idxData[uuid].title) || "";
           const sz = Math.round(
@@ -15167,6 +15259,8 @@ module.exports = {
     _collectAllConversations,
     _convReadData,
     _allCascadePbDirs,
+    _allPbDirPaths,
+    _pbDirOf,
     _pbWorkspace,
     _localTrackRowsHtml,
     get _localConvCache() {

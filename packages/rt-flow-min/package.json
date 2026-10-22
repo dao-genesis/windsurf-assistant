@@ -2,7 +2,7 @@
   "name": "rt-flow",
   "displayName": "Runtime Flow",
   "description": "Windsurf/Devin 多账号管理与对话追踪 — 额度耗尽自动切号·对话卡死监控·会话库/阅读器·全本地运行",
-  "version": "3.18.6",
+  "version": "3.18.7",
   "publisher": "devaid",
   "repository": {
     "type": "git",
