@@ -201,6 +201,8 @@ const path = require("path");
 const os = require("os");
 const http = require("http");
 const { spawn, spawnSync } = require("child_process");
+// v3.18.6 · 版本归一: 用户面字符串统一引用 (原 v9/v9.2/v12 混贴)
+const ENGINE_VER = "v12.9-wam";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v9.2 修复 [E]: 引擎永不静默死亡 — 善摄生者, 陆行不遇兕虎
@@ -244,9 +246,13 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // ─── 路径 ───
+// v3.18.6 · IDE 用户数据根 — 平台分流 (win32=APPDATA·darwin=Application Support·linux=.config)
 const APPDATA =
-  process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-const USERPROFILE = process.env.USERPROFILE || os.homedir();
+  process.platform === "win32"
+    ? process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
+    : process.platform === "darwin"
+      ? path.join(os.homedir(), "Library", "Application Support")
+      : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
 // v3.16.0 · 自适应 Devin Desktop / Windsurf 路径
 function _findPbDir() {
   const home = os.homedir();
@@ -310,6 +316,8 @@ function parseArgs() {
     else if (a[i] === "-p" || a[i] === "--poll") c.poll = +a[++i] || 10;
     else if (a[i] === "--port") c.port = +a[++i] || 19901;
     else if (a[i] === "--no-toast") c.toast = false;
+    else if (a[i] === "--toast")
+      c.toast = a[++i] !== "false"; // v3.18.6 · extension 传 --toast false (原只认 --no-toast·静默吞参→双重通知)
     else if (a[i] === "--no-beep") c.beep = false;
     else if (a[i] === "--no-flash") c.flash = false;
     else if (a[i] === "--no-msgbox")
@@ -331,7 +339,7 @@ function parseArgs() {
     else if (a[i] === "--python-path")
       c.pythonPath = a[++i] || ""; // v15.2 软编码 Python 路径 (默空·自动探测)
     else if (a[i] === "-h" || a[i] === "--help") {
-      console.log(`dao_stuck_v9.2 — Cascade 卡住检测 (双源真本源: .pb + vscdb)
+      console.log(`dao_stuck_${ENGINE_VER} — Cascade 卡住检测 (双源真本源: .pb + vscdb)
   --threshold N         CRITICAL阈值秒 (默认 120 = 2分钟)
   --warn N              WARNING阈值秒 (默认 60)
   --poll N              轮询秒 (默认 10)
@@ -423,7 +431,7 @@ if (CFG.status) {
     const hb = JSON.parse(fs.readFileSync(HB_FILE, "utf8"));
     const age = Math.round((nowMs() - new Date(hb.timestamp).getTime()) / 1000);
     console.log("═══════════════════════════════════════════════════");
-    console.log("  道 stuck-detect v9.2 状态 (双源真本源)");
+    console.log("  道 stuck-detect " + ENGINE_VER + " 状态 (双源真本源)");
     console.log("═══════════════════════════════════════════════════");
     console.log(`  PID:       ${hb.pid}`);
     console.log(`  heartbeat: ${age}s ago`);
@@ -442,7 +450,7 @@ if (CFG.status) {
       );
     }
   } catch {
-    console.log("  v9 引擎未运行");
+    console.log("  " + ENGINE_VER + " 引擎未运行");
   }
   process.exit(0);
 }
@@ -529,42 +537,7 @@ const WAL_ACTIVE_RATIO = 0.5; // < 50% active 骤降 = WAL 状态陈旧
 // 根治: 调用 Python 内置 sqlite3 模块 · 无外部依赖 · 道法自然 · 四两拨千斤
 // 路径: __dirname/_vscdb_helper.py (随插件包分发)
 // 节流: 30s 刷一次 (Python 启动 ~150ms · 可接受)
-function _tryExtractSessionsFromBuf(buf) {
-  const needle = Buffer.from('{"sessions":[');
-  let pos = 0;
-  let best = null;
-  while (pos < buf.length) {
-    const idx = buf.indexOf(needle, pos);
-    if (idx < 0) break;
-    // 提取平衡 JSON (最多 8MB)
-    let depth = 0,
-      i = idx;
-    const limit = Math.min(idx + 8 * 1024 * 1024, buf.length);
-    while (i < limit) {
-      const c = buf[i];
-      if (c === 0x7b) depth++;
-      else if (c === 0x7d) {
-        depth--;
-        if (depth === 0) {
-          i++;
-          break;
-        }
-      }
-      i++;
-    }
-    if (depth === 0 && i > idx + needle.length) {
-      try {
-        const obj = JSON.parse(buf.slice(idx, i).toString("utf8"));
-        if (obj.sessions && Array.isArray(obj.sessions)) {
-          // 取 sessions 最多的那次 (最完整)
-          if (!best || obj.sessions.length >= best.length) best = obj.sessions;
-        }
-      } catch {}
-    }
-    pos = idx + 1;
-  }
-  return best;
-}
+// v3.18.6: 摘除 _tryExtractSessionsFromBuf (零调用·文件头曾误记已删)
 
 // Python 可执行文件缓存 (避免每次都探测)
 // ═══ v15.2 (3.11.9) · 道法自然 · 适配万家系统 ═══
@@ -930,6 +903,11 @@ const USER_STATE_TTL = 15000; // 15秒缓存, 不必每次通知都查
 function getUserState() {
   const now = nowMs();
   if (now - _userStateCache.ts < USER_STATE_TTL) return _userStateCache.state;
+  // v3.18.6 · 非 win32 无 SHQueryUserNotificationState · 恒 free (免 spawnSync ENOENT)
+  if (process.platform !== "win32") {
+    _userStateCache = { state: "free", ts: now };
+    return "free";
+  }
   try {
     // SHQueryUserNotificationState 返回值:
     //   1=QUNS_NOT_PRESENT, 2=QUNS_BUSY, 3=QUNS_RUNNING_D3D_FULL_SCREEN,
@@ -1100,6 +1078,11 @@ function tryBeep(pattern) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function notify(level, kind, title, body) {
   if (!CFG.toast && level !== "critical") return;
+  // v3.18.6 · 平台门: Toast/Beep/Flash 全走 powershell —— 非 win32 仅日志不弹
+  if (process.platform !== "win32") {
+    log(`notify(${level}/${kind}): ${title} ${body} [非win32·仅日志]`);
+    return;
+  }
 
   const userState = getUserState();
   const busy = userState === "busy"; // 全屏/勿扰/演示模式
@@ -2037,105 +2020,6 @@ function scan() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // HTTP 看板
 // ═══════════════════════════════════════════════════════════════════════════════
-function dashboardHtml(summary, stuckList) {
-  summary = summary || {
-    totalSessions: 0,
-    totalPb: 0,
-    active: 0,
-    streaming: 0,
-    stuck: 0,
-    endTurn: 0,
-    error: 0,
-    pbOnly: 0,
-  };
-  stuckList = stuckList || [];
-
-  const rows = stuckList
-    .map((s) => {
-      const cls =
-        s.level === "DEAD"
-          ? "dead"
-          : s.level === "CRITICAL"
-            ? "critical"
-            : "warning";
-      return `<tr class="${cls}">
-      <td><span class="level ${cls}">${s.level}</span></td>
-      <td>${s.staleMin}min (${s.staleSec}s)</td>
-      <td>${(s.title || s.shortId).replace(/</g, "&lt;")}</td>
-      <td><code>${s.shortId}</code></td>
-      <td>${(s.size / 1024).toFixed(0)}KB</td>
-      <td>${s.vscdbStatus}</td>
-      <td>${s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("zh-CN") : "?"}</td>
-    </tr>`;
-    })
-    .join("");
-
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="10">
-<title>道 · stuck-detect v9</title>
-<style>
-body{font-family:Consolas,"Microsoft YaHei",monospace;background:#1e1e1e;color:#d4d4d4;margin:0;padding:20px}
-h1{color:#4ec9b0;margin:0 0 5px}
-.ver{color:#569cd6;font-size:13px;margin-bottom:15px}
-.box{background:#252526;padding:15px;border-radius:6px;margin-bottom:15px;border:1px solid #3e3e42}
-.stat{display:inline-block;margin-right:25px}
-.stat .v{font-size:28px;font-weight:bold;color:#dcdcaa}
-.stat .l{color:#858585;font-size:11px;text-transform:uppercase}
-.stuck .v{color:#f48771}
-.streaming .v{color:#4ec9b0}
-.active .v{color:#569cd6}
-.error .v{color:#ce9178}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#2d2d30;text-align:left;padding:8px 10px;color:#9cdcfe;font-weight:normal;border-bottom:1px solid #3e3e42}
-td{padding:8px 10px;border-bottom:1px solid #2d2d30}
-tr.dead{background:#5a0a0a}
-tr.dead td{color:#ff6b6b}
-tr.critical{background:#5a1d1d}
-tr.critical td:first-child{color:#f48771;font-weight:bold}
-tr.warning{background:#3a2e1a}
-tr.warning td:first-child{color:#dcdcaa;font-weight:bold}
-tr.normal td:first-child{color:#9cdcfe}
-.level{padding:2px 8px;border-radius:3px;font-weight:bold;font-size:11px}
-.level.dead{background:#ff0000;color:#fff}
-.level.critical{background:#e74c3c;color:#fff}
-.level.warning{background:#f39c12;color:#fff}
-code{background:#0e0e0e;padding:2px 6px;border-radius:3px;color:#ce9178}
-.empty{text-align:center;color:#4ec9b0;padding:40px;font-size:16px}
-.src{background:#1a3a1a;color:#4ec9b0;padding:8px 12px;border-radius:4px;margin-bottom:10px;font-size:12px}
-.src b{color:#dcdcaa}
-</style></head><body>
-<h1>道 · Cascade 卡住检测 v9</h1>
-<div class="ver">双源真本源 | WARNING &gt; ${CFG.warnThreshold}s | CRITICAL &gt; ${CFG.critThreshold}s | DEAD = active→error</div>
-
-<div class="src">
-  <b>SOURCE 1</b> vscdb sessions: ${summary.totalSessions} &nbsp;|&nbsp;
-  <b>SOURCE 2</b> .pb files: ${summary.totalPb} &nbsp;|&nbsp;
-  刷新: ${new Date().toLocaleString("zh-CN")} &nbsp;|&nbsp;
-  warn=${CFG.warnThreshold}s crit=${CFG.critThreshold}s poll=${CFG.poll}s
-</div>
-
-<div class="box">
-  <div class="stat active"><div class="v">${summary.active}</div><div class="l">active (vscdb)</div></div>
-  <div class="stat streaming"><div class="v">${summary.streaming}</div><div class="l">streaming (.pb↑)</div></div>
-  <div class="stat stuck"><div class="v">${summary.stuck}</div><div class="l">stuck</div></div>
-  <div class="stat"><div class="v">${summary.endTurn}</div><div class="l">end_turn</div></div>
-  <div class="stat error"><div class="v">${summary.error}</div><div class="l">error</div></div>
-</div>
-
-<div class="box">
-  <h2 style="color:#f48771;margin-top:0;font-size:16px">异常对话 (${stuckList.length})</h2>
-  ${
-    stuckList.length === 0
-      ? '<div class="empty">&#10003; 当前没有异常对话</div>'
-      : `<table><thead><tr><th>级别</th><th>停滞时间</th><th>对话名称</th><th>UUID</th><th>.pb大小</th><th>vscdb状态</th><th>最后更新</th></tr></thead><tbody>${rows}</tbody></table>`
-  }
-</div>
-
-<div style="font-size:11px;color:#555;margin-top:10px">
-  PID ${process.pid} · 瞽者善听聋者善视 · 绝利一源用师十倍
-</div>
-</body></html>`;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 全量实时看板 · 道法自然 · 万物并作吾以观其复
@@ -2143,7 +2027,7 @@ code{background:#0e0e0e;padding:2px 6px;border-radius:3px;color:#ce9178}
 function fullDashboardHtml() {
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<title>道 · Cascade Monitor v9.2</title>
+<title>道 · Cascade Monitor ${ENGINE_VER}</title>
 <style>
 *{box-sizing:border-box}
 body{font-family:'Cascadia Code','Consolas','Microsoft YaHei',monospace;background:#0d1117;color:#c9d1d9;margin:0;padding:0;overflow-x:hidden}
@@ -2220,7 +2104,7 @@ tr.no_pb{border-left:3px solid #f9a8d4;background:#9d174d08}
 <div class="header">
   <div>
     <h1>道 · Cascade Monitor</h1>
-    <div class="meta">v9.2 | PID ${process.pid} | 瞽者善听聋者善视 · 绝利一源用师十倍</div>
+    <div class="meta">${ENGINE_VER} | PID ${process.pid} | 瞽者善听聋者善视 · 绝利一源用师十倍</div>
   </div>
   <div class="controls">
     <button class="btn" onclick="testNotify()">🔔 测试通知</button>
@@ -2491,7 +2375,7 @@ function startHttpServer() {
             summary: state.lastSummary || {},
             stuckList: state.lastStuckList || [],
             pid: process.pid,
-            version: "v9.2",
+            version: ENGINE_VER,
             uptime: Math.round(process.uptime()),
             sources: { pb: PB_DIR, vscdb: VSCDB },
           },
@@ -2572,7 +2456,7 @@ function startHttpServer() {
         JSON.stringify({
           ok: true,
           pid: process.pid,
-          version: "v9.2",
+          version: ENGINE_VER,
           uptime: Math.round(process.uptime()),
         }),
       );

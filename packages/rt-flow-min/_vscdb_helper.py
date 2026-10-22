@@ -18,7 +18,13 @@ elif sys.platform == 'win32':
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-APPDATA = os.environ.get('APPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming'))
+# v3.18.6 · IDE 用户数据根 — 平台分流 (win32=APPDATA·darwin=Application Support·linux=.config)
+if sys.platform == 'win32':
+    APPDATA = os.environ.get('APPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming'))
+elif sys.platform == 'darwin':
+    APPDATA = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support')
+else:
+    APPDATA = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
 
 # v3.16.0 · 自适应 vscdb 路径: Devin Desktop 优先 → 回退 Windsurf
 def _find_vscdb():

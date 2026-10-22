@@ -35,6 +35,7 @@
 | 插件 | 版本 | 扩展 id | 说明 | Release / 下载 |
 |---|---|---|---|---|
 | **rt-flow** | `4.32.1` | `devaid.rt-flow` | 多账号管理与一键切换：添加账号 / 注入 token / 健康检查 / panic 切换。命令/视图独立命名空间 `wam.*`。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/rt-flow-v4.32.1) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/rt-flow-v4.32.1/rt-flow-4.32.1.vsix) |
+| **rt-flow-min** | `3.18.6` | `devaid.rt-flow` | rt-flow 瘦身线（与 4.x 功能线平行）：账号池 + 自动切号 + 对话卡死监控 + 会话库/阅读器（Cascade `.pb` + Devin Local `sessions.db` 双源·统一追踪·行级徽标）。同 `wam.*` 命名空间，**勿与 rt-flow 同装**。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/rt-flow-min-v3.18.6) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/rt-flow-min-v3.18.6/devaid.rt-flow-3.18.6.vsix) |
 | **dao-proxy-min** | `9.9.64` | `dao-agi.dao-proxy-min` | 反向代理 Windsurf / Devin，origin 反转与系统提示词替换、预览与自检。独立命名空间 `daomin.*`，与 Pro 同装零干扰。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-proxy-min-v9.9.64) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/dao-proxy-min-v9.9.64/dao-proxy-min-9.9.64.vsix) |
 | **dao-proxy-pro** | `9.9.358` | `dao-agi.dao-proxy-pro` | 在 min 反代/提示词隔离之上新增外接第三方 API：多 Key/多端点加权负载均衡 + 故障转移、按渠道/模型用量与成本可见、四面板（本源观照 / 渠道配置 / 模型路由 / 模型反代）、只填 API Key 自动全量识别模型、模型解锁全量目录、模型反代本地 OpenAI/Anthropic 端点。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-proxy-pro-v9.9.358) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/dao-proxy-pro-v9.9.358/dao-proxy-pro-9.9.358.vsix) |
 | **dao-desktop** | `1.5.93` | `dao-agi.dao-desktop` | Devin Desktop 插件版：复用官方 `codeium.windsurf` 本体 + Cascade 三模式面板（Cascade / Devin Cloud / Devin Local），装进任意 VS Code 系 IDE 即得，逐步脱离对 Windsurf IDE 的依赖。`cd plugins/dao-desktop && node build.js` 出 VSIX。 | [Release](https://github.com/dao-genesis/windsurf-assistant/releases/tag/dao-desktop-v1.5.93) · [⬇ VSIX](https://github.com/dao-genesis/windsurf-assistant/releases/download/dao-desktop-v1.5.93/dao-desktop-1.5.93.vsix) |
@@ -45,6 +46,7 @@
 ```
 packages/            # 可构建/被 CI 打包的插件与守护进程源码（单一事实来源）
   wam/               # 切号插件 rt-flow 源码 (publisher: devaid · 命令/视图 wam.*)
+  rt-flow-min/       # rt-flow 瘦身线 v3.x：账号池+切号+对话追踪+会话库阅读器 (同 devaid.rt-flow · 与 wam/4.x 平行)
   dao-proxy-min/     # 反代替换提示词 · 精简示范版 (publisher: dao-agi · daomin.*)
   dao-proxy-pro/     # 反代替换提示词 · 全功能版 (publisher: dao-agi · dao.*/wam.*)
   dao-core/ dao-devin-vm/ dao-pool/ dao-vm/ dao-injector/   # 反代 API / 守护进程 / 池 / 注入

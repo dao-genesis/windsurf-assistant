@@ -1,6 +1,12 @@
-*.vsix
-*.bak
+*.bak*
 *.bak-*
-_pack_vsix.ps1
-_verify_vsix.ps1
-.vscodeignore
+**/*.bak*
+**/*.bak-*
+__pycache__/
+**/__pycache__/
+*.pyc
+*.vsix
+.vscode/
+test/
+tests/
+**/*.test.js
