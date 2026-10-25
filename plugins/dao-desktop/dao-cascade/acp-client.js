@@ -192,10 +192,18 @@ class AcpClient {
     return res;
   }
 
-  // apiKey 可选:宿主持 windsurf-api-key 时经 authenticate meta 下发(实测 method_id)。
+  // apiKey 可选:宿主持 windsurf-api-key 时经 authenticate meta 下发。
+  // ★ 2026-10-25 · 蛇形 api_key + api_server_url(官方 authenticateWithWindsurfApiKey 同源实证):
+  //   驼峰 apiKey 被 chisel 无视 → 回落浏览器 PKCE → 无头环境必死 → Devin Local 无回复。
+  //   api_server_url 一并下发 → 鉴权调用走本地 origin(与官方桌面 getConfig(API_SERVER_URL) 同源)。
   async authenticate(methodId, apiKey) {
     const params = { methodId: methodId || "windsurf-api-key" };
-    if (apiKey) params._meta = { apiKey };
+    if (apiKey) {
+      let base = "";
+      try { base = require("./mode-fusion").originBase(); } catch (_) { base = ""; }
+      params._meta = { api_key: apiKey };
+      if (base) params._meta.api_server_url = base;
+    }
     return this.request("authenticate", params);
   }
 

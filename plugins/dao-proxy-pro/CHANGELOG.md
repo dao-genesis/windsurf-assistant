@@ -2,6 +2,155 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.373 · 损之又损·死尸出列 (为道者日损 · 用户口谕: 面板只留 Devin Local + Cascade 两线)
+: 病(用户实证): 面板与后端仍挂着旧项目尸骸 —— windows-agent 经藏档、
+  windows/freecad/kicad 工具契约轴、dao-desktop 归一面板的 Windows 分身/PCB/FreeCAD
+  三大死板块(及其后端 require/分发/主页卡/渲染函数/事件绑定全链)、面板本体的死下拉。
+  另有 dao_stuck.js EPIPE 日志风暴(东京实测 load 2.44·v9.log 86MB·v9.log.old 401MB)。
+  治法四件:
+  ① **工具轴归零**: sp_invert.js TOOLMODE_MAP 只余 official; _CANON_MAP 出 windows-agent;
+    source.js 自有 _CANON_MAP 副本同除; POST 死档一律 `invalid …` 拒绝。契约文件
+    (_windows_agent/_freecad_agent/_kicad_agent/_tools_windows/_tools_freecad.txt)
+    与 windows_tools.js/_windows_tools_selftest.js 全删(dao_router._winTools
+    注入/异步桥执行点一并拆除)。东京实测: /origin/tools valid=["official"],
+    /origin/canon valid=[laozi,yinfu,laozi+yinfu], POST freecad/windows-agent 拒绝。
+  ② **面板死块出列**(dao-desktop/unified-panel.js -442行): BOARDS 导航去
+    windows/pcb/freecad 三项(13→10), 主页三尸卡与"Windows 总控"标题清除;
+    require(windows-agent/winCore/pcbAgent/pcbCore/fcAgent/fcCore/modeFusion 死支)
+    + 21 条 win-*/pcb-*/fc-* 分发 + _snapshot.pcb/freecad + 死渲染函数群
+    (renderFreecad/renderPcbHomeCard/renderPcb/renderWindows/renderWinControl)
+    + 死事件绑定一并切除。panel.js 去 windowsAgent/pcbAgent/fcAgent 三命令注册;
+    package.json contributes 同步。local-api /api/winagent* 端点与 api-schema 条目除名。
+    mode-fusion TOOL_MODES→default 一档·DOMAIN_OVERLAYS→空(proxy-pro-panel 叠加钮自动归零)。
+    dao-cascade/ 下 windows-agent.js/windows-panel-core.js/pcb-agent.js/
+    pcb-panel-core.js/fc-agent.js/fc-panel-core.js 六文件删除。
+  ③ **dao_stuck EPIPE 止血**: uncaughtException/unhandledRejection 处理硬化
+    (stderr/log 写失败不再递归放大风暴), rtflow-vsix/pkg 与 packages/wam 双本同步,
+    东京实测 load 2.44→0.29。
+  ④ **真 SP 隔离测试法落地**(废"贴道德经问遵不遵守"假测): 探针=devin CLI
+    `devin --model muse-wonder-1-0-high -p "你所遵從之經典為何?…"`(提示零经藏内容)
+    → 上游线档 _upstream_req_dump._sysFull=7766B 纯经藏·官方标识 0 命中
+    (Devin/Cascade/Windsurf/Codeium 全无) → deepseek 答"帛書《老子》與道藏《陰符經》"
+    —— 答案只可能来自被替换的 SP, 双层实锤。外接链路实测:
+    muse-wonder-1-0-high→deepseek 545ms, swe-2-medium→deepseek 722ms。
+  两面分治复核: 道L/官L/道C/官C 四钮即 Devin Local ↔ Cascade 同一面板分面热切
+  (v9.9.371 已在), POST /origin/mode {mode,surface} 按面独立生效 —— 无需第二面板。
+
+v9.9.372 · 超时预算倒挂根治 (反者道之动 · 141 事故根因歼灭 · fail-fast 非 fail-stall)
+: 病(141 实证): origin 内层超时长于外层调用者 —— 隧道 CONNECT 20s / 直连建连
+  等 OS TCP ~21s, 而 Devin 客户端预算 ~5s → 任何一次上游失败 origin 都愿耗 20s,
+  LS 5s 判死 → `connection to server is erroring · Shutting down server`。
+  沙箱复现(东京·双死场景=卡死代理+黑洞直连): v9.9.371 每请求挂死 40s+ 永不答。
+  治法四件:
+  ① **建连预算** `_H2_CONNECT_BUDGET=3500`(_h2WireSession 内): session 建连
+    3.5s 未 'connect' 即毁 → stream error → 502/鉴权兜底 < 客户端预算。
+    只预算「建连」一寸, 流生命周期依旧 setTimeout(0) · AI 自然而止不相悖。
+  ② **废 _daoWarming 预热抛错**: 旧制代理在场即抛错(非鉴权 RPC 吃 502→客户端
+    重试→再抛=风暴·健康首请亦挨刀)。新制: 请求立返带预算直连 session +
+    `_h2StartProxyWarm` 异步入池·成则换池(直连会话停保活·在飞流自然完结)。
+    活道零等待; 死道预算内确答; CN 网首请 ≤3.5s 后代理道接管抗 RST。
+  ③ **死窗熔断补全**: `_OriginTunnelAgent`(test-chat 后端直发) 原无熔断 →
+    隧道失败置 `_originTunnelDeadUntil` 90s 死窗直连 + 代理解析即时过期;
+    `dao_router._proxyDead` 永久旗标 → 改 `_proxyDeadUntil` 90s 死窗(代理医好
+    自动回头, 不再一死到底)。隧道超时 20s→3s(双处)。
+  ④ **代理解析 TTL + NO_PROXY**: `_originResolveProxyUrl`/`_resolveProxyUrl`
+    永久缓存 → 60s TTL(随 watchdog 三车道切道节奏 7897↔2080); 隧道失败即时过期。
+    新增 `_originNoProxyHit`/`_noProxyHit`: `NO_PROXY=*` → 尊重全直连不静默凌驾;
+    按主机后缀/精确匹配逐目标放行。
+  沙箱对照(东京 :18937 隔离实例): 双死场景 371=40s+ 挂死 → 372=恒定 502@3.51s;
+  卡代理+直连健康场景 372=200-路径直连 0.52s→0.157s(暖池复用)·代理暖失败后台
+  3s 熔断不扰请求。ACP 全链回归全绿(官方 DAO-LOCAL-OFFICIAL-OK 3.9s ·
+  外接 muse-wonder→deepseek DAO-LOCAL-EXTERNAL-OK 1.0s · SP-DEVIN field2
+  18154B→7766B · session-titler ephemeral 不误截)。
+  注意: 测试实例裸跑即自动拉起 cloudflared 快速隧道(公网暴露面)——记入
+  「特性面耦合」问题清单, 后续版本隔离特性面与热路径。
+
+v9.9.371 · 合流单一真源 (为道者日损 · 两地分叉归一 · Devin Local 底层闭环)
+: 病: 本源引擎裂两支 —— 仓库 9.9.368(两面分治/端点重写/DEVIN标记/tools轴) 与
+  东京 standalone origin 9.9.370(field2 SP截获/H2代理隧道/鉴权韧性/路由失败回退/目录双格式)
+  各持独有根治、互缺对方所有 → Devin Local 底层永不合龙。治: 以 368 为基归并 370 独有五件:
+  ① `modifySPProto` 增 **field2=SP 显式截获**(SP-DEVIN): chisel 把 Devin SP 直挂
+  GetChatMessage 顶层 field2(非 chat_messages 包装), msgs 循环 role 检查落空漏改 →
+  显式截获原地替换; 并增 `surface` 参按面生效(_surfaceMode 回落全局)。
+  ② **官方 H2 长连经系统代理 CONNECT 隧道**(_h2TunnelConnect/_h2StartProxyWarm/
+  _h2WireSession): GFW RST 切长连致「连接不上官方服务器」→ 隧道预热入池+失败冷却回退直连。
+  ③ **鉴权/状态类 RPC 韧性兜底**(_replyAuthResilient/_lastGoodUserStatus): 官方暂断时
+  回放上次真响应/空 gRPC OK → 前端不登出。
+  ④ **路由失败回退官方**(363-止血): route FAIL 不再 Connect-RPC 错误帧 → 回退官方透传。
+  ⑤ **模型目录双格式**(client_model_configs/_respondWithCatalog 按 RPC 分派)。
+  两面分治补全: `POST /origin/mode` 增 `surface`(local|cascade|default) 写
+  `_origin_mode_surface.json` 按面独立模式; GET /origin/mode 与 /origin/ping 暴露
+  `surface_modes`; `runtime.js shouldRoute(uid,surface)` 透传; test-chat 增 `surface`
+  (缺省 any=不限面诊断直通·dao_router 增 any|* 面不限); handoff.md 增两面分治/scope 用法。
+  面板(道Agent Pro): 本源观照增 **道L/官L/道C/官C** 四钮(Devin Local 面/Cascade 面独立
+  道·官热切·ping.surface_modes 实时回显); 模型路由增 **生效面** 选择(连线面 select +
+  路由弹窗 scope + 路由条目 scope 徽标)。经文起首统一「你本無名 名可名也 非恆名也」
+  (弃 Tokyo 孤支「遵道而行者」前缀·与用户规则文件/Mini 血统对齐)。
+
+v9.9.368 · 两面分治 + spawn-hook 残缺放行 (承 ZHOU@141 实机二连翻修)
+: 用户实证: 重启后 Devin sharedProcess 把扩展当 marked-for-removal 清盘(仅存
+  media/icon.svg) → 运行中 spawn-hook 仍把 devin.exe acp 重写到已删除的
+  dao-acp-stdio-proxy.js → Devin Local spawn 即死·连用都不能用。
+  治法两层:
+  ① `_rewriteAcpSpawn` 增 fs.existsSync 守门: 中人脚本缺失 → 不重写 → 原生 acp
+    直连官方, 插件残缺不再拖死本体。(治本一)
+  ② 部署契约: extensions.json entry 版本/目录/manifest version 必须一致,
+    metadata.pinned=true(参 min-9.9.64 活过数月之据) — 触发 removal 的真因是
+    manifest version≠registered version。(治本二·部署层)
+  ③ 两面分治(用户核心诉求): Devin Local(chisel acp→api_server_pb)=local 面,
+    Cascade(LS→cascade/codeium_common/language_server_pb/chat_web)=cascade 面。
+    渠道共用, 但:
+    - 路由: daoRoutes.routes.*.scope=all|local|cascade(缺省 all) →
+      shouldRoute(uid,surface) 面不匹配即不路由(未识别面保守只走 all)
+    - SP: _origin_mode_surface.json {default?,local?,cascade?} 每面独立
+      invert/passthrough/custom → _spReplaceActiveForSurface(surface)
+    - INFER_STRIP 剥侧信道亦按面
+
+v9.9.367 · 死代理熔断直连 (承 366 实机排坑 b)
+: `dao_router.js` `_DaoTunnelAgent` createConnection 失败路径增熔断: 代理本体
+  TCP 都连不上(ECONNREFUSED/EHOSTUNREACH/ETIMEDOUT/tunnel timeout) → `_proxyDead`
+  置旗, `_getProxyAgent` 其后恒返 undefined → 外接路由永久直连。实证场景:
+  sshd/CI 环境残留 HTTPS_PROXY=127.0.0.1:7890(已停用空壳) → 每次外呼先撞死代理
+  再回退官方, 白白浪费一跳。CONNECT 被代理拒绝(有响应≠200)不熔断——
+  代理活着只是不收, 仍须保留失败语义供上层判别。
+  不改路由语义: 单请求仍先按原路失败一次(回退官方已有保障), 次请求起直连。
+
+v9.9.366-live · ZHOU@141 实机闭环验证通过 (2026-10-23)
+: 真机 GUI 证据(非 mock): ① spawn-hook-acp 日志实证两个 ACP 进程全被接管
+  (主 agent + --agent-type summarizer, pid 30496/66408 → 真实 chisel 65612/67260);
+  ② /origin/lastinject 捕获 CHAT_PROTO: 官方 Devin SP 20634B → 道藏 SP 7854B;
+  ③ /origin/upstream 捕获 provider=deepseek/deepseek-v4-flash 真实外呼;
+  ④ /origin/ea/status ready routes=37 providers=小米/glm/deepseek/kimi;
+  ⑤ swe-1-6-slow 官方透传未路由(演练)+外接模型全部应路由; ⑥ dao-subagent MCP
+  connected; ⑦ 内网穿透 userstop 落盘防 cloudflared 撞死代理。
+  排坑实录(反向深挖所得, 防复发):
+  a) PS1 脚本含中文(如 "配置.json" 路径)经 scp+ssh 落 GBK-PS5.1 会被当 ANSI 读
+     → 文件名写成乱码(閰嶇疆.json), 路由器找不到种子配置只生成 1 路线无为模板
+     → 症状即 "provider=deepseek 不存在或已禁用"。修法: 远端 ps1 一律 ASCII,
+     Unicode 名用 [char]0xNNNN 拼接。
+  b) sshd 服务环境带 HTTP(S)_PROXY=127.0.0.1:7890(死代理), dao_router 优先读
+     env→直连失败回退官方。修法: 演练时先清代理 env; 生产 ext host 无此 env,
+     且 ProxyEnable=0 不读 WinINET → 天然直连, 无需代码改。
+  c) ext host 重启回收后 origin-port.json 会短暂保留失效端口(多 ephermeral
+     绑定残留), 但新 ext host 会重新收敛到 FNV 端口并覆盖 port 文件 → 收敛自洽。
+  d) min 已安装(pinned)占 8981 → 部署时须先 rename .disabled + extensions.json
+     除名 + .obsolete 标名, 否则双 spawn-hook 互踩。
+  e) schtasks /tr 引号: /tr "E:\Devin\Devin.exe" 直接写即可, 勿嵌 \" 转义。
+
+v9.9.366 · Devin Local 推理端点重写根治 + shell 包裹 spawn 兜底 (承 9.9.364/365 未提交修复)
+: ① source.js 新增 `_pbRewriteEndpointHosts`/`_rewriteEndpointBody`: 对服务端下发配置的
+  响应体(GetCliModelConfigs/GetCliTeamSettings/GetUserStatus)做 proto 树遍历, 凡整字段
+  恰为指向官方上游(server.codeium.com/inference.codeium.com/server.self-serve.windsurf.com)
+  的 http(s) URL → authority 改写为 http://127.0.0.1:{_actualPort}。根治 findings/acp/07
+  实证缺口B: chisel(devin.exe acp) 推理端点由下发配置驱动, 仅锚 WINDSURF_API_SERVER_URL
+  env 只管管理面 RPC, GetChatMessage 直冲 server.codeium.com 绕过本地反代。改写后推理
+  归本口 → 与 Cascade 共用 CHAT_PROTO→SP改写→dao_router 管道。安: 整字段全等才改写
+  (不碰内嵌子串/JWT), api.devin.ai 不动, 改写后 _pbParseOk 校验不过则原样透传;
+  Connect 帧壳/裸 proto/gzip 三态皆收。单测: 嵌套/帧壳/gz/无靶四组全过。
+  ② extension.js `_rewriteAcpSpawn` 增 cmd.exe /c、powershell/pwsh -c/-Command、sh -c
+  包裹型 spawn 兜底(原仅 bash --login -c)。版本号连记 9.9.365(sp_invert DEVIN_SP_MARKERS)
+  与 9.9.366 两项未发版修复。
+
 v9.9.358 · 注入即入 custom · 归道即回 invert · 面板闭环(实机验证暴露之缺口)
 : 承 v9.9.357 实机全量验证(Devin Desktop 3.4.27 · invert/custom/passthrough 三态 ·
   模型路由 /origin/ea/overview · 内网穿透 · 7 项皆过)暴露一处面板可达性缺口:

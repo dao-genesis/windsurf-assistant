@@ -33,7 +33,10 @@
 "use strict";
 
 const cp = require("child_process");
+const fs = require("fs");
 const http = require("http");
+const os = require("os");
+const path = require("path");
 
 const argv = process.argv.slice(2);
 if (argv.length < 1) {
@@ -46,15 +49,64 @@ const targetArgs = argv.slice(1);
 
 // devin.exe 承之 env(可被本中人健康门控锚定 api_server)
 const childEnv = Object.assign({}, process.env);
-// 软编码 · 默认本地反代 invert 口 8937(与 LS --api_server_url 同锚点)
-const PROXY_URL = process.env.DAO_ACP_API_URL || "http://127.0.0.1:8937";
+// ★ v9.9.364 · 端口三溯 · 无为而无不为
+//   旧版硬编码 8937 → FNV 每用户异口(如 8957) → 探活必败 → 锚定错失。
+//   序: ① DAO_ACP_API_URL(spawn-hook 恒注真口) ② ~/.dao/origin-port.json
+//       (运行中反代自报) ③ FNV-1a(username) 确定性回推(与 extension.js 同源)
+//       ④ 终堕 8937 保底。 「知者不言 言者不知」· 口不问人 自得其真。
+function _resolveProxyUrl() {
+  if (process.env.DAO_ACP_API_URL) return process.env.DAO_ACP_API_URL;
+  try {
+    const p = path.join(os.homedir(), ".dao", "origin-port.json");
+    const j = JSON.parse(fs.readFileSync(p, "utf8"));
+    if (j && Number.isFinite(j.port) && j.port > 0)
+      return "http://127.0.0.1:" + j.port;
+  } catch (_) {
+    /* noop */
+  }
+  try {
+    let h = 0x811c9dc5;
+    const u = (os.userInfo().username || "") + "";
+    for (let i = 0; i < u.length; i++) {
+      h ^= u.charCodeAt(i);
+      h = (h * 0x01000193) >>> 0;
+    }
+    return "http://127.0.0.1:" + (8889 + (h % 100));
+  } catch (_) {
+    /* noop */
+  }
+  return "http://127.0.0.1:8937";
+}
+const PROXY_URL = _resolveProxyUrl();
 
 // ── spawn 前缓冲 stdin(保序·字节不改) · 待健康探测毕再落子并回放 ──
 const _pre = [];
 let _child = null;
 let _flushed = false;
 let _stdinEnded = false;
+// 观测 tap: 仅录含 method/model 的入向行 · 不改动字节流(透传第一)
+const _tapFile =
+  process.env.DAO_ACP_TAP || path.join(os.tmpdir(), "dao_acp_tap.log");
+let _tapBuf = "";
+function _tap(chunk) {
+  try {
+    _tapBuf += chunk.toString("utf8");
+    let i;
+    while ((i = _tapBuf.indexOf("\n")) >= 0) {
+      const line = _tapBuf.slice(0, i);
+      _tapBuf = _tapBuf.slice(i + 1);
+      if (/set_config_option|session\/prompt|session\/new|authenticate|"model"/.test(line)) {
+        const st = fs.statSync(_tapFile, { throwIfNoEntry: false });
+        if (!st || st.size < 262144)
+          fs.appendFileSync(_tapFile, new Date().toISOString() + " " + line.slice(0, 2000) + "\n");
+      }
+    }
+  } catch (_) {
+    /* noop */
+  }
+}
 process.stdin.on("data", (chunk) => {
+  _tap(chunk);
   if (_child && _flushed) {
     try {
       _child.stdin.write(chunk);

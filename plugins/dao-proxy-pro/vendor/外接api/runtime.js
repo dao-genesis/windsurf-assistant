@@ -222,12 +222,14 @@ function ensure(opts = {}) {
 
 /**
  * 快速路由判断 (source.js 用)
+ * ★ v9.9.371 · 两面分治: surface(local|cascade|any) 透传至 router.shouldRoute
  * @param {string} modelUid
+ * @param {string} [surface] 生效面(local|cascade|any·缺省=不限面)
  * @returns {boolean}
  */
-function shouldRoute(modelUid) {
+function shouldRoute(modelUid, surface) {
   const R = _getRouterModule();
-  return R ? R.shouldRoute(modelUid) : false;
+  return R ? R.shouldRoute(modelUid, surface) : false;
 }
 
 /**

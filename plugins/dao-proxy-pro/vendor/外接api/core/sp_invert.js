@@ -71,26 +71,19 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u66F8\u8001\u5B50+\u9053\u85CF\u9670\u7B26\u7D93", // 帛書老子+道藏陰符經
   },
-  // Windows Agent 模式: 二经合 + Windows 工具契约(dao-windows-agent MCP 官方并列工具层)
-  "windows-agent": {
-    files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt", "_windows_agent.txt"],
-    name: "\u4E8C\u7D93\u5408+Windows Agent \u5DE5\u5177\u5951\u7D04", // 二經合+Windows Agent 工具契約
-  },
+  // v9.9.373 · 损之又损: windows-agent 域工具契约线已废(旧项目尸骸·契约文件亦缺失) — 出列
 };
 
 // ── 模式/经藏持久化 ────────────────────────────────────────
 const _CANON_FILE = path.join(_BUNDLED_DIR, "_origin_canon.txt");
 const _MODE_FILE = path.join(_BUNDLED_DIR, "_origin_mode.txt");
 
-// ── 工具模式轴（与经藏轴正交：提示换提示的·工具换工具的·两者叠加）──
-//   经藏(laozi/yinfu/laozi+yinfu) × 工具(official/windows/freecad/kicad) 自由组合。
-//   工具契约文本作为后缀追加在经文之后；旧 canon=windows-agent 保留兼容（已含契约，不叠加）。
+// ── 工具模式轴 ── v9.9.373 · 损之又损: windows/freecad/kicad 域工具契约皆旧项目尸骸
+//   (dao-windows-agent/FreeCAD/KiCad 线早已收官) — 只余 official 一档。
+//   轴体保留以兼容持久化文件与 /origin/tools API 形状；非 official 一律拒绝。
 const _TOOLMODE_FILE = path.join(_BUNDLED_DIR, "_origin_tools.txt");
 const TOOLMODE_MAP = {
   official: { contract: null, name: "官方原生（无附加工具契约）" },
-  windows: { contract: "_windows_agent.txt", name: "Windows Agent 工具契约" },
-  freecad: { contract: "_freecad_agent.txt", name: "FreeCAD 域工具契约" },
-  kicad: { contract: "_kicad_agent.txt", name: "KiCad 域工具契约" },
 };
 
 function _readToolModeFile() {
@@ -311,14 +304,41 @@ const OFFICIAL_SP_MARKERS = [
   "<ide_metadata>",
 ];
 
+// ── Devin Local (chisel/ACP) SP 识别 · v9.9.365 · 道并行而不相悖 ──
+// 实证(2026-10-22 本机 ACP 活捉): devin.exe acp 之 GetChatMessage system =
+//   "You are Devin, an interactive command line agent from Cognition."
+//   ~19959B · 全文无 Cascade XML 标记 → 旧识别盲区 → invert/custom 皆透传。
+//   治: 与 Cascade 同规 —— 起首强特征 + 结构标记 ≥2 命中即判官方 SP。
+//   模型注册表实得 0 组(chisel --model 恒回退默认 swe-1-6-fast),
+//   故模型替换归于 daoRoutes 路由层(与 Cascade 同一张表)· 此处只管 SP 识别。
+const DEVIN_SP_MARKERS = [
+  "interactive command line agent",
+  "from Cognition",
+  "Available MCP Servers",
+  "Available subagent profiles",
+  "subagent_explore",
+  "subagent_general",
+  "# Task Management",
+  "# Tool Tips",
+  "## Destructive Operations",
+  "mcp_list_tools",
+  "devin-cli",
+];
+
 function isLikelyOfficialSP(s) {
   if (!s) return false;
   // v9.9.95 · startsWith 优先于长度检查 · 明确的官方标识不受长度限制
   //   道义: 一章「名可名也 非恒名也」· 有名即知 · 不以大小论
   if (s.startsWith("You are Cascade")) return true;
+  // v9.9.365 · Devin Local(chisel/ACP) 起首强特征 · 与 Cascade 同格
+  if (s.startsWith("You are Devin")) return true;
   if (s.length < 500) return false;
   let hits = 0;
   for (const m of OFFICIAL_SP_MARKERS) {
+    if (s.indexOf(m) >= 0) hits++;
+    if (hits >= 2) return true;
+  }
+  for (const m of DEVIN_SP_MARKERS) {
     if (s.indexOf(m) >= 0) hits++;
     if (hits >= 2) return true;
   }
@@ -378,6 +398,13 @@ const EPHEMERAL_SP_MARKERS = [
   "main topic",
   "<planner_response>",
   "<planner_step>",
+  // v9.9.365 · Devin Local(chisel/ACP) 标题子模型 SP 指纹
+  //   实证: "You are a session title generator. ... Output ONLY the title text
+  //         — no quotes, no punctuation wrapper, no explanation." (202B)
+  "session title generator",
+  "ONLY the title",
+  "descriptive title",
+  "no punctuation wrapper",
 ];
 
 // v9.9.92 · looksLikeSPShape · 形状判 · 从 source.js 同步
@@ -404,6 +431,8 @@ function classifySPType(s) {
   if (!s || typeof s !== "string") return null;
   if (s.length < 100) return null;
   if (s.startsWith("You are Cascade")) return "chat";
+  // v9.9.365 · Devin Local(chisel/ACP) 主对话 SP · 与 Cascade 同格
+  if (s.startsWith("You are Devin")) return "chat";
   if (
     s.startsWith("You are an expert AI coding") ||
     s.startsWith("You are an AI assistant") ||
@@ -412,6 +441,7 @@ function classifySPType(s) {
     return "summary";
   const hits = { chat: 0, summary: 0, memory: 0, ephemeral: 0 };
   for (const m of OFFICIAL_SP_MARKERS) if (s.indexOf(m) >= 0) hits.chat++;
+  for (const m of DEVIN_SP_MARKERS) if (s.indexOf(m) >= 0) hits.chat++;
   for (const m of SUMMARY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.summary++;
   for (const m of MEMORY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.memory++;
   for (const m of EPHEMERAL_SP_MARKERS) if (s.indexOf(m) >= 0) hits.ephemeral++;
@@ -528,6 +558,7 @@ function deOfficialName(s) {
   let out = s
     .replace(/CascadeProjects/g, "Projects")
     .replace(/\bCascade's\b/g, _DN_YOURP)
+    .replace(/\bDevin's\b/g, _DN_YOURP)
     .replace(/\bWindsurf's\b/g, _DN_ED + "'s")
     .replace(/\bCodeium's\b/g, _DN_ED + "'s")
     // 语法守: "the Cascade IDE"→"the IDE"(非"the you IDE")
@@ -535,6 +566,7 @@ function deOfficialName(s) {
     .replace(/\bthe Windsurf\b/g, "the")
     .replace(/\bthe Codeium\b/g, "the")
     .replace(/\bCascade\b/g, _DN_YOU)
+    .replace(/\bDevin\b/g, _DN_YOU)
     .replace(/\bWindsurf\b/g, _DN_ED)
     .replace(/\bCodeium\b/g, _DN_ED);
   // 主谓一致: 仅对哨兵主语 "⟨YOU⟩ <第三人称单数>" → 原形
@@ -876,6 +908,7 @@ module.exports = {
   DAO_DE_JING_81,
   YINFU_JING,
   OFFICIAL_SP_MARKERS,
+  DEVIN_SP_MARKERS,
   SUMMARY_SP_MARKERS,
   MEMORY_SP_MARKERS,
   EPHEMERAL_SP_MARKERS,

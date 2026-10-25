@@ -104,11 +104,6 @@ const ROUTES = [
   { path: "/api/search", method: "post", summary: "站内网页搜索", b: [{ name: "query", req: true }, { name: "engine" }] },
   { path: "/api/search/history", method: "get", summary: "搜索历史(仅查询串, 无凭据)" },
   { path: "/api/search/clear", method: "post", summary: "清空搜索历史" },
-  // ── Windows Agent(接入官方 MCP 工具层; headers 只报有无) ──
-  { path: "/api/winagent", method: "get", summary: "Windows Agent 注册状态(脱敏)" },
-  { path: "/api/winagent/local", method: "post", summary: "注册 local 通道(stdio 起 bridge.mcp)", b: [{ name: "dir" }, { name: "bridgeUrl" }, { name: "token" }, { name: "disabled" }] },
-  { path: "/api/winagent/remote", method: "post", summary: "注册 remote 通道(DAO Bridge 穿透 /mcp)", b: [{ name: "url", req: true }, { name: "token" }, { name: "disabled" }] },
-  { path: "/api/winagent/unregister", method: "post", summary: "注销 Windows Agent" },
 ];
 
 function paramSchema(list) {

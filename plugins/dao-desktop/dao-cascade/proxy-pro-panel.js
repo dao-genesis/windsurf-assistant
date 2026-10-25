@@ -25,8 +25,9 @@ class ProxyProPanel {
     w.onDidReceiveMessage((m) => this._onMessage(m || {}));
     w.html = this._html();
     this._pxList();
+    this._pxOrigin();
     // retainContextWhenHidden 下重新可见时刷新: 渠道/路由可能已在面板外(headless/切号)变更。
-    view.onDidChangeVisibility(() => { if (view.visible) this._pxList(); });
+    view.onDidChangeVisibility(() => { if (view.visible) { this._pxList(); this._pxOrigin(); } });
   }
 
   _post(m) { if (this._view) try { this._view.webview.postMessage(m); } catch (_) {} }
@@ -39,12 +40,29 @@ class ProxyProPanel {
       case "px-refresh": return this._pxRefresh(String(msg.name || ""));
       case "px-route": return this._pxRoute();
       case "px-test": return this._pxTest(String(msg.uid || ""));
+      case "px-origin": return this._pxOrigin();
       case "mf-state": return this._mfState();
       case "mf-set": return this._mfSet(String(msg.layer || ""), String(msg.id || ""));
       case "mf-custom": return this._mfCustom();
       case "mf-overlay": return this._mfOverlay(String(msg.id || ""), !!msg.on);
       default: return;
     }
+  }
+
+  // ★ 本源引擎实况(v10.3 · R258 合流): /origin/ping + /origin/ea/status + /origin/ea/usage
+  //   端口发现与 mode-fusion 同源(discoverOriginPort) — per-user FNV-1a 对齐 dao-proxy-min。
+  async _pxOrigin() {
+    const http = require("http");
+    const base = (() => { try { return modeFusion.originBase(); } catch (_) { return "http://127.0.0.1:8889"; } })();
+    const get = (p) => new Promise((resolve) => {
+      const req = http.get(base + p, { timeout: 1800 }, (r) => {
+        let b = ""; r.on("data", (c) => (b += c)); r.on("end", () => { try { resolve(JSON.parse(b)); } catch (_) { resolve(null); } });
+      });
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+      req.on("error", () => resolve(null));
+    });
+    const [ping, status, usage] = await Promise.all([get("/origin/ping"), get("/origin/ea/status"), get("/origin/ea/usage")]);
+    this._post({ type: "px-origin", base, ping, status, usage });
   }
 
   // 模式融合(提示词层×工具层 = 4×4 = 16): 真源在 mode-fusion.js(headless)。
@@ -76,23 +94,11 @@ class ProxyProPanel {
     this._mfState();
   }
 
-  // 域叠加开关(KiCad/嘉立创EDA 开/关): 开 = 工具描述并入提示词(太上下知有之);
+  // 域叠加开关(v9.9.373 · 域集已空 —— pcb/freecad 旧项目尸骸出列·保留壳以兼容消息型)。
   // 关 = 官方原貌。与提示词层三模式正交, 不论道德经/阴符经/官方都可叠加。
   _mfOverlay(id, on) {
     try {
       modeFusion.setOverlay(id, on);
-      // 域真生效: 对应 MCP(dao-pcb/dao-freecad) 开/关(官方同一注入路径 —— LS 只向模型注入 enabled 服务的工具描述),
-      // 并 best-effort 令 LS 即刻重载(不在跑不算失败, 配置文件已是真源)。
-      const agentMod = id === "pcb" ? "./pcb-agent" : id === "freecad" ? "./fc-agent" : null;
-      if (agentMod) {
-        const r = require(agentMod).setDisabled(!on);
-        if (r.ok) {
-          try {
-            const ls = require("./ls-bridge");
-            if (ls.ready() && ls.apiKey()) ls.call("RefreshMcpServers", {}).catch(() => {});
-          } catch (_) {}
-        }
-      }
       vscode.window.showInformationMessage("域叠加 " + id + (on ? " 已开(工具描述并入提示词)" : " 已关(官方原貌, 工具仍注册在册)"));
     } catch (e) { vscode.window.showErrorMessage("切域叠加失败: " + e.message); }
     this._mfState();
@@ -227,7 +233,7 @@ h2{font-size:15px;margin:0 0 4px}
 const vscode=acquireVsCodeApi();
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function cr(l,v){return '<div class="cr"><span class="l">'+E(l)+'</span><span class="v">'+v+'</span></div>';}
-let PX=null;let PXRS=[];let MF=null;
+let PX=null;let PXRS=[];let MF=null;let ORIG=null;
 function renderModes(){
   let h='<div class="st">模式矩阵 · 提示词层 × 工具层 = 4×4 = 16</div>';
   if(MF===null)return h+'<div class="card muted">加载模式…</div>';
@@ -241,9 +247,26 @@ function renderModes(){
     d.toolModes.map(m=>'<button class="btn'+(m.id===d.tool?'':' sec')+'" data-mft="'+E(m.id)+'" title="'+E(m.summary)+'">'+(m.id===d.tool?'✓ ':'')+E(m.name)+'</button>').join(' ')+'</span></div>'+
     '<div class="cr"><span class="l">域叠加(与三模式正交可叠)</span><span class="v">'+
     (d.overlays||[]).map(m=>'<button class="btn'+(m.on?'':' sec')+'" data-mfo="'+E(m.id)+'|'+(m.on?'0':'1')+'" title="'+E(m.summary)+'">'+(m.on?'✓ ':'◌ ')+E(m.name)+' '+(m.on?'开':'关')+'</button>').join(' ')+'</span></div></div>';
-  h+='<div class="muted" style="margin-bottom:10px">提示词层与 Proxy Pro 本源引擎同源(/origin/mode × /origin/canon); 工具层热切反代工具契约(/origin/tools)并与 Dao-Windows-Agent ModeManager 同一契约文件, 桥在跑即刻联动。</div>';
+  h+='<div class="muted" style="margin-bottom:10px">提示词层与 Proxy Pro 本源引擎同源(/origin/mode × /origin/canon); 工具层热切反代(/origin/tools · v9.9.373 只余 official 一档)。</div>';
   return h;
 }
+function renderOrigin(){
+  let h='<div class="row"><h2 style="flex:1">本源引擎 · 实况</h2><button class="btn sec" id="pxOriginRf">刷新</button></div>';
+  const o=ORIG;
+  if(!o||!o.ping){h+='<div class="card muted">本源引擎未达'+(o&&o.base?(' ('+E(o.base)+')'):'')+' — 反代未在跑(读盘生效待起跑)。</div>';return h;}
+  const p=o.ping,s=o.status,u=o.usage||{};
+  h+='<div class="card"><div class="cr"><span class="l">'+E(o.base)+' · '+E(p.mode||'?')+' · 经藏 '+E(p.canon||'?')+'</span><span class="v">'+
+    (s&&s.ready?'<span class="badge">路由就绪 '+((s.uids||[]).length)+' 条</span>':'<span class="badge cloud">路由未就绪</span>')+'</span></div>';
+  if(u.usage&&Object.keys(u.usage).length){
+    for(const k of Object.keys(u.usage)){
+      const d=u.usage[k]||{};
+      h+='<div class="conv" style="cursor:default"><span class="muted">外接 · '+E(k)+': 调用 '+(d.calls||0)+' · 输入 '+fmtT(d.input)+' · 缓存 '+(d.hitRate!=null?(d.hitRate+'% ('+fmtT(d.cached)+')'):'—')+' · 输出 '+fmtT(d.output)+'</span></div>';
+    }
+  } else h+='<div class="conv" style="cursor:default"><span class="muted">外接用量: 暂无(未发生路由调用)</span></div>';
+  h+='</div>';
+  return h;
+}
+function fmtT(n){n=Number(n)||0;if(n>=1e9)return (n/1e9).toFixed(2)+'B';if(n>=1e6)return (n/1e6).toFixed(2)+'M';if(n>=1e3)return (n/1e3).toFixed(1)+'K';return String(n);}
 function renderProxy(){
   let h='<div class="row"><h2 style="flex:1">Proxy Pro · 插件自持模型路由</h2>'+
     '<button class="btn" id="pxAdd">添加渠道</button>'+
@@ -272,6 +295,7 @@ function renderProxy(){
   h+='<div class="st">模型路由(生效层)</div>';
   if(!rt.length)h+='<div class="card muted">暂无路由。点「配路由」把官方模型 UID 指向某渠道模型。</div>';
   else{h+='<div class="card">';for(const r of rt){const s=rsMap[r.uid]||{};const eff=s.effective?'<span class="badge">可投递✓</span>':'<span class="badge cloud">不可投递</span>';h+=cr(E(r.uid),'→ '+E(r.channel)+' / '+E(r.model)+' '+eff+' <span class="back" data-pxtest="'+E(r.uid)+'">试跑</span> <span class="back" data-pxunroute="'+E(r.uid)+'">解除</span>');}h+='</div>';}
+  h+=renderOrigin();
   h+=renderModes();
   return h;
 }
@@ -279,7 +303,7 @@ function render(){
   document.getElementById('main').innerHTML=renderProxy();
   const pxa=document.getElementById('pxAdd'); if(pxa)pxa.onclick=()=>vscode.postMessage({type:'px-add'});
   const pxrt=document.getElementById('pxRoute'); if(pxrt)pxrt.onclick=()=>vscode.postMessage({type:'px-route'});
-  const pxrf=document.getElementById('pxRf'); if(pxrf)pxrf.onclick=()=>{PX=null;MF=null;render();vscode.postMessage({type:'px-list'});vscode.postMessage({type:'mf-state'});};
+  const pxrf=document.getElementById('pxRf'); if(pxrf)pxrf.onclick=()=>{PX=null;MF=null;ORIG=null;render();vscode.postMessage({type:'px-list'});vscode.postMessage({type:'mf-state'});vscode.postMessage({type:'px-origin'});};
   document.querySelectorAll('[data-pxref]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-refresh',name:el.dataset.pxref}));
   document.querySelectorAll('[data-pxrm]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-remove',name:el.dataset.pxrm}));
   document.querySelectorAll('[data-pxunroute]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'px-route',uid:el.dataset.pxunroute}));
@@ -288,12 +312,13 @@ function render(){
   document.querySelectorAll('[data-mft]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mf-set',layer:'tool',id:el.dataset.mft}));
   document.querySelectorAll('[data-mfo]').forEach(el=>el.onclick=()=>{const p=el.dataset.mfo.split('|');vscode.postMessage({type:'mf-overlay',id:p[0],on:p[1]==='1'});});
   const mfce=document.getElementById('mfCustomEdit'); if(mfce)mfce.onclick=()=>vscode.postMessage({type:'mf-custom'});
+  const orf=document.getElementById('pxOriginRf'); if(orf)orf.onclick=()=>vscode.postMessage({type:'px-origin'});
 }
 window.addEventListener('message',e=>{const m=e.data||{};
   if(m.type==='px-list'){PX=m.data||{channels:[],routes:[]};PXRS=m.routeStatus||[];render();}
   else if(m.type==='mf-state'){MF=m.data?m.data:{error:m.error||'拉取失败'};render();}
+  else if(m.type==='px-origin'){ORIG=m;render();}
 });
-render();
 vscode.postMessage({type:'px-list'});
 vscode.postMessage({type:'mf-state'});
 </script></body></html>`;

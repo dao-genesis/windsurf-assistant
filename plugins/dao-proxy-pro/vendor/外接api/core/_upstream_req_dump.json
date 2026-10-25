@@ -1,7 +1,7 @@
 {
-  "_ts": "2026-07-18T17:30:44.226Z",
+  "_ts": "2026-10-25T11:08:09.592Z",
   "_model": "deepseek-reasoner",
-  "_url": "http://127.0.0.1:35493/chat/completions",
+  "_url": "http://127.0.0.1:64424/chat/completions",
   "_extraHeaders": {
     "Authorization": "(14B)"
   },
@@ -35,7 +35,7 @@
   "_sysLen": 16,
   "_sysPreview": "You are helpful.",
   "_sysFull": "You are helpful.",
-  "_msgCount": 5,
+  "_msgCount": 2,
   "_thinking": true,
   "_msgSummary": [
     {
@@ -55,38 +55,8 @@
       "reasoningContentLen": 0,
       "hasToolCalls": false,
       "toolCallCount": 0,
-      "contentLen": 69,
-      "preview": "Search trajectory for conversation @conv_abc about database migration"
-    },
-    {
-      "idx": 2,
-      "role": "assistant",
-      "hasReasoningContent": true,
-      "reasoningContentLen": 35,
-      "hasToolCalls": true,
-      "toolCallCount": 1,
-      "contentLen": -1,
-      "preview": ""
-    },
-    {
-      "idx": 3,
-      "role": "tool",
-      "hasReasoningContent": false,
-      "reasoningContentLen": 0,
-      "hasToolCalls": false,
-      "toolCallCount": 0,
-      "contentLen": 90,
-      "preview": "{\"results\":[{\"text\":\"User discussed migrating from MySQL to PostgreSQL...\",\"score\":0.95}]}"
-    },
-    {
-      "idx": 4,
-      "role": "assistant",
-      "hasReasoningContent": true,
-      "reasoningContentLen": 0,
-      "hasToolCalls": false,
-      "toolCallCount": 0,
-      "contentLen": 0,
-      "preview": ""
+      "contentLen": 29,
+      "preview": "Read resource from MCP server"
     }
   ],
   "_tools": [

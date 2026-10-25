@@ -46,8 +46,33 @@ const net = require("net");
 const tls = require("tls");
 
 let _proxyUrlResolved; // undefined=未解析, null=无代理, string=代理URL
+let _proxyUrlResolvedAt = 0;
+const _PROXY_RESOLVE_TTL = 60000; // v9.9.372 · 解析TTL 60s·随 watchdog 切道节奏
+function _noProxyHit(host) {
+  const np = process.env.NO_PROXY || process.env.no_proxy || "";
+  if (!np) return false;
+  const h = String(host || "").toLowerCase();
+  for (const t of np.split(",")) {
+    const tok = t.trim().toLowerCase();
+    if (!tok) continue;
+    if (tok === "*") return true;
+    if (h === tok || h.endsWith("." + tok) || (tok[0] === "." && h.endsWith(tok)))
+      return true;
+  }
+  return false;
+}
 function _resolveProxyUrl() {
-  if (_proxyUrlResolved !== undefined) return _proxyUrlResolved;
+  if (
+    _proxyUrlResolved !== undefined &&
+    Date.now() - _proxyUrlResolvedAt < _PROXY_RESOLVE_TTL
+  )
+    return _proxyUrlResolved;
+  // v9.9.372 · NO_PROXY=* → 用户明示全直连 · 尊重之
+  if (_noProxyHit("__star__")) {
+    _proxyUrlResolved = null;
+    _proxyUrlResolvedAt = Date.now();
+    return null;
+  }
   // 1) 环境变量 (优先)
   let url =
     process.env.HTTPS_PROXY ||
@@ -87,6 +112,7 @@ function _resolveProxyUrl() {
     }
   }
   _proxyUrlResolved = url || null;
+  _proxyUrlResolvedAt = Date.now();
   return _proxyUrlResolved;
 }
 
@@ -101,6 +127,19 @@ function _isLocalHostName(host) {
 }
 
 // 纯 Node 实现的 HTTP CONNECT 隧道 https Agent · 无外部依赖
+// ★ v9.9.372 · 永久熔断→90s死窗: 代理道死让路直连, 窗满自动重探(代理医好即复用)
+//   根因(141实证): 20s隧道超时×永久旗标 —— 死时代价过大且不自愈。
+//   实证(ZHOU@141): sshd 环境残留 HTTP(S)_PROXY=127.0.0.1:7890(已停用空壳)
+//   → 外接路由全灭、只能回退官方。代理是"锦上添花"不是"必须经"——死了即让路, 好了即回头。
+let _proxyDeadUntil = 0;
+function _markProxyDead(reason) {
+  _proxyDeadUntil = Date.now() + 90000;
+  _proxyUrlResolvedAt = 0; // 隧道死 → 解析即时过期 · 下次赶上 watchdog 切道
+  try {
+    _log(`[dao-router] 代理隧道死窗 90s → 直连 (${reason})`);
+  } catch (_) {}
+}
+
 class _DaoTunnelAgent extends https.Agent {
   constructor(proxyUrl, opts) {
     super(opts || {});
@@ -111,8 +150,8 @@ class _DaoTunnelAgent extends https.Agent {
   createConnection(options, cb) {
     const destHost = options.host || options.hostname;
     const destPort = parseInt(options.port || 443, 10);
-    // 本地/内网目标 → 不走代理 (直接 TLS)
-    if (_isLocalHostName(destHost)) {
+    // 本地/内网/NO_PROXY 目标 → 不走代理 (直接 TLS) · v9.9.372
+    if (_isLocalHostName(destHost) || _noProxyHit(destHost)) {
       return super.createConnection(options, cb);
     }
     const sock = net.connect(this._proxyPort, this._proxyHost);
@@ -124,10 +163,22 @@ class _DaoTunnelAgent extends https.Agent {
       try {
         sock.destroy();
       } catch (_) {}
+      // ★ v9.9.367 · 死代理熔断: 连代理本体都失败(ECONNREFUSED/超时) → 后续直连
+      //   CONNECT 拒绝(有响应但非200)说明代理活着只是不接收 → 不熔断
+      const code = e && (e.code || e.message || "");
+      if (
+        code === "ECONNREFUSED" ||
+        code === "EHOSTUNREACH" ||
+        code === "ETIMEDOUT" ||
+        /tunnel timeout/i.test(String(code))
+      ) {
+        _markProxyDead(code);
+      }
       cb(e);
     };
     sock.once("error", fail);
-    sock.setTimeout(20000, () => fail(new Error("dao proxy tunnel timeout")));
+    // v9.9.372 · 隧道建连预算 3s (<客户端5s) · 死道 fail-fast 非 fail-stall
+    sock.setTimeout(3000, () => fail(new Error("dao proxy tunnel timeout")));
     sock.on("connect", () => {
       sock.write(
         `CONNECT ${destHost}:${destPort} HTTP/1.1\r\nHost: ${destHost}:${destPort}\r\n\r\n`,
@@ -182,6 +233,7 @@ let _daoTunnelAgentUrl = null;
 function _getProxyAgent(isHttps) {
   // 仅对 https 上游启用隧道 (http/本地上游保持直连原状)
   if (!isHttps) return undefined;
+  if (Date.now() < _proxyDeadUntil) return undefined; // v9.9.372 · 死窗内直连·窗满自动重探
   const url = _resolveProxyUrl();
   if (!url) return undefined;
   if (_daoTunnelAgent && _daoTunnelAgentUrl === url) return _daoTunnelAgent;
@@ -202,20 +254,11 @@ try {
   _spInvert = require(path.join(__dirname, "sp_invert"));
 } catch {}
 
-// ★ Windows Agent 原生工具层 · windows-agent 经藏启用时注入+代理执行
-//   与官方服务端工具同格 · LSP 太上不知有之 · 非 MCP 层
-let _winTools = null;
-try {
-  _winTools = require(path.join(__dirname, "windows_tools"));
-} catch {}
+// v9.9.373 · 损之又损: windows-agent 域工具线已废(旧项目尸骸) — _winTools 注入/代理执行一并拆除
 
-function _isWinTool(name) {
-  return !!(_winTools && _winTools.enabled() && _winTools.has(name));
-}
-
-// 代理侧拦截判定归一: 仅代理工具 ∪ Windows 原生工具(启用时)
+// 代理侧拦截判定归一: 仅代理工具
 function _isProxyExecTool(name) {
-  return _proxyOnlyToolNames.has(name) || _isWinTool(name);
+  return _proxyOnlyToolNames.has(name);
 }
 
 // ★ v9.9.101 · 太上下知有之 · 增强模式幂等标记 + DAO经藏文本
@@ -1579,7 +1622,7 @@ function _normalizeModelUid(uid) {
 /**
  * 判断是否应路由此 modelUid
  */
-function shouldRoute(modelUid) {
+function shouldRoute(modelUid, surface) {
   if (typeof modelUid !== "string") return false;
   // ★ v9.9.98 · 无配置=全官方 · 有配置才路由 · 道法自然
   //   _ready=false: 无路由配置 → 所有模型走官方透传
@@ -1595,6 +1638,14 @@ function shouldRoute(modelUid) {
   if (r.enabled === false) return false;
   // substitute模式需要全局开关
   if (r.provider === "substitute" && !_substituteEnabled) return false;
+  // ★ v9.9.368 · 分面路由: scope=local|cascade 限定生效面 · 缺省 all 双面
+  //   Devin Local(chisel acp→api_server_pb)=local · Cascade(LS)=cascade
+  //   surface 未识别('')时只应 all 面 —— 保守不误路由
+  //   ★ v9.9.371 · surface=any|* → 面不限(test-chat 等诊断直通·验路由存在性)
+  const scope = String(r.scope || "all").toLowerCase();
+  const _sf = String(surface || "").toLowerCase();
+  if (_sf !== "any" && _sf !== "*" && scope !== "all" && scope !== surface)
+    return false;
   // ★ 通配符 * 始终可路由
   if (normalized === "*") return true;
   return true;
@@ -2207,13 +2258,11 @@ async function _tryRoute({
           `_tryRoute internal retry #${_retryCount}: serverSideCalls=${_remainingServerCalls.length} names=${_remainingServerCalls.map((c) => c.name).join(",")}`,
         );
 
-        // 执行服务端工具 → 生成 tool result (Windows 原生工具走异步桥执行)
+        // 执行服务端工具 → 生成 tool result
         const _toolResults = await Promise.all(
           _remainingServerCalls.map(async (tc) => ({
             tool_call_id: tc.id,
-            content: _isWinTool(tc.name)
-              ? await _winTools.execute(tc.name, tc.argumentsJson)
-              : _executeServerTool(tc.name, tc.argumentsJson),
+            content: _executeServerTool(tc.name, tc.argumentsJson),
           })),
         );
 
@@ -2744,16 +2793,6 @@ async function _callProvider(
         if (!_existingNames.has(st.name) && !_existingNames.has(_aliasName)) {
           toolsField.push({ type: "function", function: st });
           _existingNames.add(st.name);
-        }
-      }
-
-      // ★ Windows Agent 原生工具注入 · windows-agent 经藏启用时与官方工具并列
-      if (_winTools && _winTools.enabled()) {
-        for (const wt of _winTools.defs()) {
-          if (!_existingNames.has(wt.name)) {
-            toolsField.push({ type: "function", function: wt });
-            _existingNames.add(wt.name);
-          }
         }
       }
 
@@ -3560,6 +3599,24 @@ function _streamOaToCascade(
       } catch {
         _log(`[dao-router] ⚠️ 工具调用参数JSON无效: ${tc.name} → 使用空对象`);
         _validArgs = "{}";
+      }
+
+      // v10.2 · run_subagent.profile 归一 — 外接模型发 profile 无 enum 值 → LSP 侧 spawn 必败
+      //   实证(2026-10-25 东京真流量): deepseek 发 "general"/"default" →
+      //   toolbox_core: Unknown subagent profile (Available: subagent_general/subagent_explore)
+      //   schema 无 enum · 模型自然乱填 → 归一到 LSP 实名 → 子代理真跑 (六十五章·善执生者无死地)
+      if (tc.name === "run_subagent") {
+        try {
+          const _a = JSON.parse(_validArgs);
+          const _p = _a.profile;
+          if (typeof _p === "string" && _p && !_p.startsWith("subagent_")) {
+            _a.profile = /explor|search|find/i.test(_p)
+              ? "subagent_explore"
+              : "subagent_general";
+            _validArgs = JSON.stringify(_a);
+            _log("[dao-router] run_subagent.profile 归一: " + _p + " → " + _a.profile);
+          }
+        } catch {}
       }
       // 去重: name + args 组合键 (Go EXE: toolName + ':' + JSON.stringify(params))
       const _dedupKey = tc.name + ":" + _validArgs;

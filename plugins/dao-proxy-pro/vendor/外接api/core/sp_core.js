@@ -80,11 +80,7 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u4E66\u8001\u5B50+\u9053\u85CF\u9634\u7B26\u7ECF",
   },
-  // Windows Agent 模式: 二经合 + Windows 工具契约(dao-windows-agent MCP 官方并列工具层)
-  "windows-agent": {
-    files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt", "_windows_agent.txt"],
-    name: "\u4E8C\u7ECF\u5408+Windows Agent \u5DE5\u5177\u5951\u7EA6",
-  },
+  // v9.9.373 · 损之又损: windows-agent 域工具契约线已废(旧项目尸骸) — 出列
 };
 // ★ v9.9.94 · _CANON_FILE 指向 bundled-origin (与 sp_invert.js 同源)
 //   sp_core.js 在 core/ 目录 · bundled-origin 在 ../../bundled-origin
@@ -127,9 +123,6 @@ function getCanon() {
 const _TOOLMODE_FILE = path.join(_BUNDLED_DIR, "_origin_tools.txt");
 const TOOLMODE_MAP = {
   official: { contract: null, name: "官方原生（无附加工具契约）" },
-  windows: { contract: "_windows_agent.txt", name: "Windows Agent 工具契约" },
-  freecad: { contract: "_freecad_agent.txt", name: "FreeCAD 域工具契约" },
-  kicad: { contract: "_kicad_agent.txt", name: "KiCad 域工具契约" },
 };
 
 function _readToolModeFile() {

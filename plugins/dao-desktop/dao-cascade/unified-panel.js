@@ -28,13 +28,13 @@ const proxyPro = require("./proxy-pro");
 const webSearch = require("./web-search");
 const inject = require("./inject");
 const mcpConfig = require("./mcp-config");
-const windowsAgent = require("./windows-agent");
-const winCore = require("./windows-panel-core");
-const pcbAgent = require("./pcb-agent");
-const pcbCore = require("./pcb-panel-core");
-const fcAgent = require("./fc-agent");
-const fcCore = require("./fc-panel-core");
-const modeFusion = require("./mode-fusion");
+
+
+
+
+
+
+
 
 function nonce() { let s = ""; const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < 24; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
@@ -187,27 +187,6 @@ class UnifiedPanel {
       case "acp-registry": return this._acpRegistry();
       case "acp-reload": return this._acpReload();
       case "env-open": return this._envOpen(String(msg.path || ""));
-      case "win-state": return this._winState();
-      case "win-reg-local": return this._winRegLocal();
-      case "win-reg-remote": return this._winRegRemote();
-      case "win-unreg": return this._winUnreg();
-      case "win-release": return this._winRelease(String(msg.key || ""), String(msg.owner || ""));
-      case "win-acct-create": return this._winAcctCreate();
-      case "win-acct-destroy": return this._winAcctDestroy(String(msg.name || ""));
-      case "win-acct-clone": return this._winAcctClone(String(msg.base || ""));
-      case "win-open-desktop": return this._winOpenDesktop(String(msg.account || ""));
-      case "pcb-state": return this._pcbState();
-      case "pcb-reg-local": return this._pcbRegLocal();
-      case "pcb-reg-remote": return this._pcbRegRemote();
-      case "pcb-unreg": return this._pcbUnreg();
-      case "pcb-open": return this._pcbOpen(String(msg.module || ""));
-      case "pcb-overlay": return this._pcbOverlay(!!msg.on);
-      case "fc-state": return this._fcState();
-      case "fc-reg-local": return this._fcRegLocal();
-      case "fc-reg-remote": return this._fcRegRemote();
-      case "fc-unreg": return this._fcUnreg();
-      case "fc-open": return this._fcOpen(String(msg.module || ""));
-      case "fc-overlay": return this._fcOverlay(!!msg.on);
       default: return;
     }
   }
@@ -223,10 +202,10 @@ class UnifiedPanel {
       case "inject": return this._injList();
       case "mcp": return this._mcpDetail();
       case "github": return this._ghList();
-      case "overview": this._winState(); return this._pushState();
-      case "windows": return this._winState();
-      case "pcb": return this._pcbState();
-      case "freecad": return this._fcState();
+      case "overview": return this._pushState();
+
+
+
       case "settings": return this._setDetail();
       case "browser": return this._webState();
       default: return this._pushState();
@@ -243,11 +222,11 @@ class UnifiedPanel {
     const lsReady = !!(hs && hs.lsPort && hs.csrfToken) && alive !== false;
     let backups = { root: "", accounts: [] };
     try { backups = backup.listBackups(); } catch (e) { this._log("[unified] listBackups: " + e.message); }
-    let github = null, proxy = null, pcb = null, freecad = null;
+    let github = null, proxy = null;
     try { const v = ghFleet.listView(); github = { count: v.length, ok: v.filter((a) => a.verify === "ok").length }; } catch (_) {}
     try { const v = proxyPro.listView(); proxy = { channels: v.channels.length, routes: v.routes.length }; } catch (_) {}
-    try { pcb = pcbCore.detectQuick(); pcb.overlayOn = modeFusion.overlayOn("pcb"); } catch (_) {}
-    try { freecad = fcCore.detectQuick(); freecad.overlayOn = modeFusion.overlayOn("freecad"); } catch (_) {}
+
+
     return {
       board: this._board,
       lsReady,
@@ -261,225 +240,12 @@ class UnifiedPanel {
       backups,
       github,
       proxy,
-      pcb,
-      freecad,
+
+
     };
   }
 
   _pushState() { this._post({ type: "state", data: this._snapshot() }); }
-
-  // ── 🪟 Windows 分身板块(数据核在 windows-panel-core.js, headless 可测) ──
-  async _winState() {
-    try { this._post({ type: "win-state", data: await winCore.probe() }); }
-    catch (e) { this._post({ type: "win-state", error: e.message }); }
-  }
-
-  async _winRegLocal() {
-    const r = windowsAgent.registerLocal({});
-    if (!r.ok) vscode.window.showWarningMessage("Windows Agent 注册失败: " + r.error);
-    else vscode.window.showInformationMessage("已注册 dao-windows-agent(local) → " + r.configPath);
-    return this._winState();
-  }
-
-  async _winRegRemote() {
-    const url = await vscode.window.showInputBox({ prompt: "DAO Bridge 穿透公网地址(自动补 /mcp)", placeHolder: "https://…" });
-    if (!url) return;
-    const token = await vscode.window.showInputBox({ prompt: "Bearer token(可空)", password: true });
-    const r = windowsAgent.registerRemote({ url, token });
-    if (!r.ok) vscode.window.showWarningMessage("注册失败: " + r.error);
-    else vscode.window.showInformationMessage("已注册 dao-windows-agent(remote)");
-    return this._winState();
-  }
-
-  async _winUnreg() {
-    windowsAgent.unregister();
-    return this._winState();
-  }
-
-  async _winRelease(key, owner) {
-    const r = await winCore.releaseLease(key, owner);
-    if (r && r.error) vscode.window.showWarningMessage("释放失败: " + r.error);
-    return this._winState();
-  }
-
-  // Windows 总控 · 账号建/销(桥 /api/account.* 同一真源)与开桌面(委派 dao-windows-agent 插件)。
-  async _winAcctCreate() {
-    const name = await vscode.window.showInputBox({ prompt: "新建 Windows 账号名", validateInput: (v) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,19}$/.test(v || "") ? null : "限字母数字与 . _ -，≤ 20" });
-    if (!name) return;
-    const r = await winCore.accountCreate(name);
-    if (r && r.ok) vscode.window.showInformationMessage("Windows 账号已建: " + name);
-    else vscode.window.showErrorMessage("建号失败: " + ((r && r.error) || "未知"));
-    return this._winState();
-  }
-
-  // 复制分身: 以既有账号为基底再建一路独立桌面账号(同源 /api/account.create)。
-  async _winAcctClone(base) {
-    if (!base) return;
-    const name = await vscode.window.showInputBox({ prompt: "复制分身: 新账号名(与 " + base + " 各自独立桌面会话, 互不相扰)", value: base + "-2", validateInput: (v) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,19}$/.test(v || "") ? null : "限字母数字与 . _ -，≤ 20" });
-    if (!name) return;
-    const r = await winCore.accountCreate(name);
-    if (r && r.ok) vscode.window.showInformationMessage("分身已复制: " + base + " → " + name);
-    else vscode.window.showErrorMessage("复制失败: " + ((r && r.error) || "未知"));
-    return this._winState();
-  }
-
-  async _winAcctDestroy(name) {
-    if (!name) return;
-    const pick = await vscode.window.showWarningMessage("销毁 Windows 账号 " + name + "? 其独立桌面会话与 profile 一并清除", { modal: true }, "销毁");
-    if (pick !== "销毁") return;
-    const r = await winCore.accountDestroy(name);
-    if (r && r.ok) vscode.window.showInformationMessage("Windows 账号已销毁: " + name);
-    else vscode.window.showErrorMessage("销号失败: " + ((r && r.error) || "未知"));
-    return this._winState();
-  }
-
-  async _winOpenDesktop(account) {
-    // 桌面渲染(RDP/guacamole canvas)由 dao-windows-agent 插件承载; 归一主页只做总控入口。
-    try {
-      await vscode.commands.executeCommand(account ? "daoWin.openAccountDesktop" : "daoWin.openDesktop");
-    } catch (e) {
-      vscode.window.showWarningMessage("打开桌面需安装 dao-windows-agent 插件(桌面级路由): " + e.message);
-    }
-  }
-
-  // ── ⚡ PCB 板块(数据核在 pcb-panel-core.js, headless 可测) ──
-  async _pcbState() {
-    try {
-      const data = await pcbCore.probe();
-      data.overlay = modeFusion.state().overlays.find((o) => o.id === "pcb") || null;
-      this._post({ type: "pcb-state", data });
-    } catch (e) { this._post({ type: "pcb-state", error: e.message }); }
-  }
-
-  async _pcbRegLocal() {
-    const r = pcbAgent.registerLocal({});
-    if (!r.ok) vscode.window.showWarningMessage("PCB Agent 注册失败: " + r.error);
-    else vscode.window.showInformationMessage("已注册 dao-pcb(local) → " + r.configPath);
-    return this._pcbState();
-  }
-
-  async _pcbRegRemote() {
-    const url = await vscode.window.showInputBox({ prompt: "DAO Bridge 穿透公网地址(自动补 /mcp)", placeHolder: "https://…" });
-    if (!url) return;
-    const token = await vscode.window.showInputBox({ prompt: "Bearer token(可空)", password: true });
-    const r = pcbAgent.registerRemote({ url, token });
-    if (!r.ok) vscode.window.showWarningMessage("注册失败: " + r.error);
-    else vscode.window.showInformationMessage("已注册 dao-pcb(remote)");
-    return this._pcbState();
-  }
-
-  async _pcbUnreg() {
-    pcbAgent.unregister();
-    return this._pcbState();
-  }
-
-  // 域叠加开关(与 Proxy Pro 面板 mf-overlay 同一真源): 开 = dao-pcb 工具描述并入提示词,
-  // 关 = 官方原貌(工具仍注册在册)。
-  async _pcbOverlay(on) {
-    try {
-      modeFusion.setOverlay("pcb", on);
-      const r = pcbAgent.setDisabled(!on);
-      if (r.ok) {
-        try {
-          const ls = require("./ls-bridge");
-          if (ls.ready() && ls.apiKey()) ls.call("RefreshMcpServers", {}).catch(() => {});
-        } catch (_) {}
-      }
-      vscode.window.showInformationMessage("KiCad/嘉立创EDA 模式" + (on ? "已开(工具描述并入提示词)" : "已关(官方原貌, 工具仍注册在册)"));
-    } catch (e) { vscode.window.showErrorMessage("切 PCB 模式失败: " + e.message); }
-    this._pushState();
-    return this._pcbState();
-  }
-
-  // 开模块(多实例): web 模块每次新建一个独立 webview tab(站内代理 iframe 内嵌, 与内置浏览器同技术);
-  // app 模块每次拉起一个独立本机编辑器进程(KiCad 各分编辑器/嘉立创EDA 客户端)。
-  async _pcbOpen(moduleId) {
-    const mod = pcbCore.modules().find((m) => m.id === moduleId);
-    if (!mod) return vscode.window.showWarningMessage("未知 PCB 模块: " + moduleId);
-    if (mod.kind === "app") {
-      const r = pcbCore.openApp(mod.exe);
-      if (!r.ok) vscode.window.showWarningMessage(r.error);
-      else vscode.window.showInformationMessage("已开 " + mod.name + " 新实例");
-      return;
-    }
-    try {
-      if (!localApi.running()) await localApi.start(0);
-      const base = "http://127.0.0.1:" + localApi.port() + "/web?t=" + encodeURIComponent(localApi.token()) + "&u=";
-      const p = vscode.window.createWebviewPanel("dao.pcb.module", mod.icon + " " + mod.name,
-        vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
-      const src = base + encodeURIComponent(mod.url);
-      p.webview.html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100vh}</style></head><body>' +
-        '<iframe src="' + src.replace(/"/g, "&quot;") + '" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe></body></html>';
-    } catch (e) { vscode.window.showWarningMessage("开模块失败: " + e.message); }
-  }
-
-  // ── 🧊 FreeCAD 板块(数据核在 fc-panel-core.js, headless 可测) ──
-  async _fcState() {
-    try {
-      const data = await fcCore.probe();
-      data.overlay = modeFusion.state().overlays.find((o) => o.id === "freecad") || null;
-      this._post({ type: "fc-state", data });
-    } catch (e) { this._post({ type: "fc-state", error: e.message }); }
-  }
-
-  async _fcRegLocal() {
-    const r = fcAgent.registerLocal({});
-    if (!r.ok) vscode.window.showWarningMessage("FreeCAD Agent 注册失败: " + r.error);
-    else vscode.window.showInformationMessage("已注册 dao-freecad(local) → " + r.configPath);
-    return this._fcState();
-  }
-
-  async _fcRegRemote() {
-    const url = await vscode.window.showInputBox({ prompt: "DAO Bridge 穿透公网地址(自动补 /mcp)", placeHolder: "https://…" });
-    if (!url) return;
-    const token = await vscode.window.showInputBox({ prompt: "Bearer token(可空)", password: true });
-    const r = fcAgent.registerRemote({ url, token });
-    if (!r.ok) vscode.window.showWarningMessage("注册失败: " + r.error);
-    else vscode.window.showInformationMessage("已注册 dao-freecad(remote)");
-    return this._fcState();
-  }
-
-  async _fcUnreg() {
-    fcAgent.unregister();
-    return this._fcState();
-  }
-
-  // 域叠加开关(与 Proxy Pro 面板 mf-overlay 同一真源): 开 = dao-freecad 工具描述并入提示词,
-  // 关 = 官方原貌(工具仍注册在册)。
-  async _fcOverlay(on) {
-    try {
-      modeFusion.setOverlay("freecad", on);
-      const r = fcAgent.setDisabled(!on);
-      if (r.ok) {
-        try {
-          const ls = require("./ls-bridge");
-          if (ls.ready() && ls.apiKey()) ls.call("RefreshMcpServers", {}).catch(() => {});
-        } catch (_) {}
-      }
-      vscode.window.showInformationMessage("FreeCAD 模式" + (on ? "已开(工具描述并入提示词)" : "已关(官方原貌, 工具仍注册在册)"));
-    } catch (e) { vscode.window.showErrorMessage("切 FreeCAD 模式失败: " + e.message); }
-    this._pushState();
-    return this._fcState();
-  }
-
-  // 开模块(多实例): web 模块每次新建一个独立 webview tab(归一外壳本机网页 iframe 直嵌,
-  // 主页/整窗/归一工作台/各工作台网页模块); app 模块每次拉起一个独立本机 FreeCAD 进程。
-  async _fcOpen(moduleId) {
-    const mod = fcCore.modules().find((m) => m.id === moduleId);
-    if (!mod) return vscode.window.showWarningMessage("未知 FreeCAD 模块: " + moduleId);
-    if (mod.kind === "app") {
-      const r = fcCore.openApp(mod.exe);
-      if (!r.ok) vscode.window.showWarningMessage(r.error);
-      else vscode.window.showInformationMessage("已开 " + mod.name + " 新实例");
-      return;
-    }
-    try {
-      const p = vscode.window.createWebviewPanel("dao.fc.module", mod.icon + " " + mod.name,
-        vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
-      p.webview.html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100vh}</style></head><body>' +
-        '<iframe src="' + String(mod.url).replace(/"/g, "&quot;") + '" sandbox="allow-scripts allow-forms allow-same-origin allow-popups" allow="clipboard-read; clipboard-write"></iframe></body></html>';
-    } catch (e) { vscode.window.showWarningMessage("开模块失败: " + e.message); }
-  }
 
   _openConversation(dir, folder) {
     try {
@@ -1202,7 +968,7 @@ h2{font-size:15px;margin:0 0 4px}
 const vscode=acquireVsCodeApi();
 let S=null, CONV=null;
 // 七大板块顺序/图标/标题与 dao-vsix /shell 1:1; 其后为插件版延伸板块。
-const BOARDS=[["overview","🏠","主页 · Windows 总控"],["windows","🪟","Windows 管理"],["pcb","⚡","PCB · KiCad/嘉立创EDA"],["freecad","🧊","FreeCAD · 3D 建模"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["browser","🌍","内置浏览器"],["settings","⚙","设置"]];
+const BOARDS=[["overview","🏠","主页"],["switch","🔀","切号 · 账号池"],["bridge","🌐","内网穿透 · DAO Bridge"],["backups","💬","对话备份"],["inject","💉","反向注入"],["mcp","🧩","MCP 服务器"],["github","🐙","GitHub"],["search","🔎","搜索"],["browser","🌍","内置浏览器"],["settings","⚙","设置"]];
 function E(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function cmd(c,d){vscode.postMessage(Object.assign({command:c},d||{}))}
 function sw(t){CONV=null;vscode.postMessage({type:'nav',board:t});cmd('loadTabData',{tab:t});}
@@ -1215,13 +981,13 @@ function q(x){return (x===0||x)?(x+'%'):'—';}
 function renderOverview(){
   const a=S.account||{}, mb=S.mcp&&S.mcp.servers, cb=S.cascadeBackup, eg=S.engines;
   const run=mb?mb.filter(s=>String(s.status||'').toUpperCase().indexOf('RUN')>=0).length:0;
-  let h='<div class="row"><h2 style="flex:1">主页 · Windows 总控</h2>'+
-    '<button class="btn" id="winOpen">开本窗口桌面</button>'+
-    '<button class="btn sec" id="winRf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">主页即 Windows 统一管理: 账号分身/桌面会话/模式/工具层一目了然(Dao-Windows-Agent 真源直连); 其余板块各司其职。</div>';
-  h+=renderWinControl();
-  h+=renderPcbHomeCard();
-  h+=renderFcHomeCard();
+  let h='<div class="row"><h2 style="flex:1">主页</h2></div>';
+
+
+  h+='<div class="muted" style="margin-bottom:10px">三模式引擎 / 账号配额 / 备份水位 / MCP 概览 —— 插件自持真源。</div>';
+
+
+
   h+='<div class="st">三模式引擎</div><div class="card">';
   if(eg){
     const cx=eg.cascade||{}, dl=eg.devinLocal||{}, dc=eg.devinCloud||{};
@@ -1458,185 +1224,6 @@ function renderSearch(){
   }
   return h;
 }
-let PCB=null,FC=null;
-// 主页 FreeCAD 环境卡(同步快照 S.freecad: 安装态+MCP+模式开关; 网络探活在 🧊 FreeCAD 板块)。
-function renderFcHomeCard(){
-  const p=S.freecad;
-  let h='<div class="st">FreeCAD 环境 · 3D 建模</div><div class="card">';
-  if(!p){return h+'<span class="muted">未探测</span></div>';}
-  const f=p.freecad||{},m=p.mcp||{};
-  h+=cr('FreeCAD',f.installed?('✓ 已装 '+E(f.version||'')+' '+E(f.exe||'')):'✗ 未检出');
-  h+=cr('Dao-3D-Modeling-Agent 检出',p.checkout?E(p.checkout):'未找到(可设 DAO_FC_AGENT_DIR)');
-  h+=cr('dao-freecad 工具层',m.registered?('✓ 已注册('+E(m.transport||'')+(m.disabled?' · 已停用':'')+')'):'✗ 未注册');
-  h+=cr('FreeCAD 模式',p.overlayOn?'开(工具描述已并入提示词)':'关(官方原貌)');
-  h+='<div class="cr"><span class="l"></span><span class="v"><span class="back" data-tabgo="freecad">进入 FreeCAD 板块 →</span></span></div>';
-  return h+'</div>';
-}
-function renderFreecad(){
-  let h='<div class="row"><h2 style="flex:1">🧊 FreeCAD · 3D 建模总控</h2>'+
-    '<button class="btn sec" id="fcRf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">本机环境/桥/归一外壳/xpra 探活 + dao-freecad 工具层(官方 MCP 同层同源) + 各工作台多实例直开(web 模块路由到 IDE 内独立页, app 模块拉起独立本机 FreeCAD 实例)。</div>';
-  if(FC===null)return h+'<div class="card muted">探活中…</div>';
-  if(FC.error)return h+'<div class="card">⚠ '+E(FC.error)+'</div>';
-  const d=FC,ins=d.installs||{},f=ins.freecad||{},m=d.mcp||{};
-  h+='<div class="st">本机安装</div><div class="card">'+
-    cr('FreeCAD',f.installed?('✓ '+E(f.version||'')+' · '+E(f.exe||'')):'✗ 未检出(装 FreeCAD 后刷新, 或用归一外壳内置运行时)')+
-    cr('Dao-3D-Modeling-Agent 检出',d.checkout?E(d.checkout):'未找到(可设 DAO_FC_AGENT_DIR)')+'</div>';
-  h+='<div class="st">工具层 · dao-freecad MCP(与官方工具同层同协议同路径)</div><div class="card">'+
-    cr('注册',m.registered?('✓ '+E(m.transport||'')+(m.disabled?' · 已停用':' · 启用中')):'✗ 未注册')+
-    (m.registered&&m.serverUrl?cr('穿透地址',E(m.serverUrl)):'')+
-    (m.registered&&m.cwd?cr('本地检出',E(m.cwd)):'')+
-    (m.registered?cr('鉴权',m.hasAuth?'已配(脱敏不回显)':'未配'):'')+
-    '<div class="cr"><span class="l"></span><span class="v">'+
-    '<button class="btn" id="fcRegL">注册 local</button> '+
-    '<button class="btn sec" id="fcRegR">注册 remote</button> '+
-    (m.registered?'<button class="btn sec" id="fcUnreg">取消注册</button>':'')+'</span></div></div>';
-  const ov=d.overlay||{};
-  h+='<div class="st">FreeCAD 模式开关(与道德经/阴符经/官方三模式正交)</div><div class="card">'+
-    '<div class="cr"><span class="l">'+E(ov.summary||'开=工具描述并入提示词; 关=官方原貌(工具仍注册在册)')+'</span><span class="v">'+
-    '<button class="btn'+(ov.on?'':' sec')+'" id="fcOv" data-on="'+(ov.on?'0':'1')+'">'+(ov.on?'✓ 开启中 · 点关':'◌ 已关 · 点开')+'</button></span></div></div>';
-  const br=d.bridge||{},sh=d.shell||{},xp=d.xpra||{};
-  h+='<div class="st">桥/归一外壳/显示路由探活</div><div class="card">'+
-    cr('FreeCAD 桥',(br.ok?('✓ '+E(br.version||'')+(br.workbench?(' · '+E(br.workbench)):'')+(br.toolCount?(' · '+br.toolCount+' 工具'):'')):'✗ '+E(br.error||'不可达'))+' · '+E(br.url))+
-    cr('归一外壳',(sh.ok?'✓ 健康':'✗ '+E(sh.error||'不可达'))+' · '+E(sh.url))+
-    cr('xpra 显示路由',(xp.ok?'✓ 在跑':'✗ '+E(xp.error||'不可达'))+' · '+E(xp.url))+'</div>';
-  h+='<div class="st">模块直开(每点一次 = 一个独立实例)</div>';
-  const mods=d.modules||[];
-  const webs=mods.filter(x=>x.kind==='web'),apps=mods.filter(x=>x.kind==='app');
-  h+='<div class="card"><div class="cr"><span class="l">网页模块(路由到 IDE 内)</span><span class="v">'+
-    webs.map(x=>'<button class="btn sec" data-fcopen="'+E(x.id)+'">'+E(x.icon)+' '+E(x.name)+'</button>').join(' ')+'</span></div>'+
-    '<div class="cr"><span class="l">本机客户端(原生多实例)</span><span class="v">'+
-    apps.map(x=>'<button class="btn sec" data-fcopen="'+E(x.id)+'">'+E(x.icon)+' '+E(x.name)+'</button>').join(' ')+'</span></div></div>';
-  h+='<div class="muted">探活于 '+E(d.probedAt||'')+' · 工具层只添描述不教用法 —— 太上下知有之, AI 自主择用。</div>';
-  return h;
-}
-// 主页 PCB 环境卡(同步快照 S.pcb: 安装态+MCP+模式开关; 网络探活在 ⚡ PCB 板块)。
-function renderPcbHomeCard(){
-  const p=S.pcb;
-  let h='<div class="st">PCB 环境 · KiCad/嘉立创EDA</div><div class="card">';
-  if(!p){return h+'<span class="muted">未探测</span></div>';}
-  const k=p.kicad||{},e=p.easyeda||{},m=p.mcp||{};
-  h+=cr('KiCad',k.installed?('✓ 已装 '+E(k.version||'')):'✗ 未检出');
-  h+=cr('嘉立创EDA',e.installed?('✓ 已装('+E(e.variant==='lceda'?'国内版':'国际版')+')'):'✗ 未检出');
-  h+=cr('dao-pcb 工具层',m.registered?('✓ 已注册('+E(m.transport||'')+(m.disabled?' · 已停用':'')+')'):'✗ 未注册');
-  h+=cr('PCB 模式',p.overlayOn?'开(工具描述已并入提示词)':'关(官方原貌)');
-  h+='<div class="cr"><span class="l"></span><span class="v"><span class="back" data-tabgo="pcb">进入 PCB 板块 →</span></span></div>';
-  return h+'</div>';
-}
-function renderPcb(){
-  let h='<div class="row"><h2 style="flex:1">⚡ PCB · KiCad/嘉立创EDA 总控</h2>'+
-    '<button class="btn sec" id="pcbRf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">本机环境/双桥/CDP 探活 + dao-pcb 工具层(官方 MCP 同层同源) + 各模块多实例直开(web 模块路由到 IDE 内独立页, app 模块拉起独立本机编辑器实例)。</div>';
-  if(PCB===null)return h+'<div class="card muted">探活中…</div>';
-  if(PCB.error)return h+'<div class="card">⚠ '+E(PCB.error)+'</div>';
-  const d=PCB,ins=d.installs||{},k=ins.kicad||{},e=ins.easyeda||{},m=d.mcp||{};
-  h+='<div class="st">本机安装</div><div class="card">'+
-    cr('KiCad',k.installed?('✓ '+E(k.version||'')+' · '+E(k.cli||'')):'✗ 未检出(装 KiCad 9 后刷新)')+
-    cr('嘉立创EDA/EasyEDA Pro',e.installed?('✓ '+E(e.variant==='lceda'?'国内版':'国际版')+' · '+E(e.exe||'')):'✗ 未检出')+
-    cr('Dao-PCB-Design-Agent 检出',d.checkout?E(d.checkout):'未找到(可设 DAO_PCB_AGENT_DIR)')+'</div>';
-  h+='<div class="st">工具层 · dao-pcb MCP(与官方工具同层同协议同路径)</div><div class="card">'+
-    cr('注册',m.registered?('✓ '+E(m.transport||'')+(m.disabled?' · 已停用':' · 启用中')):'✗ 未注册')+
-    (m.registered&&m.serverUrl?cr('穿透地址',E(m.serverUrl)):'')+
-    (m.registered&&m.cwd?cr('本地检出',E(m.cwd)):'')+
-    (m.registered?cr('鉴权',m.hasAuth?'已配(脱敏不回显)':'未配'):'')+
-    '<div class="cr"><span class="l"></span><span class="v">'+
-    '<button class="btn" id="pcbRegL">注册 local</button> '+
-    '<button class="btn sec" id="pcbRegR">注册 remote</button> '+
-    (m.registered?'<button class="btn sec" id="pcbUnreg">取消注册</button>':'')+'</span></div></div>';
-  const ov=d.overlay||{};
-  h+='<div class="st">PCB 模式开关(与道德经/阴符经/官方三模式正交)</div><div class="card">'+
-    '<div class="cr"><span class="l">'+E(ov.summary||'开=工具描述并入提示词; 关=官方原貌(工具仍注册在册)')+'</span><span class="v">'+
-    '<button class="btn'+(ov.on?'':' sec')+'" id="pcbOv" data-on="'+(ov.on?'0':'1')+'">'+(ov.on?'✓ 开启中 · 点关':'◌ 已关 · 点开')+'</button></span></div></div>';
-  const kb=d.kicadBridge||{},lb=d.lcedaBridge||{},cd=d.cdp||{};
-  h+='<div class="st">桥/CDP 探活</div><div class="card">'+
-    cr('KiCad 桥',(kb.ok?'✓ 健康':'✗ '+E(kb.error||'不可达'))+' · '+E(kb.url))+
-    cr('LCEDA 桥',(lb.ok?('✓ 健康'+(lb.namespaces?(' · '+lb.namespaces+' 命名空间/'+lb.verbs+' 方法'):'')):'✗ '+E(lb.error||'不可达'))+' · '+E(lb.url))+
-    cr('EasyEDA CDP',(cd.ok?('✓ '+E(cd.browser||'活')):'✗ '+E(cd.error||'不可达'))+' · '+E(cd.url))+'</div>';
-  h+='<div class="st">模块直开(每点一次 = 一个独立实例)</div>';
-  const mods=d.modules||[];
-  const webs=mods.filter(x=>x.kind==='web'),apps=mods.filter(x=>x.kind==='app');
-  h+='<div class="card"><div class="cr"><span class="l">网页模块(路由到 IDE 内)</span><span class="v">'+
-    webs.map(x=>'<button class="btn sec" data-pcbopen="'+E(x.id)+'">'+E(x.icon)+' '+E(x.name)+'</button>').join(' ')+'</span></div>'+
-    '<div class="cr"><span class="l">本机编辑器(原生多实例)</span><span class="v">'+
-    apps.map(x=>'<button class="btn sec" data-pcbopen="'+E(x.id)+'">'+E(x.icon)+' '+E(x.name)+'</button>').join(' ')+'</span></div></div>';
-  h+='<div class="muted">探活于 '+E(d.probedAt||'')+' · 工具层只添描述不教用法 —— 太上下知有之, AI 自主择用。</div>';
-  return h;
-}
-let WIN=null;
-function renderWindows(){
-  let h='<div class="row"><h2 style="flex:1">Windows 管理</h2>'+
-    '<button class="btn" id="winOpen">开本窗口桌面</button>'+
-    '<button class="btn sec" id="winRf">刷新</button></div>';
-  h+='<div class="muted" style="margin-bottom:10px">Windows 核心内容/数据/资源统一管理: 账号分身·桌面会话·模式·工具层·隔离矩阵(Dao-Windows-Agent 真源直连，与主页同源)。</div>';
-  h+=renderWinControl();
-  return h;
-}
-function renderWinControl(){
-  if(WIN===null)return '<div class="card muted">Windows 总控探活中…</div>';
-  if(WIN.error)return '<div class="card">⚠ '+E(WIN.error)+'</div>';
-  const d=WIN;
-  let h='';
-  const md=d.mode;
-  h+='<div class="st">工具层模式(桥 /api/mode.*)</div><div class="card">'+
-    (md?cr('当前模式',E(md.name||md.mode_id||'')+(md.summary?' · '+E(md.summary):'')):'<div class="cr muted">桥不在跑时无模式态(契约文件 ~/.dao/mode.json 仍为真源)</div>')+'</div>';
-  h+='<div class="st">快速连接(远程桌面连接同式)</div><div class="card"><div class="cr"><span class="l">账号</span><span class="v">'+
-    '<select id="winQcAcct"><option value="">本窗口(当前账号)</option>'+
-    ((d.accounts||[]).map(a=>'<option value="'+E(a.name)+'">'+E(a.name)+'</option>').join(''))+
-    '</select> <button class="btn" id="winQcGo">连接</button></span></div></div>';
-  h+='<div class="st">Windows 账号分身(每账号 = 一路独立桌面会话)</div>';
-  if(d.accounts===null||d.accounts===undefined)h+='<div class="card muted">隧道不可达时无账号清单。</div>';
-  else{
-    h+='<div class="card"><div class="cr"><span class="l">账号 '+(d.accounts.length)+' 个</span><span class="v"><button class="btn" id="winAcctNew">新建账号</button></span></div></div>';
-    for(const ac of d.accounts){
-      h+='<div class="acc"><div class="hd"><span>🪟 '+E(ac.name)+'</span><span>'+
-        '<button class="btn" data-winopen="'+E(ac.name)+'">开桌面</button> '+
-        '<button class="btn sec" data-winclone="'+E(ac.name)+'">复制分身</button> '+
-        '<button class="btn sec" data-winacctdel="'+E(ac.name)+'">销毁</button></span></div>'+
-        '<div class="conv" style="cursor:default"><span class="muted">'+E(ac.hostname||'')+(ac.port?':'+E(ac.port):'')+'</span></div></div>';
-    }
-  }
-  const m=d.mcp||{};
-  h+='<div class="st">官方工具层接入(dao-windows-agent MCP)</div><div class="card">'+
-    cr('注册',m.registered?('✓ 已注册 · '+E(m.transport||'')+(m.disabled?' · 已禁用':'')):'○ 未注册')+
-    (m.serverUrl?cr('远端',E(m.serverUrl)):'')+
-    (m.cwd?cr('本机检出',E(m.cwd)):(d.checkout?cr('本机检出(可注册)',E(d.checkout)):''))+
-    '<div class="cr"><span class="l"></span><span class="v">'+
-    (m.registered?'<button class="btn sec" id="winUnreg">移除注册</button>':
-      '<button class="btn" id="winRegL">注册 local</button> <button class="btn sec" id="winRegR">注册 remote</button>')+
-    '</span></div></div>';
-  const b=d.bridge||{};
-  h+='<div class="st">桥(软件画像控制面)</div><div class="card">'+
-    cr('地址',E(b.url||''))+
-    cr('状态',b.ok?'⚡在线':'○ 不可达'+(b.error?' · '+E(b.error):''))+
-    (b.ok?cr('软件画像',(b.apps||[]).map(E).join('、')):'')+
-    (b.ok?cr('活跃会话',String((b.sessions||[]).length)+' 个'):'')+'</div>';
-  const t=d.tunnel||{};
-  h+='<div class="st">分身输入租约(隧道 /input)</div>';
-  if(!t.ok)h+='<div class="card muted">隧道不可达'+(t.error?' · '+E(t.error):'')+'</div>';
-  else if(!(t.holders||[]).length)h+='<div class="card muted">当前无任何分身被持有输入权(空闲)。</div>';
-  else{
-    for(const x of t.holders){
-      const kind=x.kind==='human'?'👤 人手':'🤖 Agent';
-      h+='<div class="acc"><div class="hd"><span>'+E(x.key)+'<span class="badge'+(x.kind==='human'?'':' cloud')+'">'+kind+'</span></span>'+
-        '<button class="btn sec" data-winrel="'+E(x.key)+'|'+E(x.ownerId)+'">释放</button></div>'+
-        '<div class="conv" style="cursor:default"><span class="muted">'+E(x.ownerId)+' · 优先级 '+E(x.priority)+' · TTL 剩 '+E(x.ttlLeft)+'ms</span></div></div>';
-    }
-  }
-  const mx=d.matrix;
-  h+='<div class="st">分身隔离矩阵(每软件最低可行档)</div>';
-  if(!mx)h+='<div class="card muted">桥不可达时无矩阵。</div>';
-  else if(mx.error)h+='<div class="card">⚠ '+E(mx.error)+'</div>';
-  else{
-    h+='<div class="card">';
-    for(const app of Object.keys(mx)){
-      const p=mx[app]||{};
-      h+=cr(E(app),(p.isolated?'✓':'⚠')+' '+E(p.tier||'?')+' (最低需 '+E(p.min_tier||'?')+')'+(p.isolated?'':' · 有缺口'));
-    }
-    h+='</div>';
-  }
-  if(d.probedAt)h+='<div class="muted">探活于 '+E(String(d.probedAt).replace('T',' ').slice(0,19))+'</div>';
-  return h;
-}
 let SET=null;
 function tierName(t){return String(t||'').replace('TEAMS_TIER_','').replace(/_/g,' ')||'—';}
 function resetAt(u){return u?new Date(u*1000).toISOString().replace('T',' ').slice(0,16)+' UTC':'—';}
@@ -1793,9 +1380,6 @@ function render(){
   if(S.board==='browser'&&WEB&&WEB.base&&document.getElementById('webFrame'))return;
   let h='';
   if(S.board==='overview')h=renderOverview();
-  else if(S.board==='windows')h=renderWindows();
-  else if(S.board==='pcb')h=renderPcb();
-  else if(S.board==='freecad')h=renderFreecad();
   else if(S.board==='switch')h=renderSwitch();
   else if(S.board==='backups')h=renderBackups();
   else if(S.board==='mcp')h=renderMcp();
@@ -1833,33 +1417,7 @@ function render(){
   document.querySelectorAll('[data-mcptool]').forEach(el=>el.onclick=()=>{const [sv,tl]=el.dataset.mcptool.split('|');vscode.postMessage({type:'mcp-tool-toggle',server:sv,tool:tl});});
   document.querySelectorAll('[data-mcpinstall]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'mcp-install',name:el.dataset.mcpinstall}));
   if(S.board==='mcp'&&MCPD===null)cmd('loadTabData',{tab:'mcp'});
-  const wrf=document.getElementById('winRf'); if(wrf)wrf.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-state'});};
-  const wrl=document.getElementById('winRegL'); if(wrl)wrl.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-reg-local'});};
-  const wrr=document.getElementById('winRegR'); if(wrr)wrr.onclick=()=>vscode.postMessage({type:'win-reg-remote'});
-  const wur=document.getElementById('winUnreg'); if(wur)wur.onclick=()=>{WIN=null;render();vscode.postMessage({type:'win-unreg'});};
-  document.querySelectorAll('[data-winrel]').forEach(el=>el.onclick=()=>{const [k,o]=el.dataset.winrel.split('|');vscode.postMessage({type:'win-release',key:k,owner:o});});
-  const wo=document.getElementById('winOpen'); if(wo)wo.onclick=()=>vscode.postMessage({type:'win-open-desktop',account:''});
-  const wan=document.getElementById('winAcctNew'); if(wan)wan.onclick=()=>vscode.postMessage({type:'win-acct-create'});
-  document.querySelectorAll('[data-winopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-open-desktop',account:el.dataset.winopen}));
-  document.querySelectorAll('[data-winacctdel]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-destroy',name:el.dataset.winacctdel}));
-  document.querySelectorAll('[data-winclone]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'win-acct-clone',base:el.dataset.winclone}));
-  const wqc=document.getElementById('winQcGo'); if(wqc)wqc.onclick=()=>{const s=document.getElementById('winQcAcct');vscode.postMessage({type:'win-open-desktop',account:(s&&s.value)||''});};
-  if((S.board==='overview'||S.board==='windows')&&WIN===null)vscode.postMessage({type:'win-state'});
-  document.querySelectorAll('[data-tabgo]').forEach(el=>el.onclick=()=>sw(el.dataset.tabgo));
-  const prf=document.getElementById('pcbRf'); if(prf)prf.onclick=()=>{PCB=null;render();vscode.postMessage({type:'pcb-state'});};
-  const prl=document.getElementById('pcbRegL'); if(prl)prl.onclick=()=>{PCB=null;render();vscode.postMessage({type:'pcb-reg-local'});};
-  const prr=document.getElementById('pcbRegR'); if(prr)prr.onclick=()=>vscode.postMessage({type:'pcb-reg-remote'});
-  const pur=document.getElementById('pcbUnreg'); if(pur)pur.onclick=()=>{PCB=null;render();vscode.postMessage({type:'pcb-unreg'});};
-  const pov=document.getElementById('pcbOv'); if(pov)pov.onclick=()=>{const on=pov.dataset.on==='1';PCB=null;render();vscode.postMessage({type:'pcb-overlay',on:on});};
-  document.querySelectorAll('[data-pcbopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pcb-open',module:el.dataset.pcbopen}));
-  if(S.board==='pcb'&&PCB===null)cmd('loadTabData',{tab:'pcb'});
-  const frf=document.getElementById('fcRf'); if(frf)frf.onclick=()=>{FC=null;render();vscode.postMessage({type:'fc-state'});};
-  const frl=document.getElementById('fcRegL'); if(frl)frl.onclick=()=>{FC=null;render();vscode.postMessage({type:'fc-reg-local'});};
-  const frr=document.getElementById('fcRegR'); if(frr)frr.onclick=()=>vscode.postMessage({type:'fc-reg-remote'});
-  const fur=document.getElementById('fcUnreg'); if(fur)fur.onclick=()=>{FC=null;render();vscode.postMessage({type:'fc-unreg'});};
-  const fov=document.getElementById('fcOv'); if(fov)fov.onclick=()=>{const on=fov.dataset.on==='1';FC=null;render();vscode.postMessage({type:'fc-overlay',on:on});};
-  document.querySelectorAll('[data-fcopen]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'fc-open',module:el.dataset.fcopen}));
-  if(S.board==='freecad'&&FC===null)cmd('loadTabData',{tab:'freecad'});
+
   const pc=document.getElementById('poolCap'); if(pc)pc.onclick=()=>vscode.postMessage({type:'pool-capture'});
   const pr=document.getElementById('poolRf'); if(pr)pr.onclick=()=>{POOL=null;render();vscode.postMessage({type:'pool-list'});};
   document.querySelectorAll('[data-poolswitch]').forEach(el=>el.onclick=()=>vscode.postMessage({type:'pool-switch',email:el.dataset.poolswitch}));
@@ -1919,9 +1477,9 @@ window.addEventListener('message',e=>{const m=e.data||{};
   else if(m.type==='mem-list'){MEM=m.memories?{memories:m.memories}:{error:m.error||'拉取失败'};if(S&&S.board==='backups'&&!CONV)render();}
   else if(m.type==='pool-list'){POOL={accounts:m.accounts||[],error:m.error||''};if(S&&S.board==='switch')render();}
   else if(m.type==='bridge-state'){BR=m;if(S&&S.board==='bridge')render();}
-  else if(m.type==='win-state'){WIN=m.data?m.data:{error:m.error||'探活失败'};if(S&&(S.board==='overview'||S.board==='windows'))render();}
-  else if(m.type==='pcb-state'){PCB=m.data?m.data:{error:m.error||'探活失败'};if(S&&S.board==='pcb')render();}
-  else if(m.type==='fc-state'){FC=m.data?m.data:{error:m.error||'探活失败'};if(S&&S.board==='freecad')render();}
+
+
+
   else if(m.type==='gh-list'){GH={accounts:m.accounts||[]};if(S&&S.board==='github')render();}
   else if(m.type==='ws-progress'){WS.running=!!m.running;if(S&&S.board==='search')render();}
   else if(m.type==='ws-result'){WS={data:m.data,history:m.history||[],running:false};if(S&&S.board==='search')render();}

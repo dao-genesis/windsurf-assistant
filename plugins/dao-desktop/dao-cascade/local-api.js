@@ -19,7 +19,7 @@ const ls = require("./ls-bridge");
 const { AcpWssClient } = require("./acp-wss");
 const provision = require("./devin-provision");
 const { execFile } = require("child_process");
-// 六大板块后端(归一入协议): Proxy Pro / 账号池切号 / 反向注入 / GitHub 舰队 / Web 搜索 / Windows Agent。
+// 五大板块后端(归一入协议): Proxy Pro / 账号池切号 / 反向注入 / GitHub 舰队 / Web 搜索 (v9.9.373: Windows Agent 板块出列)。
 // 与 unified-panel 同一真源(各自 ~/.dao/*.json), 令 AI/脚本经 HTTP 零 GUI 调度全部板块。
 const proxyPro = require("./proxy-pro");
 const proxyRuntime = require("./proxy-runtime");
@@ -27,7 +27,7 @@ const accountPool = require("./account-pool");
 const inject = require("./inject");
 const githubFleet = require("./github-fleet");
 const webSearch = require("./web-search");
-const winAgent = require("./windows-agent");
+
 const coexist = require("./coexist");
 const syncAudit = require("./sync-audit");
 
@@ -228,7 +228,7 @@ function routes(reqUrl) {
     return webSearch.search(query, q.get("engine") || "");
   }
   if (u === "/api/search/history") { return { history: webSearch.historyView() }; }
-  if (u === "/api/winagent") { return winAgent.status(); }
+
   if (u === "/api/boundary") { return boundaryView(); }
   if (u === "/api/coexist") { return coexist.report(); }
   if (u === "/api/sync/audit") { return syncAudit.audit(); }
@@ -244,7 +244,7 @@ function routes(reqUrl) {
 // 同步/隔离边界自描述(道并行而不相悖): 插件自持面(~/.dao/*)与官方共享面(IDE 数据 1:1)的机器可读矩阵。
 function boundaryView() {
   return {
-    principle: "IDE 数据面(对话/设置/MCP/规则/记忆/登录态)与官方 1:1 同步; 插件自有板块(Proxy Pro/账号池/注入/GitHub 舰队/搜索/WinAgent)全部自持于 ~/.dao/*(mode 600), 与官方零交叉; 官方面仅经显式动作触碰且可归还",
+    principle: "IDE 数据面(对话/设置/MCP/规则/记忆/登录态)与官方 1:1 同步; 插件自有板块(Proxy Pro/账号池/注入/GitHub 舰队/搜索)全部自持于 ~/.dao/*(mode 600), 与官方零交叉; 官方面仅经显式动作触碰且可归还",
     isolated: [
       { module: "proxy-pro", file: proxyPro.cfgPath(), touchOfficial: "never", note: "第三方渠道/路由/反代与官方模型请求面零交叉; 路由消费点=Cascade 面板对话轨(命中即整轮改投)与 POST /api/proxy/chat" },
       { module: "account-pool", file: accountPool.poolPath(), touchOfficial: "explicit", note: "池本体自持; 仅 POST /api/pool/switch 写 credentials.toml(首次自动备份 .bak), POST /api/pool/restore 一键归还官方原登录态" },
@@ -668,19 +668,6 @@ async function postRoutes(u, body) {
   }
   if (u === "/api/search/clear") {
     return { ok: true, result: webSearch.clearHistory() };
-  }
-  // Windows Agent: 注册 local/remote 通道 / 注销(接入官方 MCP 工具层)
-  if (u === "/api/winagent/local") {
-    const b = body || {};
-    return winAgent.registerLocal({ dir: b.dir, bridgeUrl: b.bridgeUrl, token: b.token, disabled: b.disabled });
-  }
-  if (u === "/api/winagent/remote") {
-    const b = body || {};
-    if (!b.url) throw new Error("url required");
-    return winAgent.registerRemote({ url: b.url, token: b.token, disabled: b.disabled });
-  }
-  if (u === "/api/winagent/unregister") {
-    return winAgent.unregister();
   }
   return null;
 }

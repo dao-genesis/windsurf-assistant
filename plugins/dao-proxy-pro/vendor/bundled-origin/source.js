@@ -164,9 +164,44 @@ const _spInvertLib = (() => {
 //   修复: 纯 Node net+tls 实现 HTTP CONNECT 隧道 Agent · 代理来源 HTTPS_PROXY/HTTP_PROXY → Windows系统代理(WinINET)
 //   道义: 四十章「弱也者 道之用也」· 代理即弱用 · 不假外求(无外部依赖) · 与 dao_router 同源同法
 const _tls = require("tls");
+// ★ v9.9.372 · 代理解析 TTL + NO_PROXY 尊重 + 死窗熔断
+//   根因(141实证): 解析结果永久缓存 → watchdog 切道(7897↔2080)后 origin 仍抱死口;
+//   NO_PROXY=* 被无视 → 与 agent 环变语义相违。TTL 60s 跟随切道节奏, 隧道失败即时过期。
 let _originProxyUrlResolved;
+let _originProxyUrlResolvedAt = 0;
+const _ORIGIN_PROXY_TTL = 60000;
+let _originTunnelDeadUntil = 0; // 外接隧道死窗: 死则 _originGetProxyAgent 返 undefined → 直连
+function _originNoProxyHit(host) {
+  const np = process.env.NO_PROXY || process.env.no_proxy || "";
+  if (!np) return false;
+  const h = String(host || "").toLowerCase();
+  for (const t of np.split(",")) {
+    const tok = t.trim().toLowerCase();
+    if (!tok) continue;
+    if (tok === "*") return true;
+    if (h === tok || h.endsWith("." + tok) || (tok[0] === "." && h.endsWith(tok)))
+      return true;
+  }
+  return false;
+}
 function _originResolveProxyUrl() {
-  if (_originProxyUrlResolved !== undefined) return _originProxyUrlResolved;
+  if (
+    _originProxyUrlResolved !== undefined &&
+    Date.now() - _originProxyUrlResolvedAt < _ORIGIN_PROXY_TTL
+  )
+    return _originProxyUrlResolved;
+  // NO_PROXY=* → 用户明示全直连 · 尊重之 · 不静默凌驾
+  const _np = process.env.NO_PROXY || process.env.no_proxy || "";
+  if (
+    _np
+      .split(",")
+      .map((t) => t.trim())
+      .includes("*")
+  ) {
+    _originProxyUrlResolved = null;
+    _originProxyUrlResolvedAt = Date.now();
+    return null;
+  }
   let purl =
     process.env.HTTPS_PROXY ||
     process.env.https_proxy ||
@@ -204,6 +239,7 @@ function _originResolveProxyUrl() {
     }
   }
   _originProxyUrlResolved = purl || null;
+  _originProxyUrlResolvedAt = Date.now();
   return _originProxyUrlResolved;
 }
 function _originIsLocalHost(host) {
@@ -225,7 +261,8 @@ class _OriginTunnelAgent extends https.Agent {
   createConnection(options, cb) {
     const destHost = options.host || options.hostname;
     const destPort = parseInt(options.port || 443, 10);
-    if (_originIsLocalHost(destHost)) {
+    // v9.9.372 · 本地/NO_PROXY 目标 → 不走代理 (直接 TLS)
+    if (_originIsLocalHost(destHost) || _originNoProxyHit(destHost)) {
       return super.createConnection(options, cb);
     }
     const sock = net.connect(this._proxyPort, this._proxyHost);
@@ -237,10 +274,19 @@ class _OriginTunnelAgent extends https.Agent {
       try {
         sock.destroy();
       } catch (_) {}
+      // ★ v9.9.372 · 隧道死窗熔断(90s) + 代理解析即时过期
+      //   根因(141实证): 代理接受 TCP 但 CONNECT 空转(上游道死/2080专用道) → 每请求 20s 停顿
+      //   药: 3s 建隧预算 + 死窗内直连 + 解析重探(赶 watchdog 切道)
+      const code = String((e && (e.code || e.message)) || "");
+      if (/ECONNREFUSED|EHOSTUNREACH|ETIMEDOUT|tunnel timeout/i.test(code)) {
+        _originTunnelDeadUntil = Date.now() + 90000;
+        _originProxyUrlResolvedAt = 0;
+        log(`[tunnel] 代理隧道死窗 90s → 直连 (${code})`);
+      }
       cb(e);
     };
     sock.once("error", fail);
-    sock.setTimeout(20000, () => fail(new Error("dao proxy tunnel timeout")));
+    sock.setTimeout(3000, () => fail(new Error("dao proxy tunnel timeout")));
     sock.on("connect", () => {
       sock.write(
         `CONNECT ${destHost}:${destPort} HTTP/1.1\r\nHost: ${destHost}:${destPort}\r\n\r\n`,
@@ -288,6 +334,7 @@ let _originTunnelAgent = null;
 let _originTunnelAgentUrl = null;
 function _originGetProxyAgent(isHttps) {
   if (!isHttps) return undefined;
+  if (Date.now() < _originTunnelDeadUntil) return undefined; // v9.9.372 · 隧道死窗 → 直连
   const purl = _originResolveProxyUrl();
   if (!purl) return undefined;
   if (_originTunnelAgent && _originTunnelAgentUrl === purl)
@@ -307,7 +354,7 @@ function _originGetProxyAgent(isHttps) {
 const PORT = parseInt(process.env.ORIGIN_PORT || "8889", 10);
 // v9.6.1 · 反者道之动 · 远曰反 · 回归 v9.1.2 之全前端按钮 (七按钮: 道/官/实/原/编/复/卸 + dots/customBadge)
 // 以 v9.1.2 本源哲学为锚 · 守大常不动 · 五细节皆成: isAlreadyInverted · _rawTape+all_fields · 部署不 kill · 前端按钮回归
-const ORIGIN_VERSION_BASE = "v9.9.358"; // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 DESKTOP-MASTER reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(DESKTOP-MASTER): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
+const ORIGIN_VERSION_BASE = "v9.9.373"; // v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 DESKTOP-MASTER reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(DESKTOP-MASTER): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
 // 印 153 · 唯变所适 · 软编码归宗 · 二十五章「逝曰远 远曰反」· 七十六章「兵强则不胜」
 // 病: 多 ext-host 共端口 :8937 · 旧版 in-process proxy 持续 listen · self_file 锁死旧版目录
 //     → 即便装毕新版 vsix · /ping 仍返 v9.9.19/v9.9.20 之 self_file · canon_name 走旧映射
@@ -390,6 +437,35 @@ let SP_MODE = _loadModeFromDisk() || process.env.SP_MODE || "invert";
 //   自编未平替、经藏(阴符经)重复带一份。修法: 源级替换链对 invert+custom 一视同仁。
 function _spReplaceActive() {
   return SP_MODE === "invert" || SP_MODE === "custom";
+}
+// ★ v9.9.368 · 两面分治 · 道法自然
+//   Devin Local(chisel acp 经 WINDSURF_API_SERVER_URL 归本口) → 路径含 api_server_pb → "local"
+//   Cascade(LS 经 --api_server_url/--inference_api_server_url 归本口) → cascade/codeium_common/
+//   language_server_pb/chat_web → "cascade"。渠道配置两面共用, 但 SP 替换与模型路由按面分置:
+//   `_origin_mode_surface.json` = {default?, local?, cascade?} 每面可独立 invert/passthrough/custom,
+//   未设面回落 default 再回落全局 SP_MODE; 路由条目加 scope: all|local|cascade(缺省 all 双面)。
+function _surfaceOfPath(reqPath) {
+  if (!reqPath) return "";
+  if (/api_server_pb/i.test(reqPath)) return "local";
+  if (/cascade|codeium_common|language_server_pb|chat_web/i.test(reqPath))
+    return "cascade";
+  return "";
+}
+const SP_MODE_SURFACE_FILE = path.join(__dirname, "_origin_mode_surface.json");
+function _surfaceMode(surface) {
+  let m = SP_MODE;
+  try {
+    const j = JSON.parse(fs.readFileSync(SP_MODE_SURFACE_FILE, "utf8"));
+    if (j && typeof j === "object") {
+      const v = (surface && j[surface]) || j.default;
+      if (SP_MODE_VALID.has(v)) m = v;
+    }
+  } catch (_) {}
+  return m;
+}
+function _spReplaceActiveForSurface(surface) {
+  const m = _surfaceMode(surface);
+  return m === "invert" || m === "custom";
 }
 const START_TIME = Date.now();
 let reqCounter = 0;
@@ -1283,11 +1359,7 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u66F8\u8001\u5B50+\u9053\u85CF\u9670\u7B26\u7D93", // 帛書老子+道藏陰符經
   },
-  // Windows Agent 模式: 二经合 + Windows 工具契约(dao-windows-agent MCP 官方并列工具层)
-  "windows-agent": {
-    files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt", "_windows_agent.txt"],
-    name: "\u4E8C\u7D93\u5408+Windows Agent \u5DE5\u5177\u5951\u7D04", // 二經合+Windows Agent 工具契約
-  },
+  // v9.9.373 · 损之又损: windows-agent 域工具契约线已废(旧项目尸骸) — 出列
 };
 const _CANON_VALID = new Set(Object.keys(_CANON_MAP));
 const _CANON_FILE = path.join(__dirname, "_origin_canon.txt");
@@ -1373,13 +1445,36 @@ const OFFICIAL_SP_MARKERS = [
   "<ide_metadata>",
 ];
 
+// ── Devin Local (chisel/ACP) SP 识别 · v9.9.365 · 与 sp_invert.js 执一同源 ──
+// 实证(2026-10-22 本机 ACP 活捉): devin.exe acp 之 GetChatMessage system =
+//   "You are Devin, an interactive command line agent from Cognition." ~19959B
+//   无 Cascade XML 标记 → 旧识别盲区。治: 起首强特征 + 结构标记 ≥2 命中。
+const DEVIN_SP_MARKERS = [
+  "interactive command line agent",
+  "from Cognition",
+  "Available MCP Servers",
+  "Available subagent profiles",
+  "subagent_explore",
+  "subagent_general",
+  "# Task Management",
+  "# Tool Tips",
+  "## Destructive Operations",
+  "mcp_list_tools",
+  "devin-cli",
+];
 function isLikelyOfficialSP(s) {
   if (!s || s.length < 500) return false; // SP 至少数千字 · 此设最低门槛
   if (s.startsWith("You are Cascade")) return true;
+    // v9.9.365 · Devin Local(chisel/ACP) 起首强特征 · 与 Cascade 同格
+  if (s.startsWith("You are Devin")) return true;
   let hits = 0;
   for (const m of OFFICIAL_SP_MARKERS) {
     if (s.indexOf(m) >= 0) hits++;
     if (hits >= 2) return true; // 至少两个官方标签 · 防单标签误伤
+  }
+    for (const m of DEVIN_SP_MARKERS) {
+    if (s.indexOf(m) >= 0) hits++;
+    if (hits >= 2) return true;
   }
   return false;
 }
@@ -1448,6 +1543,11 @@ const EPHEMERAL_SP_MARKERS = [
   "main topic",
   "<planner_response>",
   "<planner_step>",
+  // v9.9.365 · Devin Local(chisel/ACP) 标题子模型 SP 指纹
+  "session title generator",
+  "ONLY the title",
+  "descriptive title",
+  "no punctuation wrapper",
 ];
 
 // v9.3.6 · looksLikeSPShape · 形状判 · 开 SP 似网
@@ -1480,6 +1580,8 @@ function classifySPType(s) {
   if (s.length < 100) return null;
   // 起首强特征
   if (s.startsWith("You are Cascade")) return "chat";
+    // v9.9.365 · Devin Local(chisel/ACP) 主对话 SP · 与 Cascade 同格
+  if (s.startsWith("You are Devin")) return "chat";
   if (
     s.startsWith("You are an expert AI coding") ||
     s.startsWith("You are an AI assistant") ||
@@ -1489,7 +1591,8 @@ function classifySPType(s) {
   // 计票
   const hits = { chat: 0, summary: 0, memory: 0, ephemeral: 0 };
   for (const m of OFFICIAL_SP_MARKERS) if (s.indexOf(m) >= 0) hits.chat++;
-  for (const m of SUMMARY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.summary++;
+    for (const m of DEVIN_SP_MARKERS) if (s.indexOf(m) >= 0) hits.chat++;
+for (const m of SUMMARY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.summary++;
   for (const m of MEMORY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.memory++;
   for (const m of EPHEMERAL_SP_MARKERS) if (s.indexOf(m) >= 0) hits.ephemeral++;
   // chat 标签多 (18) 单 marker 即可 (因 user_rules/user_information 等强独有)
@@ -2733,8 +2836,11 @@ function deOfficialNameToolsProto(topFields) {
   return changed;
 }
 
-function modifySPProto(reqBody) {
+function modifySPProto(reqBody, surface) {
   try {
+    // ★ v9.9.371 · 按面生效(两面分治): surface 未传回落全局 SP_MODE · 与 _mainHandler 外闸同源
+    const _spMode = _surfaceMode(surface || "");
+    if (_spMode !== "invert" && _spMode !== "custom") return reqBody;
     const frames = parseFrames(reqBody);
     if (!frames.length) return reqBody;
     const f0 = frames[0];
@@ -2744,6 +2850,30 @@ function modifySPProto(reqBody) {
     if (!msgEntries || !msgEntries.length) return reqBody;
 
     let changed = false;
+    // ★ v9.9.370(合流自 Tokyo) · devin local (api_server_pb): SP 直挂顶层 PROMPT=field2 · 显式截获
+    //   实证(Tokyo chisel 3000.11): GetChatMessage f0.2[0]="You are Devin…"(18KB)
+    //   非 chat_messages 包装; 若交 msgs 循环, parseProto 侥幸不抛则 role 检查落空漏改.
+    //   写回即原地替换 msgEntries[0] —— msgs 循环再见经文本(isAlreadyInverted→保持),
+    //   topFields[MSGS_FIELD]=newMsgs 落笔的仍是经文, 不被原 SP 覆写.
+    {
+      const _slot = topFields[2];
+      if (_slot && _slot.length === 1 && _slot[0].w === 2) {
+        const _txt = Buffer.from(_slot[0].b).toString("utf8");
+        const _kept = invertSP(_txt);
+        if (_kept !== null) {
+          const _ne = { w: 2, b: Buffer.from(_kept, "utf8") };
+          topFields[2] = [_ne];
+          if (MSGS_FIELD === 2) {
+            msgEntries.length = 0;
+            msgEntries.push(_ne);
+          }
+          changed = true;
+          log(
+            `[SP-DEVIN] field=2 before=${_txt.length}B head="${_txt.slice(0, 40).replace(/\n/g, "\\n")}" -> after=${_kept.length}B`,
+          );
+        }
+      }
+    }
     const newMsgs = [];
     const spModifiedIdx = new Set(); // 追踪 invertSP 修改过的 msg 索引
     for (let i = 0; i < msgEntries.length; i++) {
@@ -3246,6 +3376,12 @@ function handleControl(req, res) {
         ok: true,
         port: _actualPort,
         mode: SP_MODE,
+        // ★ v9.9.371 · 两面分治: 每面独立 SP 模式实况 (未设面回落 default 再回落全局)
+        surface_modes: {
+          default: _surfaceMode(""),
+          local: _surfaceMode("local"),
+          cascade: _surfaceMode("cascade"),
+        },
         pid: process.pid,
         uptime_s: Math.round((Date.now() - START_TIME) / 1000),
         req_total: reqCounter,
@@ -3428,7 +3564,19 @@ function handleControl(req, res) {
   }
 
   if (u.pathname === "/origin/mode" && req.method === "GET") {
-    res.end(JSON.stringify({ mode: SP_MODE, valid: [...SP_MODE_VALID] }));
+    res.end(
+      JSON.stringify({
+        mode: SP_MODE,
+        valid: [...SP_MODE_VALID],
+        // ★ v9.9.371 · 两面分治: 每面独立模式 (未设面回落 default 再回落全局 SP_MODE)
+        surface: {
+          default: _surfaceMode(""),
+          local: _surfaceMode("local"),
+          cascade: _surfaceMode("cascade"),
+        },
+        surface_file: SP_MODE_SURFACE_FILE,
+      }),
+    );
     return true;
   }
 
@@ -3919,11 +4067,53 @@ function handleControl(req, res) {
           );
           return;
         }
+        // ★ v9.9.371 · 两面分治: surface=local|cascade|default → 写 _origin_mode_surface.json
+        //   按面独立 invert/passthrough/custom; 缺省/all = 全局 SP_MODE(既有语义·面覆盖文件不动)。
+        const _sf = String(body.surface || body.face || "").toLowerCase();
+        if (_sf === "local" || _sf === "cascade" || _sf === "default") {
+          let j = {};
+          try {
+            j = JSON.parse(fs.readFileSync(SP_MODE_SURFACE_FILE, "utf8")) || {};
+          } catch (_) {}
+          if (typeof j !== "object" || !j) j = {};
+          const oldM = _surfaceMode(_sf);
+          j[_sf] = m;
+          j.updated = Math.floor(Date.now() / 1000);
+          try {
+            fs.writeFileSync(SP_MODE_SURFACE_FILE, JSON.stringify(j, null, 2) + "\n", { mode: 0o600 });
+          } catch (_) {}
+          log(`mode[${_sf}]: ${oldM} -> ${m} (surface persisted)`);
+          res.end(
+            JSON.stringify({
+              ok: true,
+              surface: _sf,
+              mode: m,
+              previous: oldM,
+              surface_modes: {
+                default: _surfaceMode(""),
+                local: _surfaceMode("local"),
+                cascade: _surfaceMode("cascade"),
+              },
+            }),
+          );
+          return;
+        }
         const old = SP_MODE;
         SP_MODE = m;
         _saveModeToDisk(SP_MODE);
         log(`mode: ${old} -> ${SP_MODE} (persisted)`);
-        res.end(JSON.stringify({ ok: true, mode: SP_MODE, previous: old }));
+        res.end(
+          JSON.stringify({
+            ok: true,
+            mode: SP_MODE,
+            previous: old,
+            surface_modes: {
+              default: _surfaceMode(""),
+              local: _surfaceMode("local"),
+              cascade: _surfaceMode("cascade"),
+            },
+          }),
+        );
       } catch (e) {
         res.statusCode = 400;
         res.end(JSON.stringify({ ok: false, error: e.message }));
@@ -4493,13 +4683,15 @@ function handleControl(req, res) {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         const modelUid = body.modelUid || body.model_uid;
         const message = body.message || "ping";
+        // ★ v9.9.371 · 两面分治: test-chat 可指定面(local/cascade); 缺省 any=不限面(诊断直通)
+        const _tcSurface = String(body.surface || "any").toLowerCase();
         if (!modelUid) {
           res.end(JSON.stringify({ ok: false, error: "modelUid required" }));
           return;
         }
         // 检查路由是否存在
         const router = _ea ? _ea.getRouter() : null;
-        const shouldRoute = router ? router.shouldRoute(modelUid) : false;
+        const shouldRoute = router ? router.shouldRoute(modelUid, _tcSurface) : false;
         if (!shouldRoute) {
           res.end(
             JSON.stringify({
@@ -6425,12 +6617,14 @@ function _buildHandoffMd() {
   L.push("# 模式: 道(帛书前置注入) / 官(透传)  —  GET 看当前, POST 切换");
   L.push("curl -s " + base + "/origin/mode");
   L.push("curl -X POST " + base + "/origin/mode -H 'Content-Type: application/json' -d '" + JSON.stringify({ mode: "invert" }) + "'");
+  L.push("# 两面分治(v9.9.371): Devin Local(local 面·chisel acp) 与 Cascade(cascade 面·LS) 各自独立 SP 模式");
+  L.push("curl -X POST " + base + "/origin/mode -H 'Content-Type: application/json' -d '" + JSON.stringify({ mode: "invert", surface: "local" }) + "'  # 仅 Devin Local 面切道化");
+  L.push("# 路由 scope: routes[uid].scope = all|local|cascade (缺省 all 双面生效·POST /origin/ea/route 传 scope)");
   L.push("# 经藏热切: laozi+yinfu(默认) / laozi(单帛书老子) / yinfu(单阴符经)");
   L.push("curl -s " + base + "/origin/canon");
   L.push("curl -X POST " + base + "/origin/canon -H 'Content-Type: application/json' -d '" + JSON.stringify({ canon: "laozi" }) + "'");
-  L.push("# 工具模式(与经藏正交叠加): official(默认) / windows / freecad / kicad");
+  L.push("# 工具模式: 仅 official 一档 (v9.9.373 · windows/freecad/kicad 域契约线已废)");
   L.push("curl -s " + base + "/origin/tools");
-  L.push("curl -X POST " + base + "/origin/tools -H 'Content-Type: application/json' -d '" + JSON.stringify({ tools: "windows" }) + "'");
   L.push("# 自定义注入 SP: GET 看 / POST 设 / DELETE 清");
   L.push("curl -s " + base + "/origin/custom_sp");
   L.push("curl -X POST " + base + "/origin/custom_sp -H 'Content-Type: application/json' -d '" + JSON.stringify({ sp: "你的自定义系统提示词" }) + "'");
@@ -7468,6 +7662,134 @@ function _pbRebuildField(buf, targetField, fn) {
   }
   return Buffer.concat(out);
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// ★ v9.9.366 · 推理端点重写 · 反者道之动 (findings/acp/07 缺口B 治本)
+//   病(实证): chisel(devin.exe acp) 的推理端点 = GetCliModelConfigs 响应
+//     tag18 下发字段(每模型一条 https://server.codeium.com ×N)。
+//     仅锚 WINDSURF_API_SERVER_URL env 只管到管理面 RPC
+//     (GetUserStatus/GetCliTeamSettings/GetCliModelConfigs/...),
+//     GetChatMessage 仍直冲 server.codeium.com → 推理绕过本地反代 →
+//     外接api路由/SP替换全落空。
+//   治: 对服务端下发配置的响应体做 proto 树遍历,
+//     凡整字段恰为指向官方上游的 http(s) URL 字符串, 改 authority 为
+//     http://127.0.0.1:{_actualPort} —— 推理即归本口, 与 Cascade 同管道。
+//   安: 仅整字段全等 URL 才改写(不碰内嵌子串/签名/JWT);
+//     api.devin.ai(会话同步) 不重写; 已指本机者不重写;
+//     改写后 _pbParseOk 校验, 不过则整体放弃原样透传。
+//   道义: 五十二章「既得其母 以知其子」· 母=本口 · 子=推理端点。
+// ═══════════════════════════════════════════════════════════════════════
+const _EP_REWRITE_HOSTS = new Set([
+  "server.codeium.com",
+  "inference.codeium.com",
+  "server.self-serve.windsurf.com",
+]);
+const _EP_URL_RE = /^https?:\/\/([\w.-]+)(:\d+)?(\/[^\s]*)?$/;
+function _pbRewriteEndpointHosts(buf, localBase, stats, depth) {
+  if (!buf || !buf.length) return buf;
+  if (depth == null) depth = 0;
+  if (depth > 8) return buf; // 深不穷·知止
+  const out = [];
+  let i = 0;
+  const n = buf.length;
+  let changed = false;
+  while (i < n) {
+    let tag;
+    [tag, i] = _pbReadVarint(buf, i);
+    const field = tag >> 3;
+    const wt = tag & 7;
+    if (wt === 0) {
+      let v;
+      [v, i] = _pbReadVarint(buf, i);
+      out.push(_pbTag(field, 0), _pbEncVarint(v));
+    } else if (wt === 2) {
+      let ln;
+      [ln, i] = _pbReadVarint(buf, i);
+      if (i + ln > n) return buf; // 截断 → 本层放弃
+      let sub = buf.slice(i, i + ln);
+      i += ln;
+      // 整字段恰为目标 host 的 URL?
+      if (ln > 8 && ln < 300) {
+        const s = sub.toString("utf8");
+        const m = _EP_URL_RE.exec(s);
+        if (m && _EP_REWRITE_HOSTS.has(m[1].toLowerCase())) {
+          const rep = Buffer.from(localBase + (m[3] || ""), "utf8");
+          stats.rewritten = (stats.rewritten || 0) + 1;
+          stats.hosts = stats.hosts || {};
+          stats.hosts[m[1].toLowerCase()] = (stats.hosts[m[1].toLowerCase()] || 0) + 1;
+          out.push(_pbTag(field, 2), _pbEncVarint(rep.length), rep);
+          changed = true;
+          continue;
+        }
+      }
+      // 嵌套消息? 严格可解析则递归 (ln>1 防空壳)
+      if (ln > 1 && _pbParseOk(sub)) {
+        const cs = _pbRewriteEndpointHosts(sub, localBase, stats, depth + 1);
+        if (cs !== sub) changed = true;
+        out.push(_pbTag(field, 2), _pbEncVarint(cs.length), cs);
+      } else {
+        out.push(_pbTag(field, 2), _pbEncVarint(sub.length), sub);
+      }
+    } else if (wt === 5) {
+      out.push(_pbTag(field, 5), buf.slice(i, i + 4));
+      i += 4;
+    } else if (wt === 1) {
+      out.push(_pbTag(field, 1), buf.slice(i, i + 8));
+      i += 8;
+    } else {
+      return buf; // 未知 wire → 本层放弃
+    }
+  }
+  return changed ? Buffer.concat(out) : buf;
+}
+
+// 入口: 对配置下发类响应体重写端点 · 失败/null=原样 (利而不害)
+function _rewriteEndpointBody(bodyBuf, rid) {
+  try {
+    const localBase = "http://127.0.0.1:" + _actualPort;
+    let data = bodyBuf;
+    let isGz = false;
+    if (bodyBuf.length > 2 && bodyBuf[0] === 0x1f && bodyBuf[1] === 0x8b) {
+      isGz = true;
+      data = zlib.gunzipSync(bodyBuf);
+    }
+    // 快路: 无目标 host 字节 → 不动
+    if (data.indexOf("codeium.com") < 0 && data.indexOf("windsurf.com") < 0)
+      return null;
+    const stats = {};
+    // Connect-RPC 帧壳 (flags+len+payload) 与裸 proto 两态皆收
+    const frames = parseFrames(data);
+    let framed = false;
+    if (frames.length > 0) {
+      // 校验全覆盖: 末帧恰消费完全部字节? parseFrames 遇不完整尾部即停,
+      // 以 payload 累计无法回推 → 用首帧 len 粗判 + 逐帧重建后比长度区间
+      framed = data.length >= 5 && (data[0] & ~0x81) === 0;
+    }
+    let out;
+    if (framed && frames.length > 0) {
+      const rebuilt = [];
+      for (const fr of frames) {
+        const np = _pbRewriteEndpointHosts(fr.payload, localBase, stats, 0);
+        rebuilt.push(buildFrame(fr.flags, np));
+      }
+      out = Buffer.concat(rebuilt);
+    } else {
+      out = _pbRewriteEndpointHosts(data, localBase, stats, 0);
+    }
+    if (!stats.rewritten) return null;
+    if (!framed && !_pbParseOk(out)) return null;
+    const finalBuf = isGz ? zlib.gzipSync(out) : out;
+    log(
+      `#${rid} [端点重写] ${stats.rewritten} 处 → ${localBase} ` +
+        JSON.stringify(stats.hosts || {}) +
+        ` · ${data.length}→${out.length}B`,
+    );
+    return finalBuf;
+  } catch (e) {
+    log(`#${rid} [端点重写] 失败 → 原样透传: ${e.message}`);
+    return null;
+  }
+}
 // 顶层某 repeated(wt=2) field 仅保留最末一条(用于把整段历史裁成单条新 user turn)。
 function _pbKeepLastRepeated(buf, targetField) {
   const recs = [];
@@ -7688,6 +8010,60 @@ _loadFullModelCatalog();
  * 道义: 三十五章「往而不害」· 补充不破坏 · 原有模型保留
  *       「执大象 天下往」· 全量模型即大象 · 执之则天下往
  */
+// ★ v9.9.362(合流自 Tokyo) · 鉴权/状态/配置类 RPC 韧性兜底 (官方长连 RST/代理预热时不硬失败·前端不登出)
+//   病灶: GetUserStatus / 登录(RegisterUser) / GetCommandModelConfigs 走 PASSTHROUGH →
+//     proxyToCloud, 官方 H2 一 RST 即回 502/ECONNRESET → 前端「连接不上官方服务器」并登出。
+//   药(母子相守): 这些「前端据以判定已连接/已鉴权」的一元 RPC, 官方暂不可达时不抛错 —— 有
+//     上次官方 GetUserStatus 真响应则原样回放(守其母·保 Pro 身份与模型), 否则回空 gRPC OK
+//     (LS 仅验 grpc-status=0 即认已连接)。推理仍走 BYOK/路由器, 故 Cascade 全程可用、彻底
+//     解耦官方可达性。非鉴权类(补全等)不入此集 → 照旧 502 由客户端自然重试, 不夺其真。
+const _AUTH_RESILIENT_RE =
+  /GetUserStatus|GetCommandModelConfigs|GetCascadeModelConfigs|GetUserSettings|RegisterUser|RefreshToken|GetAuthToken|Login/i;
+function _isAuthResilientRpc(u) {
+  try {
+    return _AUTH_RESILIENT_RE.test(_rpcName(u));
+  } catch (_) {
+    return false;
+  }
+}
+let _lastGoodUserStatus = null; // { buf, ct, ce, at } · 最近一次官方 200 GetUserStatus(解锁后)
+function _replyAuthResilient(req, res, rid) {
+  try { req.resume(); } catch (_) {} // 排空入站体·防 socket 悬挂
+  const url = req.url || "";
+  const rpc = _rpcName(url);
+  // GetUserStatus: 优先回放上次真官方响应(守其母) · 30 分钟内视为可用
+  if (
+    /GetUserStatus/i.test(rpc) &&
+    _lastGoodUserStatus &&
+    _lastGoodUserStatus.buf &&
+    Date.now() - (_lastGoodUserStatus.at || 0) < 30 * 60 * 1000
+  ) {
+    try {
+      if (res.headersSent) return true;
+      const h = {
+        "content-type": _lastGoodUserStatus.ct || "application/proto",
+      };
+      if (_lastGoodUserStatus.ce) h["content-encoding"] = _lastGoodUserStatus.ce;
+      h["content-length"] = String(_lastGoodUserStatus.buf.length);
+      res.writeHead(200, h);
+      res.write(_lastGoodUserStatus.buf);
+      try {
+        res.addTrailers({ "grpc-status": "0", "grpc-message": "" });
+      } catch (_) {}
+      res.end();
+      log(
+        `#${rid} [auth-resilient] ${rpc} → 回放上次官方响应 ${_lastGoodUserStatus.buf.length}B (官方长连暂断·守其母不登出)`,
+      );
+      return true;
+    } catch (e) {
+      log(`#${rid} [auth-resilient] 回放失败: ${e.message} → 转空 gRPC OK`);
+    }
+  }
+  // 无 last-good → 空 gRPC OK(前端仅验 grpc-status=0 即认已连接·不抛 ECONNRESET)
+  _replyGrpcOk(res, rid, rpc);
+  return true;
+}
+
 function proxyToCloudWithModelUnlock(req, res, rid) {
   const rpcName = (req.url || "").split("/").pop() || "?";
   const unlockEnabled = _isModelUnlockEnabled();
@@ -7757,17 +8133,18 @@ function _proxyAndInject(req, res, rid, rpcName, catalog, reqBody) {
       if (status !== 200) {
         // LS返回非200 → 降级为直接返回全量目录
         log(`#${rid} [model-unlock] LS返回${status} → 降级直接返回全量目录`);
-        _respondWithCatalog(res, catalog, rid);
+        _respondWithCatalog(res, catalog, rid, rpcName);
         return;
       }
 
       try {
         const orig = JSON.parse(body.toString("utf8"));
-        // 递归查找 cachedCascadeModelConfigs
+        // ★ v9.9.362(合流自 Tokyo) · 递归查找模型配置数组 (双格式)
         const existing = _extractModelConfigs(orig);
         if (existing) {
           // ★ 合并: 保留原有 + 补充缺失 + 强制解锁
-          _mergeAndUnlock(existing, catalog);
+          _mergeAndUnlock(existing.arr, catalog);
+          existing.parent[existing.key] = existing.arr;
           const outBody = JSON.stringify(orig);
           res.writeHead(200, {
             "Content-Type": "application/json",
@@ -7775,10 +8152,10 @@ function _proxyAndInject(req, res, rid, rpcName, catalog, reqBody) {
           });
           res.end(outBody);
           log(
-            `#${rid} [model-unlock] 合并完成: ${existing.length} models (${outBody.length} bytes)`,
+            `#${rid} [model-unlock] 合并完成: ${existing.arr.length} models (${outBody.length} bytes)`,
           );
         } else {
-          // 无cachedCascadeModelConfigs → 直接注入
+          // 无模型配置数组 → 直接注入
           _injectCatalogIntoResponse(orig, catalog);
           const outBody = JSON.stringify(orig);
           res.writeHead(200, {
@@ -7793,20 +8170,20 @@ function _proxyAndInject(req, res, rid, rpcName, catalog, reqBody) {
       } catch (e) {
         // JSON解析失败 → 降级
         log(`#${rid} [model-unlock] LS响应解析失败: ${e.message} → 降级`);
-        _respondWithCatalog(res, catalog, rid);
+        _respondWithCatalog(res, catalog, rid, rpcName);
       }
     });
   });
 
   lsReq.on("error", (e) => {
     log(`#${rid} [model-unlock] LS请求失败: ${e.message} → 降级`);
-    _respondWithCatalog(res, catalog, rid);
+    _respondWithCatalog(res, catalog, rid, rpcName);
   });
 
   lsReq.on("timeout", () => {
     lsReq.destroy();
     log(`#${rid} [model-unlock] LS请求超时 → 降级`);
-    _respondWithCatalog(res, catalog, rid);
+    _respondWithCatalog(res, catalog, rid, rpcName);
   });
 
   if (reqBody.length > 0) lsReq.write(reqBody);
@@ -7814,13 +8191,20 @@ function _proxyAndInject(req, res, rid, rpcName, catalog, reqBody) {
 }
 
 /**
- * 递归查找响应中的 cachedCascadeModelConfigs 数组
+ * ★ v9.9.362(合流自 Tokyo) · 递归查找响应中的模型配置数组 (双格式兼容)
+ *   GetUserSettings        → userSettings.cachedCascadeModelConfigs
+ *   GetCascadeModelConfigs → client_model_configs (顶层)
+ *   GetCommandModelConfigs → client_model_configs (顶层)
+ * 返回 { arr, key, parent } · 合并后写回 parent[key]
  */
 function _extractModelConfigs(obj) {
   if (!obj || typeof obj !== "object") return null;
   for (const key of Object.keys(obj)) {
-    if (key === "cachedCascadeModelConfigs" && Array.isArray(obj[key])) {
-      return obj[key];
+    if (
+      (key === "cachedCascadeModelConfigs" || key === "client_model_configs") &&
+      Array.isArray(obj[key])
+    ) {
+      return { arr: obj[key], key, parent: obj };
     }
     if (typeof obj[key] === "object" && obj[key] !== null) {
       const found = _extractModelConfigs(obj[key]);
@@ -7875,12 +8259,17 @@ function _mergeAndUnlock(existing, catalog) {
 }
 
 /**
- * 注入全量目录到响应对象 (无cachedCascadeModelConfigs时)
+ * ★ v9.9.362(合流自 Tokyo) · 注入全量目录到响应对象 (无模型配置数组时)
+ * 双格式: client_model_configs (顶层) / userSettings.cachedCascadeModelConfigs
  */
 function _injectCatalogIntoResponse(obj, catalog) {
   if (!obj || typeof obj !== "object") return;
   const models = Array.isArray(catalog) ? catalog : catalog.models || [];
   for (const key of Object.keys(obj)) {
+    if (key === "client_model_configs" && Array.isArray(obj[key])) {
+      obj[key] = models;
+      return;
+    }
     if (key === "userSettings" && typeof obj[key] === "object") {
       obj[key].cachedCascadeModelConfigs = models;
       return;
@@ -7892,11 +8281,18 @@ function _injectCatalogIntoResponse(obj, catalog) {
 }
 
 /**
- * 降级: 直接返回全量目录
+ * ★ v9.9.362(合流自 Tokyo) · 降级: 直接返回全量目录 (按 RPC 分派格式)
+ *   GetCascadeModelConfigs/GetCommandModelConfigs → { client_model_configs }
+ *   GetUserSettings 等 → { userSettings: { cachedCascadeModelConfigs } }
  */
-function _respondWithCatalog(res, catalog, rid) {
+function _respondWithCatalog(res, catalog, rid, rpcName) {
   const models = Array.isArray(catalog) ? catalog : catalog.models || [];
-  const response = { userSettings: { cachedCascadeModelConfigs: models } };
+  let response;
+  if (rpcName === "GetCascadeModelConfigs" || rpcName === "GetCommandModelConfigs") {
+    response = { client_model_configs: models };
+  } else {
+    response = { userSettings: { cachedCascadeModelConfigs: models } };
+  }
   const body = JSON.stringify(response);
   res.writeHead(200, {
     "Content-Type": "application/json",
@@ -7918,16 +8314,32 @@ const _h2Sessions = {};
 // 根因: 云端 H2 session 空闲超阈即发 GOAWAY → 活跃流式推理被中断 → 对话截断
 // 药: 每 45s ping 一次 · 保鲜 session · 无活跃流时自然 idle close
 const _H2_PING_INTERVAL = 45000;
-function _getH2Session(host) {
-  const key = host;
-  const s = _h2Sessions[key];
-  if (s && !s.closed && !s.destroyed && !s._daoGoaway) return s;
-  if (s && (s._daoGoaway || s.closed || s.destroyed)) {
-    try { if (s._daoPingTimer) clearInterval(s._daoPingTimer); } catch {}
-  }
-  log(`[h2] connect https://${host}:${CLOUD_PORT}`);
-  const session = http2.connect(`https://${host}:${CLOUD_PORT}`);
-  // keepalive ping
+// session 通用监听装配 (ping / error / close / goaway) · 直连与代理隧道共用
+// ★ v9.9.371 · 合流自 Tokyo v9.9.370/362 · 装配体自 _getH2Session 拆出共用
+// ★ v9.9.372 · 建连预算 · 四十章「反者道之动」
+//   根因(141实证): 上游不可达时请求绑死 pending session → 排队等 OS TCP 超时 ~21s
+//   → LS 5s 预算早过 → 「connection to server is erroring · Shutting down server」
+//   药: session 建连超 3.5s 未 'connect' 即毁 → stream error → 502/鉴权兜底 < 客户端预算
+//   不动流生命周期: upStream.setTimeout(0) 依旧 · 预算只管「建连」这一寸
+const _H2_CONNECT_BUDGET = 3500;
+function _h2WireSession(session, host, key) {
+  session._daoConnectBudget = setTimeout(() => {
+    if (session._daoConnected) return;
+    log(`[h2] ${host} 建连超 ${_H2_CONNECT_BUDGET}ms → 毁session fail-fast`);
+    try {
+      session.destroy();
+    } catch {}
+    delete _h2Sessions[key];
+  }, _H2_CONNECT_BUDGET);
+  try {
+    session._daoConnectBudget.unref();
+  } catch {}
+  session.once("connect", () => {
+    session._daoConnected = true;
+    try {
+      clearTimeout(session._daoConnectBudget);
+    } catch {}
+  });
   session._daoPingTimer = setInterval(() => {
     try {
       if (session.closed || session.destroyed) {
@@ -7943,6 +8355,7 @@ function _getH2Session(host) {
   session.on("error", (e) => {
     log(`[h2] session ${host} error: ${e.message}`);
     try { clearInterval(session._daoPingTimer); } catch {}
+    try { clearTimeout(session._daoConnectBudget); } catch {}
     try {
       session.close();
     } catch {}
@@ -7950,6 +8363,7 @@ function _getH2Session(host) {
   });
   session.on("close", () => {
     try { clearInterval(session._daoPingTimer); } catch {}
+    try { clearTimeout(session._daoConnectBudget); } catch {}
     delete _h2Sessions[key];
   });
   // v9.9.337 · GOAWAY 优雅排水 · 十六章「万物并作 吾以观其复也」
@@ -7961,6 +8375,143 @@ function _getH2Session(host) {
     session._daoGoaway = true;
     delete _h2Sessions[key];
   });
+}
+
+// ★ v9.9.362(合流自 Tokyo) · 官方 H2 长连经系统/VPN 代理隧道 (根治「连接不上官方服务器」· 反者道之动)
+//   病灶(根因·实证): _getH2Session 一律 http2.connect 直连官方 →
+//     官方 H2/gRPC 长连在本网络(GFW)被 RST 切断 → GetUserStatus / 登录(RegisterUser) /
+//     GetCommandModelConfigs 皆 "read ECONNRESET" → 前端登出、永报「连接不上官方服务器」。
+//     注: 短 GET 探活可达(404)不代表 H2 长连可用 —— 前者秒断秒建, 后者持久流才遭 RST。
+//   药(既得其母以知其子): 若系统/WinINET 配了代理, 官方 H2 改走 HTTP CONNECT 隧道
+//     (与 _OriginTunnelAgent 同源·纯 net+tls·无外部依赖), 长连稳定不被 RST。
+//   道并行不相悖: 隧道须先建好(异步)方能 http2.connect(createConnection 返成品 TLS socket);
+//     故代理会话「预热」异步入池, 冷未命中当次抛 _daoWarming → 上层鉴权类 RPC 本地韧性兜底
+//     (见 _replyAuthResilient), 待预热成 (~亚秒) 后续请求即拿真官方数据; 预热失败(无代理/
+//     代理坏)则回退直连(不劣于旧) + 60s 冷却不空转。天之道利而不害。
+function _h2TunnelConnect(host, port, purl, cb) {
+  let u;
+  try {
+    u = new URL(purl);
+  } catch (e) {
+    return cb(e);
+  }
+  const proxyHost = u.hostname;
+  const proxyPort = parseInt(u.port || "80", 10);
+  const raw = net.connect(proxyPort, proxyHost);
+  let settled = false;
+  let buf = "";
+  const fail = (e) => {
+    if (settled) return;
+    settled = true;
+    try { raw.destroy(); } catch {}
+    cb(e);
+  };
+  raw.once("error", fail);
+  raw.setTimeout(3000, () => fail(new Error("dao h2 proxy tunnel timeout")));
+  raw.on("connect", () => {
+    raw.write(
+      `CONNECT ${host}:${port} HTTP/1.1\r\nHost: ${host}:${port}\r\n\r\n`,
+    );
+  });
+  const onData = (chunk) => {
+    buf += chunk.toString("binary");
+    if (buf.indexOf("\r\n\r\n") === -1) return;
+    raw.removeListener("data", onData);
+    const statusLine = buf.split("\r\n")[0];
+    if (!/ 200 /.test(statusLine)) {
+      fail(new Error("dao h2 CONNECT rejected: " + statusLine));
+      return;
+    }
+    raw.setTimeout(0);
+    raw.removeListener("error", fail);
+    const tlsSock = _tls.connect(
+      {
+        socket: raw,
+        servername: host,
+        ALPNProtocols: ["h2"],
+        rejectUnauthorized: true,
+      },
+      () => {
+        if (!settled) {
+          settled = true;
+          cb(null, tlsSock);
+        }
+      },
+    );
+    tlsSock.once("error", (e) => {
+      if (!settled) {
+        settled = true;
+        cb(e);
+      }
+    });
+  };
+  raw.on("data", onData);
+}
+const _h2Warming = {};
+const _h2ProxyFailed = {}; // host -> ts 上次代理预热失败(回退直连冷却)
+function _h2StartProxyWarm(host, purl) {
+  if (_h2Warming[host]) return;
+  _h2Warming[host] = true;
+  log(`[h2] proxy warm ${host} 经系统代理 …`);
+  _h2TunnelConnect(host, CLOUD_PORT, purl, (err, tlsSock) => {
+    _h2Warming[host] = false;
+    if (err) {
+      _h2ProxyFailed[host] = Date.now();
+      _originProxyUrlResolvedAt = 0; // v9.9.372 · 代理道死 → 解析即时过期·赶 watchdog 切道
+      log(`[h2] proxy warm ${host} 失败 → 回退直连: ${err.message}`);
+      return;
+    }
+    try {
+      // v9.9.372 · 池内已是健康代理会话则弃新暖会话(防泄); 直连会话被换出时停其保活·任流自然完结
+      const cur = _h2Sessions[host];
+      if (cur && cur._daoViaProxy && !cur.closed && !cur.destroyed && !cur._daoGoaway) {
+        try {
+          tlsSock.destroy();
+        } catch {}
+        return;
+      }
+      const session = http2.connect(`https://${host}:${CLOUD_PORT}`, {
+        createConnection: () => tlsSock,
+      });
+      session._daoViaProxy = true;
+      _h2WireSession(session, host, host);
+      _h2Sessions[host] = session;
+      if (cur && !cur._daoViaProxy) {
+        try {
+          clearInterval(cur._daoPingTimer);
+        } catch {}
+      }
+      delete _h2ProxyFailed[host];
+      log(`[h2] proxy warm ${host} 成功 · 官方长连经系统代理隧道(抗 RST) · 新请求改走隧道`);
+    } catch (e) {
+      _h2ProxyFailed[host] = Date.now();
+      try { tlsSock.destroy(); } catch {}
+      log(`[h2] proxy warm ${host} http2.connect 失败: ${e.message}`);
+    }
+  });
+}
+function _getH2Session(host) {
+  const key = host;
+  const s = _h2Sessions[key];
+  if (s && !s.closed && !s.destroyed && !s._daoGoaway) return s;
+  if (s && (s._daoGoaway || s.closed || s.destroyed)) {
+    try { if (s._daoPingTimer) clearInterval(s._daoPingTimer); } catch {}
+  }
+  // ★ v9.9.372 · 反者道之动 · 废预热抛错(_daoWarming→502风暴·健康首请亦挨刀·141实证根因之一)
+  //   代理优先生效改为「异步暖+成则换池」: 本次请求立返带 3.5s 建连预算的直连 session ——
+  //   活道直连立即可用零等待; 死道预算内 fail-fast → 502/鉴权兜底 → 客户端5s内得确答不卡死;
+  //   代理暖成(亚秒级)后换池, 后续请求走隧道享抗 RST。弱者道之用·并行不相悖。
+  const purl = _originResolveProxyUrl();
+  const failedAt = _h2ProxyFailed[key] || 0;
+  const proxyUsable =
+    purl &&
+    !_originIsLocalHost(host) &&
+    !_originNoProxyHit(host) &&
+    Date.now() - failedAt > 60000;
+  if (proxyUsable) _h2StartProxyWarm(host, purl);
+  log(`[h2] connect https://${host}:${CLOUD_PORT}`);
+  const session = http2.connect(`https://${host}:${CLOUD_PORT}`);
+  _h2WireSession(session, host, key);
   _h2Sessions[key] = session;
   return session;
 }
@@ -7982,6 +8533,15 @@ function proxyToCloud(req, res, overrideBody, _rid) {
   try {
     session = _getH2Session(route.host);
   } catch (e) {
+    // ★ v9.9.372 · session 建连失败(死道 fail-fast): 鉴权/状态类 RPC 本地韧性兜底
+    //   → 前端不登出、不报「连接不上官方服务器」; 预热成后续请求即拿真官方数据。
+    if (_isAuthResilientRpc(req.url)) {
+      log(
+        `#${_rid} [h2] 建连失败(${e.message}) → 鉴权类本地兜底`,
+      );
+      _replyAuthResilient(req, res, _rid);
+      return;
+    }
     log(`[h2] session create fail: ${e.message}`);
     if (!res.headersSent) res.writeHead(502);
     try {
@@ -8065,17 +8625,22 @@ function proxyToCloud(req, res, overrideBody, _rid) {
         }
       }
       // ★ v9.9.263 · 真解锁 · GetUserStatus(proto/gzip) 缓冲改写去 Pro 锁 · 非直透
-      //   反者道之动: 损模型下 field 33 Pro 徽标 → 全模型即可选
+      //   反者道之动: 模型容器 field 33 Pro 徽标 → 全模型解禁可选
+      // ★ v9.9.366 · 端点重写同口并入 · GetCliModelConfigs/GetCliTeamSettings/GetUserStatus
+      //   响应体内的官方上游 URL 字段 → 127.0.0.1:_actualPort · chisel 推理归本口
       {
         const _rpcPathU = route.path || req.url || "";
         const _ctU = (h2resHeaders && h2resHeaders["content-type"]) || "";
         const _ceU = (h2resHeaders && h2resHeaders["content-encoding"]) || "";
-        if (
+        const _unlockHit =
           _isModelUnlockEnabled() &&
           status === 200 &&
           /GetUserStatus/i.test(_rpcPathU) &&
-          /proto/i.test(_ctU)
-        ) {
+          /proto/i.test(_ctU);
+        const _epHit =
+          status === 200 &&
+          /GetCliModelConfigs|GetCliTeamSettings|GetUserStatus/i.test(_rpcPathU);
+        if (_unlockHit || _epHit) {
           let _ub = [],
             _un = 0;
           const _ubMax = 4 * 1024 * 1024;
@@ -8088,15 +8653,31 @@ function proxyToCloud(req, res, overrideBody, _rid) {
           upStream.on("end", () => {
             try {
               const orig = Buffer.concat(_ub);
-              const unlocked = _unlockUserStatusBody(orig, _ceU, _rid || "?");
-              const outBuf = unlocked || orig;
+              let outBuf = orig;
+              if (_unlockHit) {
+                const unlocked = _unlockUserStatusBody(orig, _ceU, _rid || "?");
+                if (unlocked) outBuf = unlocked;
+              }
+              if (_epHit) {
+                const rw = _rewriteEndpointBody(outBuf, _rid || "?");
+                if (rw) outBuf = rw;
+              }
               const h = { ...resHeaders };
               delete h["content-length"];
               h["content-length"] = String(outBuf.length);
+              // ★ v9.9.362(合流自 Tokyo) · 缓存本次官方真响应(守其母·连同其编码) · 供官方长连暂断时原样回放不登出
+              try {
+                _lastGoodUserStatus = {
+                  buf: outBuf,
+                  ct: h["content-type"] || "application/proto",
+                  ce: h["content-encoding"] || "",
+                  at: Date.now(),
+                };
+              } catch (_) {}
               res.writeHead(status, h);
               res.end(outBuf);
             } catch (e) {
-              log(`#${_rid} [真解锁] 写回失败 → 502: ${e.message}`);
+              log(`#${_rid} [响应改写] 写回失败 → 502: ${e.message}`);
               try {
                 if (!res.headersSent) {
                   res.writeHead(502);
@@ -8178,6 +8759,14 @@ function proxyToCloud(req, res, overrideBody, _rid) {
     log(`upstream h2 error ${req.method} ${req.url}: ${e.message}`);
     _upClosed = true; // 已错 · 无需再 cancel
     if (!res.headersSent) {
+      // ★ v9.9.362(合流自 Tokyo) · 官方流中途 RST(ECONNRESET 等)且未出头: 鉴权/状态类本地韧性兜底
+      //   → 彻底解耦官方可达性 · 前端不登出、不报「连接不上官方服务器」。
+      if (_isAuthResilientRpc(req.url)) {
+        try {
+          _replyAuthResilient(req, res, _rid);
+        } catch (_) {}
+        return;
+      }
       try {
         res.writeHead(502);
       } catch {}
@@ -9515,6 +10104,7 @@ const _mainHandler = async (req, res) => {
     _lastLsReqAt = Date.now();
     // 2. 路由分类
     const kind = classifyRPC(req.url);
+    const _reqSurface = _surfaceOfPath(req.url); // v9.9.368 · 两面分治面标 local|cascade|''
     const route = routeUpstream(req.url);
     const isInferenceRPC = route.host === UPSTREAM_INFER;
     _recordPath(req.method, req.url, kind, route.host);
@@ -9634,9 +10224,10 @@ const _mainHandler = async (req, res) => {
     //   无为无以为 · 不增不减 · 只剔除残留
     let _eaBody = body;
     // ★ v9.9.357 · invert+custom 皆走源级替换 (custom 由 invertSP 内自编分支平替)
-    if (_spReplaceActive()) {
+    // ★ v9.9.368 · 按面生效: _origin_mode_surface.json 未配置面回落全局 SP_MODE
+    if (_spReplaceActiveForSurface(_reqSurface)) {
       if (kind === "CHAT_PROTO") {
-        _eaBody = modifySPProto(body);
+        _eaBody = modifySPProto(body, _reqSurface);
       } else if (kind === "CHAT_RAW") {
         _eaBody = modifyRawSP(body);
       }
@@ -9677,7 +10268,7 @@ const _mainHandler = async (req, res) => {
           // ★ v9.9.93 · 追踪已见模型 · 四十七章「不出于户 以知天下」
           if (_eaModelUid) {
             const _prev = _seenModelUids.get(_eaModelUid);
-            const _isRouted = _eaRouter.shouldRoute(_eaModelUid);
+            const _isRouted = _eaRouter.shouldRoute(_eaModelUid, _reqSurface);
             _seenModelUids.set(_eaModelUid, {
               count: (_prev ? _prev.count : 0) + 1,
               lastAt: Date.now(),
@@ -9698,7 +10289,7 @@ const _mainHandler = async (req, res) => {
               " modelUid=" +
               _eaModelUid +
               " shouldRoute=" +
-              (_eaModelUid ? _eaRouter.shouldRoute(_eaModelUid) : "N/A"),
+              (_eaModelUid ? _eaRouter.shouldRoute(_eaModelUid, _reqSurface) : "N/A"),
           );
           log(
             "#" +
@@ -9708,9 +10299,9 @@ const _mainHandler = async (req, res) => {
               " modelUid=" +
               _eaModelUid +
               " shouldRoute=" +
-              (_eaModelUid ? _eaRouter.shouldRoute(_eaModelUid) : "N/A"),
+              (_eaModelUid ? _eaRouter.shouldRoute(_eaModelUid, _reqSurface) : "N/A"),
           );
-          if (_eaModelUid && _eaRouter.shouldRoute(_eaModelUid)) {
+          if (_eaModelUid && _eaRouter.shouldRoute(_eaModelUid, _reqSurface)) {
             log("#" + rid + " [外接api] " + _eaModelUid + " → 外部API");
             log("#" + rid + " [外接api-PRE] _eaRouter.route() about to call");
             const _eaOk = await _eaRouter.route(
@@ -9753,53 +10344,23 @@ const _mainHandler = async (req, res) => {
               if (!res.writableEnded) res.end();
               return;
             }
-            // ★ v9.9.92-fix · 路由模型失败 → Connect-RPC 错误帧 · 不回退官方
-            //   道义: 二十九章「天下神器 非可为也」· 失败即失败 · 不伪饰成功
-            //   原则: shouldRoute=true → 路由 → 失败则报错
+            // ★ v9.9.363-止血(合流自 Tokyo) · 路由模型失败 → 回退官方透传 · 不再报错(工具不再直接报错)
+            //   道义: 天之道利而不害 · 失败则利民(回退) · 不伪饰成功亦不横加其害
+            //   原则: shouldRoute=true → 路由 → 失败则回退官方(而非 Connect-RPC 错误帧)
             //         shouldRoute=false → 不路由 → 走官方透传
-            if (_eaModelUid) {
-              _eaDiag(
-                "#" +
-                  rid +
-                  " route FAIL → Connect-RPC error (NO FALLBACK) model=" +
-                  _eaModelUid,
-              );
-              log(
-                "#" +
-                  rid +
-                  " [外接api] 路由失败 → Connect-RPC错误 (不回退官方) model=" +
-                  _eaModelUid,
-              );
-              try {
-                if (!res.headersSent) {
-                  // ★ Connect-RPC 流式响应头 · 与正常路由相同格式
-                  res.writeHead(200, {
-                    "content-type": "application/connect+proto",
-                    "connect-accept-encoding": "gzip",
-                    "connect-content-encoding": "gzip",
-                  });
-                }
-                // ★ 用 cascade_wire 构建 gRPC 错误帧
-                const _wire = _eaRuntimeMod ? _eaRuntimeMod.getWire() : null;
-                if (_wire) {
-                  const _errFrame = _wire.buildEndFrame(
-                    "[路由失败] 外部API调用失败(model=" +
-                      _eaModelUid +
-                      "), 请检查provider配置或稍后重试",
-                  );
-                  if (_errFrame && !res.writableEnded) res.write(_errFrame);
-                }
-                if (!res.writableEnded) res.end();
-              } catch (_endErr) {
-                if (!res.writableEnded) res.end();
-              }
-              return; // ★ 不回退官方
-            }
-            // 非 SWE 模型 → 仍可回退官方
+            //   原 v9.9.92-fix「失败即失败·不回退官方」致 route FAIL 直接工具报错 · 今改之
             _eaDiag(
-              "#" + rid + " route FAIL + no headers → fallback to official",
+              "#" +
+                rid +
+                " route FAIL → fallback to official (止血 · 不再报错) model=" +
+                _eaModelUid,
             );
-            log("#" + rid + " [外接api] 路由失败 → 回退官方");
+            log(
+              "#" +
+                rid +
+                " [外接api] 路由失败 → 回退官方(止血) model=" +
+                _eaModelUid,
+            );
           }
         }
       } catch (e) {
@@ -9970,7 +10531,8 @@ const _mainHandler = async (req, res) => {
     //    INFER_STRIP: 仅剥侧信道 · 不碰 SP (4.5P 不处理此 kind)
     let modified = _eaBody;
     // ★ v9.9.357 · custom 模式亦剥侧信道 · 隔离与 invert 同源
-    if (_spReplaceActive() && kind === "INFER_STRIP") {
+    // ★ v9.9.368 · 按面生效 · cascade 面 SP_MODE=passthrough 时 INFER_STRIP 亦不剥
+    if (_spReplaceActiveForSurface(_reqSurface) && kind === "INFER_STRIP") {
       const r = deepStripRequestBody(_eaBody);
       modified = r.body;
       if (r.changed > 0) {
@@ -10440,5 +11002,13 @@ module.exports = {
     _brgLoadRelayCfg,
     _brgSaveRelayCfg,
     _brgRelayState,
+    // ★ v9.9.362(合流自 Tokyo) · 官方 H2 经代理隧道 + 鉴权类韧性兜底 (离线可测)
+    _h2TunnelConnect,
+    _isAuthResilientRpc,
+    _replyAuthResilient,
+    _originResolveProxyUrl,
+    _originIsLocalHost,
+    _setLastGoodUserStatusForTest: (v) => { _lastGoodUserStatus = v; },
+    _getLastGoodUserStatusForTest: () => _lastGoodUserStatus,
   },
 };

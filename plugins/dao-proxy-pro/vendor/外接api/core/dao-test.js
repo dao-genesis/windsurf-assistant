@@ -861,10 +861,12 @@ async function runCustomSPCheck() {
       srcJs.includes("function _spReplaceActive()") &&
       srcJs.includes('SP_MODE === "invert" || SP_MODE === "custom"'),
   });
-  const _gateCount = (srcJs.match(/_spReplaceActive\(\)/g) || []).length;
+  const _gateCount = (
+    srcJs.match(/_spReplaceActive(?:ForSurface)?\(/g) || []
+  ).length;
   checks.push({
     name: "源级替换链门控已由「仅invert」改为 _spReplaceActive (≥3处: 主链/preview/INFER_STRIP)",
-    pass: _gateCount >= 4, // 定义1处 + 门控≥3处
+    pass: _gateCount >= 5, // 定义2处(_spReplaceActive + ForSurface) + 门控≥3处(主链/preview/INFER_STRIP)
   });
   checks.push({
     name: "observe 延迟观照亦认 custom 模式 (面板 after=真实替换结果)",

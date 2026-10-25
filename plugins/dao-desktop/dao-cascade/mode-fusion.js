@@ -1,4 +1,4 @@
-// 道 · 模式融合(headless·零 vscode 依赖) —— 提示词层 × 工具层 = 4×4 = 16 模式。
+// 道 · 模式融合(headless·零 vscode 依赖) —— 提示词层 × 工具层 (v9.9.373: 工具轴只余 official · 域叠加清空)。
 // ─────────────────────────────────────────────────────────────────────────────
 // 两层正交, 各自独立切换, 组合即模式矩阵(不生产, 只搬运: 两轴皆映射既有引擎):
 //   · 提示词层(4): Proxy Pro 本源引擎同源(sp_invert SP_MODE × 经藏 canon) ——
@@ -6,11 +6,11 @@
 //       daodejing  道德经模式:     /origin/mode=invert × /origin/canon=laozi
 //       yinfujing  阴符经模式:     /origin/mode=invert × /origin/canon=yinfu
 //       daoyin     道德经+阴符经:  /origin/mode=invert × /origin/canon=laozi+yinfu(本源默认)
-//   · 工具层(4): sp_invert 工具契约轴(/origin/tools) + Dao-Windows-Agent ModeManager 联动 ——
+//   · 工具层(1): sp_invert 工具契约轴(/origin/tools) —— v9.9.373 只剩 official 一档
 //       default    默认模式:   tools=official(无附加工具契约) · 桥 mode=primary
-//       windows    Windows:    tools=windows(整机工具契约并入提示词) · 桥 mode=windows
-//       freecad    FreeCAD:    tools=freecad(3D 建模域契约) · 桥 mode=domain:freecad
-//       kicad      KiCad:      tools=kicad(PCB 域契约) · 桥 mode=domain:kicad
+//       (windows/freecad/kicad 域契约线已废 · 旧项目尸骸出列)
+
+
 // 真源落盘:
 //   · 双轴态: ~/.dao/mode-fusion.json(本插件自持; 旧 invert/passthrough/custom 自动迁移)
 //   · 工具层契约: ~/.dao/mode.json(与 ModeManager 同一契约文件, merge 写不覆没自持字段),
@@ -33,24 +33,24 @@ const PROMPT_MODES = [
 // tools: sp_invert TOOLMODE_MAP(/origin/tools) · bridge: ModeManager(~/.dao/mode.json) 模式 id。
 const TOOL_MODES = [
   { id: "default", name: "默认模式", summary: "官方工具原貌, 无附加工具契约(日常默认)", tools: "official", bridge: "primary" },
-  { id: "windows", name: "Windows 模式", summary: "整机工具契约并入提示词, 整台 Windows 为主战场", tools: "windows", bridge: "windows" },
-  { id: "freecad", name: "FreeCAD 模式", summary: "FreeCAD 3D 建模域工具契约并入提示词", tools: "freecad", bridge: "domain:freecad" },
-  { id: "kicad", name: "KiCad 模式", summary: "KiCad PCB 域工具契约并入提示词", tools: "kicad", bridge: "domain:kicad" },
+
+
+
 ];
 
 // 域叠加层(与提示词层/工具层正交, 非第五模式)：开 = 把该域的工具描述并入系统提示
 // (太上下知有之：AI 只是知道有这些工具, 自主择用); 关 = 官方原貌, 工具仍注册在册。
 // 不论道德经/阴符经/官方哪种提示词模式, 叠加层都可叠加 —— 两者道并行而不相悖。
-const DOMAIN_OVERLAYS = [
-  { id: "pcb", name: "KiCad/嘉立创EDA", summary: "PCB 工具层描述并入提示词(dao-pcb MCP 同源)" },
-  { id: "freecad", name: "FreeCAD 3D建模", summary: "FreeCAD 工具层描述并入提示词(dao-freecad MCP 同源)" },
-];
+// v9.9.373 · 损之又损: pcb/freecad 域叠加层皆旧项目尸骸 —— 出列(overlay 机制留壳)。
+const DOMAIN_OVERLAYS = [];
+
+
 
 function fusionPath() {
   return process.env.DAO_MODE_FUSION_FILE || path.join(os.homedir(), ".dao", "mode-fusion.json");
 }
 
-// 与 Dao-Windows-Agent core/agent/modes.py DEFAULT_STATE_PATH 同一契约文件。
+// 与旧 Dao-Windows-Agent ModeManager 同一契约文件(v9.9.373: 桥已死·文件仅作迁移回读)。
 function contractPath() {
   return process.env.DAO_MODE_CONTRACT_FILE || path.join(os.homedir(), ".dao", "mode.json");
 }
@@ -103,13 +103,7 @@ function setOverlay(id, on) {
 
 // 叠加层提示词文本(开启者拼接)：供反代/运行期并入系统提示。
 function overlayPrompt() {
-  const parts = [];
-  for (const m of DOMAIN_OVERLAYS) {
-    if (!overlayOn(m.id)) continue;
-    if (m.id === "pcb") parts.push(require("./pcb-agent").modePrompt());
-    if (m.id === "freecad") parts.push(require("./fc-agent").modePrompt());
-  }
-  return parts.join("\n\n");
+  return ""; // v9.9.373 · 域叠加层已空 —— 无损可叠
 }
 
 function setPromptMode(id) {
@@ -140,9 +134,35 @@ function setToolMode(id) {
   return state();
 }
 
+// ★ 端口发现归一(v10.3): env 显式 > endpoint.json 软读 > per-user FNV-1a(与 dao-proxy-min
+//   扩展同式 8889+hash%100·多账号自然隔离) > 8889 兜底。旧病: 硬编码 8889 — 在 per-user
+//   端口部署点(如 zhouyoukang→8957)热切永远打不中真源, 静默失效(读盘生效掩盖之)。
+function _fnv1aPort(username) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < username.length; i++) {
+    h ^= username.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return 8889 + (h % 100);
+}
+function _discoverOriginPort() {
+  if (process.env.ORIGIN_PORT) return process.env.ORIGIN_PORT;
+  try {
+    const os = require("os");
+    const fs = require("fs");
+    const path = require("path");
+    const home = os.homedir();
+    try {
+      const j = JSON.parse(fs.readFileSync(path.join(home, ".codeium", "dao-byok", "endpoint.json"), "utf8"));
+      const p = parseInt(j && j.port, 10);
+      if (p > 0 && p < 65536) return String(p);
+    } catch (_) { /* 无 endpoint.json 则继续 */ }
+    return String(_fnv1aPort(os.userInfo().username));
+  } catch (_) { return "8889"; }
+}
 function _originBase(opts) {
   return String((opts && opts.originUrl) || process.env.DAO_ORIGIN_URL ||
-    "http://127.0.0.1:" + (process.env.ORIGIN_PORT || "8889")).replace(/\/+$/, "");
+    "http://127.0.0.1:" + _discoverOriginPort()).replace(/\/+$/, "");
 }
 
 function _originReq(method, pathname, payload, opts) {
@@ -228,7 +248,7 @@ function syncBridge(id, opts) {
   });
 }
 
-// 4×4 = 16 组合矩阵。
+// 提示词 × 工具 组合矩阵(v9.9.373: 4×1=4)。
 function matrix() {
   const out = [];
   for (const p of PROMPT_MODES) {
@@ -262,4 +282,5 @@ module.exports = {
   overlayOn, setOverlay, overlayPrompt,
   setCustomText, clearCustomText,
   matrix, state, fusionPath, contractPath,
+  discoverOriginPort: _discoverOriginPort, originBase: _originBase,
 };

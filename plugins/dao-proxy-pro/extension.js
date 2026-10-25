@@ -268,17 +268,42 @@ let _spawnHooked = false;
 // v9.9.200 · stdio 中间人代理 · 拦截 extension.js ↔ devin.exe 的 ndJson ACP 流
 // 道义: 四十章「反也者 道之动也」· 旧HTTP MITM死 → 新stdio中间人生
 // 返回 { cmd, args, options } 或 null · 由 spawn hook 修改 arguments
+let _acpProxyMissingWarned = false;
 function _rewriteAcpSpawn(command, args) {
   if (typeof command !== "string" || !Array.isArray(args)) return null;
   // 仅在 ACP 模式下拦截
   if (!_acpMode || !_acpProxyPath) return null;
+  // ★ v9.9.368 · 中人文件存续检查 · 插件本体残缺(扫描清理/热删)时绝不重写
+  //   实证(ZHOU@141): extensions 扫描把扩展当 marked-for-removal 清盘 →
+  //   运行中 hook 仍把 devin.exe acp 重写成 node 已删除脚本 → Devin Local
+  //   spawn 即死·连用都不能用。中人不在即放行原生 acp → 本体保命。
+  try {
+    if (!fs.existsSync(_acpProxyPath)) {
+      if (!_acpProxyMissingWarned) {
+        _acpProxyMissingWarned = true;
+        L.warn(
+          "spawn-hook-acp",
+          `stdio proxy 缺失: ${_acpProxyPath} → 不拦截(本体保命)`,
+        );
+      }
+      return null;
+    }
+  } catch (_) {}
+  _acpProxyMissingWarned = false;
   const nodeExe = process.execPath || "node";
   // 直接 spawn devin.exe
   if (/devin\.exe$|\/devin$/.test(command)) {
+    // ★ v9.9.364 · 只拦 acp 子命令 · 弱者道之用
+    //   devin.exe 其余调用(--version/skills/sandbox 等)原样放行,
+    //   避免无差别包裹拖慢/误伤非 ACP 路径。
+    const hasAcp = args.some(
+      (x) => typeof x === "string" && x.toLowerCase() === "acp",
+    );
+    if (!hasAcp) return null;
     const newArgs = [_acpProxyPath, command, ...args];
     L.info(
       "spawn-hook-acp",
-      `devin.exe → stdio proxy: ${command} → node ${_acpProxyPath}`,
+      `devin.exe acp → stdio proxy: ${command} → node ${_acpProxyPath}`,
     );
     return { cmd: nodeExe, args: newArgs };
   }
@@ -307,6 +332,32 @@ function _rewriteAcpSpawn(command, args) {
       `bash包裹 devin.exe → stdio proxy: ${devinPath} → node ${_acpProxyPath}`,
     );
     return { cmd: nodeExe, args: newArgs };
+  }
+  // ★ v9.9.366 · 其余壳包裹型 spawn (cmd.exe /c · powershell -c/-Command · pwsh -c)
+  //   深挖兜底: IDE 层若换 shell 拉起 devin.exe, 只认 bash 仍漏网 →
+  //   通用式: 定位命令文本里 devin(.exe) token, 其后 token 皆为 agent args 承袭。
+  if (/(cmd|powershell|pwsh|sh)(\.exe)?$/i.test(command)) {
+    const ci = args.findIndex(
+      (x) => typeof x === "string" && /^(-c|\/c|-command)$/i.test(x),
+    );
+    if (ci < 0 || ci + 1 >= args.length) return null;
+    const script = args.slice(ci + 1).join(" ");
+    if (!/devin(\.exe)?["']?\s+["']?acp\b/i.test(script)) return null;
+    const toks = [];
+    const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+    let m;
+    while ((m = re.exec(script)) !== null)
+      toks.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3]);
+    const di = toks.findIndex((t) => /devin(\.exe)?$/i.test(t));
+    if (di < 0) return null;
+    let devinPath = toks[di];
+    const mm = devinPath.match(/^\/([a-zA-Z])\/(.*)$/);
+    if (mm) devinPath = mm[1] + ":\\" + mm[2].replace(/\//g, "\\");
+    L.info(
+      "spawn-hook-acp",
+      `shell包裹 devin.exe → stdio proxy: ${devinPath} → node ${_acpProxyPath}`,
+    );
+    return { cmd: nodeExe, args: [_acpProxyPath, devinPath, ...toks.slice(di + 1)] };
   }
   return null;
 }
@@ -416,92 +467,79 @@ function installSpawnHook() {
   if (_spawnHooked) return;
   _spawnHooked = true;
   const _sysProxy = _readSystemProxy();
+  // ★ v9.9.364 · 根治「插件一开 Devin Local 连用都不能用」· 反者道之动
+  //   病根(实证): process.execPath = Devin.exe(Electron 本体)。无
+  //     ELECTRON_RUN_AS_NODE=1 时 Electron 起 GUI 实例而非 node →
+  //     stdio 代理脚本根本没跑 → ACP stdio 全哑 → 前端永卡 Connecting。
+  //     IDE 原 spawn 传 env:{...process.env,...A}(env 必存在但不含此变量)
+  //     → 旧版只在 options 已有时才补 env, 且不补 RUN_AS_NODE → 必死。
+  //   治法: 统一 _fixAcpOpts —— 强制 stdio pipe + RUN_AS_NODE=1 +
+  //     ACP_BACKEND + DAO_ACP_API_URL(中人自探端口) + 健康锚定 + 系统代理。
+  //   道义: 「为之于未有 治之于未乱」· 缺陷在入口即补, 不赖中人兜底。
+  const _fixAcpOpts = (origOpts) => {
+    const o =
+      origOpts && typeof origOpts === "object" && !Array.isArray(origOpts)
+        ? origOpts
+        : {};
+    o.stdio = ["pipe", "pipe", "pipe"]; // ACP 双向 stdio · inherit 会哑
+    o.windowsHide = true;
+    const env =
+      o.env && typeof o.env === "object"
+        ? o.env
+        : (o.env = Object.assign({}, process.env));
+    if (!env.ELECTRON_RUN_AS_NODE) env.ELECTRON_RUN_AS_NODE = "1"; // Electron→node
+    if (!env.ACP_BACKEND) env.ACP_BACKEND = "windsurf";
+    // 中人探口之引: 硬编码 8937 早失效(FNV 端口)→ 恒注当前缓存口, 中人再探
+    if (!env.DAO_ACP_API_URL && _cachedProxyUrl)
+      env.DAO_ACP_API_URL = _cachedProxyUrl;
+    _acpEnvAnchorApi(env);
+    if (_sysProxy && !env.HTTP_PROXY && !env.http_proxy) {
+      env.HTTP_PROXY = _sysProxy;
+      env.HTTPS_PROXY = _sysProxy;
+      env.http_proxy = _sysProxy;
+      env.https_proxy = _sysProxy;
+      L.info("spawn-hook-acp", `注入代理: ${_sysProxy}`);
+    }
+    return o;
+  };
   cp.spawn = function (cmd, a) {
-    // ★ v9.9.200 · ACP spawn hook 优先 (devin.exe → stdio proxy)
+    // ★ v9.9.200 · ACP spawn hook 优先 (devin.exe acp → stdio proxy)
     const _acp = _rewriteAcpSpawn(cmd, a);
     if (_acp) {
-      arguments[0] = _acp.cmd;
-      arguments[1] = _acp.args;
-      // 确保 stdio 为 pipe (ACP 需要 stdin/stdout 双向通信)
-      if (arguments[2] && typeof arguments[2] === "object") {
-        arguments[2].stdio = ["pipe", "pipe", "pipe"];
-        arguments[2].windowsHide = true;
-        if (!arguments[2].env) arguments[2].env = { ...process.env };
-        if (!arguments[2].env.ACP_BACKEND)
-          arguments[2].env.ACP_BACKEND = "windsurf";
-        _acpEnvAnchorApi(arguments[2].env);
-        if (
-          _sysProxy &&
-          !arguments[2].env.HTTP_PROXY &&
-          !arguments[2].env.http_proxy
-        ) {
-          arguments[2].env.HTTP_PROXY = _sysProxy;
-          arguments[2].env.HTTPS_PROXY = _sysProxy;
-          arguments[2].env.http_proxy = _sysProxy;
-          arguments[2].env.https_proxy = _sysProxy;
-          L.info("spawn-hook-acp", `注入代理: ${_sysProxy}`);
-        }
-      }
-    } else {
-      maybeRewriteLsArgs(cmd, a);
+      const opts = _fixAcpOpts(arguments[2]);
+      return _origSpawn.call(this, _acp.cmd, _acp.args, opts);
     }
+    maybeRewriteLsArgs(cmd, a);
     return _origSpawn.apply(this, arguments);
   };
   cp.spawnSync = function (cmd, a) {
     const _acp = _rewriteAcpSpawn(cmd, a);
     if (_acp) {
-      arguments[0] = _acp.cmd;
-      arguments[1] = _acp.args;
-      if (arguments[2] && typeof arguments[2] === "object") {
-        arguments[2].stdio = ["pipe", "pipe", "pipe"];
-        arguments[2].windowsHide = true;
-        if (!arguments[2].env) arguments[2].env = { ...process.env };
-        if (!arguments[2].env.ACP_BACKEND)
-          arguments[2].env.ACP_BACKEND = "windsurf";
-        _acpEnvAnchorApi(arguments[2].env);
-        if (
-          _sysProxy &&
-          !arguments[2].env.HTTP_PROXY &&
-          !arguments[2].env.http_proxy
-        ) {
-          arguments[2].env.HTTP_PROXY = _sysProxy;
-          arguments[2].env.HTTPS_PROXY = _sysProxy;
-          arguments[2].env.http_proxy = _sysProxy;
-          arguments[2].env.https_proxy = _sysProxy;
-        }
-      }
-    } else {
-      maybeRewriteLsArgs(cmd, a);
+      const opts = _fixAcpOpts(arguments[2]);
+      return _origSpawnSync.call(this, _acp.cmd, _acp.args, opts);
     }
+    maybeRewriteLsArgs(cmd, a);
     return _origSpawnSync.apply(this, arguments);
   };
   cp.execFile = function (cmd, a) {
     if (Array.isArray(a)) {
       const _acp = _rewriteAcpSpawn(cmd, a);
       if (_acp) {
-        arguments[0] = _acp.cmd;
-        arguments[1] = _acp.args;
-        if (arguments[2] && typeof arguments[2] === "object") {
-          arguments[2].stdio = ["pipe", "pipe", "pipe"];
-          arguments[2].windowsHide = true;
-          if (!arguments[2].env) arguments[2].env = { ...process.env };
-          if (!arguments[2].env.ACP_BACKEND)
-            arguments[2].env.ACP_BACKEND = "windsurf";
-          _acpEnvAnchorApi(arguments[2].env);
-          if (
-            _sysProxy &&
-            !arguments[2].env.HTTP_PROXY &&
-            !arguments[2].env.http_proxy
-          ) {
-            arguments[2].env.HTTP_PROXY = _sysProxy;
-            arguments[2].env.HTTPS_PROXY = _sysProxy;
-            arguments[2].env.http_proxy = _sysProxy;
-            arguments[2].env.https_proxy = _sysProxy;
-          }
-        }
-      } else {
-        maybeRewriteLsArgs(cmd, a);
+        // execFile(cmd,args[,opts][,cb]) · 保 callback 位次
+        const cb =
+          typeof arguments[arguments.length - 1] === "function"
+            ? arguments[arguments.length - 1]
+            : undefined;
+        const opts = _fixAcpOpts(
+          typeof arguments[2] === "object" && arguments[2] !== null
+            ? arguments[2]
+            : null,
+        );
+        return cb
+          ? _origExecFile.call(this, _acp.cmd, _acp.args, opts, cb)
+          : _origExecFile.call(this, _acp.cmd, _acp.args, opts);
       }
+      maybeRewriteLsArgs(cmd, a);
     }
     return _origExecFile.apply(this, arguments);
   };
@@ -2707,7 +2745,8 @@ class EssenceProvider {
           return;
         }
         if (msg.command === "refresh") await this.refresh();
-        else if (msg.command === "setMode") await this._handleSetMode(msg.mode);
+        else if (msg.command === "setMode")
+          await this._handleSetMode(msg.mode, msg.surface);
         else if (msg.command === "getCustomSP") await this._handleGetCustomSP();
         else if (msg.command === "setCustomSP")
           await this._handleSetCustomSP(msg);
@@ -2937,7 +2976,26 @@ class EssenceProvider {
     await this.refresh();
   }
 
-  async _handleSetMode(mode) {
+  async _handleSetMode(mode, surface) {
+    // ★ v9.9.371 · 两面分治: surface(local|cascade) 按面独立热切(纯 POST·不惊 LS);
+    //   缺省 = 全局两面(既有语义: cmdInvert/cmdPassthrough 含锚定/LS 首启逻辑)。
+    if (surface === "local" || surface === "cascade") {
+      try {
+        const m =
+          mode === "dao" || mode === "invert" ? "invert" : "passthrough";
+        const r = await httpPostJson(
+          `http://127.0.0.1:${_cachedPort}/origin/mode`,
+          { mode: m, surface },
+          2000,
+        );
+        L.info("setMode", `surface ${surface} -> ${m} (ok=${r && r.ok})`);
+      } catch (e) {
+        L.error("setMode", e && e.message);
+      }
+      this._lastSig = "";
+      setTimeout(() => this.forceRefresh().catch(() => {}), 300);
+      return;
+    }
     if (mode === "dao" || mode === "invert") await cmdInvert();
     else await cmdPassthrough();
     this._lastSig = "";
@@ -3429,20 +3487,17 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
 <body data-port="${proxyPort}">
   <div class="bar">
     <span class="dots" id="dots" title="Proxy\u00b7Capture\u00b7Mode"></span>
-    <button class="mb" id="btnDao" title="\u9053Agent\u00b7\u5e1b\u4e66\u524d\u7f6e">\u9053</button>
-    <button class="mb" id="btnOff" title="\u5b98\u65b9Agent\u00b7\u900f\u4f20">\u5b98</button>
+    <button class="mb" id="btnDao" title="\u9053Agent\u00b7\u5e1b\u4e66\u524d\u7f6e(\u4e24\u9762\u00b7\u5168\u5c40)">\u9053</button>
+    <button class="mb" id="btnOff" title="\u5b98\u65b9Agent\u00b7\u900f\u4f20(\u4e24\u9762\u00b7\u5168\u5c40)">\u5b98</button>
+    <button class="mb" id="btnDaoLocal" title="Devin Local \u9762(chisel acp)\u00b7\u5e1b\u4e66\u524d\u7f6e">\u9053L</button>
+    <button class="mb" id="btnOffLocal" title="Devin Local \u9762\u00b7\u5b98\u65b9\u900f\u4f20">\u5b98L</button>
+    <button class="mb" id="btnDaoCas" title="Cascade \u9762(LS)\u00b7\u5e1b\u4e66\u524d\u7f6e">\u9053C</button>
+    <button class="mb" id="btnOffCas" title="Cascade \u9762\u00b7\u5b98\u65b9\u900f\u4f20">\u5b98C</button>
     <button class="ib" id="editToggle" title="\u7f16\u8f91\u6ce8\u5165 SP">\u7f16</button>
     <select id="canonSelect" title="\u7ecf\u85cf\u5207\u6362 \u00b7 \u4e24\u7ecf\u5f52\u4e00\u00b7\u9053\u751f\u4e00">
       <option value="laozi+yinfu">\u5e1b\u4e66\u8001\u5b50+\u9053\u85cf\u9634\u7b26\u7ecf</option>
       <option value="laozi">\u5e1b\u4e66\u300a\u8001\u5b50\u300b</option>
       <option value="yinfu">\u9053\u85cf\u300a\u9634\u7b26\u7ecf\u300b</option>
-      <option value="windows-agent">\u4e8c\u7ecf\u5408+Windows Agent \u5de5\u5177\u5951\u7ea6</option>
-    </select>
-    <select id="toolsSelect" title="\u5de5\u5177\u6a21\u5f0f \u00b7 \u4e0e\u7ecf\u85cf\u6b63\u4ea4\u53e0\u52a0">
-      <option value="official">\u5b98\u65b9\u539f\u751f\u5de5\u5177</option>
-      <option value="windows">Windows \u5de5\u5177\u5951\u7ea6</option>
-      <option value="freecad">FreeCAD \u57df\u5de5\u5177</option>
-      <option value="kicad">KiCad \u57df\u5de5\u5177</option>
     </select>
     <span id="customBadge"></span>
   </div>
@@ -3507,6 +3562,10 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   var $dots = document.getElementById('dots');
   var $btnDao = document.getElementById('btnDao');
   var $btnOff = document.getElementById('btnOff');
+  var $btnDaoLocal = document.getElementById('btnDaoLocal');
+  var $btnOffLocal = document.getElementById('btnOffLocal');
+  var $btnDaoCas = document.getElementById('btnDaoCas');
+  var $btnOffCas = document.getElementById('btnOffCas');
   var $editToggle = document.getElementById('editToggle');
   var $editArea = document.getElementById('editArea');
   var $editText = document.getElementById('editText');
@@ -3607,13 +3666,28 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     return true;
   }
 
-  // ─── 道/官 切换 ───
-  function setModeUI(mode) {
+  // ─── 道/官 切换 (★ v9.9.371 两面分治: 全局 + Devin Local 面 + Cascade 面) ───
+  var curSurf = { local: null, cascade: null }; // null=随全局(未设面覆盖)
+  function setModeUI(mode, sm) {
     curMode = mode || 'invert';
     $btnDao.classList.remove('active', 'active-dao');
     $btnOff.classList.remove('active');
     if (curMode === 'invert') $btnDao.classList.add('active', 'active-dao');
     else $btnOff.classList.add('active');
+    if (sm && typeof sm === 'object') {
+      curSurf.local = sm.local || null;
+      curSurf.cascade = sm.cascade || null;
+    }
+    var effLocal = curSurf.local || curMode;
+    var effCas = curSurf.cascade || curMode;
+    $btnDaoLocal.classList.remove('active', 'active-dao');
+    $btnOffLocal.classList.remove('active');
+    if (effLocal === 'invert') $btnDaoLocal.classList.add('active', 'active-dao');
+    else $btnOffLocal.classList.add('active');
+    $btnDaoCas.classList.remove('active', 'active-dao');
+    $btnOffCas.classList.remove('active');
+    if (effCas === 'invert') $btnDaoCas.classList.add('active', 'active-dao');
+    else $btnOffCas.classList.add('active');
   }
   $btnDao.addEventListener('click', function() {
     if (curMode === 'invert') return;
@@ -3624,6 +3698,22 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     if (curMode === 'passthrough') return;
     setModeUI('passthrough');
     vsc.postMessage({ command: 'setMode', mode: 'official' });
+  });
+  $btnDaoLocal.addEventListener('click', function() {
+    setModeUI(curMode, { local: 'invert', cascade: curSurf.cascade });
+    vsc.postMessage({ command: 'setMode', mode: 'dao', surface: 'local' });
+  });
+  $btnOffLocal.addEventListener('click', function() {
+    setModeUI(curMode, { local: 'passthrough', cascade: curSurf.cascade });
+    vsc.postMessage({ command: 'setMode', mode: 'official', surface: 'local' });
+  });
+  $btnDaoCas.addEventListener('click', function() {
+    setModeUI(curMode, { local: curSurf.local, cascade: 'invert' });
+    vsc.postMessage({ command: 'setMode', mode: 'dao', surface: 'cascade' });
+  });
+  $btnOffCas.addEventListener('click', function() {
+    setModeUI(curMode, { local: curSurf.local, cascade: 'passthrough' });
+    vsc.postMessage({ command: 'setMode', mode: 'official', surface: 'cascade' });
   });
 
   // ─── 经藏切换 · 道生一 一生二 二生三 三生万物 ───
@@ -3721,7 +3811,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   function pingPull() {
     fJson('/origin/ping').then(function(p){
       if (!p) return;
-      if (p.mode) setModeUI(p.mode);
+      if (p.mode) setModeUI(p.mode, p.surface_modes);
       if (p.canon && $canonSelect.value !== p.canon) $canonSelect.value = p.canon;
       if (p.tools && $toolsSelect && $toolsSelect.value !== p.tools) $toolsSelect.value = p.tools;
       setDots(p);
@@ -3792,7 +3882,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       var _d = e.data.data;
       if (!_d) return;
       // 1. \u66f4\u65b0\u4e09\u76cf + \u6309\u9215\u72b6\u6001
-      if (_d.ping && _d.ping.mode) setModeUI(_d.ping.mode);
+      if (_d.ping && _d.ping.mode) setModeUI(_d.ping.mode, _d.ping.surface_modes);
       if (_d.ping) setDots(_d.ping);
       // 2. \u540c\u6b65\u7ecf\u85cf\u4e0b\u62c9
       if (_d.ping && _d.ping.canon && $canonSelect.value !== _d.ping.canon) $canonSelect.value = _d.ping.canon;
@@ -5095,13 +5185,6 @@ function getEaConfigHtml(port, nonce, opts) {
         <option value="laozi+yinfu">帛书老子+道藏阴符经</option>
         <option value="laozi">帛书《老子》</option>
         <option value="yinfu">道藏《阴符经》</option>
-        <option value="windows-agent">二经合+Windows Agent 工具契约</option>
-      </select>
-      <select id="e1Tools" title="工具模式·与经藏正交叠加（提示换提示的·工具换工具的）" style="font-size:11px;padding:2px 4px;border:1px solid rgba(128,128,128,0.3);border-radius:3px;background:var(--vscode-dropdown-background,rgba(0,0,0,0.2));color:var(--vscode-dropdown-foreground,var(--vscode-foreground));outline:none;font-family:inherit">
-        <option value="official">官方原生工具</option>
-        <option value="windows">Windows 工具契约</option>
-        <option value="freecad">FreeCAD 域工具</option>
-        <option value="kicad">KiCad 域工具</option>
       </select>
       <span id="e1Badge" style="font-size:10px;opacity:0.6"></span>
       <button class="btn" id="e1Open" style="margin-left:auto" title="在侧栏展开完整本源观照">↗ 侧栏</button>
@@ -5160,6 +5243,11 @@ function getEaConfigHtml(port, nonce, opts) {
     <!-- v9.9.288 · 1:1 对齐开关 (居中) -->
     <div class="align-bar">
       <button class="align-btn" id="alignToggle" title="1:1 对齐: 把已路由的两侧模型按路由关系重排成水平直线对齐 · 再点一次回退到默认分组排序">⇄ 1:1 对齐</button>
+      <select id="routeScopeFlow" title="连线生效面(两面分治 v9.9.371): 新建路由作用于哪个面 · Devin Local=chisel acp · Cascade=LS" style="font-size:10px;padding:1px 4px;border:1px solid rgba(128,128,128,0.3);background:var(--vscode-dropdown-background,rgba(0,0,0,0.2));color:var(--vscode-dropdown-foreground,inherit);border-radius:3px;cursor:pointer;">
+        <option value="all">面: 两面</option>
+        <option value="local">面: 仅 Devin Local</option>
+        <option value="cascade">面: 仅 Cascade</option>
+      </select>
       <span class="align-hint">拖拽 ⋮⋮ 可重排板块/模型</span>
     </div>
     <!-- 连线图 -->
@@ -5385,6 +5473,14 @@ function getEaConfigHtml(port, nonce, opts) {
         <label style="font-size:10px;opacity:0.6">
           <input type="checkbox" id="routeThinking"> Thinking 模式
         </label>
+      </div>
+      <div>
+        <label style="font-size:10px;opacity:0.6">生效面 (两面分治 · Devin Local=chisel acp · Cascade=LS)</label>
+        <select id="routeScope">
+          <option value="all">两面 (all)</option>
+          <option value="local">仅 Devin Local (local)</option>
+          <option value="cascade">仅 Cascade (cascade)</option>
+        </select>
       </div>
       <div class="route-modal-actions">
         <button class="btn add" id="routeSave">保存</button>
@@ -5746,7 +5842,7 @@ function getEaConfigHtml(port, nonce, opts) {
     if (f.members.length > 1) {
       html += '<span class="target" title="' + f.members.map(function(mm){ return (mm.tier || 'base') + (_routeFor(mm.modelUid) ? ' ✓' : ''); }).join(' · ') + '">×' + f.members.length + '</span>';
     }
-    if (target) html += '<span class="target">' + target + '</span>';
+    if (target) html += '<span class="target">' + target + (route && route.scope && String(route.scope).toLowerCase() !== 'all' ? ' ·' + String(route.scope).toLowerCase() : '') + '</span>';
     div.innerHTML = html;
     div.addEventListener('click', function() {
       _selectedLeft = this.getAttribute('data-uid');
@@ -6145,7 +6241,8 @@ function getEaConfigHtml(port, nonce, opts) {
     //   注: Cascade 实发的 swe-1-6-slow 等档 catalog 无独立项·不在 _tierGroups 中·
     //   默认其保持官方原生直通(不路由·免费)·仅当用户显式置 familyTierExtend:true 时方随族延伸.
     var uids = (_tierGroups[left] && _tierGroups[left].length) ? _tierGroups[left] : [left];
-    var route = { provider: prov, model: model, maxOutputTokens: 16384, thinkingEnabled: false };
+    var _flowScope = (document.getElementById('routeScopeFlow') || {}).value || 'all';
+    var route = { provider: prov, model: model, maxOutputTokens: 16384, thinkingEnabled: false, scope: _flowScope };
     var st = document.getElementById('statusText');
     if (st) st.textContent = '路由中: ' + left + (uids.length > 1 ? ' (×' + uids.length + '档)' : '') + ' → ' + right + ' …';
     Promise.all(uids.map(function(uid) {
@@ -6229,11 +6326,18 @@ function getEaConfigHtml(port, nonce, opts) {
       document.getElementById('routeMaxTokens').value = route.maxOutputTokens || 16384;
       document.getElementById('routeTemp').value = (route.temperature != null ? route.temperature : '');
       document.getElementById('routeThinking').checked = !!route.thinkingEnabled;
+      var _scopeSel = document.getElementById('routeScope');
+      if (_scopeSel) _scopeSel.value = String(route.scope || 'all').toLowerCase();
       for (var i = 0; i < sel.options.length; i++) {
         if (sel.options[i].value === route.provider) sel.options[i].selected = true;
       }
     } else {
       document.getElementById('routeModalTitle').textContent = '添加路由';
+      var _scopeSel2 = document.getElementById('routeScope');
+      if (_scopeSel2) {
+        var _flowSel = document.getElementById('routeScopeFlow');
+        _scopeSel2.value = (_flowSel && _flowSel.value) || 'all';
+      }
     }
 
     modal.classList.add('show');
@@ -6246,8 +6350,9 @@ function getEaConfigHtml(port, nonce, opts) {
     var maxTokens = parseInt(document.getElementById('routeMaxTokens').value) || 16384;
     var tempRaw = (document.getElementById('routeTemp').value || '').trim();
     var thinking = document.getElementById('routeThinking').checked;
+    var scope = document.getElementById('routeScope').value || 'all';
     if (!uid || !prov || !model) { _daoToast('所有字段必填'); return; }
-    var _route = { provider: prov, model: model, maxOutputTokens: maxTokens, thinkingEnabled: thinking };
+    var _route = { provider: prov, model: model, maxOutputTokens: maxTokens, thinkingEnabled: thinking, scope: scope };
     if (tempRaw !== '') { var _tv = parseFloat(tempRaw); if (!isNaN(_tv)) _route.temperature = _tv; }
     fPost('/origin/ea/route', {
       modelUid: uid,
