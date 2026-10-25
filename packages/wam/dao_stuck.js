@@ -211,6 +211,7 @@ const ENGINE_VER = "v13.0-wam";
 //   write 再抛 EPIPE → 本 handler 自激递归 → 单核打满 + 107GB 日志。
 //   治: ① EPIPE/stderr.destroyed 即永久弃 stderr·只落文件 ② 10s>30 次异常=毒循环·静默自裁
 let _stderrDead = false;
+let _stdoutDead = false;
 let _fatalCount = 0;
 let _fatalWindowStart = Date.now();
 function _fatalLog(kind, text, err) {
@@ -458,7 +459,13 @@ function _displayTitleFor(uuid, ...candidates) {
 
 function log(msg) {
   const line = `[${isoTs()}] ${msg}`;
-  process.stdout.write(line + "\n");
+  if (!_stdoutDead) {
+    try {
+      process.stdout.write(line + "\n");
+    } catch (_) {
+      _stdoutDead = true;
+    }
+  }
   try {
     try {
       if (fs.statSync(LOG_FILE).size > CFG.logMax) {

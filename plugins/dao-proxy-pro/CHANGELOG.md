@@ -35,6 +35,24 @@ v9.9.373 · 损之又损·死尸出列 (为道者日损 · 用户口谕: 面板�
     muse-wonder-1-0-high→deepseek 545ms, swe-2-medium→deepseek 722ms。
   两面分治复核: 道L/官L/道C/官C 四钮即 Devin Local ↔ Cascade 同一面板分面热切
   (v9.9.371 已在), POST /origin/mode {mode,surface} 按面独立生效 —— 无需第二面板。
+  ── 同日二役(东京部署侧实证追加):
+  ⑤ **G1 四测 v9.9.373 复跑全绿**(独立 origin :8937 · drive_acp_371 真实 ACP):
+    官方道 swe-2-max→DAO-OK 2.2s / 外接道 muse-wonder→deepseek→DAO-OK 0.9s /
+    scope 金丝雀(local 档路由不泄 cascade 面: local=sweep→deepseek ✓ cascade=no route ✓) /
+    SP-DEVIN 行为+线双证(答"帛書《老子》與《陰符經》"+_sysFull 官方标识 0 命中)。
+  ⑥ **minswap 遭遇战与归一补全**: 并行操作(dao 侧部署链)14:47-14:49 将
+    dao-proxy-pro-9.9.371 换为 dao-proxy-min-9.9.374(内嵌 v9.9.373 同源 origin,
+    唯缺 vendor/外接api 运行树 → 嵌入 :8917 _ea=false·外接路由死·spawn-hook
+    双面相向 :8917 全断)。治: ① rt-flow 缺依赖模块(devin_cloud/web/proxy/git.js)
+    补齐(激活失败修复) ② run-devin.sh +--disable-gpu(xrdp 无 GPU·FATAL 1002
+    崩溃循环根治) ③ 外接api 运行树回填 min vendor 且写入其规范构建树
+    /root/dao/proxy-min(防 rsync --delete 再剥) + dao.外接api.enabled=true。
+    实证: :8917 _ea=true·8 路由就位·muse-wonder→deepseek-chat(DAO-OK 1.6s·
+    线档证实 upstream=api.deepseek.com)·cascade 面 test-chat 766ms 同通·
+    /origin/tools valid=["official"]·canon 三档·死档拒绝 —— min 本体即统一源。
+  ⑦ **dao_stuck stdout 死管根治**: log() 裸 process.stdout.write 宿主亡=EPIPE
+    循环异常; 补 _stdoutDead 旗(EPIPE/destroyed 即永久弃 stdout·文件照常)·
+    packages/wam 与部署双本同步·重生后 0.0%CPU 稳态。
 
 v9.9.372 · 超时预算倒挂根治 (反者道之动 · 141 事故根因歼灭 · fail-fast 非 fail-stall)
 : 病(141 实证): origin 内层超时长于外层调用者 —— 隧道 CONNECT 20s / 直连建连
