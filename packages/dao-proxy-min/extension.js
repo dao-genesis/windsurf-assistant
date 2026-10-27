@@ -1,4 +1,11 @@
-// extension.js · dao-proxy-min v9.9.67 · 道法自然 · 无为而无以为
+// extension.js · dao-proxy-min v9.9.68 · 道法自然 · 无为而无以为
+//   v9.9.68 · ACP锚链根治 + 面板收净:
+//     ① EADDRINUSE ping 二发补试 (单发 2s 失误曾致整窗 _proxyHandle=null)
+//     ② watchdog 健康路径回填 _proxyHandle (一次误判定终身之根治)
+//     ③ _maybeAnchorAcpEnv 去 _proxyHandle 门控 → _cachedProxyUrl (与 LS 无条件重写同律)
+//        — 实证: devin.exe acp 全程无 WINDSURF_API_SERVER_URL → devin-real 直连官方
+//     ④ 面板收净: 条尾「编」钮+全局典源下拉双冗余出列 · 编唯经 L编/C编 以面入
+//     ⑤ 归道按面: 面编辑态清该面 customsp + 回落 invert (旧码恒清全局·名实不符)
 //
 // 道德经 · 第四十章: "反者道之动, 弱者道之用."
 // 道德经 · 第四十八章: "为道日损. 损之又损, 以至于无为."
@@ -268,7 +275,9 @@ function maybeRewriteLsArgs(command, args) {
 const _DEVIN_SPAWN_RE = /devin(\.exe)?["'\s]+acp\b/i;
 function _maybeAnchorAcpEnv(cmd, args, opts) {
   try {
-    if (!_proxyHandle) return;
+    // v9.9.68 · 去 _proxyHandle 门控 — 与 LS 重写同律 (v9.9.38): 端口确定 (fnv1a) · proxy 总会存活
+    //   病: 激活期 EADDRINUSE 后单次 ping 2s 失误判"非反代" → _proxyHandle 永 null → devin.exe acp 全程无 env 锚 → devin-real 直连官方 (2026-10-27 实证)
+    if (!_cachedProxyUrl) return;
     // v9.9.67 · 守 · exec(cmd, callback) / execFile(cmd, args, callback) 之第三参乃回调(函数)
     //   旧码误作 opts → 返 {env} 覆写 arguments[1/2] → 回调被吞 → 调用方永挂
     //   函数即回调 · 非选项 · 静默让路 (六十四章「为之于其未有也」)
@@ -502,10 +511,19 @@ async function proxyStart(port, mode, _retried) {
       (e.message && e.message.includes("EADDRINUSE"))
     ) {
       L.info("proxy", `port :${port} EADDRINUSE → ping remote`);
-      const ping = await httpGetJson(
+      let ping = await httpGetJson(
         `http://127.0.0.1:${port}/origin/ping`,
         2000,
       );
+      // v9.9.68 · 冷启竞速窗补一发 — 单次 2s ping 失误曾致整窗口 _proxyHandle=null → ACP env 锚死 (2026-10-27 实证)
+      if (!ping) {
+        await new Promise((r) => setTimeout(r, 800));
+        ping = await httpGetJson(
+          `http://127.0.0.1:${port}/origin/ping`,
+          3000,
+        );
+        if (ping) L.info("proxy", `port :${port} ping 二发命中`);
+      }
       if (
         ping &&
         ping.ok &&
@@ -2393,15 +2411,7 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
     display: flex; flex-direction: column;
   }
   .bar { display: flex; gap: 3px; align-items: center; margin-bottom: 3px; flex: 0 0 auto; font-size: 10px; flex-wrap: wrap; }
-  .ib {
-    padding: 2px 5px; font-size: 12px; border: 1px solid transparent;
-    background: transparent; color: var(--vscode-foreground);
-    cursor: pointer; border-radius: 2px; font-family: inherit;
-    opacity: 0.55; min-width: 20px; line-height: 1;
-  }
-  .ib:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.15)); }
-  .ib.edit-active { opacity: 1; color: #e8a040; border-color: #e8a040; background: rgba(232,160,64,0.1); }
-  .ib.detail-on { opacity: 1; color: #888; border-color: #888; background: rgba(128,128,128,0.08); }
+
   .mb {
     padding: 1px 7px; font-size: 11px; border: 1px solid rgba(128,128,128,0.3);
     background: transparent; color: var(--vscode-foreground);
@@ -2452,9 +2462,7 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
   .edit-bar .eb.reload:hover { background: rgba(128,176,224,0.15); }
   .edit-hint { font-size: 9px; opacity: 0.55; margin-bottom: 3px; padding: 2px 4px; font-style: italic; flex: 0 0 auto; }
   .custom-badge { display: inline-block; font-size: 8px; padding: 0 4px; border-radius: 2px; background: rgba(232,160,64,0.2); color: #e8a040; border: 1px solid rgba(232,160,64,0.3); margin-left: 4px; }
-  #canonSelect { font-size: 10px; padding: 1px 2px; border: 1px solid rgba(128,128,128,0.3); background: var(--vscode-dropdown-background, rgba(0,0,0,0.2)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); border-radius: 3px; cursor: pointer; outline: none; font-family: inherit; max-width: 96px; margin-left: 4px; }
-  #canonSelect:focus { border-color: var(--vscode-focusBorder, #007fd4); }
-  #canonSelect option { background: var(--vscode-dropdown-listBackground, #252526); color: var(--vscode-dropdown-foreground, #ccc); }
+
   /* v9.9.376 · 两面分治 · 道/官 分面开关 (L=Devin Local · C=Cascade) */
   .sf-sep { opacity: 0.3; margin: 0 2px; }
   .sf-label { font-size: 9px; opacity: 0.6; font-weight: 700; margin: 0 1px 0 4px; cursor: default; }
@@ -2486,12 +2494,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
       <option value="laozi+yinfu"${_oSel("laozi+yinfu", _icc)}>\u5408\u4e00</option>
       <option value="laozi"${_oSel("laozi", _icc)}>\u8001\u5b50</option>
       <option value="yinfu"${_oSel("yinfu", _icc)}>\u9634\u7b26</option>
-    </select>
-    <button class="ib" id="editToggle" title="\u7f16\u8f91\u6ce8\u5165 SP">\u7f16</button>
-    <select id="canonSelect" title="\u5168\u5c40\u5178\u6e90(\u9ed8\u8ba4) \u00b7 \u4e24\u7ecf\u5f52\u4e00\u00b7\u9053\u751f\u4e00">
-      <option value="laozi+yinfu"${_oSel("laozi+yinfu", _ic)}>\u5e1b\u4e66\u8001\u5b50+\u9053\u85cf\u9634\u7b26\u7ecf</option>
-      <option value="laozi"${_oSel("laozi", _ic)}>\u5e1b\u4e66\u300a\u8001\u5b50\u300b</option>
-      <option value="yinfu"${_oSel("yinfu", _ic)}>\u9053\u85cf\u300a\u9634\u7b26\u7ecf\u300b</option>
     </select>
     <span id="customBadge"></span>
   </div>
@@ -2556,7 +2558,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
   var $dots = document.getElementById('dots');
   // ★ v9.9.67 · SSR 真态 (mode/canon/双面) · 首绘已预渲 · 此为逻辑层镜像
   var _INIT = ${JSON.stringify(_INIT)};
-  var $editToggle = document.getElementById('editToggle');
   var $editArea = document.getElementById('editArea');
   var $editText = document.getElementById('editText');
   var $editSave = document.getElementById('editSave');
@@ -2565,7 +2566,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
   var $editStatus = document.getElementById('editStatus');
   var $editCount = document.getElementById('editCount');
   var $customBadge = document.getElementById('customBadge');
-  var $canonSelect = document.getElementById('canonSelect');
   var lastText = '';
   var lastSP = ${JSON.stringify(initialSP || "")};
   var _ssrShown = ${initialSP ? "true" : "false"}; // ★ v9.9.67 · SSR 道魂已嵌 · pull 空槽不覆
@@ -2727,7 +2727,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
     _postSurf({ surface: surface, mode: 'custom' });
     editMode = true;
     $editArea.classList.add('show');
-    $editToggle.classList.add('edit-active');
     $sp.style.display = 'none';
     // 「原有规则改动 · 默认显示当前规则」—— 自编优先, 否则预填该面现行典源原文
     var seed = _surf[surface].customsp || '';
@@ -2763,18 +2762,11 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
   if ($canonC) $canonC.addEventListener('change', function() { _setSurfCanon('cascade', $canonC.value); });
   _refreshSurf();
 
-  // ─── 经藏切换 · 道生一 一生二 二生三 三生万物 ───
-  $canonSelect.addEventListener('change', function() {
-    var c = $canonSelect.value;
-    vsc.postMessage({ command: 'setCanon', canon: c });
-  });
-
   // ─── 编辑模式 ───
   function _closeEditMode() {
     editMode = false;
     _editSurface = null;
     $editArea.classList.remove('show');
-    $editToggle.classList.remove('edit-active');
     $sp.style.display = '';
     if (_editClosing) { clearTimeout(_editClosing); _editClosing = null; }
   }
@@ -2783,24 +2775,7 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
     var d = (lastSP || '').length;
     $editCount.textContent = n + (d > 0 ? '/' + d : '') + '\u5b57';
   }
-  $editToggle.addEventListener('click', function() {
-    editMode = !editMode;
-    if (editMode) {
-      _editSurface = null;
-      $editArea.classList.add('show');
-      $editToggle.classList.add('edit-active');
-      $sp.style.display = 'none';
-      // v9.9.22 · 不再用旧 lastSP 预填 (lastSP 可能是切前经文)
-      // 道义: 十六章「致虚极 守静笃」· 清空守静以待真源 · getCustomSP 必返新 default_sp 填实
-      $editText.value = '';
-      updateEditCount();
-      $editStatus.textContent = '\u52a0\u8f7d\u4e2d\u2026';
-      vsc.postMessage({ command: 'getCustomSP' });
-      $editText.focus();
-    } else {
-      _closeEditMode();
-    }
-  });
+  // v9.9.68 · 损 · 顶层「编」钮已除 — 编辑器唯经 L编/C编 以面开启 (_editSurface 恒非空)
   $editSave.addEventListener('click', function() {
     var sp = $editText.value;
     if (!sp || !sp.trim()) { $editStatus.textContent = '\u2716 \u5185\u5bb9\u4e0d\u53ef\u4e3a\u7a7a'; return; }
@@ -2819,7 +2794,8 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
       });
       return;
     }
-    vsc.postMessage({ command: 'setCustomSP', sp: sp.trim() });
+    // v9.9.68 · _editSurface 恒非空 (顶层编钮已除) · 全局 setCustomSP 支路同损
+    $editStatus.textContent = '✖ 未择面 · 请从 L编/C编 入';
   });
   $editReload.addEventListener('click', function() {
     $editText.value = _spCanonPart(lastSP);
@@ -2828,6 +2804,21 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
     $editText.focus();
   });
   $editReset.addEventListener('click', function() {
+    // v9.9.68 · 按面归道: 面编辑态清该面 customsp 并回落 invert 典源 (旧码恒清全局 _customSP · 于面态名实不符)
+    if (_editSurface) {
+      var _rsf = _editSurface;
+      $editStatus.textContent = '\u5f52\u9053\u4e2d\u2026';
+      _postSurf({ surface: _rsf, customsp: '' }).then(function() {
+        return _postSurf({ surface: _rsf, mode: 'invert' });
+      }).then(function() {
+        _surf[_rsf].customsp = null; _surf[_rsf].mode = 'invert'; _paintSurf();
+        $editStatus.textContent = '\u2714 \u5df2\u5f52\u9053 · ' + (_rsf === 'local' ? 'Devin Local' : 'Cascade') + ' \u9762\u56de\u5178\u6e90';
+        _refreshSurf();
+        if (_editClosing) clearTimeout(_editClosing);
+        _editClosing = setTimeout(_closeEditMode, 1200);
+      }).catch(function() { $editStatus.textContent = '\u2716 \u5f52\u9053\u5931\u8d25'; });
+      return;
+    }
     $editStatus.textContent = '\u6e05\u9664\u4e2d\u2026';
     vsc.postMessage({ command: 'resetCustomSP' });
   });
@@ -2870,7 +2861,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
     fJson('/origin/ping').then(function(p){
       if (!p) return;
       // ★ v9.9.67 · 顶层 道/官 总择已除 · p.mode 只入 dots 题注 (setDots 已含)
-      if (p.canon && $canonSelect.value !== p.canon) $canonSelect.value = p.canon;
       setDots(p);
       if (p.custom_sp != null) updateCustomBadge(p.custom_sp, p.custom_sp_chars);
     }).catch(function(){ setDots(null); });
@@ -2918,7 +2908,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
       // 1. \u66f4\u65b0\u4e09\u76cf (mode \u706f\u5728 dots \u9898\u6ce8 \u00b7 \u9876\u5c42\u94ae\u5df2\u9664)
       if (_d.ping) setDots(_d.ping);
       // 2. \u540c\u6b65\u7ecf\u85cf\u4e0b\u62c9
-      if (_d.ping && _d.ping.canon && $canonSelect.value !== _d.ping.canon) $canonSelect.value = _d.ping.canon;
       // 3. \u81ea\u5b9a\u4e49 badge
       if (_d.ping && _d.ping.custom_sp != null) updateCustomBadge(_d.ping.custom_sp, _d.ping.custom_sp_chars);
       // 4. \u663e\u793a SP \u5185\u5bb9 (\u4f18\u5148 proxy.after · \u5df2\u8fd0\u884c\u624d\u6709)
@@ -2964,7 +2953,6 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
         }
       }
       // 同步下拉选中态 (防 extension 推之 canon 与 webview 局部不一致)
-      if (_cc.canon && $canonSelect.value !== _cc.canon) $canonSelect.value = _cc.canon;
       // stat 更新经名
       var _ccPill = (_cc.default_chars || 0) + '\u5B57';
       if (_cc.default_source_name) _ccPill += ' \u00B7 ' + _cc.default_source_name;
@@ -3039,7 +3027,7 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
   // v9.9.20 jiqi · IIFE 全跑通 · 至此即活 · 上报 boot-done 标记
   // v9.9.22 · 加 canonChanged listener · 切经文真联动
   // v9.9.67 · 版本串归一动态 · 名实相符 · 不再硬编码 '9.9.31'
-  _wdbg('boot-done', 'boot', { listeners: 'sf[L/C],canon[L/C/g],editToggle,editSave,editReload,editReset,message[data,customSP,canonChanged]', ver: '${PKG_VERSION}' });
+  _wdbg('boot-done', 'boot', { listeners: 'sf[L/C],canon[L/C],editSave,editReload,editReset,message[data,customSP,canonChanged]', ver: '${PKG_VERSION}' });
 })();
 </script>
 </body>
@@ -3242,6 +3230,11 @@ function activate(ctx) {
             ).catch(() => {});
             await new Promise((r) => setTimeout(r, 1500));
           } else {
+            // v9.9.68 · 健康路径回填 _proxyHandle — 根治「激活期单次 ping 失误判非反代 → handle 永 null → ACP env 锚死」
+            if (!_proxyHandle) {
+              _proxyHandle = _createRemoteHandle(port, ping.mode);
+              L.info("watchdog", `remote handle 回填 (mode=${ping.mode})`);
+            }
             return; // 活且版本最新 · 安心
           }
         }

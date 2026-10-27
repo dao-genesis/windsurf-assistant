@@ -1,4 +1,4 @@
-# 道Agent · dao-proxy-min · **v9.9.67** · 道法自然 · 无为而无不为
+# 道Agent · dao-proxy-min · **v9.9.68** · ACP锚链根治 · 面板收净 · 道法自然
 
 > **一气化三清 · Three Pure · 道并行而不悖**
 > [I · 反代 API · `dao-core`](../dao-core/README.md) &middot; [II · 切号 WAM · `wam`](../wam/README.md) &middot; **III · 提示词反代 · 本**
@@ -9,6 +9,22 @@
 > **损之又损, 以至于无为, 无为而无不为.** —《四十八章》
 > **道法自然.** —《二十五章》
 
+
+## v9.9.68 · ACP锚链根治 · 面板收净 (2026-10-27)
+
+**实证修补** — 本机 devin.exe acp 全链裸奔直连 `server.codeium.com` 之证:
+
+| 位 | 治 |
+|---|---|
+| proxyStart · EADDRINUSE | ping 单发 2s 失误曾定终身 → **二发补试** (800ms 后再 ping 3s) |
+| watchdog 健康路径 | `ping.ok && !stale && !_proxyHandle` → **回填 `_createRemoteHandle`** — 一次误判定终身根治 |
+| `_maybeAnchorAcpEnv` | 去 `_proxyHandle` 门控 → 唯查 `_cachedProxyUrl` — 与 LS 无条件重写同律 (端口确定·proxy 永存) |
+| 面板 | 条尾「编」钮 + 全局典源下拉 **出列** — 编唯经 `L编`/`C编` 以面入 · 全局典源唯回落义 |
+| 归道 | 面编辑态清 **该面** `customsp` + 回落 invert (旧码恒清全局 `_customSP` · 名实不符根治) |
+
+**面板**: `dots | L道 L官 L编 典源 | C道 C官 C编 典源` — 两面分治 · 无为而无不备。
+
+---
 
 ## v9.9.67 · 道法自然 · 反向审视·底层完善 (2026-10-27)
 
