@@ -31,9 +31,12 @@ _审视/_dao.env.json
 **/dao-cred.xml
 **/*.cred.xml
 
-# 白名单 · 帛书《老子》二文是运行时本源 · 必入包
+# 白名单 · 帛书《老子》二文 + 道藏《阴符经》是运行时本源 · 必入包
+# ★ v9.9.67 审视补: _yinfu.txt 原不在白名单 → 下次 vsce 打包将被 **/_* 排除 →
+#   laozi+yinfu 合一典源静默失阴符经 (loadCanonText 缺文不报错·静默降级) · 名实裂
 !vendor/bundled-origin/_silk_de.txt
 !vendor/bundled-origin/_silk_dao.txt
+!vendor/bundled-origin/_yinfu.txt
 
 # 历史本源导出 (v9.1.2-dao 对照)
 _origin_v912/**
@@ -42,10 +45,20 @@ _origin_v912/**
 tests/**
 
 # 运行时生成于 vendor · 不入包
+# ★ v9.9.67 审视补: _injectsbykind.json 曾随 9.9.64 tar 入包(捕得之官方SP随包泄于新装)
+#   + _origin_canon.txt/_model_unlock_enabled/_origin_mode_surface.json/_origin_tools.txt/
+#     _lastupstream.json/_ea_diag.log 皆运行时态 · 一律出包 (运行时自生)
 vendor/bundled-origin/_sp_candidates.json
 vendor/bundled-origin/_custom_sp.json
 vendor/bundled-origin/_lastinject.json
+vendor/bundled-origin/_injectsbykind.json
 vendor/bundled-origin/_origin_mode.txt
+vendor/bundled-origin/_origin_canon.txt
+vendor/bundled-origin/_origin_mode_surface.json
+vendor/bundled-origin/_origin_tools.txt
+vendor/bundled-origin/_model_unlock_enabled
+vendor/bundled-origin/_lastupstream.json
+vendor/bundled-origin/_ea_diag.log
 vendor/bundled-origin/_dao_81.txt
 
 # 历史版本归档文档

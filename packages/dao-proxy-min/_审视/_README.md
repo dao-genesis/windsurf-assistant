@@ -33,8 +33,8 @@ pwsh -File _审视\_smoke.ps1 -ExpectVersion 9.8.0
 1. **ENV** (临时 shell / CI):
 
    ```powershell
-   $env:DAO_REMOTE_HOST = '192.168.31.179'
-   $env:DAO_REMOTE_USER = 'zhouyoukang'
+   $env:DAO_REMOTE_HOST = '192.168.1.10'
+   $env:DAO_REMOTE_USER = 'user'
    $env:DAO_REMOTE_PASS = '<plaintext · 仅 ephemeral>'
    pwsh -File _审视\_deploy.ps1
    ```
@@ -47,8 +47,8 @@ pwsh -File _审视\_smoke.ps1 -ExpectVersion 9.8.0
 
    # _审视\_dao.env.json (从 _dao.env.example.json 复改)
    # {
-   #   "Computer": "192.168.31.179",
-   #   "User": "zhouyoukang",
+   #   "Computer": "192.168.1.10",
+   #   "User": "user",
    #   "PasswordFile": "C:\\secure\\dao-cred.xml"
    # }
 
@@ -58,7 +58,7 @@ pwsh -File _审视\_smoke.ps1 -ExpectVersion 9.8.0
 3. **交互 prompt** (无 ENV 无 JSON 时自动):
 
    ```powershell
-   pwsh -File _审视\_deploy.ps1 -Computer 192.168.31.179 -User zhouyoukang
+   pwsh -File _审视\_deploy.ps1 -Computer 192.168.1.10 -User user
    # ↓ 弹 SecureString 输入
    ```
 

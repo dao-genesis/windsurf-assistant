@@ -1,8 +1,8 @@
 {
   "name": "dao-proxy-min",
   "displayName": "道Agent · 反者道之动 · 弱者道之用",
-  "description": "v9.9.64 道法自然·從Pro版吸取底層修復·DevService/ApiServerService退出INFERENCE_SERVICES·管理RPC歸位MGMT·繁體經文·帛書老子+道藏陰符經·適配Windsurf+Devin Desktop雙環境·無為而無以為. 承v9.9.63.",
-  "version": "9.9.64",
+  "description": "v9.9.67 · 反向审视·底层完善: 切经藏log未定义修·回调吞噬守卫·重启丢模式根治·隧道自动连接默认关(env门控)·帧不落盘(token不离内存)·解锁缺省禁·尸骸出包(_dao_81/运行时态)·承9.9.66",
+  "version": "9.9.67",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "engines": {
@@ -10,8 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dao-genesis/windsurf-assistant.git",
-    "directory": "packages/dao-proxy-min"
+    "url": "https://github.com/dao-genesis/windsurf-assistant.git"
   },
   "homepage": "https://github.com/dao-genesis/windsurf-assistant",
   "icon": "media/icon.png",
@@ -91,26 +90,6 @@
         "command": "wam.selftest",
         "title": "闭环自检 (L1 + L2)",
         "category": "道Agent"
-      },
-      {
-        "command": "dao.外接api.toggle",
-        "title": "道Agent: 外接 api 开关 (印 124 · 14 provider · vscode.lm 注 · 默关)",
-        "category": "道Agent"
-      },
-      {
-        "command": "dao.term.exec",
-        "title": "道Agent: 终端会话池 · exec (印 160 · 七层一招治 · 零第三方)",
-        "category": "道Agent"
-      },
-      {
-        "command": "dao.term.list",
-        "title": "道Agent: 终端会话池 · list (列所有 sid · 终端池状)",
-        "category": "道Agent"
-      },
-      {
-        "command": "dao.term.close",
-        "title": "道Agent: 终端会话池 · close (选 sid 关 · 释 shell 进程)",
-        "category": "道Agent"
       }
     ],
     "configuration": {
@@ -140,28 +119,16 @@
           "type": "boolean",
           "default": false,
           "description": "启动时显道德经横幅 (默认 false · 不言之教)"
-        },
-        "dao.外接api.enabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "印 124 · 第一细药 · 外接 api 归一 · 启后: gateway :11635..11734 起 · vscode.lm 注 14 provider 之 N 模 · Cascade 选单见 'dao-*' · 与 4 BYOK 一视同仁. 需手编 ~/.codeium/dao-byok/配置.json 填 apiKey."
         }
       }
     }
   },
   "scripts": {
-    "smoke": "pwsh -NoProfile -ExecutionPolicy Bypass -File _审视/_smoke.ps1",
-    "strip-test": "node _审视/_v980_strip_test.js",
     "package": "vsce package --no-dependencies --allow-missing-repository"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.84.0",
     "@vscode/vsce": "^3.6.0"
-  },
-  "__metadata": {
-    "installedTimestamp": 1779962380478,
-    "targetPlatform": "undefined",
-    "size": 537891
   }
 }

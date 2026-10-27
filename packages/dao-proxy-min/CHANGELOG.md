@@ -2,6 +2,22 @@
 
 > 反也者, 道之动也; 弱也者, 道之用也. —— 帛书《老子》德经
 
+## v9.9.67 · 道法自然 (2026-10-27)
+
+反向审视·底层完善三轮:
+
+- **proto 往返保真**: readVarint/encodeVarint 32位位移腐大 int → 乘法累积+raw字节保真+Symbol全序 — 字节级无损
+- **状态归恒所** `~/.codeium/dao-origin/`: mode/canon/按面/自编/解锁 随用户不随版本 · 首载自迁 · 盘值优先于 config 默认
+- **热路收敛**: 250ms TTL 缓存+写透失效 (一请七读→一读) · `_surfaceJson` 重复定义除 (缓存复得其实)
+- **面板去繁·真态首绘**: 顶层道/官总择除 · SSR 嵌 mode/canon/双面真态 (首绘即实·无跳) · mode SSE 无变不播
+- **SSE 环圆**: `/origin/stream` 实装 (hello/mode/canon/hb) · 停机关长连不悬
+- **Min 名实归一**: 隧道自动连接默认关(env门控) · 聊天帧不落盘(凭据不离内存·默认关) · 模型解锁缺省禁 · 外接api轴/模型反代轴源码级拆除 · `/v1/*` 诚实 404 · `_eaDiag` 默寂
+- **生命周期**: source.js stop() 双闭 (mux+H2) · 终端池超时杀 shell · spawn钩保回调+equals形参
+- **无痕**: dump 归 `DAO_WEBVIEW_DUMP=1` 门控 · 运行时态文件尽出包 · 卸载清锚
+- **隐私净**: 包内无用户名/IP/主机名/凭据 · URL 归组织 dao-genesis
+- 修 `_handleSetCanon` undefined log() (canonChanged 推送断裂根) · 回调吞噬守卫 (exec/execFile callback 被 env 覆写)
+- 验器: `_selftest_967`(30) · `_sse_test` · `_proto_rt_test`(9) · `_ssr_state_test`(17) — 皆 __dirname 相对可移植
+
 ## v9.9.0 — 印 124 · 第一细药 · 外接 api 归一 (2026-05-17)
 
 > **图难于其易也，为大于其细也。天下之难作于易，天下之大作于细。是以圣人终不为大，故能成其大.** —— 帛书《老子》六十三章

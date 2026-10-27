@@ -1,4 +1,4 @@
-// extension.js · dao-proxy-min v9.9.57 · 道法自然 · 无为而无以为
+// extension.js · dao-proxy-min v9.9.67 · 道法自然 · 无为而无以为
 //
 // 道德经 · 第四十章: "反者道之动, 弱者道之用."
 // 道德经 · 第四十八章: "为道日损. 损之又损, 以至于无为."
@@ -239,15 +239,65 @@ function maybeRewriteLsArgs(command, args) {
       args[idx + 1] = _cachedProxyUrl;
       rewrote++;
     }
+    // ★ v9.9.67 · equals 形 (--api_server_url=URL 单参) 亦覆 · 形二守一
+    //   病: 旧码仅认分离参形 · 若宿主以单参 equals 形传 → 漏Rewrite → LS 直连官方
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (
+        typeof a === "string" &&
+        a.startsWith(flag + "=") &&
+        a !== flag + "=" + _cachedProxyUrl
+      ) {
+        L.info(
+          "spawn-hook",
+          `${flag}(=形): ${a.slice(flag.length + 1)} → ${_cachedProxyUrl}`,
+        );
+        args[i] = flag + "=" + _cachedProxyUrl;
+        rewrote++;
+      }
+    }
   }
   return rewrote > 0;
 }
 
+
+// v9.9.66-min ACP env anchor: Devin Local(devin.exe acp) also routed to local origin
+// Tokyo anchors via WINDSURF_API_SERVER_URL env -> standalone :8937;
+// Windows has no such env -> devin.exe hits official directly (179 evidence).
+// Same boundary: spawn-hook injects the env; respect pre-set value; skip when origin down.
+const _DEVIN_SPAWN_RE = /devin(\.exe)?["'\s]+acp\b/i;
+function _maybeAnchorAcpEnv(cmd, args, opts) {
+  try {
+    if (!_proxyHandle) return;
+    // v9.9.67 · 守 · exec(cmd, callback) / execFile(cmd, args, callback) 之第三参乃回调(函数)
+    //   旧码误作 opts → 返 {env} 覆写 arguments[1/2] → 回调被吞 → 调用方永挂
+    //   函数即回调 · 非选项 · 静默让路 (六十四章「为之于其未有也」)
+    if (typeof opts === "function") return;
+    const s0 = [cmd, ...(Array.isArray(args) ? args : [])].join(" ").slice(0, 4000);
+    const isDevin =
+      (typeof cmd === "string" && /devin(\.exe)?$/i.test(cmd.trim())) ||
+      _DEVIN_SPAWN_RE.test(s0);
+    if (!isDevin) return;
+    opts = opts && typeof opts === "object" ? opts : {};
+    const env = Object.assign({}, process.env, opts.env || {});
+    if (env.WINDSURF_API_SERVER_URL) return;
+    env.WINDSURF_API_SERVER_URL = _cachedProxyUrl;
+    const np = String(env.NO_PROXY || env.no_proxy || "")
+      .split(",").map((x) => x.trim()).filter(Boolean);
+    for (const h of ["127.0.0.1", "localhost"]) if (!np.includes(h)) np.push(h);
+    env.NO_PROXY = np.join(",");
+    opts.env = env;
+    L.info("spawn-hook", "acp env anchor -> " + _cachedProxyUrl);
+    return opts;
+  } catch {}
+}
 function installSpawnHook() {
   if (_spawnHooked) return;
   _spawnHooked = true;
   cp.spawn = function (cmd, a) {
     maybeRewriteLsArgs(cmd, a);
+    const _mo = _maybeAnchorAcpEnv(cmd, a, arguments[2]);
+    if (_mo) arguments[2] = _mo;
     return _origSpawn.apply(this, arguments);
   };
   cp.spawnSync = function (cmd, a) {
@@ -256,9 +306,13 @@ function installSpawnHook() {
   };
   cp.execFile = function (cmd, a) {
     if (Array.isArray(a)) maybeRewriteLsArgs(cmd, a);
+    const _mo = _maybeAnchorAcpEnv(cmd, a, arguments[2]);
+    if (_mo) arguments[2] = _mo;
     return _origExecFile.apply(this, arguments);
   };
   cp.exec = function (cmdline) {
+    const _mo = _maybeAnchorAcpEnv(cmdline, null, arguments[1]);
+    if (_mo) arguments[1] = _mo;
     if (typeof cmdline === "string" && /language_server/.test(cmdline)) {
       const orig = cmdline;
       cmdline = cmdline.replace(
@@ -737,6 +791,91 @@ function isAnchored() {
   return false;
 }
 
+// ★ v9.9.67 · 执今之道 · 模式复原以磁盘持久为真 · 治「重启丢模式」
+//   病: activate 以 config dao.origin.defaultMode(默 invert) 传 start() + proxySetMode
+//       → source.js setMode 落盘 → 用户运行时切换(道⇄官)于窗口重启即被 config 默认覆没。
+//   治: activate 先读状态文件(用户运行时真意) · 有则为主 · config 默认为备。
+//   ★ v9.9.67 根药 · 状态归恒所 ~/.codeium/dao-origin/ (随用户不随版本 · 升级不复位)
+//     恒所无则兜底读旧版目录 (source.js 首载自迁移)
+//   道义: 十四章「执今之道 以御今之有」· 三十二章「侯王若能守之 万物将自宾」
+function _stateDir() {
+  const home =
+    os.homedir() || process.env.USERPROFILE || process.env.HOME || "";
+  return home ? path.join(home, ".codeium", "dao-origin") : null;
+}
+function _readPersistedMode() {
+  const candidates = [];
+  const sd = _stateDir();
+  if (sd) candidates.push(path.join(sd, "_origin_mode.txt"));
+  try {
+    candidates.push(path.join(vendorDir(), "_origin_mode.txt"));
+  } catch {}
+  for (const fp of candidates) {
+    try {
+      const v = fs.readFileSync(fp, "utf8").trim().toLowerCase();
+      if (v === "invert" || v === "passthrough" || v === "custom") return v;
+    } catch {}
+  }
+  return null;
+}
+
+// ★ v9.9.67 · SSR 真态首绘 · 治「面板初启跳来跳去」
+//   病: 面板 HTML 首绘恒默认 (canon 下拉停首项「合一」· 钮皆无 active)
+//       → pingPull/_refreshSurf 真态至 → 灯亮 · 下拉跳变 → 观者见「跳来跳去」
+//   治: resolveWebviewView 时同步读持久态 (与 source.js _surfaceMode/_surfaceCanon 同律:
+//       面 mode 回落 default 再回落全局 · 面 canon 回落 default_canon 再回落全局 canon 文件)
+//       → getEssenceHtml 预渲 active/selected → 首绘即实 · 无为而无不为
+function _readPersistedCanon() {
+  const candidates = [];
+  const sd = _stateDir();
+  if (sd) candidates.push(path.join(sd, "_origin_canon.txt"));
+  try {
+    candidates.push(path.join(vendorDir(), "_origin_canon.txt"));
+  } catch {}
+  for (const fp of candidates) {
+    try {
+      const v = fs.readFileSync(fp, "utf8").trim().toLowerCase();
+      if (v === "laozi" || v === "yinfu" || v === "laozi+yinfu") return v;
+    } catch {}
+  }
+  return "laozi+yinfu";
+}
+function _readPersistedSurfaceJson() {
+  const candidates = [];
+  const sd = _stateDir();
+  if (sd) candidates.push(path.join(sd, "_origin_mode_surface.json"));
+  try {
+    candidates.push(path.join(vendorDir(), "_origin_mode_surface.json"));
+  } catch {}
+  for (const fp of candidates) {
+    try {
+      const j = JSON.parse(fs.readFileSync(fp, "utf8"));
+      if (j && typeof j === "object") return j;
+    } catch {}
+  }
+  return {};
+}
+function _initialPanelState() {
+  const validMode = (v) =>
+    v === "invert" || v === "passthrough" || v === "custom" ? v : null;
+  const validCanon = (v) =>
+    v === "laozi" || v === "yinfu" || v === "laozi+yinfu" ? v : null;
+  const mode = _cachedMode || _readPersistedMode() || "invert";
+  const canon = _readPersistedCanon();
+  const sf = _readPersistedSurfaceJson();
+  const defM = validMode(sf.default);
+  const defC = validCanon(sf.default_canon);
+  const face = (k) => ({
+    mode: validMode(sf[k]) || defM || mode,
+    canon: validCanon(sf[k + "_canon"]) || defC || canon,
+  });
+  return {
+    mode,
+    canon,
+    surf: { local: face("local"), cascade: face("cascade") },
+  };
+}
+
 // ═══════════════════════════ HTTP 工具 ═══════════════════════════
 function httpGetJson(url, timeoutMs) {
   return new Promise((resolve) => {
@@ -1020,15 +1159,15 @@ async function gatherEssence(port) {
   );
   if (!ping)
     return { ts: new Date().toISOString(), proxy: null, proxyUp: false };
-  // 一请观全槽 · /origin/allinjects 含 _injectsByKind 全槽
-  // v9.4.5 · 删 realprompt fetch · 该端点 source.js 不存 · 仅 404 浪费
-  const [proxy, allInjects] = (await withTimeout(
-    Promise.all([
-      httpGetJson(`${base}/origin/preview`, 4000),
-      httpGetJson(`${base}/origin/allinjects`, 4000),
-    ]),
-    6000,
-  )) || [null, null];
+  // ★ v9.9.67 · 损 · 去 allinjects 死 fetch
+  //   病: v9.9.19 面板瘦身 (slimData 不含 allInjects) 后, 此 fetch 仍每刷拉
+  //       /origin/allinjects 全文 (~1MB) 而弃之不用 → 纯浪费 (30s 周期 + sig 变 + SSE 事件皆拉)
+  //   治: 只拉 preview (面板实显所需) · 全槽数据仍由 /origin/allinjects 端点专供 (按需取)
+  //   道义: 四十八章「为道日损」· 不取无用之物
+  const proxy = await withTimeout(
+    httpGetJson(`${base}/origin/preview`, 4000),
+    5000,
+  );
   const realprompt = null;
   const diag = {
     proxy_up: true,
@@ -1046,7 +1185,6 @@ async function gatherEssence(port) {
     ts: new Date().toISOString(),
     proxy,
     realprompt,
-    allInjects,
     proxyUp: true,
     diag,
     ping,
@@ -1211,7 +1349,22 @@ class DaoTerminalPool {
       const timer = setTimeout(() => {
         if (s.pending && s.pending.eid === eid) {
           s.pending = null;
-          reject(new Error(`exec timeout ${timeout}ms sid=${sid}`));
+          // ★ v9.9.67 · 超时即闭此会话 (杀 shell) · 治输出交织之根
+          //   病: 旧码超时仅清 pending 而命令仍在跑 → 下一 exec 与残命令输出交织
+          //       → sentinel 错切 · 输出张冠李戴
+          //   治: 闭会话 (stdin.end + kill) · 下次 _ensure 自起新 shell · 干净之境
+          //       长命令者当自设 opts.timeout (默 120s)
+          //   道义: 六十四章「为之于其未有也 治之于其未乱也」· 断于未乱
+          try {
+            s.child.stdin.end();
+          } catch {}
+          try {
+            s.child.kill();
+          } catch {}
+          s.closed = true;
+          reject(
+            new Error(`exec timeout ${timeout}ms sid=${sid} (shell killed)`),
+          );
         }
       }, timeout);
       s.pending = {
@@ -1579,8 +1732,7 @@ class EssenceProvider {
       _cachedPort,
       null,
       ssrSp,
-      webviewView.webview,
-      this._ctx.extensionUri,
+      _initialPanelState(),
     );
     webviewView.webview.html = _html;
     // v9.4.5 · 强制 show webview · 否则 collapsed 时 JS 不跑
@@ -1592,15 +1744,21 @@ class EssenceProvider {
     }
     // v9.4.5 · dump 实际 html 到磁盘 · 离线诊
     // v9.9.20 jiqi 改 · 每次 resolveWebviewView 即覆写 · 反映当前版本之实 · 不再缓存旧版误诊
-    try {
-      const dumpFp = path.join(os.homedir(), ".dao-webview-dump.html");
-      fs.writeFileSync(dumpFp, _html, "utf8");
-      L.info(
-        "webview",
-        `dumped html → ${dumpFp} (overwrite · v${PKG_VERSION})`,
-      );
-    } catch (e) {
-      L.warn("webview", `dump fail: ${e.message}`);
+    // ★ v9.9.67 · 损 · dump 归 env 门控 (DAO_WEBVIEW_DUMP=1 方写)
+    //   病: 每 resolveWebviewView 即写 ~/.dao-webview-dump.html · 卸后留痕于用户家目录
+    //       (水过无痕之违) · 且含注入全文 · 隐私面
+    //   治: 默认不写 · 需诊者 env 一开即得原行为
+    if (process.env.DAO_WEBVIEW_DUMP === "1") {
+      try {
+        const dumpFp = path.join(os.homedir(), ".dao-webview-dump.html");
+        fs.writeFileSync(dumpFp, _html, "utf8");
+        L.info(
+          "webview",
+          `dumped html → ${dumpFp} (overwrite · v${PKG_VERSION})`,
+        );
+      } catch (e) {
+        L.warn("webview", `dump fail: ${e.message}`);
+      }
     }
     try {
       const _portMatch = _html.match(/var _PORT = ([^;]+);/);
@@ -1891,7 +2049,12 @@ class EssenceProvider {
         { canon: String(canon || "laozi") },
         2000,
       );
-      log(`canon -> ${canon} (ok=${r && r.ok}, chars=${r && r.chars})`);
+      // v9.9.67 · 修 log() 未定义之病 · 四十八章「为道日损」· 此处原引 log(不存在) →
+      //   ReferenceError → canonChanged 推送与 forceRefresh 皆断 → 面板切经藏无反馈
+      L.info(
+        "canon",
+        `canon -> ${canon} (ok=${r && r.ok}, chars=${r && r.chars})`,
+      );
       this._lastSig = "";
       // v9.9.22 · 切经文即推新 default_sp · 不依赖 tape entry (tape 仍是切前)
       // 道义: 二十五章「逝曰远 远曰反」· 名实变即推 · 不滞旧
@@ -1911,16 +2074,17 @@ class EssenceProvider {
             default_source_name: cs.default_source_name,
             has_custom: cs.has_custom,
           });
-          log(
+          L.info(
+            "canon",
             `canon push canonChanged · canon=${r && r.canon} · default_chars=${cs.default_chars} · has_custom=${cs.has_custom}`,
           );
         }
       } catch (e) {
-        log(`canon push default_sp fail: ${e && e.message}`);
+        L.warn("canon", `canon push default_sp fail: ${e && e.message}`);
       }
       setTimeout(() => this.forceRefresh().catch(() => {}), 300);
     } catch (e) {
-      log(`canon set fail: ${e && e.message}`);
+      L.error("canon", `canon set fail: ${e && e.message}`);
     }
   }
 
@@ -2159,7 +2323,14 @@ function _loadSilkForWebview() {
   }
 }
 
-function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
+// ★ v9.9.67 · 损死参 + SSR 实嵌 · 名实终一
+//   病: getEssenceHtml(port, nonce, initialSP, webview, extensionUri) 五参之中
+//       initialSP/webview/extensionUri 三参从未入模板 — 「SSR 道魂直嵌」有名无实,
+//       webview 首屏恒「(待首次对话)」· 帛书全文从未直嵌。
+//   治: initialSP 实嵌 <pre> (escape) + 实嵌脚本 lastSP (JSON.stringify 插值安全:
+//       模板字面量插值不重扫值内容) · webview/extensionUri 两死参出列。
+//   道义: 一章「名可名也 非恒名也」· 名实相符 · 三十二章「侯王若能守之 万物将自宾」
+function getEssenceHtml(port, nonce, initialSP, initState) {
   // v9.8.0 · 守一不离 · 三十九章「得一」· 复 @ 工具之根 · 名实终一
   // 痛: SIDE_CHANNEL_TAGS 含 'additional_metadata' · 致用户消息中 @ 项之元 (Cascade ID/file path/line range) 被剥
   //     agent 失 @ 项之元 · trajectory_search/read_file 等 @ 工具调用败 · 此为 v9.7.x 之底病
@@ -2177,6 +2348,34 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   //         D · 隐藏 SECTION_OVERRIDE_MODE_APPEND 身份锚中性化 · 模型不再被强令"respond with Cascade"
   const N = nonce || _genNonce();
   const proxyPort = port || 0;
+  // ★ v9.9.67 · SSR 真态首绘 · initState 由 _initialPanelState() 供 (持久态同律解析)
+  //   预渲 active/selected → 首绘即实 · 下拉不跳 · 钮不迟亮
+  const _is = initState || {};
+  const _im = _is.mode || "invert";
+  const _ic = _is.canon || "laozi+yinfu";
+  const _isf = _is.surf || {};
+  const _ilm = (_isf.local && _isf.local.mode) || _im;
+  const _icm = (_isf.cascade && _isf.cascade.mode) || _im;
+  const _ilc = (_isf.local && _isf.local.canon) || _ic;
+  const _icc = (_isf.cascade && _isf.cascade.canon) || _ic;
+  const _sfCls = (cur) =>
+    cur === "invert"
+      ? " active active-dao"
+      : cur === "custom"
+        ? " active active-custom"
+        : " active";
+  const _daoCls = (cur) => (cur === "invert" ? _sfCls(cur) : "");
+  const _offCls = (cur) => (cur === "passthrough" ? _sfCls(cur) : "");
+  const _custCls = (cur) => (cur === "custom" ? _sfCls(cur) : "");
+  const _oSel = (v, cur) => (v === cur ? " selected" : "");
+  const _INIT = {
+    mode: _im,
+    canon: _ic,
+    surf: {
+      local: { mode: _ilm, canon: _ilc },
+      cascade: { mode: _icm, canon: _icc },
+    },
+  };
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -2256,23 +2455,48 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   #canonSelect { font-size: 10px; padding: 1px 2px; border: 1px solid rgba(128,128,128,0.3); background: var(--vscode-dropdown-background, rgba(0,0,0,0.2)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); border-radius: 3px; cursor: pointer; outline: none; font-family: inherit; max-width: 96px; margin-left: 4px; }
   #canonSelect:focus { border-color: var(--vscode-focusBorder, #007fd4); }
   #canonSelect option { background: var(--vscode-dropdown-listBackground, #252526); color: var(--vscode-dropdown-foreground, #ccc); }
+  /* v9.9.376 · 两面分治 · 道/官 分面开关 (L=Devin Local · C=Cascade) */
+  .sf-sep { opacity: 0.3; margin: 0 2px; }
+  .sf-label { font-size: 9px; opacity: 0.6; font-weight: 700; margin: 0 1px 0 4px; cursor: default; }
+  .mb.sf { padding: 1px 5px; font-size: 10px; min-width: 24px; }
+  .mb.sf.active { opacity: 1; border-color: var(--vscode-textLink-foreground, #4fc1ff); color: var(--vscode-textLink-foreground, #4fc1ff); background: rgba(79,193,255,0.1); font-weight: 700; }
+  .mb.sf.active-dao { border-color: #6bb86b; color: #6bb86b; background: rgba(107,184,107,0.1); }
+  .mb.sf.active-custom { border-color: #d0a44a; color: #d0a44a; background: rgba(208,164,74,0.12); }
+  .scn { font-size: 10px; padding: 0 1px; max-width: 56px; border: 1px solid rgba(128,128,128,0.3); background: var(--vscode-dropdown-background, rgba(0,0,0,0.2)); color: var(--vscode-dropdown-foreground, #ccc); }
 </style>
 </head>
 <body data-port="${proxyPort}">
   <div class="bar">
     <span class="dots" id="dots" title="Proxy\u00b7Capture\u00b7Mode"></span>
-    <button class="mb" id="btnDao" title="\u9053Agent\u00b7\u5e1b\u4e66\u524d\u7f6e">\u9053</button>
-    <button class="mb" id="btnOff" title="\u5b98\u65b9Agent\u00b7\u900f\u4f20">\u5b98</button>
+    <span class="sf-sep">|</span>
+    <span class="sf-label" title="Devin Local \u00b7 devin-cli ACP \u00b7 api_server_pb \u9762">L</span>
+    <button class="mb sf${_daoCls(_ilm)}" id="btnLDao" title="Devin Local \u2192 \u9053(\u9694\u79bb\u66ff\u6362)">L\u9053</button>
+    <button class="mb sf${_offCls(_ilm)}" id="btnLOff" title="Devin Local \u2192 \u5b98(\u5b8c\u5168\u5b98\u65b9\u900f\u4f20)">L\u5b98</button>
+    <button class="mb sf${_custCls(_ilm)}" id="btnLCustom" title="Devin Local \u2192 \u7f16\u5199\u63d0\u793a\u8bcd(custom)">L\u7f16</button>
+    <select class="scn" id="canonL" title="Devin Local \u5178\u6e90\u00b7\u5e1b\u4e66\u8001\u5b50/\u9053\u85cf\u9634\u7b26\u7ecf/\u5408\u4e00">
+      <option value="laozi+yinfu"${_oSel("laozi+yinfu", _ilc)}>\u5408\u4e00</option>
+      <option value="laozi"${_oSel("laozi", _ilc)}>\u8001\u5b50</option>
+      <option value="yinfu"${_oSel("yinfu", _ilc)}>\u9634\u7b26</option>
+    </select>
+    <span class="sf-label" title="Cascade \u00b7 language_server \u00b7 cascade/codeium_common \u9762">C</span>
+    <button class="mb sf${_daoCls(_icm)}" id="btnCDao" title="Cascade \u2192 \u9053(\u9694\u79bb\u66ff\u6362)">C\u9053</button>
+    <button class="mb sf${_offCls(_icm)}" id="btnCOff" title="Cascade \u2192 \u5b98(\u5b8c\u5168\u5b98\u65b9\u900f\u4f20)">C\u5b98</button>
+    <button class="mb sf${_custCls(_icm)}" id="btnCCustom" title="Cascade \u2192 \u7f16\u5199\u63d0\u793a\u8bcd(custom)">C\u7f16</button>
+    <select class="scn" id="canonC" title="Cascade \u5178\u6e90\u00b7\u5e1b\u4e66\u8001\u5b50/\u9053\u85cf\u9634\u7b26\u7ecf/\u5408\u4e00">
+      <option value="laozi+yinfu"${_oSel("laozi+yinfu", _icc)}>\u5408\u4e00</option>
+      <option value="laozi"${_oSel("laozi", _icc)}>\u8001\u5b50</option>
+      <option value="yinfu"${_oSel("yinfu", _icc)}>\u9634\u7b26</option>
+    </select>
     <button class="ib" id="editToggle" title="\u7f16\u8f91\u6ce8\u5165 SP">\u7f16</button>
-    <select id="canonSelect" title="\u7ecf\u85cf\u5207\u6362 \u00b7 \u4e24\u7ecf\u5f52\u4e00\u00b7\u9053\u751f\u4e00">
-      <option value="laozi+yinfu">\u5e1b\u4e66\u8001\u5b50+\u9053\u85cf\u9634\u7b26\u7ecf</option>
-      <option value="laozi">\u5e1b\u4e66\u300a\u8001\u5b50\u300b</option>
-      <option value="yinfu">\u9053\u85cf\u300a\u9634\u7b26\u7ecf\u300b</option>
+    <select id="canonSelect" title="\u5168\u5c40\u5178\u6e90(\u9ed8\u8ba4) \u00b7 \u4e24\u7ecf\u5f52\u4e00\u00b7\u9053\u751f\u4e00">
+      <option value="laozi+yinfu"${_oSel("laozi+yinfu", _ic)}>\u5e1b\u4e66\u8001\u5b50+\u9053\u85cf\u9634\u7b26\u7ecf</option>
+      <option value="laozi"${_oSel("laozi", _ic)}>\u5e1b\u4e66\u300a\u8001\u5b50\u300b</option>
+      <option value="yinfu"${_oSel("yinfu", _ic)}>\u9053\u85cf\u300a\u9634\u7b26\u7ecf\u300b</option>
     </select>
     <span id="customBadge"></span>
   </div>
   <div class="stat" id="stat"></div>
-  <pre id="sp" class="quiet">\uff08\u5f85\u9996\u6b21\u5bf9\u8bdd\uff09</pre>
+  <pre id="sp" class="${initialSP ? "" : "quiet"}">${initialSP ? _escapeHtml(initialSP) : "\uff08\u5f85\u9996\u6b21\u5bf9\u8bdd\uff09"}</pre>
   <div id="editArea">
     <div class="edit-hint">\u7f16\u6b64 \u00b7 \u6539\u9053 agent \u6ce8\u5165 LLM \u4e4b SP (\u5e1b\u4e66\u5fb7\u9053\u7ecf) \u00b7 Ctrl+Enter \u4fdd\u5b58 \u00b7 Esc \u5173</div>
     <textarea id="editText" placeholder="\u7f16\u8f91\u9053 agent \u6a21\u5f0f\u6ce8\u5165 LLM \u4e4b\u6838\u5fc3 SP (\u5e1b\u4e66\u300a\u8001\u5b50\u300b) \u00b7 \u6539\u6b64\u5373\u6539\u6ce8\u5165 \u00b7 \u4fdd\u5b58\u540e\u4e0b\u6b21 chat \u5373\u751f\u6548"></textarea>
@@ -2330,8 +2554,8 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   var $sp = document.getElementById('sp');
   var $stat = document.getElementById('stat');
   var $dots = document.getElementById('dots');
-  var $btnDao = document.getElementById('btnDao');
-  var $btnOff = document.getElementById('btnOff');
+  // ★ v9.9.67 · SSR 真态 (mode/canon/双面) · 首绘已预渲 · 此为逻辑层镜像
+  var _INIT = ${JSON.stringify(_INIT)};
   var $editToggle = document.getElementById('editToggle');
   var $editArea = document.getElementById('editArea');
   var $editText = document.getElementById('editText');
@@ -2343,10 +2567,10 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   var $customBadge = document.getElementById('customBadge');
   var $canonSelect = document.getElementById('canonSelect');
   var lastText = '';
-  var lastSP = '';
+  var lastSP = ${JSON.stringify(initialSP || "")};
+  var _ssrShown = ${initialSP ? "true" : "false"}; // ★ v9.9.67 · SSR 道魂已嵌 · pull 空槽不覆
   var lastEntry = null;
   var lastSig = '';
-  var curMode = 'invert';
   var editMode = false;
 
   // 反者道之动 · 编模式预填只取经文本源部分 · 截去 kept blocks (—之后)
@@ -2367,6 +2591,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   function renderTapeEntry(entry, ts) {
     if (!entry) return false;
     lastEntry = entry;
+    _ssrShown = false; // ★ v9.9.67 · 真数据至 · SSR 初示功成身退
 
     // lastSP 锚定本源 · 供 [编] 初值 & [载] 重载 & [归道] 复原
     // 优先 entry.after (CHAT_PROTO 命中之 invertSP 结果)
@@ -2426,24 +2651,117 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     return true;
   }
 
-  // ─── 道/官 切换 ───
-  function setModeUI(mode) {
-    curMode = mode || 'invert';
-    $btnDao.classList.remove('active', 'active-dao');
-    $btnOff.classList.remove('active');
-    if (curMode === 'invert') $btnDao.classList.add('active', 'active-dao');
-    else $btnOff.classList.add('active');
+  // ─── v9.9.376 · 两面同构·层级化 · 道/官/编 + 按面典源 ───
+  //   ★ v9.9.67 · 损 · 顶层 道/官 总择已除 (主公命「L/C 各有即足 · 顶层多增复杂度」)
+  //     模式三态 (道/官/编) 只以面为准 · 全局 SP_MODE 为未设面之回落 · 命令仍可供手动
+  //   L=Devin Local(api_server_pb面·devin-cli ACP) · C=Cascade(language_server面)
+  //   每面子系统同构: 道(invert) | 官(passthrough) | 编(custom) + 典源(合一/老子/阴符)
+  var $btnLDao = document.getElementById('btnLDao');
+  var $btnLOff = document.getElementById('btnLOff');
+  var $btnLCustom = document.getElementById('btnLCustom');
+  var $canonL = document.getElementById('canonL');
+  var $btnCDao = document.getElementById('btnCDao');
+  var $btnCOff = document.getElementById('btnCOff');
+  var $btnCCustom = document.getElementById('btnCCustom');
+  var $canonC = document.getElementById('canonC');
+  var _surf = {
+    local: { mode: _INIT.surf.local.mode, canon: _INIT.surf.local.canon, customsp: null },
+    cascade: { mode: _INIT.surf.cascade.mode, canon: _INIT.surf.cascade.canon, customsp: null },
+  };
+  var _editSurface = null; // 编辑器绑定的面 (null=全局自编)
+  function _paintSurf() {
+    var pairs = [
+      ['local', $btnLDao, $btnLOff, $btnLCustom, $canonL],
+      ['cascade', $btnCDao, $btnCOff, $btnCCustom, $canonC],
+    ];
+    for (var i = 0; i < pairs.length; i++) {
+      var s = pairs[i][0], bd = pairs[i][1], bo = pairs[i][2], bc = pairs[i][3], sc = pairs[i][4];
+      var st = _surf[s] || {};
+      var m = st.mode || 'invert';
+      if (bd) { bd.classList.remove('active', 'active-dao'); if (m === 'invert') bd.classList.add('active', 'active-dao'); }
+      if (bo) { bo.classList.remove('active'); if (m === 'passthrough') bo.classList.add('active'); }
+      if (bc) { bc.classList.remove('active', 'active-custom'); if (m === 'custom') bc.classList.add('active', 'active-custom'); }
+      if (sc && st.canon && sc.value !== st.canon) sc.value = st.canon;
+    }
   }
-  $btnDao.addEventListener('click', function() {
-    if (curMode === 'invert') return;
-    setModeUI('invert');
-    vsc.postMessage({ command: 'setMode', mode: 'dao' });
-  });
-  $btnOff.addEventListener('click', function() {
-    if (curMode === 'passthrough') return;
-    setModeUI('passthrough');
-    vsc.postMessage({ command: 'setMode', mode: 'official' });
-  });
+  function _refreshSurf() {
+    try {
+      fetch(_BASE + '/origin/mode', { cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          var s = (j && j.surface) || {};
+          var cn = (j && j.surface_canons) || {};
+          var cs = (j && j.surface_customs) || {};
+          _surf.local.mode = s.local || 'invert';
+          _surf.cascade.mode = s.cascade || 'invert';
+          if (cn.local) _surf.local.canon = cn.local;
+          if (cn.cascade) _surf.cascade.canon = cn.cascade;
+          _surf.local.customsp = cs.local || null;
+          _surf.cascade.customsp = cs.cascade || null;
+          _paintSurf();
+        })
+        .catch(function() {});
+    } catch (_) {}
+  }
+  function _postSurf(payload) {
+    return fetch(_BASE + '/origin/mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(function(r) { return r.json(); }).catch(function() { return null; });
+  }
+  function _setSurf(surface, mode) {
+    _surf[surface].mode = mode;
+    _paintSurf();
+    _postSurf({ surface: surface, mode: mode }).then(function() { _refreshSurf(); });
+  }
+  function _setSurfCanon(surface, canon) {
+    _surf[surface].canon = canon;
+    _paintSurf();
+    _postSurf({ surface: surface, canon: canon }).then(function() { _refreshSurf(); });
+  }
+  function _openSurfaceEdit(surface) {
+    _editSurface = surface;
+    _surf[surface].mode = 'custom';
+    _paintSurf();
+    _postSurf({ surface: surface, mode: 'custom' });
+    editMode = true;
+    $editArea.classList.add('show');
+    $editToggle.classList.add('edit-active');
+    $sp.style.display = 'none';
+    // 「原有规则改动 · 默认显示当前规则」—— 自编优先, 否则预填该面现行典源原文
+    var seed = _surf[surface].customsp || '';
+    $editText.value = seed;
+    updateEditCount();
+    var sname = surface === 'local' ? 'Devin Local' : 'Cascade';
+    $editStatus.textContent = '自编·' + sname + ' 面 · Ctrl+Enter 保存';
+    $editText.focus();
+    if (!seed) {
+      $editStatus.textContent = '载现行典源中…';
+      fetch(_BASE + '/origin/canon_text?surface=' + surface, { cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          if (_editSurface !== surface || !editMode) return;
+          if (j && j.ok && j.text) {
+            $editText.value = j.text;
+            updateEditCount();
+            $editStatus.textContent = '自编·' + sname + ' 面 · 已预填现行典源 ' + j.chars + '字 · Ctrl+Enter 保存';
+          } else {
+            $editStatus.textContent = '自编·' + sname + ' 面';
+          }
+        })
+        .catch(function() { if (_editSurface === surface && editMode) $editStatus.textContent = '自编·' + sname + ' 面'; });
+    }
+  }
+  if ($btnLDao) $btnLDao.addEventListener('click', function() { _setSurf('local', 'invert'); });
+  if ($btnLOff) $btnLOff.addEventListener('click', function() { _setSurf('local', 'passthrough'); });
+  if ($btnLCustom) $btnLCustom.addEventListener('click', function() { _openSurfaceEdit('local'); });
+  if ($canonL) $canonL.addEventListener('change', function() { _setSurfCanon('local', $canonL.value); });
+  if ($btnCDao) $btnCDao.addEventListener('click', function() { _setSurf('cascade', 'invert'); });
+  if ($btnCOff) $btnCOff.addEventListener('click', function() { _setSurf('cascade', 'passthrough'); });
+  if ($btnCCustom) $btnCCustom.addEventListener('click', function() { _openSurfaceEdit('cascade'); });
+  if ($canonC) $canonC.addEventListener('change', function() { _setSurfCanon('cascade', $canonC.value); });
+  _refreshSurf();
 
   // ─── 经藏切换 · 道生一 一生二 二生三 三生万物 ───
   $canonSelect.addEventListener('change', function() {
@@ -2454,6 +2772,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   // ─── 编辑模式 ───
   function _closeEditMode() {
     editMode = false;
+    _editSurface = null;
     $editArea.classList.remove('show');
     $editToggle.classList.remove('edit-active');
     $sp.style.display = '';
@@ -2467,6 +2786,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   $editToggle.addEventListener('click', function() {
     editMode = !editMode;
     if (editMode) {
+      _editSurface = null;
       $editArea.classList.add('show');
       $editToggle.classList.add('edit-active');
       $sp.style.display = 'none';
@@ -2485,6 +2805,20 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     var sp = $editText.value;
     if (!sp || !sp.trim()) { $editStatus.textContent = '\u2716 \u5185\u5bb9\u4e0d\u53ef\u4e3a\u7a7a'; return; }
     $editStatus.textContent = '\u4fdd\u5b58\u4e2d\u2026';
+    if (_editSurface) {
+      // 按面自编: POST /origin/mode {surface, customsp}
+      var sf = _editSurface;
+      _postSurf({ surface: sf, customsp: sp.trim(), mode: 'custom' }).then(function(j) {
+        if (j && j.ok) {
+          _surf[sf].customsp = sp.trim();
+          $editStatus.textContent = '\u2714 已注入 · ' + (sf === 'local' ? 'Devin Local' : 'Cascade') + ' 面自编 ' + sp.trim().length + '字';
+          _refreshSurf();
+        } else {
+          $editStatus.textContent = '\u2716 保存失败';
+        }
+      });
+      return;
+    }
     vsc.postMessage({ command: 'setCustomSP', sp: sp.trim() });
   });
   $editReload.addEventListener('click', function() {
@@ -2535,7 +2869,7 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   function pingPull() {
     fJson('/origin/ping').then(function(p){
       if (!p) return;
-      if (p.mode) setModeUI(p.mode);
+      // ★ v9.9.67 · 顶层 道/官 总择已除 · p.mode 只入 dots 题注 (setDots 已含)
       if (p.canon && $canonSelect.value !== p.canon) $canonSelect.value = p.canon;
       setDots(p);
       if (p.custom_sp != null) updateCustomBadge(p.custom_sp, p.custom_sp_chars);
@@ -2549,7 +2883,8 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       if (resp && resp.ok && resp.tape && resp.tape.length > 0) {
         renderTapeEntry(resp.tape[0], new Date().toLocaleTimeString());
       } else {
-        if (!editMode) {
+        // ★ v9.9.67 · SSR 道魂已嵌时不覆 (守初示) · 无 SSR 方示待语
+        if (!editMode && !_ssrShown) {
           $sp.classList.add('quiet');
           $sp.textContent = '\uff08\u5f85\u9996\u6b21\u5bf9\u8bdd\uff09';
         }
@@ -2574,14 +2909,13 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
     // v9.9.20 jiqi · 上报 msg-recv · 反诊 webview ↔ extension host IPC 通路
     try { _wdbg('msg-recv', String(e.data.command || e.data.type || '?'), { keys: Object.keys(e.data).slice(0, 8) }); } catch(_) {}
     if (e.data.command === '_diag-ping') return;  // 主进程探活包 · 已 _wdbg 上报 · 不入业务
-    if (e.data.type === 'mode') setModeUI(e.data.mode);
+    if (e.data.type === 'mode') { pingPull(); _refreshSurf(); }
     // v9.9.18 \u4fee\u590d \u00b7 extension host gatherEssence \u63a8\u9001\u4e4b data \u5305 · \u6838\u5fc3\u663e\u793a\u901a\u8def
     // forceRefresh() \u53d1\u9001 {type:"data", data:{ping,proxy,allInjects,...}} \u4e4b\u540e webview \u5e94\u66f4\u65b0\u4e09\u76cf/\u6309\u9215/SP\u663e\u793a
     if (e.data.type === 'data') {
       var _d = e.data.data;
       if (!_d) return;
-      // 1. \u66f4\u65b0\u4e09\u76cf + \u6309\u9215\u72b6\u6001
-      if (_d.ping && _d.ping.mode) setModeUI(_d.ping.mode);
+      // 1. \u66f4\u65b0\u4e09\u76cf (mode \u706f\u5728 dots \u9898\u6ce8 \u00b7 \u9876\u5c42\u94ae\u5df2\u9664)
       if (_d.ping) setDots(_d.ping);
       // 2. \u540c\u6b65\u7ecf\u85cf\u4e0b\u62c9
       if (_d.ping && _d.ping.canon && $canonSelect.value !== _d.ping.canon) $canonSelect.value = _d.ping.canon;
@@ -2603,7 +2937,8 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
       } else if (_d.proxyUp === false) {
         // v9.9.19 对标v9.9.16本源: 只有代理真正宿机才重置显示
         // 去掉!_d.proxy分支: preview超时/gatherEssence失败导致proxy=null时不覆盖pull()展示内容
-        if (!editMode) {
+        // ★ v9.9.67 · SSR 道魂已嵌时不覆 (守初示)
+        if (!editMode && !_ssrShown) {
           $sp.classList.add('quiet');
           $sp.textContent = '\uff08待首次对话\uff09';
         }
@@ -2703,7 +3038,8 @@ function getEssenceHtml(port, nonce, initialSP, webview, extensionUri) {
   setInterval(function() { vsc.postMessage({ command: 'refresh' }); }, 15000);
   // v9.9.20 jiqi · IIFE 全跑通 · 至此即活 · 上报 boot-done 标记
   // v9.9.22 · 加 canonChanged listener · 切经文真联动
-  _wdbg('boot-done', 'boot', { listeners: 'btnDao,btnOff,canon,editToggle,editSave,editReload,editReset,message[data,customSP,canonChanged]', ver: '9.9.31' });
+  // v9.9.67 · 版本串归一动态 · 名实相符 · 不再硬编码 '9.9.31'
+  _wdbg('boot-done', 'boot', { listeners: 'sf[L/C],canon[L/C/g],editToggle,editSave,editReload,editReset,message[data,customSP,canonChanged]', ver: '${PKG_VERSION}' });
 })();
 </script>
 </body>
@@ -2731,9 +3067,12 @@ function activate(ctx) {
   try {
     cfg();
     _cachedAnchored = isAnchored();
-    _cachedMode = vscode.workspace
-      .getConfiguration("dao")
-      .get("origin.defaultMode", "invert");
+    // ★ v9.9.67 · 磁盘持久模式优先 · config defaultMode 为备 · 治「重启丢模式」
+    _cachedMode =
+      _readPersistedMode() ||
+      vscode.workspace
+        .getConfiguration("dao")
+        .get("origin.defaultMode", "invert");
 
     installSpawnHook();
     ensureIconSvg();
@@ -2757,15 +3096,12 @@ function activate(ctx) {
       vscode.commands.registerCommand("dao.openPreview", cmdOpenPreview),
       vscode.commands.registerCommand("wam.verifyEndToEnd", cmdVerifyE2E),
       vscode.commands.registerCommand("wam.selftest", cmdSelftest),
-      // v9.9.0 · 印 124 · 第一细药 · 外接 api 开关 (默关 · 主公一字开)
-      vscode.commands.registerCommand(
-        "dao.外接api.toggle",
-        cmdExternalApiToggle,
-      ),
       // v9.9.29 · 印 160 · 终端会话池 (反者道之动 · 七层污染一招治)
       vscode.commands.registerCommand("dao.term.exec", cmdTermExec),
       vscode.commands.registerCommand("dao.term.list", cmdTermList),
       vscode.commands.registerCommand("dao.term.close", cmdTermClose),
+      // ★ v9.9.67 · 损 · dao.外接api.toggle 命令已删 (外接api轴 v9.9.374-min 源码级拆除
+      //   · 令存实亡 · 面板调之永无响应 · 名实不符 · 四十八章「为道日损」)
     );
 
     // 注册 webview
@@ -2800,6 +3136,8 @@ function activate(ctx) {
     // LS 自然重启时 spawn hook 自挂; 用户欲即时切换可显式调 wam.originInvert
     if (_cachedAnchored) {
       L.info("activate", "settings anchored → auto-restore proxy");
+      // ★ v9.9.67 · 推前以盘最新为准 (防陈值覆盘 · 无为)
+      _cachedMode = _readPersistedMode() || _cachedMode || "invert";
       proxyStart(_cachedPort, _cachedMode || "invert")
         .then((handle) => {
           if (!handle) {
@@ -2833,6 +3171,8 @@ function activate(ctx) {
       (async () => {
         let handle;
         try {
+          // ★ v9.9.67 · 推前以盘最新为准
+          _cachedMode = _readPersistedMode() || _cachedMode || "invert";
           handle = await proxyStart(_cachedPort, _cachedMode || "invert");
         } catch (e) {
           L.error("activate", `first-run proxy fail: ${e.message}`);
@@ -2907,6 +3247,8 @@ function activate(ctx) {
         }
         L.warn("watchdog", `proxy 死/旧 · 重起 :${port}`);
         _proxyHandle = null;
+        // ★ v9.9.67 · 重启前以盘最新为准 (治「用户切官后 watchdog 推陈 invert 覆盘」之跳)
+        _cachedMode = _readPersistedMode() || _cachedMode || "invert";
         const handle = await proxyStart(port, _cachedMode || "invert").catch(
           (e) => {
             L.error("watchdog", `restart fail: ${e.message}`);
@@ -2938,15 +3280,7 @@ function activate(ctx) {
         L.warn("term", `term service start fail (non-fatal): ${e.message}`);
       }
     }, 10000);
-
-    // ── v9.9.0 · 印 124 · 第一细药 · 外接 api 自启 (默关) ──
-    // 帛书六十三章: 图难于其易 · 为大于其细 · 终不为大 · 故能成其大
-    // dao.外接api.enabled=true 才启 · 失败不影响 min 反代主体
-    setTimeout(() => {
-      tryStartExternalApi(ctx).catch((e) => {
-        L.warn("外接api", `自启失 (non-fatal): ${e.message}`);
-      });
-    }, 12000);
+    // ★ v9.9.67 · 损 · 外接api 自启定时器已删 (轴已源码级拆除 · v9.9.374-min)
   } catch (e) {
     L.error("activate", `FATAL activation error: ${e.stack || e.message}`);
     vscode.window.showErrorMessage(`道Agent 激活失败: ${e.message}`);
@@ -3014,9 +3348,7 @@ async function deactivate() {
     );
   }
 
-  try {
-    await tryStopExternalApi();
-  } catch {}
+  // ★ v9.9.67 · 损 · tryStopExternalApi 调用已删 (轴已源码级拆除 · v9.9.374-min)
 
   if (_essenceProvider) {
     _essenceProvider.dispose();
@@ -3034,104 +3366,10 @@ async function deactivate() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// v9.9.0 · 印 124 · 第一细药 · 外接 api 启停 helper
+// ★ v9.9.67 · 损之又损 · 外接api 轴 ext 侧残骸全出列 (四十八章)
+//   tryStartExternalApi / tryStopExternalApi / cmdExternalApiToggle
+//   三函数 + _externalApiRuntime 状态 · 轴已源码级拆除(v9.9.374-min) ·
+//   命令已除册 · 自启定时器已删 · deactivate 调用已删 · 名实归一。
 // ═══════════════════════════════════════════════════════════════════
-// 帛书《老子》:
-//   六十三章 · 图难其易 · 为大其细 · 终不为大 · 故能成其大
-//   六十四章 · 为之于其未有也, 治之于其未乱也
-//   四十八章 · 损之又损, 以至于无为, 无为而无不为
-//
-// 与 min 反代主体字节级正交:
-//   反代核 :8889..8988 (per-user FNV) · 守 Cascade SP 注入之心 (字节级不动)
-//   外接 api gateway :11635..11734 (per-user FNV) · 展 14 provider N 模选用之能
-//   二轨不撞 · 道并行而不相悖
-
-let _externalApiRuntime = null;
-
-async function tryStartExternalApi(ctx) {
-  // 默关 · 主公 dao.外接api.enabled=true 才启
-  const enabled = vscode.workspace
-    .getConfiguration("dao")
-    .get("外接api.enabled", false);
-  if (!enabled) {
-    L.info("外接api", "默关 (dao.外接api.enabled=false) · 跳启");
-    return null;
-  }
-  if (_externalApiRuntime && _externalApiRuntime.isRunning()) {
-    L.info("外接api", "已运行 · 跳启");
-    return _externalApiRuntime;
-  }
-  let ExternalApiRuntime;
-  try {
-    ({ ExternalApiRuntime } = require("./vendor/外接api/runtime.js"));
-  } catch (e) {
-    L.warn("外接api", `vendor/外接api/runtime.js 不加载: ${e.message}`);
-    return null;
-  }
-  _externalApiRuntime = new ExternalApiRuntime({
-    vscodeModule: vscode,
-    logger: L,
-    configKey: "dao.外接api",
-    vendorPrefix: "dao-",
-  });
-  const status = await _externalApiRuntime.start();
-  L.info(
-    "外接api",
-    `启 · gw=${status.gatewayUrl} · providers=${status.providers} · models=${status.models}`,
-  );
-  // 注入 dispose · 主进程退时 deactivate 已显式 stop · 此为兜底
-  if (ctx && ctx.subscriptions) {
-    ctx.subscriptions.push({
-      dispose: () => {
-        if (_externalApiRuntime) {
-          _externalApiRuntime.stop().catch(() => {});
-        }
-      },
-    });
-  }
-  return _externalApiRuntime;
-}
-
-async function tryStopExternalApi() {
-  if (!_externalApiRuntime) return;
-  try {
-    await _externalApiRuntime.stop();
-  } catch (e) {
-    L.warn("外接api", `stop err: ${e.message}`);
-  }
-  _externalApiRuntime = null;
-}
-
-async function cmdExternalApiToggle() {
-  try {
-    const cfg = vscode.workspace.getConfiguration("dao");
-    const cur = cfg.get("外接api.enabled", false);
-    const next = !cur;
-    await cfg.update(
-      "外接api.enabled",
-      next,
-      vscode.ConfigurationTarget.Global,
-    );
-    if (next) {
-      const rt = await tryStartExternalApi(null);
-      if (rt) {
-        const status = rt.getStatus();
-        vscode.window.showInformationMessage(
-          `道Agent · 外接 api 启 · ${status.providers} provider · ${status.models} 模 · gw=${status.gatewayUrl}`,
-        );
-      } else {
-        vscode.window.showWarningMessage(
-          `道Agent · 外接 api 启失 · 见 Output 道Agent 频道`,
-        );
-      }
-    } else {
-      await tryStopExternalApi();
-      vscode.window.showInformationMessage("道Agent · 外接 api 已停");
-    }
-  } catch (e) {
-    L.error("外接api", `toggle fail: ${e.stack || e.message}`);
-    vscode.window.showErrorMessage(`外接 api toggle 失: ${e.message}`);
-  }
-}
 
 module.exports = { activate, deactivate };

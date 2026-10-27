@@ -47,11 +47,29 @@ diagnostics/
 research/
 bundled-origin/
 
-# 例外 · packages/dao-proxy-min/vendor/bundled-origin/ 内之 essence (source.js + 帛书二篇) 必入库
+# 例外 · packages/dao-proxy-min/vendor/bundled-origin/ 内之 essence (source.js + 帛书二篇 + 阴符经) 必入库
+# ★ v9.9.67 审视补: _yinfu.txt 原不在白名单 (幸先已 tracked) · 今补之与 .vscodeignore 同律
+# ★ v9.9.67 审视补: 白名单密封 — dir/** 全排 + !file 复纳 · 未列者(古体源.js/_dao_81/devin-setup 等)永不出现在 ??
+# 次序要义: 上行 bundled-origin/ 排「目录」→ 父目录被排则子项 !复纳无效 (git 不历被排目录)
+#           故先复纳目录本身 · 再排其内容 · 再纳白名单文件
 !packages/dao-proxy-min/vendor/bundled-origin/
+packages/dao-proxy-min/vendor/bundled-origin/**
 !packages/dao-proxy-min/vendor/bundled-origin/source.js
+!packages/dao-proxy-min/vendor/bundled-origin/sp_invert.js
 !packages/dao-proxy-min/vendor/bundled-origin/_silk_de.txt
 !packages/dao-proxy-min/vendor/bundled-origin/_silk_dao.txt
+!packages/dao-proxy-min/vendor/bundled-origin/_yinfu.txt
+
+# ★ v9.9.67 审视补 · 运行时态文件一律不入库 (反代自生 · 含捕得之SP/凭据者尤甚)
+**/_injectsbykind.json
+**/_origin_canon.txt
+**/_origin_mode_surface.json
+**/_origin_tools.txt
+**/_model_unlock_enabled
+**/_lastupstream.json
+**/_ea_diag.log
+**/_sp_candidates.json
+**/_custom_sp.json
 
 # scripts/ 细规则: 保留合法构建脚本 (build-vsix.js / deploy.js)
 # 屏蔽敏感一键批处理 (→ 开头 · 中文 .cmd/.ps1/.py)
