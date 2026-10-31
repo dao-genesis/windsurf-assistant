@@ -354,7 +354,7 @@ function _originGetProxyAgent(isHttps) {
 const PORT = parseInt(process.env.ORIGIN_PORT || "8889", 10);
 // v9.6.1 · 反者道之动 · 远曰反 · 回归 v9.1.2 之全前端按钮 (七按钮: 道/官/实/原/编/复/卸 + dots/customBadge)
 // 以 v9.1.2 本源哲学为锚 · 守大常不动 · 五细节皆成: isAlreadyInverted · _rawTape+all_fields · 部署不 kill · 前端按钮回归
-const ORIGIN_VERSION_BASE = "v9.9.68"; // v9.9.67-min · 反向审视·底层完善(九药): ①切经藏log未定义修(ext·canonChanged推送断裂根) ②回调吞噬守卫(exec/execFile callback被env对象覆写) ③重启丢模式根治(磁盘持久模式优先于config默认·ext+src双侧) ④隧道自动连接默认关(DAO_BRIDGE_AUTOCONNECT=1显式开·手动端点保留·Min版revproxy已拆·隧道零收益纯攻击面) ⑤帧不落盘(DAO_FRAME_PERSIST=1复旧·Authorization+会话token不再每轮writeFileSync落盘) ⑥解锁缺省禁(名实相符·无模型解锁) ⑦selftest总判唯系道魂之路(外接径Min已拆不再拖累总判) ⑧stop()补闭H2内部服务器(CLI进程不退之根) ⑨尸骸出包(_dao_81传世本无引用·运行时态文件) · 前系 v9.9.66-min · Min 版系归位(非 Pro 9.9.3xx) · always-on 用户规则部件剔除 + 按面典源/自编 + pin 防热回滚 + 面板两面同构 · 前系: v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 多账号机 reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(多账号机): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
+const ORIGIN_VERSION_BASE = "v9.9.73"; // v9.9.73-min · 水过无痕·名实终一(主公诏): ①执葬两路皆装(spawned自葬+进程内退而不杀·还原锚面转透传待逝) ②录死钥双式并查(目录名·扩展ID)+兄弟在册甄别(活兄在→升级让位非死不葬) ③settings×4还原(Devin/Windsurf User+~/.windsurf/~/.devin家目录遗珠·裸回环锚式为据·/t/中继不犯) ④NO_PROXY我植并除·空壳剪·dao.origin.*尽扫 ⑤进程内_/_quit录死亦还原 · 前系v9.9.72: 卸则有终·幸存者执葬 —— spawned relay 巡 .obsolete/目录亡 → 还原三面锚(settings×2+credentials.toml)+清dao-origin+逝后扫尾自退 · deactivate未逮之洞闭合 · 走而能离reqModeEff(治全局SP_MODE=custom误杀面invert·治面道全局官之原文冒充实收) ③preview停重演直呈录存真值 ④/origin/verify闭环自检+tape末条判词(sig嵌入) ⑤detached支持(DAO_SPAWNED·DAO_PARENT_PID孤儿收割·父亡+静默10min自退·_quit后自终) ⑥名实字段并录持久化(surface/mode_eff/sp_on_wire/after_source/wire_changed)·前系v9.9.69: ①切经藏log未定义修(ext·canonChanged推送断裂根) ②回调吞噬守卫(exec/execFile callback被env对象覆写) ③重启丢模式根治(磁盘持久模式优先于config默认·ext+src双侧) ④隧道自动连接默认关(DAO_BRIDGE_AUTOCONNECT=1显式开·手动端点保留·Min版revproxy已拆·隧道零收益纯攻击面) ⑤帧不落盘(DAO_FRAME_PERSIST=1复旧·Authorization+会话token不再每轮writeFileSync落盘) ⑥解锁缺省禁(名实相符·无模型解锁) ⑦selftest总判唯系道魂之路(外接径Min已拆不再拖累总判) ⑧stop()补闭H2内部服务器(CLI进程不退之根) ⑨尸骸出包(_dao_81传世本无引用·运行时态文件) · 前系 v9.9.66-min · Min 版系归位(非 Pro 9.9.3xx) · always-on 用户规则部件剔除 + 按面典源/自编 + pin 防热回滚 + 面板两面同构 · 前系: v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 多账号机 reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(多账号机): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
 // 印 153 · 唯变所适 · 软编码归宗 · 二十五章「逝曰远 远曰反」· 七十六章「兵强则不胜」
 // 病: 多 ext-host 共端口 :8937 · 旧版 in-process proxy 持续 listen · self_file 锁死旧版目录
 //     → 即便装毕新版 vsix · /ping 仍返 v9.9.19/v9.9.20 之 self_file · canon_name 走旧映射
@@ -478,6 +478,18 @@ function _saveModeToDisk(mode) {
 }
 
 let SP_MODE = _loadModeFromDisk() || process.env.SP_MODE || "invert";
+// ★ v9.9.70 · 名实终一 · 按面有效模式贯通线
+//   病: invertSP/invertAnySP 内嵌 `SP_MODE==="custom"` 全局判断 —
+//       全局=custom 而 面=invert 时, 面之请求被误判"custom无自编"→透传不改(应改未改);
+//       观察路径 _dMode=SP_MODE 亦然(面=道而全局=官 → tape 记 after=原文冒充实收)。
+//   治: _reqModeEff 于请求入手法 _reqSurface 同步点赋值 (_surfaceMode 之果),
+//       invertSP/invertAnySP/观察路径一律问有效模式, 不直问全局。无请求上下文时回落全局。
+let _reqModeEff = null;
+function _effMode() {
+  return _reqModeEff || SP_MODE;
+}
+// ★ v9.9.70 · 观察路实发载体钩子 —— _mainHandler 步5 立 · 步7 回填 modified
+let _pendingObsCtx = null;
 // ★ v9.9.357 · 自定义模式亦须道化 · 根治 custom 模式 SP 不替换
 //   道义: 二章「有无相生」· invert 与 custom 皆「有为之替」, passthrough 独「无为之透」。
 //   根因: SP 替换链(modifySPProto/preview/observe/INFER_STRIP)历来只认 SP_MODE==="invert",
@@ -576,9 +588,328 @@ let reqCounter = 0;
 //   仅在「真 LS→上游」请求(排除 /origin/* 控制面与 /v1/ 外接反代)时刷新此戳,
 //   故看门狗可据 ls_idle_s 精准辨识「proxy 健康却 LS 掉线」之 wedge。
 let _lastLsReqAt = 0;
+// ★ v9.9.70 · detached 活性戳 —— 孤儿收割以「任一请求」为活
+let _lastAnyReqAt = 0;
 // v9.9.21 · 唯变所适 · 让位标志 · POST /origin/_quit 后置 true · ext-host watchdog 见之不再唤起
 // 二十二章「夫唯不争 故莫能与之争」· 让位之德 · 旧不抢新道
 let _quitSignaled = false;
+
+// ═══════════════════════════════════════════════════════════
+// ★ v9.9.70 · detached 孤儿收割 —— 重启后生效·不扰中段之根
+// ═══════════════════════════════════════════════════════════
+//   ext-host spawn detached 时植 DAO_PARENT_PID → 本进程可独立于 ext-host 存活:
+//     · 升级/重载/崩溃 → 旧代理续服至新 ext-host 采用 (EADDRINUSE→ping→remote handle)
+//       或让位 (/_quit) · 流量零断窗 · 是为「重启后生效」。
+//   孤儿防: 父 PID 亡 + 静默逾 10min → 自退 (免孤守端口)。
+//     采用之新宿主其 watchdog 每 60s /origin/ping → 活性戳自续 → 不死。
+//   道义: 七十六章「人之生也柔弱 其死也仞贤强」· 生则有用 死则有终。
+const _SPAWNED = !!process.env.DAO_SPAWNED;
+const _PARENT_PID = parseInt(process.env.DAO_PARENT_PID || "0", 10) || 0;
+if (_PARENT_PID) {
+  const _orphanTick = () => {
+    try {
+      process.kill(_PARENT_PID, 0);
+    } catch (e) {
+      // ESRCH=父亡; EPERM=父在无权 (视同活)
+      if (e && e.code === "ESRCH") {
+        const silentFor = Date.now() - (_lastAnyReqAt || START_TIME);
+        if (silentFor > 10 * 60 * 1000) {
+          log(
+            `[orphan] parent ${_PARENT_PID} 亡 + 静默 ${Math.round(silentFor / 1000)}s → 自退`,
+          );
+          process.exit(0);
+        }
+      }
+    }
+  };
+  setInterval(_orphanTick, 30000).unref();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ★ v9.9.72 · 卸则有终 —— 幸存者执葬 (道法自然)
+// ═══════════════════════════════════════════════════════════
+//   病 (179 实证): 点击卸载 → VS Code 录 .obsolete → 重启即强杀 ext-host
+//     并删物理目录 → deactivate() 未及运行 → 三面锚 (settings.json×2 +
+//     credentials.toml) 永指死口 → 官方归路反断 · 卸载即全局崩。
+//   治: 唯"活得最久者"可执葬 —— spawned 本为续命而生, 令其自葬:
+//     每 30s 自问: 家目录尚存否? .obsolete 录我名否?
+//     亡 → 还原三面锚 → 自退。无主机可信, 唯逝者可信。
+//   边界: 唯 spawned 进程装此哨 —— 进程内 (ext-host 内嵌) 不装,
+//     exit 会带崩宿主; 其死有 deactivate 兜底, 各司其死。
+//   道义: 五十一章「生而不有 为而不恃 长而不宰 是谓玄德」
+//          五十章「善执生者…以其无死地焉」
+const _SELF_DIR = path.resolve(__dirname, "..", ".."); // vendor/bundled-origin → 扩展根
+const _EXT_ROOT_DIR = path.dirname(_SELF_DIR); //          extensions/
+const _OBSOLETE_FP = path.join(_EXT_ROOT_DIR, ".obsolete");
+const _EXTINCT_URL_KEYS = ["WINDSURF_API_SERVER_URL", "DEVIN_API_URL"];
+const _EXTINCT_ENV_BLOCKS = [
+  "devin.acp.agentEnv",
+  "windsurf.acp.agentEnv",
+];
+const _EXTINCT_SETTING_KEYS = [
+  "codeium.apiServerUrl",
+  "codeium.inferenceApiServerUrl",
+  "dao.origin._backup_apiServerUrl",
+  "dao.origin._backup_inferenceApiServerUrl",
+];
+function _daoExtId() {
+  try {
+    const pj = JSON.parse(
+      fs.readFileSync(path.join(_SELF_DIR, "package.json"), "utf8"),
+    );
+    if (pj && pj.publisher && pj.name) return `${pj.publisher}.${pj.name}`;
+  } catch {}
+  return null;
+}
+// ★ v9.9.73 · 兄弟甄别 —— 活兄在则「录死」实为让位 (升级), 非卸载
+//   活兄 = 同前缀目录 · 非己 · 未录死 · 在册 (extensions.json 可读则以册为准,
+//   不可读退守「未录死」). 僵尸目录/亡弟皆不阻真卸载之判.
+function _daoHasLiveSibling() {
+  try {
+    const selfName = path.basename(_SELF_DIR);
+    const id = _daoExtId();
+    // 目录已删则 package.json 不可读 → 由己名剥尾版号推前缀 (dao-x.y-9.9.73 → dao-x.y-)
+    let stem = id ? id + "-" : null;
+    if (!stem) {
+      const m = selfName.match(/^(.+?)-\d+\.\d+\.\d+/);
+      if (m) stem = m[1] + "-";
+    }
+    if (!stem) return false;
+    const ob = (() => {
+      try {
+        return JSON.parse(fs.readFileSync(_OBSOLETE_FP, "utf8") || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    let installed = null;
+    try {
+      const ej = JSON.parse(
+        fs.readFileSync(path.join(_EXT_ROOT_DIR, "extensions.json"), "utf8"),
+      );
+      if (Array.isArray(ej)) {
+        installed = new Set();
+        for (const e of ej) {
+          if (e && e.relativeLocation)
+            installed.add(String(e.relativeLocation));
+          const eid = e && e.identifier && e.identifier.id;
+          const v = e && e.version;
+          if (eid && v) installed.add(`${String(eid).toLowerCase()}-${v}`);
+        }
+      }
+    } catch {}
+    for (const name of fs.readdirSync(_EXT_ROOT_DIR)) {
+      if (name === selfName) continue;
+      if (name.indexOf(stem) !== 0) continue;
+      if (/\.(obsolete|disabled|preinstall|backup|bak)/i.test(name)) continue;
+      if (ob[name]) continue; // 同录死者 → 亡弟非兄
+      if (installed && !installed.has(name)) continue; // 不在册 → 僵尸
+      return true;
+    }
+  } catch {}
+  return false;
+}
+// ★ v9.9.73 · 名实终一 —— 录死之钥双式并查 (目录名钥 · 扩展ID钥) + 兄弟甄别
+//   真死 = (录名 或 目录亡) 且 无活兄 (有兄则升级途中 · 锚与态当归新主)
+function _daoSelfMarkedDead() {
+  try {
+    const ob = JSON.parse(fs.readFileSync(_OBSOLETE_FP, "utf8") || "{}");
+    const selfName = path.basename(_SELF_DIR);
+    const id = _daoExtId();
+    const marked = !!(ob[selfName] || (id && ob[id]));
+    const gone = !fs.existsSync(_SELF_DIR);
+    if (!marked && !gone) return false;
+    if (_daoHasLiveSibling()) return false; // 升级途中 · 非死
+    return true;
+  } catch {
+    return false;
+  }
+}
+// 三面还原 —— 与 extension.js::_clearAnchorFileSync + _unanchorCredentialsToml 同义
+//   只除所植之键 · 原子写 (tmp+rename) · 不可读不覆盖 · 无残零写
+// ★ v9.9.73 · 收净四义:
+//   ① codeium 锚键唯删「裸回环锚」式 (127.0.0.1:port 无路径) —— 用户他设不犯;
+//   ② agentEnv 之 URL 键同护 (/t/ 令牌中继非我所植); 我植 NO_PROXY 并除;
+//   ③ dao.origin.* 我域键尽扫 (port/defaultMode/banner/backup);
+//   ④ 空 agent 子表、空 agentEnv 块尽剪 —— 不留壳.
+const _DAO_ANCHOR_RE = /^https?:\/\/127\.0\.0\.1:\d+\/?$/;
+function _isPlantedNoProxyStr(v) {
+  const np = String(v || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return np.length > 0 && np.every((t) => t === "127.0.0.1" || t === "localhost");
+}
+function _daoCleanSettingsJson(json) {
+  let changed = false;
+  for (const k of _EXTINCT_SETTING_KEYS) {
+    // URL 锚键唯删裸回环式; 备份键非 URL 值, 由下行我域前缀并扫
+    if (k in json && _DAO_ANCHOR_RE.test(String(json[k]))) {
+      delete json[k];
+      changed = true;
+    }
+  }
+  for (const k of Object.keys(json)) {
+    if (k.indexOf("dao.origin.") === 0) {
+      delete json[k];
+      changed = true;
+    }
+  }
+  for (const bk of _EXTINCT_ENV_BLOCKS) {
+    const env = json[bk];
+    if (!env || typeof env !== "object" || Array.isArray(env)) continue;
+    for (const ak of Object.keys(env)) {
+      const sub = env[ak];
+      if (!sub || typeof sub !== "object" || Array.isArray(sub)) continue;
+      for (const uk of _EXTINCT_URL_KEYS) {
+        if (uk in sub && _DAO_ANCHOR_RE.test(String(sub[uk]))) {
+          delete sub[uk];
+          changed = true;
+        }
+      }
+      if (_isPlantedNoProxyStr(sub.NO_PROXY)) {
+        delete sub.NO_PROXY;
+        changed = true;
+      }
+      if (Object.keys(sub).length === 0) {
+        delete env[ak];
+        changed = true;
+      }
+    }
+    if (Object.keys(env).length === 0) {
+      delete json[bk];
+      changed = true;
+    }
+  }
+  return changed;
+}
+function _daoSettingsFiles() {
+  let base;
+  const plat = process.platform;
+  if (plat === "win32") base = process.env.APPDATA;
+  else if (plat === "darwin")
+    base = path.join(os.homedir(), "Library", "Application Support");
+  else base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  const h = os.homedir();
+  // v9.9.73 · 家目录遗珠并扫 (~/.windsurf|~/.devin/settings.json 实证亦载裸锚)
+  return [
+    path.join(base, "Devin", "User", "settings.json"),
+    path.join(base, "Windsurf", "User", "settings.json"),
+    path.join(h, ".windsurf", "settings.json"),
+    path.join(h, ".devin", "settings.json"),
+  ];
+}
+function _daoFinalCleanup() {
+  for (const sp of _daoSettingsFiles()) {
+    try {
+      const raw = fs.readFileSync(sp, "utf8").trim();
+      if (!raw) continue;
+      const json = JSON.parse(raw);
+      if (_daoCleanSettingsJson(json)) {
+        const tmp = sp + ".dao-tmp";
+        fs.writeFileSync(tmp, JSON.stringify(json, null, 2), "utf8");
+        fs.renameSync(tmp, sp);
+        log(`[extinct] settings 还原 → ${sp}`);
+      }
+    } catch {}
+  }
+  // credentials.toml: 127.0.0.1 锚 → 官方常量 (与 _unanchorCredentialsToml 同式)
+  const h = os.homedir();
+  for (const cp of [
+    path.join(h, ".local", "share", "devin", "credentials.toml"),
+    path.join(h, ".config", "devin", "credentials.toml"),
+  ]) {
+    try {
+      const t = fs.readFileSync(cp, "utf8");
+      const nt = t.replace(
+        /^((?:devin_api_url|api_server_url)\s*=\s*")http:\/\/127\.0\.0\.1:\d+(?:\/t\/[^"]*)?"/gm,
+        (m, pre) =>
+          pre +
+          (pre.startsWith("devin_api_url")
+            ? "https://api.devin.ai"
+            : "https://server.codeium.com") +
+          '"',
+      );
+      if (nt !== t) {
+        const tmp = cp + ".dao-tmp";
+        fs.writeFileSync(tmp, nt);
+        fs.renameSync(tmp, cp);
+        log(`[extinct] credentials.toml 归官方 → ${cp}`);
+      }
+    } catch {}
+  }
+  // ~/.codeium/dao-origin 全除 (状态/日志/别名exe 之巢 · 我之私域)
+  try {
+    const dd = path.join(os.homedir(), ".codeium", "dao-origin");
+    fs.rmSync(dd, { recursive: true, force: true });
+    log(`[extinct] dao-origin 已清 → ${dd}`);
+  } catch {}
+}
+// 执葬一式: 还原 → 退出后异步扫尾(别名 exe 自锁, 唯逝后方能除) → 自退
+function _daoBurial() {
+  try {
+    _daoFinalCleanup();
+  } catch (e) {}
+  try {
+    const _cp = require("child_process");
+    const dd = path.join(os.homedir(), ".codeium", "dao-origin");
+    if (process.platform === "win32") {
+      _cp.spawn(
+        "cmd.exe",
+        ["/c", `ping 127.0.0.1 -n 3 >nul & rd /s /q "${dd}"`],
+        { detached: true, stdio: "ignore", windowsHide: true },
+      ).unref();
+    } else {
+      _cp.spawn("sh", ["-c", `sleep 2; rm -rf "${dd}"`], {
+        detached: true,
+        stdio: "ignore",
+      }).unref();
+    }
+  } catch (e) {}
+  setTimeout(() => process.exit(0), 300).unref();
+}
+// ★ v9.9.73 · 执葬两路皆装 —— spawned 自葬; 进程内退而不杀
+//   进程内 (ext-host 内嵌) exit 会带崩全殿 —— 故唯还原锚面+转透传,
+//   宿主随重启自然而逝, 名「水过无痕」. 兄弟甄别在 _daoSelfMarkedDead.
+let _buriedOnce = false;
+const _extinctTimer = setInterval(() => {
+  if (_buriedOnce || !_daoSelfMarkedDead()) return;
+  _buriedOnce = true;
+  clearInterval(_extinctTimer);
+  if (_SPAWNED) {
+    log(`[extinct] ${_SELF_DIR} 录死 (.obsolete/目录亡) → 还原三面锚 → 自退`);
+    _daoBurial();
+  } else {
+    log(`[extinct] ${_SELF_DIR} 录死 (进程内) → 还原三面锚 → 透传待逝`);
+    try {
+      _daoFinalCleanup();
+    } catch (_) {}
+    try {
+      SP_MODE = "passthrough"; // 退守无为之透 · 内存一易 · 不再落盘
+    } catch (_) {}
+  }
+}, 30000);
+_extinctTimer.unref();
+// 60s 宽限后初巡 — 装/升级过渡态不误判 (此时 .obsolete 或有旧名)
+setTimeout(() => {
+  try {
+    if (_buriedOnce || !_daoSelfMarkedDead()) return;
+    _buriedOnce = true;
+    clearInterval(_extinctTimer);
+    if (_SPAWNED) {
+      log(`[extinct] ${_SELF_DIR} 录死 (初巡) → 还原三面锚 → 自退`);
+      _daoBurial();
+    } else {
+      log(`[extinct] ${_SELF_DIR} 录死 (进程内·初巡) → 还原三面锚 → 透传待逝`);
+      try {
+        _daoFinalCleanup();
+      } catch (_) {}
+      try {
+        SP_MODE = "passthrough";
+      } catch (_) {}
+    }
+  } catch (_) {}
+}, 60000).unref();
 
 // ═══════════════════════════════════════════════════════════
 // v9.9.57P · 外接api模型路由 · 无为而无以为
@@ -1126,6 +1457,51 @@ function _recordRawTape(ev) {
   } catch {}
 }
 
+// ★ v9.9.70 · 名实终一 · 末条闭环判词 —— 由 tape 录存之线上真值判决
+//   判词: ok_wire_inverted | ok_custom | ok_passthrough | warn_should_invert
+//         | warn_transformed_passthrough | warn_sp_absent_wire | no_capture
+//   detail=true 带全文头指纹 (/origin/verify); sig 内嵌轻形
+function _tapeVerdict(detail) {
+  const e = _rawTape.length ? _rawTape[_rawTape.length - 1] : null;
+  if (!e) return { verdict: "no_capture", t: 0 };
+  const mode = e.mode_at || e.mode || "";
+  const ageS = Math.round((Date.now() - (e.t || 0)) / 1000);
+  let verdict;
+  if (e.transformed === true) {
+    if (mode === "invert") verdict = "ok_wire_inverted";
+    else if (mode === "custom") verdict = "ok_custom";
+    else verdict = "warn_transformed_passthrough"; // 官模竟改 · 异象
+  } else if (e.sp_on_wire === false && e.before != null) {
+    verdict = "warn_sp_absent_wire"; // 入来有 SP · 线上无其字段
+  } else if (mode === "invert" || mode === "custom") {
+    verdict = "warn_should_invert"; // 面应改而线文同原文 · 应改未改
+  } else {
+    verdict = "ok_passthrough";
+  }
+  const v = {
+    verdict,
+    t: e.t || 0,
+    age_s: ageS,
+    stale: ageS > 86400,
+    rid: e.rid,
+    kind: e.kind,
+    surface: e.surface || "",
+    mode_eff: mode,
+    transformed: !!e.transformed,
+    sp_on_wire: e.sp_on_wire !== false,
+    after_source: e.after_source || null,
+    wire_changed: !!e.wire_changed,
+    before_chars: e.before_chars || 0,
+    after_chars: e.after_chars || 0,
+  };
+  if (detail) {
+    v.rpc = e.rpc || null;
+    v.before_head = e.before ? e.before.slice(0, 80) : null;
+    v.after_head = e.after ? e.after.slice(0, 80) : null;
+  }
+  return v;
+}
+
 // ═══════════════════════════════════════════════════════════
 // v7.2 · _customSP · 用户实时编辑之提示词 · 道法自然
 // ═══════════════════════════════════════════════════════════
@@ -1215,6 +1591,12 @@ function _saveLastInject() {
           field: _lastInject.field,
           role: _lastInject.role,
           mode: _lastInject.mode,
+          // ★ v9.9.70 · 名实字段并录 (跨重启仍判名实)
+          mode_global: _lastInject.mode_global,
+          surface: _lastInject.surface,
+          sp_on_wire: _lastInject.sp_on_wire,
+          after_source: _lastInject.after_source,
+          wire_changed: _lastInject.wire_changed,
           transformed: _lastInject.transformed,
           before_chars: _lastInject.before_chars,
           after_chars: _lastInject.after_chars,
@@ -1270,6 +1652,12 @@ function _saveInjectsByKind() {
           field: v.field,
           role: v.role,
           mode: v.mode,
+          // ★ v9.9.70 · 名实字段并录
+          mode_global: v.mode_global,
+          surface: v.surface,
+          sp_on_wire: v.sp_on_wire,
+          after_source: v.after_source,
+          wire_changed: v.wire_changed,
           transformed: v.transformed,
           sp_role: v.sp_role,
           before_chars: v.before_chars,
@@ -2578,7 +2966,8 @@ function invertSP(spText) {
     }
     // ★ v9.9.357 · custom 模式而无自编文本 → 透传 · 绝不回落经藏注入
     //   道义: 十七章「信不足 安有不信」· 用户选 custom 即以用户为真 · 无文则无为
-    if (SP_MODE === "custom") return null;
+    // ★ v9.9.70 · 按面有效模式 · 全局 SP_MODE=custom 不再误杀面 invert (应改未改之治)
+    if (_effMode() === "custom") return null;
     // ★ v9.9.92 · 执一 · 委托 sp_invert.js · 唯一引擎 · 无本地 fallback
     //   道义: 二十八章「圣人执一以为天下牧」· 大制无割
     //   sp_invert.js 已是完整引擎 · source.js 不再自持副本
@@ -2635,7 +3024,8 @@ function invertAnySP(spText) {
     }
     // ★ v9.9.357 · custom 模式下副路(summary/memory/ephemeral)不再回落经藏注入
     //   自编仅主路 chat 生效 · 副路透传 · 隔离彻底 · 阴符经不再从副路带入
-    if (SP_MODE === "custom") return null;
+    // ★ v9.9.70 · 按面有效模式 · 同上治
+    if (_effMode() === "custom") return null;
     // ★ v9.9.92 · 执一 · 委托 sp_invert.js · 唯一引擎
     if (_spInvertLib) return _spInvertLib.invertAnySP(s);
     log("[invertAnySP] _spInvertLib=null · 透传 (不应发生)");
@@ -3654,6 +4044,9 @@ function handleControl(req, res) {
           cascade: _surfaceMode("cascade"),
         },
         pid: process.pid,
+        // ★ v9.9.70 · detached 身份 —— ext-host 据此知其为独立子进程 (采用/让位判据)
+        spawned: _SPAWNED,
+        parent_pid: _PARENT_PID || null,
         uptime_s: Math.round((Date.now() - START_TIME) / 1000),
         req_total: reqCounter,
         // v9.9.330 · LS 心跳活性 · 看门狗据此辨识扩展↔LS wedge (idle 超阈即自愈重启 LS)
@@ -3906,17 +4299,23 @@ function handleControl(req, res) {
       _lastInject && _lastInject.at
         ? Math.round((Date.now() - _lastInject.at) / 1000)
         : null;
-    let after = null;
-    // ★ v9.9.357 · custom 模式预览亦显真实替换结果 (自编平替 · 面板所见即所发)
-    if (_spReplaceActive()) {
-      after = hasBefore ? invertSP(before) || before : null;
-    } else {
-      after = before;
-    }
+    // ★ v9.9.70 · 名实终一 · 停重演 · 直呈录存之线上真值
+    //   旧病: after = invertSP(before) 即席重演 —— 全局 SP_MODE 为凭 · 与按面实发分裂.
+    //   今: _lastInject.after 已录线上实发 SP (deferred-observe wire 提取) · 所见即所发.
+    const after = hasBefore
+      ? _lastInject.after != null
+        ? _lastInject.after
+        : before
+      : null;
     res.end(
       JSON.stringify({
         ok: true,
         mode: SP_MODE,
+        surface_modes: {
+          default: _surfaceMode(""),
+          local: _surfaceMode("local"),
+          cascade: _surfaceMode("cascade"),
+        },
         source: hasBefore ? "captured" : "at_rest",
         after: after,
         after_chars: after ? after.length : 0,
@@ -3924,6 +4323,15 @@ function handleControl(req, res) {
         before_chars: before ? before.length : 0,
         has_captured_before: hasBefore,
         age_s: age_s,
+        // ★ v9.9.70 · 闭环判词携带 (面板/自检共凭)
+        kind: _lastInject && _lastInject.kind,
+        variant: _lastInject && _lastInject.variant,
+        surface: _lastInject && _lastInject.surface,
+        mode_eff: _lastInject && _lastInject.mode,
+        transformed: _lastInject ? !!_lastInject.transformed : null,
+        sp_on_wire: _lastInject ? !!_lastInject.sp_on_wire : null,
+        after_source: _lastInject && _lastInject.after_source,
+        wire_changed: _lastInject ? !!_lastInject.wire_changed : null,
         // v9.9.19 · 损之又损 · 去 injects_by_kind 全体 (934KB) · preview瘦身 872KB→~52KB
         // 全量数据仍由 /origin/allinjects 专供 · preview 只返 webview 所需精华
         injects_kinds: Object.keys(_injectsByKind || {}),
@@ -4124,6 +4532,25 @@ function handleControl(req, res) {
           try {
             _h2Server && _h2Server.close && _h2Server.close();
           } catch {}
+          // ★ v9.9.70 · spawned 进程 close 后自退 —— SSE/H2 长连不阻让位
+          //   ext-host 内嵌路径进程死随宿主 · 无需此; 独立子进程须自终
+          // ★ v9.9.72 · 让位或执葬: .obsolete 录名 → 非让位乃永诀 → 还原锚面
+          // ★ v9.9.73 · 进程内同护: 录死则还原 (自终唯 spawned 可)
+          if (_daoSelfMarkedDead()) {
+            if (_SPAWNED) {
+              _daoBurial();
+            } else {
+              try {
+                _daoFinalCleanup();
+              } catch (_) {}
+              _buriedOnce = true;
+            }
+          } else if (_SPAWNED)
+            setTimeout(() => {
+              try {
+                process.exit(0);
+              } catch (_) {}
+            }, 800).unref();
         } catch (e) {
           log(`[_quit] close fail: ${e.message}`);
         }
@@ -4250,8 +4677,44 @@ function handleControl(req, res) {
         // v9.9.307 · 真上游动感 · 第三方实发即变 · 面板优先据此刷
         upstream_last_at:
           _lastUpstream && _lastUpstream.at ? _lastUpstream.at : 0,
+        // ★ v9.9.70 · 末条闭环判词 · 面板 sigTick 一签带变
+        last: _tapeVerdict(),
         uptime_s: Math.round((Date.now() - START_TIME) / 1000),
         req_total: reqCounter,
+      }),
+    );
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ★ v9.9.70 · /origin/verify · 闭环自检端点 —— 名实终一之判
+  // ═══════════════════════════════════════════════════════════
+  // 不问重演 · 只验录存之线上真值:
+  //   ok_wire_inverted      面应改 · 线上SP实异于入来 (发改证成)
+  //   ok_passthrough        面应透 · 线上SP=入来原文 (无为证成)
+  //   ok_custom             面应编 · 发改证成 (mode=custom)
+  //   warn_should_invert    面应改 · 线上SP=原文 (应改未改 · 真病灶)
+  //   warn_sp_absent_wire   入来有SP · 线上无SP字段 (疑脱)
+  //   stale                 最近录 > 24h (信旧)
+  //   no_capture            tape 空 · 流量未入此门 (绕行官方?)
+  if (u.pathname === "/origin/verify" && req.method === "GET") {
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    res.end(
+      JSON.stringify({
+        ok: true,
+        mode: SP_MODE,
+        surface_modes: {
+          default: _surfaceMode(""),
+          local: _surfaceMode("local"),
+          cascade: _surfaceMode("cascade"),
+        },
+        tape_count: _rawTape.length,
+        req_total: reqCounter,
+        uptime_s: Math.round((Date.now() - START_TIME) / 1000),
+        last: _tapeVerdict(true),
       }),
     );
     return true;
@@ -9435,6 +9898,19 @@ function readBody(req) {
 // 主公照观面板见 AFTER 即 LLM 实收 · 主公谓"残留"消 (实已 neutralize 上行)
 // 道义: 三十九章「得一」· 名实一体不裂 · 二十一章「其精甚真，其中有信」
 function _buildAllFieldEntry(c, mode) {
+  // ★ v9.9.70 · "wire" 直通形 —— 字段取自实发 body · text 即线上真字节 · 不重演
+  if (mode === "wire") {
+    const t = c.text || "";
+    return {
+      path: c.field_path,
+      kind: c.kind,
+      chars: t.length,
+      hash: _quickHash(t),
+      text: t,
+      text_before: null,
+      chars_before: 0,
+    };
+  }
   let displayText = c.text;
   let textBefore = null;
   if (mode === "invert") {
@@ -10708,6 +11184,8 @@ async function _maybeRevproxy(req, res) {
 const _mainHandler = async (req, res) => {
   reqCounter++;
   const rid = reqCounter;
+  // ★ v9.9.70 · detached 活性戳 —— 孤儿收割以「任一请求」为活 (控制面 ping 亦计)
+  _lastAnyReqAt = Date.now();
   if (!_envBootstrapped) {
     try {
       _bootstrapEnvelopeFromDisk();
@@ -10753,6 +11231,8 @@ const _mainHandler = async (req, res) => {
     // 2. 路由分类
     const kind = classifyRPC(req.url);
     const _reqSurface = _surfaceOfPath(req.url); // v9.9.368 · 两面分治面标 local|cascade|''
+    // ★ v9.9.70 · 名实终一 · 按面有效模式入手即定 (invertSP/invertAnySP/观察路同此一源)
+    _reqModeEff = _surfaceMode(_reqSurface);
     const route = routeUpstream(req.url);
     const isInferenceRPC = route.host === UPSTREAM_INFER;
     _recordPath(req.method, req.url, kind, route.host);
@@ -10897,6 +11377,9 @@ const _mainHandler = async (req, res) => {
     let _eaBody = body;
     // ★ v9.9.357 · invert+custom 皆走源级替换 (custom 由 invertSP 内自编分支平替)
     // ★ v9.9.368 · 按面生效: _origin_mode_surface.json 未配置面回落全局 SP_MODE
+    // ★ v9.9.73 · 有效模式再钉 —— readBody await 间 _reqModeEff 或被他请求覆写,
+    //   变换 tick 内重钉一次 · 并发串面风险归零 (与 _applyReq* 同律).
+    _reqModeEff = _surfaceMode(_reqSurface);
     if (_spReplaceActiveForSurface(_reqSurface)) {
       // v9.9.376 · 按面经藏+自编 · 与下方变换同一同步 tick 内生效 (无 await 不交错)
       _applyReqCanon(_surfaceCanon(_reqSurface));
@@ -11114,13 +11597,21 @@ const _mainHandler = async (req, res) => {
     ) {
       const _dBody = body,
         _dKind = kind,
-        _dMode = SP_MODE;
+        // ★ v9.9.70 · 名实终一 · 观察以按面有效模式为准 (全局 SP_MODE 退位)
+        _dSurface = _reqSurface,
+        _dMode = _reqModeEff || SP_MODE;
       const _dMethod = req.method,
         _dUrl = req.url,
         _dHost = route.host,
         _dRid = rid;
+      // ★ v9.9.70 · 实发载体 —— 步7 定案 modified 后回填 · 观察路得窥线上真字节
+      //   rid 随身: 异常残留之 ctx 不被后至请求误填 (为者败之 · 防串)
+      const _dCtx = { out: null, rid: _dRid };
+      _pendingObsCtx = _dCtx;
       setImmediate(() => {
         try {
+          // 观察路之有效模式复位 (防后至请求覆 _reqModeEff 致串面)
+          _reqModeEff = _dMode;
           let _allCandsForInject = [];
           try {
             const cands = observeAllSPInBody(_dBody, _dUrl);
@@ -11146,23 +11637,62 @@ const _mainHandler = async (req, res) => {
           } catch (e) {
             log(`#${_dRid} sp_scan err: ${e.message}`);
           }
+          // ══ v9.9.70 · 名实终一 · 线上真值提取 ══
+          //   旧病: after 是 invertSP(obs.before) 之重演 —— 全局/面模式分裂时
+          //         面板所示即虚 (面道全局官 → 原文冒充实收; 面官全局道 → 伪经冒充实收).
+          //   治: after 由「实发 body (modified)」提取 —— LLM 实收之字节, 非重演之猜.
+          //       transformed = 线上SP ≠ 入来SP (实改之果, 非 invertSP 返非空之意).
+          const _outBody = _dCtx.out || _dBody;
+          const _wireChanged = _outBody !== _dBody;
+          let _wireObs = null;
+          try {
+            _wireObs = observeSPFromBody(_outBody, _dKind);
+          } catch (_) {}
+          const _wireSP =
+            _wireObs && _wireObs.before ? _wireObs.before : null;
+          // 线上 all_fields: body 变则重扫实发 (fields=1 时面板所见即线上字节);
+          //   未变则入文即线文 · 无为不重复扫
+          let _outCands = _allCandsForInject;
+          if (_wireChanged) {
+            try {
+              _outCands = observeAllSPInBody(_outBody, _dUrl) || [];
+            } catch (_) {}
+          }
+          const allFields = _outCands.map((c) =>
+            _buildAllFieldEntry(c, "wire"),
+          );
           const obs = observeSPFromBody(_dBody, _dKind);
           if (obs && obs.before && obs.before.length > 100) {
             const inverted =
               _dMode === "invert" || _dMode === "custom"
                 ? invertSP(obs.before)
                 : null;
-            const after = inverted !== null ? inverted : obs.before;
-            const allFields = _allCandsForInject.map((c) =>
-              _buildAllFieldEntry(c, _dMode),
-            );
+            const after =
+              _wireSP !== null
+                ? _wireSP
+                : inverted !== null
+                  ? inverted
+                  : obs.before;
             const injectEv = {
               kind: _dKind,
               variant: obs.variant,
               field: obs.field,
               role: obs.role,
               mode: _dMode,
-              transformed: inverted !== null,
+              mode_global: SP_MODE,
+              surface: _dSurface || "",
+              transformed:
+                _wireSP !== null
+                  ? _wireSP !== obs.before
+                  : inverted !== null,
+              sp_on_wire: _wireSP !== null,
+              after_source:
+                _wireSP !== null
+                  ? "wire"
+                  : inverted !== null
+                    ? "sim"
+                    : "before",
+              wire_changed: _wireChanged,
               before_chars: obs.before.length,
               after_chars: after.length,
               before: obs.before,
@@ -11181,21 +11711,25 @@ const _mainHandler = async (req, res) => {
               }),
             );
           } else {
-            const allFields = _allCandsForInject.map((c) =>
-              _buildAllFieldEntry(c, _dMode),
-            );
-            if (allFields.length > 0) {
+            // 无入主 SP · 线上 SP 提取亦录 (after=_wireSP) · 名实不失
+            const _wsp = _wireObs && _wireObs.before ? _wireObs.before : null;
+            if (allFields.length > 0 || _wsp !== null) {
               _recordRawTape({
                 kind: _dKind,
-                variant: null,
-                field: null,
-                role: null,
+                variant: _wireObs ? _wireObs.variant : null,
+                field: _wireObs ? _wireObs.field : null,
+                role: _wireObs ? _wireObs.role : null,
                 mode_at: _dMode,
+                mode_global: SP_MODE,
+                surface: _dSurface || "",
                 transformed: false,
+                sp_on_wire: _wsp !== null,
+                after_source: _wsp !== null ? "wire" : "none",
+                wire_changed: _wireChanged,
                 before: null,
-                after: null,
+                after: _wsp,
                 before_chars: 0,
-                after_chars: 0,
+                after_chars: _wsp ? _wsp.length : 0,
                 all_fields: allFields,
                 all_fields_count: allFields.length,
                 all_fields_chars: allFields.reduce((s, f) => s + f.chars, 0),
@@ -11235,6 +11769,13 @@ const _mainHandler = async (req, res) => {
       );
     } else {
       log(`#${rid} ${kind} UNCHANGED ${body.length}B mode=${SP_MODE}`);
+    }
+
+    // ★ v9.9.70 · 名实终一 · 实发字节交观察路 (after=LLM实收 · 非重演)
+    //   rid 校验: 仅本请求之 ctx 受填 · 异常残留者清而不填
+    if (_pendingObsCtx) {
+      if (_pendingObsCtx.rid === rid) _pendingObsCtx.out = modified;
+      _pendingObsCtx = null;
     }
 
     proxyToCloud(req, res, modified, rid);

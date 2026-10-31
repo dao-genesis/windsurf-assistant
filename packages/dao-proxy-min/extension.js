@@ -1,4 +1,32 @@
-// extension.js · dao-proxy-min v9.9.68 · 道法自然 · 无为而无以为
+// extension.js · dao-proxy-min v9.9.73 · 道法自然 · 无为而无以为
+//   v9.9.73 · 水过无痕 —— 名实终一 · 卸真无痕 (主公诏: 卸载即自己回退完消失完):
+//     ① 面板复活 —— setDots 内 var items=[ 误入 var 声明 → 全脚本语法错误,
+//        面板整瘫 (热切换/面选/dots 尽死). 此即「热切换规则全废」之真根.
+//     ② .obsolete 双钥 —— 旧码唯查扩展ID钥, 本 fork 实以「目录名」录 →
+//        真卸载判永不命中 → 卸不清锚不杀代理. 双钥并查 + 兄弟在册甄别.
+//     ③ 快哨 8s —— 录死之窗愈短痕愈无 (补 60s watchdog 失窗之险).
+//     ④ 家目录遗珠 —— ~/.windsurf|~/.devin/settings.json 裸锚并扫.
+//     ⑤ agentEnv 收净 —— 我植 NO_PROXY 除 · 空壳剪 · /t/ 令牌中继不犯.
+//   v9.9.72 · 卸则有终 —— 幸存者执葬 (主公诏: 手动卸载即自己回退完消失完):
+//     ① source.js spawned relay 每 30s 巡 .obsolete/家目录存亡 →
+//        录死即还原三面锚 (settings.json×2 + credentials.toml) +
+//        清 ~/.codeium/dao-origin + 逝后异步扫尾(别名exe自锁) + 自退
+//        —— deactivate 未及运行(强杀)之洞, 由活得最久者闭合.
+//     ② ext 侧 watchdog 活巡见 .obsolete 录名 → 当场清锚杀代理,
+//        覆盖「点击卸载后未重启」窗口期.
+//     ③ /_quit 让位路亦查录死 → 非让位乃永诀 → 同执葬.
+//     道义: 五十一章「生而不有 为而不恃 长而不宰 是谓玄德」· 走而能离.
+//   v9.9.69 · agentEnv 正门锚 + 版本自适:
+//     ① setAnchor 直写 devin.acp.agentEnv / windsurf.acp.agentEnv 之
+//        WINDSURF_API_SERVER_URL + DEVIN_API_URL → 127.0.0.1:<port>
+//        — 实证(Devin 3.11.228): 官方以 agentEnv 声明式注入 acp 环境, 预指
+//          IDE 令牌中继 127.0.0.1:32809/t/<tok>; spawn-hook 见 env 已设退让
+//          → acp 全程绕过代理直连官方. 正门既现, 顺门而入 —— 一锚两世界:
+//          旧版不读 agentEnv(写之无害), 新版读之归代理.
+//     ② watchdog 巡检 agentEnv drift → 复位 (Devin 或按会话再生中继锚)
+//     ③ clearAnchor / _clearAnchorFileSync 卸正门锁 (删我二键, 留用户余键)
+//     ④ NO_PROXY 保底 loopback (用户已设 */自带值皆留)
+//     ⑤ spawn-hook/env 注入/LS 改写 全保 —— 新旧版本, 各从其门, 无为而无不为
 //   v9.9.68 · ACP锚链根治 + 面板收净:
 //     ① EADDRINUSE ping 二发补试 (单发 2s 失误曾致整窗 _proxyHandle=null)
 //     ② watchdog 健康路径回填 _proxyHandle (一次误判定终身之根治)
@@ -146,6 +174,15 @@ const OFFICIAL_INFER_URL = "https://inference.codeium.com";
 const BACKUP_KEY_API = "dao.origin._backup_apiServerUrl";
 const BACKUP_KEY_INFER = "dao.origin._backup_inferenceApiServerUrl";
 
+// ═ v9.9.69 · ACP agentEnv 正门锚 (Devin 3.11+ 声明式 env 注入之门) ═
+//   实证: 3.11.228 settings.json 内 devin.acp.agentEnv["devin-cli"] 预置
+//     WINDSURF_API_SERVER_URL + DEVIN_API_URL → IDE 令牌中继
+//     (127.0.0.1:32809/t/<token>/<id>); spawn-hook 见 env 已设则让 → 裸奔.
+//   治: 直写正门. 旧版无此机制者读之无害; 新版读之归代理. 一锚两世界.
+const ACP_ENV_BLOCKS = ["devin.acp.agentEnv", "windsurf.acp.agentEnv"];
+const ACP_ENV_URL_KEYS = ["WINDSURF_API_SERVER_URL", "DEVIN_API_URL"];
+const ACP_ENV_DEFAULT_AGENT = "devin-cli";
+
 const DAO_QUOTES = [
   "道可道，非常道",
   "上善若水",
@@ -289,14 +326,27 @@ function _maybeAnchorAcpEnv(cmd, args, opts) {
     if (!isDevin) return;
     opts = opts && typeof opts === "object" ? opts : {};
     const env = Object.assign({}, process.env, opts.env || {});
-    if (env.WINDSURF_API_SERVER_URL) return;
+    // v9.9.69 · 同值则让·异值则夺 — Devin 3.11+ agentEnv 预植 IDE 令牌中继
+    //   (127.0.0.1:32809/t/<tok>) → 旧律「已设则让」致 acp 绕代理裸奔.
+    //   今: 值=我锚 → 让 (无为); 值≠我锚 → 夺 (重写为锚).
+    //   双键并锚 (WINDSURF_API_SERVER_URL + DEVIN_API_URL) · 与 agentEnv 正门同构.
+    const preA = env.WINDSURF_API_SERVER_URL;
+    const preB = env.DEVIN_API_URL;
+    if (preA === _cachedProxyUrl && preB === _cachedProxyUrl) return;
     env.WINDSURF_API_SERVER_URL = _cachedProxyUrl;
+    env.DEVIN_API_URL = _cachedProxyUrl;
     const np = String(env.NO_PROXY || env.no_proxy || "")
       .split(",").map((x) => x.trim()).filter(Boolean);
-    for (const h of ["127.0.0.1", "localhost"]) if (!np.includes(h)) np.push(h);
+    if (!np.includes("*"))
+      for (const h of ["127.0.0.1", "localhost"]) if (!np.includes(h)) np.push(h);
     env.NO_PROXY = np.join(",");
     opts.env = env;
-    L.info("spawn-hook", "acp env anchor -> " + _cachedProxyUrl);
+    L.info(
+      "spawn-hook",
+      "acp env anchor -> " +
+        _cachedProxyUrl +
+        (preA && preA !== _cachedProxyUrl ? ` (夺回:${preA.slice(0, 60)})` : ""),
+    );
     return opts;
   } catch {}
 }
@@ -439,6 +489,70 @@ function _scanLatestVendorDir() {
   }
 }
 
+// ★ v9.9.70 · 重启后生效判别 —— deactivate 真因三分
+//   .obsolete 录己名 → VS Code 标记待删 (卸载 pending)
+//   兄弟版本目录并存 → 升级途中 (旧版退役新版就位)
+//   二者皆非 → 重载/崩溃/关窗 (宿主轮换·非卸载)
+// ★ v9.9.73 · 名实终一 —— .obsolete 之键各 fork 不一:
+//     本机实证键为「目录名」("dao-agi.dao-proxy-min-9.9.71" → true);
+//     他 fork 或以「扩展ID」("dao-agi.dao-proxy-min") 录 —— 双钥并查.
+//   旧病: 唯查 ID 一钥 → 本 fork 永不命中 → 真卸载路死 →
+//         锚残代存 · 代理不死 —— 主公所诉「卸载后还持续去后端连接」之根.
+function _readObsoleteMap() {
+  try {
+    const fp = path.join(path.dirname(__dirname), ".obsolete");
+    if (!fs.existsSync(fp)) return {};
+    const ob = JSON.parse(fs.readFileSync(fp, "utf8"));
+    return ob && typeof ob === "object" ? ob : {};
+  } catch {
+    return {};
+  }
+}
+function _selfObsoleteMarked() {
+  const ob = _readObsoleteMap();
+  const dirName = path.basename(__dirname); // 目录名钥 (本 fork 实证)
+  return !!(ob[dirName] || ob[SELF_EXT_ID]);
+}
+// 兄弟甄别: 同前缀目录 · 非己 · 未录死 · 在册 —— 四者俱备方为活兄
+//   僵尸目录(未在册之残留)、亡弟(亦录死)皆不算兄 · 不阻真卸载之判.
+//   册 (extensions.json) 不可读 → 退以「未录死」为准 (保守: 视为有兄).
+function _selfHasSiblingVersion() {
+  try {
+    const extRoot = path.dirname(__dirname);
+    const selfName = path.basename(__dirname);
+    const ob = _readObsoleteMap();
+    let installed = null; // null = 册不可读
+    try {
+      const ej = JSON.parse(
+        fs.readFileSync(path.join(extRoot, "extensions.json"), "utf8"),
+      );
+      if (Array.isArray(ej)) {
+        installed = new Set();
+        for (const e of ej) {
+          if (e && e.relativeLocation)
+            installed.add(String(e.relativeLocation));
+          const id = e && e.identifier && e.identifier.id;
+          const v = e && e.version;
+          if (id && v) installed.add(`${String(id).toLowerCase()}-${v}`);
+        }
+      }
+    } catch {}
+    for (const name of fs.readdirSync(extRoot)) {
+      if (!SELF_EXT_DIR_REGEX.test(name)) continue;
+      if (/\.(obsolete|disabled|preinstall|backup|bak)/i.test(name)) continue;
+      if (name === selfName) continue;
+      if (ob[name]) continue; // 同录死者 → 亡弟非兄
+      if (installed && !installed.has(name)) continue; // 不在册 → 僵尸目录
+      return true;
+    }
+  } catch {}
+  return false;
+}
+// 真卸载 = .obsolete 录己名 且 无兄弟版本并存
+function _selfUninstallPending() {
+  return _selfObsoleteMarked() && !_selfHasSiblingVersion();
+}
+
 function vendorDir() {
   // 优先选最新版 · 唯变所适
   const best = _scanLatestVendorDir();
@@ -486,10 +600,170 @@ function _isRemoteStale(remoteSelfFile) {
   return remoteSelfFile.toLowerCase() !== expected;
 }
 
+// ★ v9.9.70 · spawned detached —— 代理独立于 ext-host 存活
+//   病: 旧制 require() 进程内起服 → ext-host 一死(升级/重载/崩溃)代理即亡,
+//       锚仍指死口 → 中段断流 (141 实证之「正常体验都没了」).
+//   治: ELECTRON_RUN_AS_NODE spawn detached → ext-host 死而代理存 →
+//       新宿主 ping 采用 (remote handle) 或 _isRemoteStale 让位 → 零断窗·重启生效.
+//   孤儿防: DAO_PARENT_PID 由 source.js 收割 (父亡+静默10min自退).
+//   回落: spawn 不可行则仍旧 require 进程内.
+async function _spawnDetachedProxy(srcPath, port, mode) {
+  try {
+    const env = Object.assign({}, process.env, {
+      ELECTRON_RUN_AS_NODE: "1", // Electron 宿主亦可作纯 node 跑
+      ORIGIN_PORT: String(port),
+      SP_MODE: mode || "invert", // 盘值优先 · env 仅兜底 (与 start() 语义同)
+      DAO_PARENT_PID: String(process.pid),
+      DAO_SPAWNED: "1",
+    });
+    const logDir = _stateDir() || os.tmpdir();
+    let logFd = null;
+    try {
+      fs.mkdirSync(logDir, { recursive: true });
+      logFd = fs.openSync(path.join(logDir, "_spawned.log"), "a");
+    } catch {}
+    const stdio = logFd != null ? ["ignore", logFd, logFd] : "ignore";
+    // ★ v9.9.71 · 进程名伪装 —— 东京机实证: pkill devin-desktop 殃及 spawned 代理
+    //   (comm 取 execPath basename). 别名为 "node" → comm=node → 免疫粗杀.
+    //   硬链→符链→复制递进; 三法皆废则直用 execPath (名险可受, 能活为主).
+    let binPath = process.execPath;
+    try {
+      const alias = path.join(
+        logDir,
+        process.platform === "win32" ? "dao-node.exe" : "node",
+      );
+      const st = (() => {
+        try {
+          return fs.statSync(alias);
+        } catch {
+          return null;
+        }
+      })();
+      if (!st || st.size === 0) {
+        let made = false;
+        try {
+          fs.linkSync(binPath, alias);
+          made = true;
+        } catch {}
+        if (!made) {
+          try {
+            fs.symlinkSync(binPath, alias);
+            made = true;
+          } catch {}
+        }
+        if (!made) {
+          try {
+            fs.copyFileSync(binPath, alias);
+            made = true;
+          } catch {}
+        }
+      }
+      if (fs.existsSync(alias)) binPath = alias;
+    } catch {}
+    const child = cp.spawn(binPath, [srcPath], {
+      env,
+      detached: true,
+      stdio,
+      windowsHide: true,
+    });
+    if (logFd != null) {
+      try {
+        fs.closeSync(logFd);
+      } catch {}
+    }
+    child.on("error", () => {});
+    child.unref();
+    const childPid = child.pid;
+    if (!childPid) return null;
+    // 等 ping · 验 pid 属我子 (防占用误判)
+    for (let i = 0; i < 18; i++) {
+      if (child.exitCode != null) break;
+      await new Promise((r) => setTimeout(r, 350));
+      const p = await httpGetJson(
+        `http://127.0.0.1:${port}/origin/ping`,
+        700,
+      ).catch(() => null);
+      if (p && p.ok) {
+        if (p.pid === childPid) {
+          L.info(
+            "proxy",
+            `spawned detached :${port} pid=${childPid} mode=${p.mode}`,
+          );
+          return _createRemoteHandle(port, p.mode, {
+            spawned: true,
+            pid: childPid,
+          });
+        }
+        // 口被他人先得 (旧代理迟亡/异族) → 子将 EADDRINUSE 自退 · 交上层采用流
+        L.info(
+          "proxy",
+          `spawn 未得口 · 占者 pid=${p.pid} self=${p.self_file}`,
+        );
+        return null;
+      }
+    }
+    L.warn("proxy", `spawned ping 超时 (pid=${childPid} exit=${child.exitCode})`);
+    return null;
+  } catch (e) {
+    L.warn("proxy", `spawn fail: ${e.message}`);
+    return null;
+  }
+}
+
 async function proxyStart(port, mode, _retried) {
   if (_proxyHandle) return _proxyHandle;
   const srcPath = findSourceJs();
   if (!srcPath) throw new Error(`源.js 不存在: ${vendorDir()}`);
+
+  // ① 采用优先 · 活代理先收编 (升级/重载/崩溃复起皆无缝 · 不扰中段)
+  const ping0 = await httpGetJson(
+    `http://127.0.0.1:${port}/origin/ping`,
+    1500,
+  ).catch(() => null);
+  if (
+    ping0 &&
+    ping0.ok &&
+    (ping0.mode === "invert" ||
+      ping0.mode === "passthrough" ||
+      ping0.mode === "custom")
+  ) {
+    // v9.9.21 · 检远端 self_file 是否最新 · 旧则让位
+    if (!_retried && _isRemoteStale(ping0.self_file)) {
+      L.warn(
+        "proxy",
+        `remote stale self_file=${ping0.self_file} → POST /_quit · 让位重起`,
+      );
+      await httpPostJson(
+        `http://127.0.0.1:${port}/origin/_quit`,
+        { reason: `newer-version v${PKG_VERSION} arrived` },
+        2000,
+      ).catch(() => {});
+      await new Promise((r) => setTimeout(r, 1500));
+      return proxyStart(port, mode, true); // 一次重试 · 防递归无限
+    }
+    L.info(
+      "proxy",
+      `adopt live remote :${port} (mode=${ping0.mode} spawned=${!!ping0.spawned} pid=${ping0.pid} self=${ping0.self_file})`,
+    );
+    _proxyHandle = _createRemoteHandle(port, ping0.mode, {
+      spawned: !!ping0.spawned,
+      pid: ping0.pid,
+    });
+    return _proxyHandle;
+  }
+  if (ping0 && ping0.ok) {
+    L.warn("proxy", `port :${port} 占且非反代 · 返 null (本窗口直连)`);
+    return null;
+  }
+
+  // ② detached spawn —— 独立于 ext-host 存活 (重启生效之骨)
+  const spawned = await _spawnDetachedProxy(srcPath, port, mode);
+  if (spawned) {
+    _proxyHandle = spawned;
+    return _proxyHandle;
+  }
+
+  // ③ 回落 · 进程内 require (detached 被阻时之朴)
   try {
     delete require.cache[require.resolve(srcPath)];
     const mod = require(srcPath);
@@ -502,7 +776,7 @@ async function proxyStart(port, mode, _retried) {
     });
     L.info(
       "proxy",
-      `started :${_proxyHandle.port} src=${srcPath} mode=${_proxyHandle.getMode()}`,
+      `started in-proc :${_proxyHandle.port} src=${srcPath} mode=${_proxyHandle.getMode()}`,
     );
     return _proxyHandle;
   } catch (e) {
@@ -527,10 +801,10 @@ async function proxyStart(port, mode, _retried) {
       if (
         ping &&
         ping.ok &&
-        (ping.mode === "invert" || ping.mode === "passthrough")
+        (ping.mode === "invert" ||
+          ping.mode === "passthrough" ||
+          ping.mode === "custom")
       ) {
-        // v9.9.21 · 检远端 self_file 是否最新 · 旧则让位
-        // 二十二章「夫唯不争 故莫能与之争」 · 七十六章「兵强则不胜」
         if (!_retried && _isRemoteStale(ping.self_file)) {
           L.warn(
             "proxy",
@@ -541,7 +815,6 @@ async function proxyStart(port, mode, _retried) {
             { reason: `newer-version v${PKG_VERSION} arrived` },
             2000,
           ).catch(() => {});
-          // 等远端 server.close 完毕 (远端 setTimeout 100ms · 加 close 时间)
           await new Promise((r) => setTimeout(r, 1500));
           return proxyStart(port, mode, true); // 一次重试 · 防递归无限
         }
@@ -549,7 +822,10 @@ async function proxyStart(port, mode, _retried) {
           "proxy",
           `port :${port} live remote (mode=${ping.mode} · ver=${(ping.features || {}).mode || "?"}) → remote handle`,
         );
-        _proxyHandle = _createRemoteHandle(port, ping.mode);
+        _proxyHandle = _createRemoteHandle(port, ping.mode, {
+          spawned: !!ping.spawned,
+          pid: ping.pid,
+        });
         return _proxyHandle;
       }
       L.warn("proxy", `port :${port} 占且非反代 · 返 null (本窗口直连)`);
@@ -570,14 +846,18 @@ async function proxyStop() {
   L.info("proxy", "stopped");
 }
 
-// 远程 handle: 端口已有 proxy (多窗口) → 复用而非销毁
-function _createRemoteHandle(port, mode) {
+// 远程 handle: 端口已有 proxy (多窗口/detached 子进程) → 复用而非销毁
+// ★ v9.9.70 · spawned 身份 + quit() —— 采用不夺命 · 卸载才 _quit (重启生效)
+function _createRemoteHandle(port, mode, info) {
   let _mode = mode || "invert";
+  const _spawned = !!(info && info.spawned);
   return {
     port,
     host: "127.0.0.1",
     server: null, // remote · 无本地 server
-    kind: "remote",
+    kind: _spawned ? "spawned" : "remote",
+    pid: info && info.pid,
+    spawned: _spawned,
     getMode: () => _mode,
     setMode: (m) => {
       _mode = m;
@@ -587,7 +867,14 @@ function _createRemoteHandle(port, mode) {
         2000,
       ).catch(() => {});
     },
-    close: async () => {}, // remote · 不关闭别窗进程
+    close: async () => {}, // remote/spawned · 不关闭别窗/独立进程 (留活待用)
+    quit: async () => {
+      await httpPostJson(
+        `http://127.0.0.1:${port}/origin/_quit`,
+        { reason: `deactivate v${PKG_VERSION}` },
+        2000,
+      ).catch(() => {});
+    },
   };
 }
 
@@ -640,12 +927,148 @@ function _readSettingsJson(fp) {
 function _writeSettingsJson(fp, json) {
   try {
     fs.mkdirSync(path.dirname(fp), { recursive: true }); // 确保父目录存在
-    fs.writeFileSync(fp, JSON.stringify(json, null, 2), "utf8");
+    // ★ v9.9.70 · 原子替身 —— tmp+rename · 防写半遭杀而留残篇坏 JSON (settings 损坏即全局乱)
+    const tmp = fp + ".dao-tmp";
+    fs.writeFileSync(tmp, JSON.stringify(json, null, 2), "utf8");
+    fs.renameSync(tmp, fp);
     return true;
   } catch (e) {
     L.warn("anchor", `file write fail: ${e.message}`);
+    try {
+      fs.unlinkSync(fp + ".dao-tmp");
+    } catch {}
     return false;
   }
+}
+
+// ── v9.9.69 · agentEnv 正门锚 helpers ────────────────────────────────
+// 写: 遍历 ACP_ENV_BLOCKS 之每一 agent 键(现存者全锚, 无则立 devin-cli),
+//   置 WINDSURF_API_SERVER_URL/DEVIN_API_URL=url, NO_PROXY 保底 loopback.
+//   用户之 HTTP_PROXY 清空项/NO_PROXY="*"/自定义键 一概不触.
+// 返: 改动计数 (0=已在锚 → 无为不写盘).
+function _anchorAcpEnvJson(json, url) {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return 0;
+  let n = 0;
+  for (const bk of ACP_ENV_BLOCKS) {
+    let env = json[bk];
+    if (!env || typeof env !== "object" || Array.isArray(env)) env = {};
+    let agentKeys = Object.keys(env);
+    if (!agentKeys.length) agentKeys = [ACP_ENV_DEFAULT_AGENT];
+    for (const ak of agentKeys) {
+      let sub = env[ak];
+      if (!sub || typeof sub !== "object" || Array.isArray(sub)) sub = {};
+      for (const uk of ACP_ENV_URL_KEYS) {
+        if (sub[uk] !== url) {
+          sub[uk] = url;
+          n++;
+        }
+      }
+      // loopback 保底免代理 (用户已置 "*" 或自带两址者不动)
+      const npv = String(sub.NO_PROXY ?? sub.no_proxy ?? "");
+      const np = npv
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!np.includes("*")) {
+        let npDirty = false;
+        for (const h of ["127.0.0.1", "localhost"])
+          if (!np.includes(h)) {
+            np.push(h);
+            npDirty = true;
+          }
+        if (npDirty || !sub.NO_PROXY) {
+          sub.NO_PROXY = np.join(",");
+          n++;
+        }
+      }
+      env[ak] = sub;
+    }
+    json[bk] = env;
+  }
+  return n;
+}
+
+// 卸: 删我所植之 WINDSURF_API_SERVER_URL/DEVIN_API_URL, 留用户余键不犯.
+// ★ v9.9.73 · 收净三义:
+//   ① URL 键唯删「裸回环锚」式 (127.0.0.1:port 无路径) —— Devin 自置之
+//     令牌中继 (127.0.0.1:port/t/<tok>) 非我所植 · 一字不犯;
+//   ② 我植 NO_PROXY (纯 127.0.0.1/localhost 无他项) 并除; 用户杂项不动;
+//   ③ 空 agent 子表、空 agentEnv 块尽剪 —— 不留壳.
+const _DAO_LOOPBACK_ROOT_RE = /^https?:\/\/127\.0\.0\.1:\d+\/?$/;
+function _isPlantedNoProxy(v) {
+  const np = String(v || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return np.length > 0 && np.every((t) => t === "127.0.0.1" || t === "localhost");
+}
+function _clearAcpEnvJson(json) {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return 0;
+  let n = 0;
+  for (const bk of ACP_ENV_BLOCKS) {
+    const env = json[bk];
+    if (!env || typeof env !== "object" || Array.isArray(env)) continue;
+    for (const ak of Object.keys(env)) {
+      const sub = env[ak];
+      if (!sub || typeof sub !== "object" || Array.isArray(sub)) continue;
+      for (const uk of ACP_ENV_URL_KEYS) {
+        if (uk in sub && _DAO_LOOPBACK_ROOT_RE.test(String(sub[uk]))) {
+          delete sub[uk];
+          n++;
+        }
+      }
+      if (_isPlantedNoProxy(sub.NO_PROXY)) {
+        delete sub.NO_PROXY;
+        n++;
+      }
+      if (Object.keys(sub).length === 0) {
+        delete env[ak];
+        n++;
+      }
+    }
+    if (Object.keys(env).length === 0) {
+      delete json[bk];
+      n++;
+    }
+  }
+  return n;
+}
+
+// 巡检: agentEnv 之 URL 键有离 _cachedProxyUrl 者 → 复位. watchdog 每巡调之,
+//   防 Devin 按会话重书令牌中继锚 (3.11 实证之病灶). 返 true=有修.
+function _reanchorAcpEnvDrift(url) {
+  if (!url) return false;
+  const plat = process.platform;
+  let base;
+  if (plat === "win32") base = process.env.APPDATA;
+  else if (plat === "darwin")
+    base = path.join(os.homedir(), "Library", "Application Support");
+  else base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  let fixed = false;
+  for (const sp of [
+    path.join(base, "Devin", "User", "settings.json"),
+    path.join(base, "Windsurf", "User", "settings.json"),
+  ]) {
+    try {
+      const json = _readSettingsJson(sp);
+      if (!json) continue;
+      const n = _anchorAcpEnvJson(json, url);
+      if (n > 0 && _writeSettingsJson(sp, json)) {
+        fixed = true;
+        L.info("watchdog", `agentEnv drift 复位 ×${n} → ${sp}`);
+      }
+    } catch {}
+  }
+  // v9.9.71 · credentials.toml 同巡 —— 第四锚面之漂移 (login/换号/升级重写) 复位
+  try {
+    if (_isCredentialsDrifted()) {
+      if (_anchorCredentialsToml(url)) {
+        fixed = true;
+        L.info("watchdog", `credentials.toml drift 复位 → ${url}`);
+      }
+    }
+  } catch {}
+  return fixed;
 }
 
 async function setAnchor(port) {
@@ -674,17 +1097,28 @@ async function setAnchor(port) {
     try {
       const json = _readSettingsJson(sp);
       if (!json) continue; // 不存在或不可读 → 跳过
+      let dirty = false;
       if (
-        json["codeium.apiServerUrl"] === url &&
-        json["codeium.inferenceApiServerUrl"] === url
+        json["codeium.apiServerUrl"] !== url ||
+        json["codeium.inferenceApiServerUrl"] !== url
       ) {
+        json["codeium.apiServerUrl"] = url;
+        json["codeium.inferenceApiServerUrl"] = url;
+        dirty = true;
+      }
+      // v9.9.69 · 正门锚: agentEnv 声明式 env 注入 (Devin 3.11+)
+      //   codeium.* 已同值亦须查 agentEnv —— 或为新版本写之缺/被再生之中继
+      const envN = _anchorAcpEnvJson(json, url);
+      if (envN > 0) dirty = true;
+      if (!dirty) {
         L.info("anchor", `already ${url} · skip ${sp} (无为而治)`);
         continue;
       }
-      json["codeium.apiServerUrl"] = url;
-      json["codeium.inferenceApiServerUrl"] = url;
       if (_writeSettingsJson(sp, json)) {
-        L.info("anchor", `file set ${url} → ${sp}`);
+        L.info(
+          "anchor",
+          `file set ${url} → ${sp} (codeium${envN > 0 ? ` +agentEnv×${envN}` : ""})`,
+        );
       }
     } catch (e) {
       L.warn("anchor", `file set fail ${sp}: ${e.message}`);
@@ -693,6 +1127,102 @@ async function setAnchor(port) {
 
   _cachedAnchored = true;
   _cachedProxyUrl = url;
+
+  // ★ v9.9.71 · credentials.toml 锚面 · 一锚统万面 (道法自然)
+  //   Devin Local(chisel/acp/CLI) 之 devin_api_url / api_server_url 居
+  //   ~/.local/share/devin/credentials.toml —— devin login/换号/升级辄重写
+  //   → acp chat 直连官方绕代理 (东京机实证: 友人被迫以 shell watchdog 手工纠偏)。
+  //   今并入正门: setAnchor 即写 + drift watchdog 巡 · 补丁之补丁尽废。
+  try {
+    _anchorCredentialsToml(url);
+  } catch (e) {
+    L.warn("anchor", `credentials.toml: ${e.message}`);
+  }
+}
+
+// ── credentials.toml 锚面 ──
+// 仅存则锚; 无文件不造 (未登录之机无此面 · 无为).
+// 原子写: tmp+rename · 与 _writeSettingsJson 同律.
+const _CRED_PATHS = () => {
+  const h = os.homedir();
+  return [
+    path.join(h, ".local", "share", "devin", "credentials.toml"),
+    path.join(h, ".config", "devin", "credentials.toml"),
+  ];
+};
+function _readCredAnchor() {
+  for (const p of _CRED_PATHS()) {
+    try {
+      const t = fs.readFileSync(p, "utf8");
+      const m1 = t.match(/^devin_api_url\s*=\s*"([^"]*)"/m);
+      const m2 = t.match(/^api_server_url\s*=\s*"([^"]*)"/m);
+      return {
+        path: p,
+        text: t,
+        devin_api_url: m1 ? m1[1] : null,
+        api_server_url: m2 ? m2[1] : null,
+      };
+    } catch {}
+  }
+  return null;
+}
+function _anchorCredentialsToml(url) {
+  const cur = _readCredAnchor();
+  if (!cur) return false; // 无 credentials.toml · 无面可锚
+  const want = url || _cachedProxyUrl;
+  let t = cur.text;
+  let n = 0;
+  if (cur.devin_api_url !== null && cur.devin_api_url !== want) {
+    t = t.replace(
+      /^devin_api_url\s*=.*$/m,
+      `devin_api_url = "${want}"`,
+    );
+    n++;
+  }
+  if (cur.api_server_url !== null && cur.api_server_url !== want) {
+    t = t.replace(
+      /^api_server_url\s*=.*$/m,
+      `api_server_url = "${want}"`,
+    );
+    n++;
+  }
+  if (!n) return false;
+  const tmp = cur.path + ".dao-tmp";
+  fs.writeFileSync(tmp, t);
+  fs.renameSync(tmp, cur.path);
+  L.info("anchor", `credentials.toml ×${n} → ${want} · ${cur.path}`);
+  return true;
+}
+// 卸载之反: 归官方常量 · 免残锚指向死口
+function _unanchorCredentialsToml() {
+  const cur = _readCredAnchor();
+  if (!cur) return false;
+  let t = cur.text;
+  let n = 0;
+  const re = /^((?:devin_api_url|api_server_url)\s*=\s*")(http:\/\/127\.0\.0\.1:\d+(?:\/t\/[^"]*)?)"/gm;
+  t = t.replace(re, (m, pre) => {
+    const key = pre.startsWith("devin_api_url")
+      ? "https://api.devin.ai"
+      : "https://server.codeium.com";
+    n++;
+    return pre + key + '"';
+  });
+  if (!n) return false;
+  const tmp = cur.path + ".dao-tmp";
+  fs.writeFileSync(tmp, t);
+  fs.renameSync(tmp, cur.path);
+  L.info("anchor", `credentials.toml 归官方 ×${n}`);
+  return true;
+}
+// drift 巡检之判: 面存在且值≠我锚 → 漂
+function _isCredentialsDrifted() {
+  const cur = _readCredAnchor();
+  if (!cur) return false;
+  const want = _cachedProxyUrl;
+  return (
+    (cur.devin_api_url !== null && cur.devin_api_url !== want) ||
+    (cur.api_server_url !== null && cur.api_server_url !== want)
+  );
 }
 
 async function clearAnchor() {
@@ -745,8 +1275,12 @@ async function clearAnchor() {
       delete json["codeium.inferenceApiServerUrl"];
       delete json[BACKUP_KEY_API];
       delete json[BACKUP_KEY_INFER];
+      const envN = _clearAcpEnvJson(json); // v9.9.69 · 卸正门锁
       _writeSettingsJson(sp, json);
-      L.info("anchor", `file cleared → ${sp}`);
+      L.info(
+        "anchor",
+        `file cleared → ${sp}${envN > 0 ? ` (−agentEnv×${envN})` : ""}`,
+      );
     }
   }
 
@@ -783,6 +1317,14 @@ function _clearAnchorFileSync() {
             changed = true;
           }
         }
+        // ★ v9.9.73 · dao.origin.* 我域键尽扫 (port/defaultMode/banner/backup)
+        for (const k of Object.keys(json)) {
+          if (k.indexOf("dao.origin.") === 0) {
+            delete json[k];
+            changed = true;
+          }
+        }
+        if (_clearAcpEnvJson(json) > 0) changed = true; // v9.9.69 · 卸正门锁
         if (changed) {
           _writeSettingsJson(sp, json);
           L.info("anchor", `file-sync cleared → ${sp}`);
@@ -793,6 +1335,45 @@ function _clearAnchorFileSync() {
     }
   }
   _cachedAnchored = false;
+}
+
+// ★ v9.9.73 · 家目录遗珠 —— ~/.windsurf|~/.devin/settings.json 之锚一并还原
+//   实证(179 本机): ~/.windsurf/settings.json 亦载 127.0.0.1 裸锚
+//   (旧版/手记所遗) —— 正门之外漏扫一面, 卸载后犹指死口.
+//   唯删我式之值 (127.0.0.1:port 裸锚) + 我域键 (dao.origin.* · agentEnv 我植) —
+//   用户他设、令牌中继 (/t/…) 一概不犯.
+function _clearHomeSettingsSync() {
+  const home = os.homedir();
+  if (!home) return 0;
+  let files = 0;
+  for (const sp of [
+    path.join(home, ".windsurf", "settings.json"),
+    path.join(home, ".devin", "settings.json"),
+  ]) {
+    try {
+      const json = _readSettingsJson(sp);
+      if (!json) continue;
+      let changed = false;
+      for (const k of ["codeium.apiServerUrl", "codeium.inferenceApiServerUrl"]) {
+        if (k in json && _DAO_LOOPBACK_ROOT_RE.test(String(json[k]))) {
+          delete json[k];
+          changed = true;
+        }
+      }
+      for (const k of Object.keys(json)) {
+        if (k.indexOf("dao.origin.") === 0) {
+          delete json[k];
+          changed = true;
+        }
+      }
+      if (_clearAcpEnvJson(json) > 0) changed = true;
+      if (changed) {
+        if (_writeSettingsJson(sp, json)) files++;
+        L.info("anchor", `home-settings cleared → ${sp}`);
+      }
+    } catch {}
+  }
+  return files;
 }
 
 function isAnchored() {
@@ -2208,6 +2789,46 @@ async function cmdSelftest() {
 
   const { port } = cfg();
 
+  // ★ v9.9.70 · L0 闭环判决 (名实终一) —— /origin/verify 由录存线上真值判
+  //   ok_wire_inverted=发改证成 · ok_passthrough=透传证成 · warn_should_invert=应改未改(真病灶)
+  out.appendLine("\n── L0 · 闭环判决 (线上真值 · /origin/verify) ──");
+  try {
+    const v = await httpGetJson(
+      `http://127.0.0.1:${port}/origin/verify`,
+      3000,
+    );
+    if (v && v.last) {
+      const l = v.last;
+      const icon = l.verdict && l.verdict.startsWith("ok") ? "✓" : "⚠";
+      out.appendLine(
+        `  ${icon} ${l.verdict} · ${l.surface || "?"}面·${l.mode_eff || "?"} · ` +
+          `${l.kind || "?"} · ${l.before_chars || 0}→${l.after_chars || 0}字 · ` +
+          `发改=${l.transformed} · 线源=${l.after_source || "?"} · ${l.age_s != null ? l.age_s + "s前" : "?"}`,
+      );
+      if (v.surface_modes) {
+        out.appendLine(
+          `  面实况: L=${v.surface_modes.local || "?"} C=${v.surface_modes.cascade || "?"} G=${v.mode || "?"}`,
+        );
+      }
+      if (l.after_head) {
+        out.appendLine(`    线实头: ${String(l.after_head).slice(0, 70)}…`);
+      }
+      if (l.verdict === "warn_should_invert") {
+        out.appendLine(
+          `  ⚠ 应改未改 —— 该面模式要求发改而线上 SP 同原文 · 此即「面板所示 vs LLM 实收」分裂之病灶`,
+        );
+      } else if (l.verdict === "no_capture") {
+        out.appendLine(
+          `  ⚠ tape 空 —— 无任何流量入此口 · 若刚对话过 → 请求未经代理 (锚漂/绕行)`,
+        );
+      }
+    } else {
+      out.appendLine("  ⚠ /origin/verify 无判词 (代理未启或旧版)");
+    }
+  } catch (e) {
+    out.appendLine(`  ✗ L0 异: ${e.message}`);
+  }
+
   // L1: 损 selftest endpoint (v9.7.0 为道日损) · 走 ping 之 features 诊
   out.appendLine("\n── L1 · 帛书+大常 (从 /origin/ping 取 features) ──");
   try {
@@ -2626,7 +3247,12 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
       }
     } else if (lastSP) {
       // 兑底 · all_fields 空但 after 存 · 极罕之境
-      parts.push('\u2501\u2501\u2501 LLM \u5b9e\u6536 \u00b7 ' + lastSP.length + '\u5b57 \u2501\u2501\u2501');
+      // ★ v9.9.70 · 名实标注 —— after 已是线上实发 SP · 非重演之猜
+      var _hdr = '\u2501\u2501\u2501 LLM \u5b9e\u6536' +
+        (entry.transformed === true ? '\u00b7\u53d1\u6539' : '') +
+        (entry.after_source === 'wire' ? '\u00b7\u7ebf' : '') +
+        ' \u00b7 ' + lastSP.length + '\u5b57 \u2501\u2501\u2501';
+      parts.push(_hdr);
       parts.push(lastSP);
       totalChars += lastSP.length;
     }
@@ -2640,15 +3266,37 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
       $sp.textContent = text;
     }
 
-    if (fieldCount > 0) {
-      $stat.innerHTML = '<span class="pill">\u5168\u00b7' + fieldCount + '\u5b57\u6bb5\u00b7' + totalChars + '\u5b57</span>';
-    } else if (lastSP) {
-      $stat.innerHTML = '<span class="pill">\u5168\u00b71\u5b57\u6bb5\u00b7' + lastSP.length + '\u5b57</span>';
-    } else {
-      $stat.innerHTML = '';
-    }
+    // ★ v9.9.70 · 闭环判决 pill —— 面·模·线实·kind·age · 名实一目了然
+    //   道·发改✓ = 该面应改且线上实发改成; 官·原文 = 该面透传之实;
+    //   道·应改未改⚠ = 模式要求改而线文同原 · 真病灶立现
+    $stat.innerHTML = _verdictPill(entry) +
+      '<span class="pill">\u5168\u00b7' + (fieldCount || 1) + '\u5b57\u6bb5\u00b7' +
+      (fieldCount ? totalChars : lastSP.length) + '\u5b57</span>';
+    $stat.classList.add('show');
 
     return true;
+  }
+
+  // ★ v9.9.70 · 闭环判词 —— 由 tape 录存之线上真值成 pill
+  //   L/C=面标 · 道/官/编=按面有效模式 · 发改✓|原文|应改未改⚠=线实
+  function _verdictPill(entry) {
+    if (!entry) return '';
+    var m = entry.mode_at || entry.mode || '';
+    var mlbl = m === 'invert' ? '\u9053' : m === 'custom' ? '\u7f16' : m === 'passthrough' ? '\u5b98' : (m || '?');
+    var sf = entry.surface === 'local' ? 'L' : entry.surface === 'cascade' ? 'C' : '\u00b7';
+    var w;
+    if (entry.sp_on_wire === false) w = 'SP\u672a\u4e0a\u7ebf';
+    else if (entry.transformed === true) w = '\u53d1\u6539\u2713';
+    else if (m === 'invert' || m === 'custom') w = '\u5e94\u6539\u672a\u6539\u26a0';
+    else w = '\u539f\u6587';
+    var age = entry.t ? Math.max(0, Math.round((Date.now() - entry.t) / 1000)) : null;
+    var s = sf + '\u9762\u00b7' + mlbl + '\u00b7' + w + '\u00b7' + (entry.kind || '?');
+    if (entry.before_chars || entry.after_chars) {
+      s += '\u00b7' + (entry.before_chars || 0) + '\u2192' + (entry.after_chars || 0) + '\u5b57';
+    }
+    if (entry.after_source === 'sim') s += '\u00b7\u63a8';
+    if (age != null) s += '\u00b7' + age + 's\u524d';
+    return '<span class="pill">' + s + '</span>';
   }
 
   // ─── v9.9.376 · 两面同构·层级化 · 道/官/编 + 按面典源 ───
@@ -2843,18 +3491,25 @@ function getEssenceHtml(port, nonce, initialSP, initState) {
       $dots.title = 'Proxy:\u2717';
       return;
     }
+    // ★ v9.9.70 · 名实终一 · Mode dot 读 surface_modes 面实况 (不问全局 SP_MODE)
+    var _sm = (p && p.surface_modes) || {};
+    var _l = _sm.local || p.mode || 'invert';
+    var _c = _sm.cascade || p.mode || 'invert';
+    var _ldao = (_l === 'invert' || _l === 'custom');
+    var _cdao = (_c === 'invert' || _c === 'custom');
     var items = [
       { label: 'Proxy', on: true, k: 'proxy' },
       { label: 'Capture', on: !!(p.tape_count > 0), k: 'cap' },
-      { label: 'Mode', on: p.mode === 'invert', k: 'mode' }
+      { label: 'Mode', on: _ldao && _cdao, k: 'mode' }
     ];
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       var d2 = document.createElement('span');
-      d2.className = 'dot ' + (it.on ? 'ok' : (it.k === 'cap' ? 'warn' : 'err'));
+      // 面分裂(一道一官) → warn 色 · 名实立辨
+      d2.className = 'dot ' + (it.on ? 'ok' : (it.k === 'cap' || (it.k === 'mode' && (_ldao || _cdao)) ? 'warn' : 'err'));
       $dots.appendChild(d2);
     }
-    $dots.title = 'Proxy:' + (items[0].on?'\u2713':'\u2717') + ' \u00b7 Cap:' + (items[1].on?'\u2713':'\u2717') + ' \u00b7 M:' + (p.mode||'?');
+    $dots.title = 'Proxy:' + (items[0].on?'\u2713':'\u2717') + ' \u00b7 Cap:' + (items[1].on?'\u2713':'\u2717') + ' \u00b7 L:' + _l + ' C:' + _c + ' \u00b7 G:' + (p.mode||'?');
   }
 
   function pingPull() {
@@ -3205,6 +3860,24 @@ function activate(ctx) {
     const watchdogId = setInterval(async () => {
       try {
         if (Date.now() - _activateTs < 20000) return; // v9.9.36 · 渡过启动危窗 · 20s 内不检
+        // ★ v9.9.72 · 卸则即葬 — 活巡见 .obsolete 录名 → 当场还原+杀代理
+        //   补 deactivate 未逮之窗: 用户点击卸载后未重启之区间, 锚即归官方
+        if (_selfUninstallPending()) {
+          L.warn("watchdog", ".obsolete 录名 → 当场清锚杀代理 · 卸有终");
+          _clearAnchorFileSync();
+          _clearHomeSettingsSync(); // v9.9.73 · 家目录遗珠并扫
+          try {
+            _unanchorCredentialsToml();
+          } catch {}
+          if (_proxyHandle && _proxyHandle.quit) {
+            await _proxyHandle.quit().catch(() => {});
+          } else {
+            await proxyStop().catch(() => {});
+          }
+          _proxyHandle = null;
+          _cachedAnchored = false;
+          return;
+        }
         if (!_cachedAnchored && !_proxyHandle) return; // 未锚 · 不主动起
         const port = _cachedPort;
         const ping = await httpGetJson(
@@ -3235,6 +3908,11 @@ function activate(ctx) {
               _proxyHandle = _createRemoteHandle(port, ping.mode);
               L.info("watchdog", `remote handle 回填 (mode=${ping.mode})`);
             }
+            // v9.9.69 · 正门守护: Devin 3.11+ 或按会话重书 agentEnv 令牌中继锚
+            //   → 每巡读 settings, URL 键离 _cachedProxyUrl 者复位 (同值不写盘)
+            try {
+              _reanchorAcpEnvDrift(_cachedProxyUrl);
+            } catch {}
             return; // 活且版本最新 · 安心
           }
         }
@@ -3258,6 +3936,32 @@ function activate(ctx) {
     }, 60000);
     ctx.subscriptions.push({ dispose: () => clearInterval(watchdogId) });
     L.info("activate", "watchdog 启 · 60s 自愈一周");
+
+    // ★ v9.9.73 · 卸则即葬 · 快哨 —— 录死之窗愈短 · 痕愈无
+    //   病: watchdog 60s 之巡或失「点卸载→秒重启/强杀」之短窗 → 锚残代存.
+    //   治: 8s 专职轻巡 (唯 .obsolete+目录两 stat · 无为不耗) · 见录即葬.
+    const extinctId = setInterval(async () => {
+      try {
+        if (Date.now() - _activateTs < 8000) return; // 渡启动危窗
+        if (!_selfUninstallPending()) return;
+        L.warn("extinct", ".obsolete 录名 → 还原锚面+杀代理 · 卸有终");
+        _clearAnchorFileSync();
+        _clearHomeSettingsSync();
+        try {
+          _unanchorCredentialsToml();
+        } catch {}
+        if (_proxyHandle && _proxyHandle.quit) {
+          await _proxyHandle.quit().catch(() => {});
+        } else if (_proxyHandle) {
+          await proxyStop().catch(() => {});
+        }
+        _proxyHandle = null;
+        _cachedAnchored = false;
+        removeSpawnHook();
+        clearInterval(extinctId); // 一葬足矣 · 不再扰
+      } catch {}
+    }, 8000);
+    ctx.subscriptions.push({ dispose: () => clearInterval(extinctId) });
 
     // ── v9.9.29 真治 · 终端会话池 (印 160 · 七层污染一招治) ──
     // 主公诏 5/19 3:11: 「反者道之动 · 不依赖任何第三方 · 直接 dao-proxy-min 解决 · 推进到底 实现一切」
@@ -3305,57 +4009,67 @@ async function deactivate() {
     );
   }
 
-  const isLocal = _proxyHandle && _proxyHandle.server;
+  const isLocal = !!(_proxyHandle && _proxyHandle.server);
   const lifetime = _activateTs ? Date.now() - _activateTs : 0;
 
-  // ① 先设透传 · 过渡期 LS 若仍连代理 · 透传至官方 · 不断不乱
-  if (isLocal && _proxyHandle.setMode) {
-    try {
-      _proxyHandle.setMode("passthrough");
-    } catch {}
-  }
-
-  // ② 立即断钩 · 新 LS 不再被截持
+  // ② 立即断钩 · 新 LS 不再被截持 (内存层 · 不写盘)
   _cachedAnchored = false;
   removeSpawnHook();
 
-  // ③ 同步清锚 · v9.9.36 道法自然 · 短命 ext-host 不清锚
+  // ★ v9.9.70 · 重启后生效 · 真因判别 —— 卸则卸锚 · 活则保锚
   // ════════════════════════════════════════════════════════════
-  // 日志实证 (window23/24/25 三窗口一致):
-  //   ext-host 存活 < 30s → 被 "Installation modified" 杀
-  //   清锚导致下个 ext-host 重走 setAnchor → 再触写风暴 → 连环重载
-  //   不清锚 → 下个 ext-host 走 "anchored → auto-restore" 快路 · 零写入
-  // 道义: 七十六「兵强则不胜 · 木强则折」· 强清反害 · 柔保则安
-  //       二十二「曲则金 · 枉则定」· 不争 · 故莫能与之争
+  // 旧病 (141 实证): 不问真因 · lifetime>30s 即 _clearAnchorFileSync →
+  //   升级/重载/崩溃之宿主轮换亦清锚 → settings.json 中段改写 →
+  //   Devin 热读漂移 + 旧代理随亡 → 用户对话中段断流(「正常体验都没了」)。
+  // 真治:
+  //   卸载(.obsolete 录己名且无兄弟版) → 清锚 + 杀代理 (真卸有终)
+  //   升级/重载/崩溃/关窗 → 保锚零写盘 · spawned/remote 代理留活待用
+  //     → 新宿主 activate 见锚已同值 → 零写入 · ping 采用即合
+  //     → 全程无一笔 settings 落盘 · 是为「重启后生效」
+  // 道义: 六十四章「为者败之 执者失之」· 七十六章「兵强则不胜 木强则折」
   // ════════════════════════════════════════════════════════════
-  if (isLocal && lifetime > 30000) {
+  const uninstalling = _selfUninstallPending();
+  const sibling = uninstalling ? false : _selfHasSiblingVersion();
+  if (uninstalling) {
     _clearAnchorFileSync();
+    _clearHomeSettingsSync(); // v9.9.73 · 家目录遗珠并扫
+    try {
+      _unanchorCredentialsToml(); // v9.9.71 · 第四锚面归官方
+    } catch {}
+    if (_proxyHandle && _proxyHandle.quit) {
+      await _proxyHandle.quit().catch(() => {});
+    } else if (isLocal) {
+      await proxyStop();
+    } else {
+      _proxyHandle = null;
+    }
     L.info(
       "deactivate",
-      `清锚 · lifetime=${Math.round(lifetime / 1000)}s · 正常关闭`,
+      `卸载真因 → 清锚 + 杀代理 · 卸有终 · lifetime=${Math.round(lifetime / 1000)}s`,
     );
-  } else if (isLocal) {
-    L.info(
-      "deactivate",
-      `保锚 · lifetime=${Math.round(lifetime / 1000)}s < 30s · 下次 auto-restore 零写入`,
-    );
+  } else {
+    // 活则保锚 · 不写一盘
+    if (isLocal) {
+      await proxyStop(); // 进程内 server 随宿主亡 · graceful 收而已
+      L.info(
+        "deactivate",
+        `${sibling ? "升级" : "重载/关窗"} → 保锚零写 · local代理随宿主 · 新宿主采用链自愈`,
+      );
+    } else {
+      // spawned/remote: 独立于本宿主 · 留活待新主采用 (流量零断窗)
+      const k = _proxyHandle ? _proxyHandle.kind : "none";
+      _proxyHandle = null;
+      L.info(
+        "deactivate",
+        `${sibling ? "升级" : "重载/关窗"} → 保锚零写 · ${k} 代理留活待用 · 重启生效`,
+      );
+    }
   }
-
-  // ★ v9.9.67 · 损 · tryStopExternalApi 调用已删 (轴已源码级拆除 · v9.9.374-min)
 
   if (_essenceProvider) {
     _essenceProvider.dispose();
     _essenceProvider = null;
   }
-
-  await proxyStop();
-
-  L.info(
-    "deactivate",
-    isLocal
-      ? `local: lifetime=${Math.round(lifetime / 1000)}s · ${lifetime > 30000 ? "清锚" : "保锚"} · 大道至简`
-      : "remote: 仅停代理 · 无本地状态",
-  );
 }
 
 // ═══════════════════════════════════════════════════════════════════

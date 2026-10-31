@@ -1,8 +1,8 @@
 {
   "name": "dao-proxy-min",
   "displayName": "道Agent · 反者道之动 · 弱者道之用",
-  "description": "v9.9.68 · ACP锚链根治+面板收净: 激活期ping二发补试·watchdog健康路回填_proxyHandle·ACP env锚去handle门控(治devin.exe acp全程裸奔直连)·面板条尾编钮+全局典源双冗余出列(编唯经L编/C编入)·归道按面清customsp回典源·承9.9.67",
-  "version": "9.9.68",
+  "description": "v9.9.73 · 水过无痕·名实终一(主公诏:卸载即自己回退完消失完): 面板语法错误根治(webview整瘫·热切换全废之真根)+.obsolete双钥(目录名/扩展ID·真卸载判死码复活)+8s快哨+执葬两路皆装(spawned自葬·进程内退而不杀)+settings×4还原(Devin/Windsurf User+家目录遗珠·裸回环锚为据·/t/中继不犯·NO_PROXY我植并除·空壳剪)+兄弟在册甄别(升级让位不误葬)",
+  "version": "9.9.73",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "engines": {
@@ -88,7 +88,7 @@
       },
       {
         "command": "wam.selftest",
-        "title": "闭环自检 (L1 + L2)",
+        "title": "闭环自检 (L0+L1+L2 · 线上真值)",
         "category": "道Agent"
       }
     ],

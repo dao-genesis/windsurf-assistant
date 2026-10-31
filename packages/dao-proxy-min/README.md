@@ -1,4 +1,4 @@
-# 道Agent · dao-proxy-min · **v9.9.68** · ACP锚链根治 · 面板收净 · 道法自然
+# 道Agent · dao-proxy-min · **v9.9.73** · 水过无痕 · 名实终一 · 道法自然
 
 > **一气化三清 · Three Pure · 道并行而不悖**
 > [I · 反代 API · `dao-core`](../dao-core/README.md) &middot; [II · 切号 WAM · `wam`](../wam/README.md) &middot; **III · 提示词反代 · 本**
@@ -9,6 +9,26 @@
 > **损之又损, 以至于无为, 无为而无不为.** —《四十八章》
 > **道法自然.** —《二十五章》
 
+
+## v9.9.73 · 水过无痕 · 名实终一 (2026-10-31)
+
+**四重病根全勘实证 · 装则无为而锚 · 卸则水过无痕**:
+
+| 病 | 根 | 治 |
+|---|---|---|
+| 面板整瘫·切换全废 | webview `<script>` `var items=[` 误入 var 声明链 → SyntaxError 胎死腹中(v9.9.70 引入) | 杂枝删 · 23KB 脚本解析复过 · 面板复活 |
+| 卸载不清锚·代理不死 | `.obsolete` 录死以**目录名键**·旧码唯查扩展ID键→永不命中 | `_readObsoleteMap` 双钥并查(目录名·扩展ID) |
+| 执葬只装半边 | `_extinctTick` 唯 `_SPAWNED` 装载·进程内形态缺席 | 两路皆装: spawned 自葬 · 进程内退而不杀 |
+| 收净不净 | acp env 留壳·家目录遗珠·`dao.origin.*` 孤儿键 | `settings×4` 还原 · 裸回环锚为据 · `/t/` 中继不犯 |
+
+- **兄弟在册甄别** — 升级让位不误葬(四证: 同前缀·非己·未录死·在册)
+- **8s 快哨** — 专职 `.obsolete` 轻巡 · 补 60s watchdog/deactivate 失窗
+- **一锚统万面**(v9.9.69–71 承链) — `agentEnv` 正门锚 · spawn-hook 异值则夺 · `credentials.toml` 第四锚面 · detached spawned 进程名伪装 · `/origin/verify` 判词 `ok_wire_inverted` 闭环自证
+- **自适应**: 端口 `dao.origin.port=0` → per-user FNV-1a hash `8889..8988` 多账号自然隔离 · H2 内部端口随 mux 动态 · 扩展目录异位自适 — 无一机一死口
+
+**面板**: `dots | L道 L官 L编 典源 | C道 C官 C编 典源` — 两面分治 · 无为而无不备。
+
+---
 
 ## v9.9.68 · ACP锚链根治 · 面板收净 (2026-10-27)
 

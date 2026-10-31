@@ -2,6 +2,55 @@
 
 > 反也者, 道之动也; 弱也者, 道之用也. —— 帛书《老子》德经
 
+## v9.9.73 · 水过无痕 · 名实终一 (2026-10-31)
+
+用户诏:「新版很烂 · 切换规则一点用都没有 · 卸载就要卸干净 · 不留后门」— 四重病根全勘实证:
+
+- **面板整瘫根治**: webview `<script>` 内 `var items = [` 误入 var 声明链 → SyntaxError → IIFE 胎死腹中 · 自 v9.9.70 起面板全键皆死(切换规则无效之真根·非切换逻辑坏) — 杂枝删 · 23KB 脚本 `new Function` 复过
+- **`.obsolete` 双钥并查**: fork 录死以**目录名键**(`dao-agi.dao-proxy-min-9.9.73`)·旧码唯查扩展ID键→永不命中→卸载判死全链皆死码 — `_readObsoleteMap` 共用读册·双钥并查
+- **执葬两路皆装**: `_extinctTick` 幸存哨兵原唯 `_SPAWNED` 装载 · 进程内嵌形态(Windows 常态)执葬缺席 → spawned 自葬 · 进程内**退而不杀**(还原锚面·转透传·随宿主自然逝)
+- **兄弟在册甄别**: `_selfHasSiblingVersion` 四证(同前缀·非己·未录死·在册)→ 升级让位不误葬
+- **收净三义**: `_clearAcpEnvJson` 唯删裸回环锚式(URL无路径)·`/t/` 令牌中继(Devin自植)一字不犯·我植 NO_PROXY 并除·空壳尽剪
+- **家目录遗珠**: `_clearHomeSettingsSync` 新设 — `~/.windsurf|~/.devin/settings.json` 裸锚+`dao.origin.*` 我域键并扫·他设不犯
+- **8s 快哨**: 专职 `.obsolete` 轻巡 · 补 60s watchdog 与 deactivate 之失窗
+- 验: `_selfUninstallPending` 八式全过 · 三重 E2E(spawned卸载/升级/进程内卸载) · `node --check` 双过
+
+## v9.9.72 · 执葬哨兵初装 (2026-10-30)
+
+- `.obsolete` 录死感 + `_extinctTick` 幸存者执葬首创 · 唯 `_SPAWNED` 分支装载(进程内形态缺席 · v9.9.73 补齐两路)
+- `_daoSelfMarkedDead` 初版 · 未甄兄弟(升级途中误判·v9.9.73 治)
+
+## v9.9.71 · 一锚统万面 · 东京矩阵 (2026-10-28)
+
+- **进程名伪装**: spawn 经硬链别名 `node` — `pkill devin-desktop` 不殃及 spawned 代理 · IDE 死而代理独活
+- **credentials.toml 第四锚面**: `devin_api_url`+`api_server_url` → 我锚 · drift 巡检纠偏 · 卸载归官方 · 原子写 (取代外部 watchdog.sh sed 纠偏)
+- **spawn-hook 强制夺正**: 预置 WS_URL/DEVIN_API_URL ≠ 我锚 → 重写 · 不再 respect 陈旧值(8937→8917 实证)
+- 东京机矩阵实证: Devin 3.10.67/3.11.228 × in-proc/spawned · 四锚合一 · `ok_wire_inverted` · 升级链零断窗(pid 跨 pkill 独活→新宿主采用)
+
+## v9.9.70 · 名实终一 · 闭环自证 (2026-10-28)
+
+- **`_reqModeEff` 贯通线**: `invertSP` 之 custom 判定改问有效模式(面为准)·全局 custom+面 invert 不再误杀
+- **观察改线真**: `_pendingObsCtx` 钩实发载体 — `after`=线上提取字节(非重演)·`after_source=wire`·`transformed`=实改之果·面板谎言根治
+- **`/origin/verify` + `_tapeVerdict` 判词**: `ok_wire_inverted|ok_passthrough|warn_should_invert|warn_sp_absent_wire|no_capture` — 「所显即所发」闭环自证
+- **detached spawned 代理**: `ELECTRON_RUN_AS_NODE=1`+`DAO_PARENT_PID` 孤儿收割+采用链 — 代理独立于宿主存活
+- **deactivate 真因判别**: 真卸载→清锚杀代理 · 升级/重载/崩溃→保锚零写盘 — 「重启后生效·不扰中段」
+- `_writeSettingsJson` 原子写(tmp+rename) · 面板闭环判决 pill · setDots 读 `surface_modes` 分裂告警
+
+## v9.9.69 · agentEnv 正门锚 · 版本自适 (2026-10-27)
+
+- **Devin 3.11+ 新正门** `devin.acp.agentEnv`/`windsurf.acp.agentEnv`: 官方声明式注 env 预植 IDE 令牌中继 `127.0.0.1:<port>/t/<tok>` → acp 全程绕代理裸奔 — setAnchor 直写全部 agent 键双键(WINDSURF_API_SERVER_URL+DEVIN_API_URL)→proxyUrl · 一锚两世界
+- **spawn-hook 让→夺**: 「已设则让」→「同值则让·异值则夺」+ DEVIN_API_URL 并锚
+- watchdog `_reanchorAcpEnvDrift` 每巡复位(Devin 按会话重书中继锚) · `_clearAcpEnvJson` 卸正门锁 · NO_PROXY 保底 loopback
+- 活目录异位自适: 扩展目录可在 `D:\other\vscode-extensions` 等自定义位 — 药随经行
+
+## v9.9.68 · ACP锚链根治 + 面板收净 (2026-10-27)
+
+- proxyStart EADDRINUSE **ping 二发补试**(800ms后再ping 3s)— 冷启竞速窗不再定终身
+- watchdog 健康路径回填 `_createRemoteHandle`(一次误判定终身根治)
+- `_maybeAnchorAcpEnv` 去 `_proxyHandle` 门控 → 唯查 `_cachedProxyUrl`
+- 面板收净: 条尾「编」钮+全局典源下拉出列 · 编唯经 `L编`/`C编` 以面入
+- 「归道」按面清 `customsp` + 回落 invert(旧码恒清全局·名实不符根治)
+
 ## v9.9.67 · 道法自然 (2026-10-27)
 
 反向审视·底层完善三轮:
