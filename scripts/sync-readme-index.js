@@ -91,7 +91,15 @@ function rebuild() {
       continue;
     }
     const ext = extIdOf(c[2] || '');
-    const mod = ext && byExt.get(ext);
+    let mod = ext && byExt.get(ext);
+    // v3.19.3 · 同行名消歧: rt-flow 与 rt-flow-min 共 extId `devaid.rt-flow` —
+    //   按模块 rowLabel 匹该行首列粗体名 (如 **rt-flow-min**) · 无则回落 extId
+    if (ext) {
+      const rowName = String(c[0] || '').replace(/\*+/g, '').trim();
+      const cands = CFG.modules.filter((m) => m.extId === ext);
+      const labelled = cands.find((m) => m.rowLabel && m.rowLabel === rowName);
+      if (labelled) mod = labelled;
+    }
     if (!mod || c.length < 5) { updated.push(line); continue; }
     const version = resolveVersion(mod, overrides);
     if (!version) { updated.push(line); continue; }

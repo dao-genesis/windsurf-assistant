@@ -10,7 +10,15 @@
       "extId": "devaid.rt-flow",
       "key": "rt-flow",
       "versionFile": "plugins/rt-flow/package.json",
-      "vsix": "rt-flow-{v}.vsix"
+      "vsix": "rt-flow-{v}.vsix",
+      "rowLabel": "rt-flow"
+    },
+    {
+      "extId": "devaid.rt-flow",
+      "key": "rt-flow-min",
+      "versionFile": "packages/rt-flow-min/package.json",
+      "vsix": "devaid.rt-flow-{v}.vsix",
+      "rowLabel": "rt-flow-min"
     },
     {
       "extId": "dao-agi.dao-proxy-min",
