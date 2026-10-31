@@ -66,17 +66,17 @@ scripts/
 
 ### 三插互不干扰（道并行而不相悖）
 
-min 与 pro 同源（pro 是 min 的全功能超集），同装时若标识重叠会在第二个激活时因「命令已注册」崩溃。本仓库已把 **min 整体退到独立命名空间**，pro 保持规范标识不动：
+min 与 pro 同源（pro 是 min 的全功能超集）。**命令 ID 两线全异·无交集**：min 走 `wam.*`/`dao.*` 混名，pro 走独立 `daopp.*` 名。二者共享 `dao-container`/`dao.essence` 面板位与 `dao.origin.*` 配置键（同源同位之「道Agent」本体设计）：
 
 | 维度 | rt-flow | dao-proxy-min | dao-proxy-pro |
 | --- | --- | --- | --- |
-| 命令 | `wam.openEditor` … | `daomin.originInvert` … | `wam.originInvert` / `dao.toggleMode` … |
-| 视图容器 / 视图 | `wam-container` / `wam.panel` | `daomin-container` / `daomin.essence` | `dao-container` / `dao.essence` |
-| 配置命名空间 | `wam.*` | `daomin.*` | `dao.*` |
-| 反代后端端口 | — | 8889..8988（per-user FNV `username+":min"`） | 8937（per-user FNV `username`） |
-| settings 备份键 | — | `daomin.origin._backup_*` | `dao.origin._backup_*` |
+| 命令 | `wam.openEditor` … | `wam.originInvert`/`wam.originPassthrough`/`wam.verifyEndToEnd`/`wam.selftest` + `dao.toggleMode`/`dao.openPreview`/`dao.term.*` | `daopp.originInvert`/`daopp.toggleMode`/`daopp.eaConfig`/`daopp.modelUnlock.*` … |
+| 视图容器 / 视图 | `wam-container` / `wam.panel` | `dao-container` / `dao.essence`（与 pro 共位） | `dao-container` / `dao.essence`（与 min 共位） |
+| 配置命名空间 | `wam.*` | `dao.origin.*`（与 pro 共享） | `dao.origin.*` + `dao.外接api.*`/`dao.modelUnlock.*`/`dao.revproxy.*` |
+| 反代后端端口 | — | 8889..8988（per-user FNV `username+":min"` · 0=自动） | 8937（per-user FNV `username` · 0=自动） |
+| settings 备份键 | — | `dao.origin._backup_*` | `dao.origin._backup_*` |
 
-三者命令 ID、视图 ID、配置键、端口、备份键全无交集，可同时安装、各自独立运行（origin 反转为 min/pro 共有能力，同一时刻建议仅启用其一处于 invert 模式，另一处于 passthrough）。
+三者可同时安装、各自独立运行（命令零重叠）。origin 反转为 min/pro 共有能力，同一时刻建议仅启用其一处于 invert 模式，另一处于 passthrough。
 
 ## 安装
 
