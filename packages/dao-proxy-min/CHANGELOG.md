@@ -2,6 +2,16 @@
 
 > 反也者, 道之动也; 弱也者, 道之用也. —— 帛书《老子》德经
 
+## v9.9.75 · 漏网归网 · 子代理尽道 (2026-10-31)
+
+用户诏:「官方最新版 Devin 底层感觉不符合预期 · 回复更多地接受了官方的一些规则 · 隔离替换没干净 · 挖到根逆流分析到底」— 活口实证根治:
+
+- **病(141 zhou 活捉)**: 官方最新版 Devin 转 **lead+Sidekick 双代理架构** —— 子代理 SP `"You are the Sidekick subagent of Devin, an AI software engineer, paired with a lead agent..."` (~11362B) 不在 `isLikelyOfficialSP`/`classifySPType` 识别集 → `invertSP` 返 null → `transformed:false` → **13/16 请求官方规则全量直通**(tape 实证: before_chars==after_chars==11362); 主 Devin SP(23334B)正常道化 7766B —— 故回复「半道半官·官方规则气」.
+- **药(不为一家开门·为一族开门)**: `isLikelyOfficialSP` + `classifySPType` 首句开 Devin 系代理一族 —— `"You are the <X> of Devin"` / `"You are a <X> from Cognition"` 正则同格(Sidekick/lead/reviewer 及未来变体); `DEVIN_SP_MARKERS` 增双代理指纹(`subagent of Devin`/`paired with a lead agent`/`Sidekick subagent`/`hands you tasks`/`many handoffs`/`an AI software engineer` 等)·计票路双保险.
+- **执一同源**: `sp_invert.js` 与 `source.js` 内副本并改(两处常量在册同步律).
+- **验**: 真实 Sidekick SP(11362B)离线过闸 → `isLikelyOfficialSP=true`·`classifySPType=chat`·`invertSP→7766B 道经文`; `_selftest_967` **30/30**·`_surface_port_test` **14/14**·`_v980_strip` **6/6**·`node --check` 双过.
+- **附带**: 141 机 zhou+administrator 双账号同版同病同药 · 已各部署 9.9.75(ext-host 重载生效).
+
 ## v9.9.74 · 分口定面 · 两面真分 (2026-10-31)
 
 用户诏:「两个被直接划到一起 · 完全没有处理好 · 全都要去修复到底」— 实证根治:

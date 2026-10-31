@@ -1,4 +1,14 @@
-// extension.js · dao-proxy-min v9.9.74 · 道法自然 · 无为而无以为
+// extension.js · dao-proxy-min v9.9.75 · 道法自然 · 无为而无以为
+//   v9.9.75 · 漏网归网 —— 子代理尽道 (主公诏: 新版 Devin 官方规则气·挖到根):
+//     病: 官方最新版 Devin lead+Sidekick 双代理架构 —— 子代理 SP
+//         "You are the Sidekick subagent of Devin..." (~11362B) 不在
+//         isLikelyOfficialSP/classifySPType 识别集 → invertSP 返 null →
+//         transformed:false → 13/16 请求官方规则全量直通 (141 zhou 活捉).
+//     治: ① DEVIN_SP_MARKERS 增双代理一族指纹 (subagent of Devin/
+//            paired with a lead agent/Sidekick subagent 等);
+//         ② isLikelyOfficialSP+classifySPType 首句开一族 —
+//            "You are the <X> of Devin" / "You are a <X> from Cognition";
+//         ③ source.js/sp_invert.js 执一同源并改 · 主副路皆尽道.
 //   v9.9.74 · 分口定面 —— 两面真分·口即面 (主公诏: L/C 被划成一面 根治到底):
 //     病: Devin Desktop 实证 —— Cascade(LS) 与 Devin Local(devin.exe acp)
 //         同走 api_server_pb → 路径分类尽归 local → C 行全死键,

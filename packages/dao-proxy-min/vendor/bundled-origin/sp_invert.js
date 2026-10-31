@@ -355,6 +355,17 @@ const DEVIN_SP_MARKERS = [
   "## Destructive Operations",
   "mcp_list_tools",
   "devin-cli",
+  // v9.9.75 · 新版 Devin lead+Sidekick 双代理架构 · 子代理 SP 指纹
+  //   实证(141 zhou · 官方最新版活捉): "You are the Sidekick subagent of Devin,
+  //   an AI software engineer, paired with a lead agent..." ~11362B ·
+  //   全量官方SP直通(transformed:false) —— 首句不识+指纹不足2票 → 漏网根治
+  "subagent of Devin",
+  "paired with a lead agent",
+  "the lead plans the work",
+  "hands you tasks",
+  "Sidekick subagent",
+  "many handoffs",
+  "an AI software engineer",
 ];
 
 function isLikelyOfficialSP(s) {
@@ -364,6 +375,9 @@ function isLikelyOfficialSP(s) {
   if (s.startsWith("You are Cascade")) return true;
   // v9.9.365 · Devin Local(chisel/ACP) 起首强特征 · 与 Cascade 同格
   if (s.startsWith("You are Devin")) return true;
+  // v9.9.75 · Devin 系代理 SP 首句同格 —— "You are the <X> of Devin" /
+  //   "You are a <X> from Cognition" 一族 (Sidekick/lead/reviewer 及未来变体)
+  if (/^You are (?:the |an? )?\w[\w' -]*\b(?:of Devin|from Cognition)\b/.test(s.slice(0, 160))) return true;
   if (s.length < 500) return false;
   let hits = 0;
   for (const m of OFFICIAL_SP_MARKERS) {
@@ -465,6 +479,8 @@ function classifySPType(s) {
   if (s.startsWith("You are Cascade")) return "chat";
   // v9.9.365 · Devin Local(chisel/ACP) 主对话 SP · 与 Cascade 同格
   if (s.startsWith("You are Devin")) return "chat";
+  // v9.9.75 · Devin 系代理 SP (Sidekick/lead 等双代理一族) · 归 chat 全置换
+  if (/^You are (?:the |an? )?\w[\w' -]*\b(?:of Devin|from Cognition)\b/.test(s.slice(0, 160))) return "chat";
   if (
     s.startsWith("You are an expert AI coding") ||
     s.startsWith("You are an AI assistant") ||
