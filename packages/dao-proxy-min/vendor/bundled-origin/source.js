@@ -352,9 +352,18 @@ function _originGetProxyAgent(isHttps) {
 // 配置 · 常量
 // ═══════════════════════════════════════════════════════════
 const PORT = parseInt(process.env.ORIGIN_PORT || "8889", 10);
+// ★ v9.9.74 · 两面分治之根药 · 分口定面 (道法自然·无为而分)
+//   病: Devin Desktop 实证 —— Cascade(LS) 与 Devin Local(devin.exe acp) 同走
+//       api_server_pb → _surfaceOfPath 把全部聊天判 local → C 行按钮死键,
+//       一切请求只吃第一行模式 (主公实测「两个被直接划到一起」).
+//   治: acp 锚面(env/agentEnv/credentials.toml)指专属第二口 ORIGIN_ACP_PORT;
+//       同 handler 双 mux 并听, 按 socket.localPort 定面 —— 口即面, 无猜无惑;
+//       主口 api_server_pb 归 cascade (其本即 LS/IDE 之 inference 协议).
+const ACP_PORT = parseInt(process.env.ORIGIN_ACP_PORT || "0", 10); // 0=不分口(旧机/手动直跑兼容)
+let _acpPortWanted = ACP_PORT; // start(opts.acpPort) 可覆 · server listening 时按此绑 acp mux
 // v9.6.1 · 反者道之动 · 远曰反 · 回归 v9.1.2 之全前端按钮 (七按钮: 道/官/实/原/编/复/卸 + dots/customBadge)
 // 以 v9.1.2 本源哲学为锚 · 守大常不动 · 五细节皆成: isAlreadyInverted · _rawTape+all_fields · 部署不 kill · 前端按钮回归
-const ORIGIN_VERSION_BASE = "v9.9.73"; // v9.9.73-min · 水过无痕·名实终一(主公诏): ①执葬两路皆装(spawned自葬+进程内退而不杀·还原锚面转透传待逝) ②录死钥双式并查(目录名·扩展ID)+兄弟在册甄别(活兄在→升级让位非死不葬) ③settings×4还原(Devin/Windsurf User+~/.windsurf/~/.devin家目录遗珠·裸回环锚式为据·/t/中继不犯) ④NO_PROXY我植并除·空壳剪·dao.origin.*尽扫 ⑤进程内_/_quit录死亦还原 · 前系v9.9.72: 卸则有终·幸存者执葬 —— spawned relay 巡 .obsolete/目录亡 → 还原三面锚(settings×2+credentials.toml)+清dao-origin+逝后扫尾自退 · deactivate未逮之洞闭合 · 走而能离reqModeEff(治全局SP_MODE=custom误杀面invert·治面道全局官之原文冒充实收) ③preview停重演直呈录存真值 ④/origin/verify闭环自检+tape末条判词(sig嵌入) ⑤detached支持(DAO_SPAWNED·DAO_PARENT_PID孤儿收割·父亡+静默10min自退·_quit后自终) ⑥名实字段并录持久化(surface/mode_eff/sp_on_wire/after_source/wire_changed)·前系v9.9.69: ①切经藏log未定义修(ext·canonChanged推送断裂根) ②回调吞噬守卫(exec/execFile callback被env对象覆写) ③重启丢模式根治(磁盘持久模式优先于config默认·ext+src双侧) ④隧道自动连接默认关(DAO_BRIDGE_AUTOCONNECT=1显式开·手动端点保留·Min版revproxy已拆·隧道零收益纯攻击面) ⑤帧不落盘(DAO_FRAME_PERSIST=1复旧·Authorization+会话token不再每轮writeFileSync落盘) ⑥解锁缺省禁(名实相符·无模型解锁) ⑦selftest总判唯系道魂之路(外接径Min已拆不再拖累总判) ⑧stop()补闭H2内部服务器(CLI进程不退之根) ⑨尸骸出包(_dao_81传世本无引用·运行时态文件) · 前系 v9.9.66-min · Min 版系归位(非 Pro 9.9.3xx) · always-on 用户规则部件剔除 + 按面典源/自编 + pin 防热回滚 + 面板两面同构 · 前系: v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 多账号机 reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(多账号机): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
+const ORIGIN_VERSION_BASE = "v9.9.74"; // v9.9.74-min · 分口定面·两面真分(主公诏:L/C划成一面根治): acp专属口并听→localPort即面·主口api_server_pb归cascade·acp域锚面(env/agentEnv/credentials)尽归专口·ping.acp_port实况·credentials Win遗珠补径·显有效模式+面 —— 前系v9.9.73-min · 水过无痕·名实终一(主公诏): ①执葬两路皆装(spawned自葬+进程内退而不杀·还原锚面转透传待逝) ②录死钥双式并查(目录名·扩展ID)+兄弟在册甄别(活兄在→升级让位非死不葬) ③settings×4还原(Devin/Windsurf User+~/.windsurf/~/.devin家目录遗珠·裸回环锚式为据·/t/中继不犯) ④NO_PROXY我植并除·空壳剪·dao.origin.*尽扫 ⑤进程内_/_quit录死亦还原 · 前系v9.9.72: 卸则有终·幸存者执葬 —— spawned relay 巡 .obsolete/目录亡 → 还原三面锚(settings×2+credentials.toml)+清dao-origin+逝后扫尾自退 · deactivate未逮之洞闭合 · 走而能离reqModeEff(治全局SP_MODE=custom误杀面invert·治面道全局官之原文冒充实收) ③preview停重演直呈录存真值 ④/origin/verify闭环自检+tape末条判词(sig嵌入) ⑤detached支持(DAO_SPAWNED·DAO_PARENT_PID孤儿收割·父亡+静默10min自退·_quit后自终) ⑥名实字段并录持久化(surface/mode_eff/sp_on_wire/after_source/wire_changed)·前系v9.9.69: ①切经藏log未定义修(ext·canonChanged推送断裂根) ②回调吞噬守卫(exec/execFile callback被env对象覆写) ③重启丢模式根治(磁盘持久模式优先于config默认·ext+src双侧) ④隧道自动连接默认关(DAO_BRIDGE_AUTOCONNECT=1显式开·手动端点保留·Min版revproxy已拆·隧道零收益纯攻击面) ⑤帧不落盘(DAO_FRAME_PERSIST=1复旧·Authorization+会话token不再每轮writeFileSync落盘) ⑥解锁缺省禁(名实相符·无模型解锁) ⑦selftest总判唯系道魂之路(外接径Min已拆不再拖累总判) ⑧stop()补闭H2内部服务器(CLI进程不退之根) ⑨尸骸出包(_dao_81传世本无引用·运行时态文件) · 前系 v9.9.66-min · Min 版系归位(非 Pro 9.9.3xx) · always-on 用户规则部件剔除 + 按面典源/自编 + pin 防热回滚 + 面板两面同构 · 前系: v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 多账号机 reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(多账号机): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
 // 印 153 · 唯变所适 · 软编码归宗 · 二十五章「逝曰远 远曰反」· 七十六章「兵强则不胜」
 // 病: 多 ext-host 共端口 :8937 · 旧版 in-process proxy 持续 listen · self_file 锁死旧版目录
 //     → 即便装毕新版 vsix · /ping 仍返 v9.9.19/v9.9.20 之 self_file · canon_name 走旧映射
@@ -499,18 +508,32 @@ let _pendingObsCtx = null;
 function _spReplaceActive() {
   return SP_MODE === "invert" || SP_MODE === "custom";
 }
-// ★ v9.9.368 · 两面分治 · 道法自然
-//   Devin Local(chisel acp 经 WINDSURF_API_SERVER_URL 归本口) → 路径含 api_server_pb → "local"
-//   Cascade(LS 经 --api_server_url/--inference_api_server_url 归本口) → cascade/codeium_common/
-//   language_server_pb/chat_web → "cascade"。渠道配置两面共用, 但 SP 替换与模型路由按面分置:
+// ★ v9.9.368 · 两面分治 · 道法自然 —— v9.9.74 名实归位
+//   Devin Local(devin.exe acp 经 WINDSURF_API_SERVER_URL/DEVIN_API_URL/agentEnv/
+//     credentials.toml 归 ACP_PORT 专属口) → socket.localPort===acp口 → "local"
+//   Cascade(LS 经 --api_server_url/--inference_api_server_url/settings.json 归主口) →
+//     cascade/codeium_common/language_server_pb/chat_web/api_server_pb → "cascade"
+//   ★ 实证纠偏: Devin Desktop 之 Cascade(LS) 亦走 api_server_pb —— api_server_pb
+//     本就是 LS/IDE 之 inference 协议, 旧码误归 local → 两面划为一面。
 //   `_origin_mode_surface.json` = {default?, local?, cascade?} 每面可独立 invert/passthrough/custom,
 //   未设面回落 default 再回落全局 SP_MODE; 路由条目加 scope: all|local|cascade(缺省 all 双面)。
+let _acpBoundPort = 0; // acp 面 mux 实绑口 (0=未绑)
+let _acpH2Port = 0; // acp 面 h2 内部实绑口 (0=未绑)
 function _surfaceOfPath(reqPath) {
   if (!reqPath) return "";
-  if (/api_server_pb/i.test(reqPath)) return "local";
-  if (/cascade|codeium_common|language_server_pb|chat_web/i.test(reqPath))
+  if (/cascade|codeium_common|language_server_pb|chat_web|api_server_pb/i.test(reqPath))
     return "cascade";
   return "";
+}
+// ★ v9.9.74 · 分口定面 —— 口标优先于路径: acp 专属口(socket.localPort==_acpBoundPort/_acpH2Port)
+//   恒归 local; 主口请求按路径分 (api_server_pb 即 cascade)。
+function _reqSurfaceOf(req) {
+  try {
+    const lp = req && req.socket && req.socket.localPort;
+    if (lp && _acpBoundPort && (lp === _acpBoundPort || lp === _acpH2Port))
+      return "local";
+  } catch (_) {}
+  return _surfaceOfPath(req && req.url);
 }
 const SP_MODE_SURFACE_FILE = _stableStateFile("_origin_mode_surface.json");
 // ★ v9.9.67 · surface 文件一请五读 → 一读共享 (TTL 缓存)
@@ -4036,6 +4059,8 @@ function handleControl(req, res) {
       JSON.stringify({
         ok: true,
         port: _actualPort,
+        // ★ v9.9.74 · acp 面专属口实况 (0=未分口 · 旧版/绑定失败回落)
+        acp_port: _acpBoundPort || 0,
         mode: SP_MODE,
         // ★ v9.9.371 · 两面分治: 每面独立 SP 模式实况 (未设面回落 default 再回落全局)
         surface_modes: {
@@ -4531,6 +4556,10 @@ function handleControl(req, res) {
           // h2 内部 server 也关
           try {
             _h2Server && _h2Server.close && _h2Server.close();
+          } catch {}
+          // ★ v9.9.74 · acp 面并听同闭
+          try {
+            _closeAcpMux();
           } catch {}
           // ★ v9.9.70 · spawned 进程 close 后自退 —— SSE/H2 长连不阻让位
           //   ext-host 内嵌路径进程死随宿主 · 无需此; 独立子进程须自终
@@ -11230,7 +11259,7 @@ const _mainHandler = async (req, res) => {
     _lastLsReqAt = Date.now();
     // 2. 路由分类
     const kind = classifyRPC(req.url);
-    const _reqSurface = _surfaceOfPath(req.url); // v9.9.368 · 两面分治面标 local|cascade|''
+    const _reqSurface = _reqSurfaceOf(req); // v9.9.74 · 分口定面: acp专属口→local · 主口按路径→cascade|''
     // ★ v9.9.70 · 名实终一 · 按面有效模式入手即定 (invertSP/invertAnySP/观察路同此一源)
     _reqModeEff = _surfaceMode(_reqSurface);
     const route = routeUpstream(req.url);
@@ -11768,7 +11797,7 @@ const _mainHandler = async (req, res) => {
         `#${rid} ${kind} CHANGED ${body.length}B → ${modified.length}B mode=${SP_MODE}`,
       );
     } else {
-      log(`#${rid} ${kind} UNCHANGED ${body.length}B mode=${SP_MODE}`);
+      log(`#${rid} ${kind} UNCHANGED ${body.length}B mode=${_effMode()} surface=${_reqSurface || "-"}`); // v9.9.74 · 显有效模式+面 (名实归一)
     }
 
     // ★ v9.9.70 · 名实终一 · 实发字节交观察路 (after=LLM实收 · 非重演)
@@ -11929,11 +11958,119 @@ const server = net.createServer((socket) => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ★ v9.9.74 · acp 面并听 —— Devin Local(devin.exe acp) 专属口 · 两面分治之根药
+//   Devin Desktop 实证: Cascade(LS) 与 acp 同走 api_server_pb → 路径不可分。
+//   治: 第二 mux 与主口同 handler 并听 ORIGIN_ACP_PORT —— socket.localPort
+//       即面 (h1 直连口 / h2 桥接内口 皆归 local) · 口即面, 无猜无惑。
+//   h1: socket 直发 _h1Server (localPort=acp口 自来面标);
+//   h2: 桥至 _h2ServerAcp 专内口 (localPort=_acpH2Port → local)。
+// ═══════════════════════════════════════════════════════════════════════════
+const _h2ServerAcp = http2.createServer(_mainHandler);
+_h2ServerAcp.on("sessionError", (err) => {
+  _h2Errs++;
+  if (_h2SessErrs.length < 8)
+    _h2SessErrs.push({ t: Date.now(), msg: err.message || String(err), code: err.code, acp: true });
+});
+const _acpMux = net.createServer((socket) => {
+  _muxConns++;
+  socket.once("data", (buf) => {
+    if (buf[0] === 0x50 && buf.length >= 3 && buf[1] === 0x52 && buf[2] === 0x49) {
+      socket.pause();
+      _muxH2++;
+      const bridge = net.createConnection(_acpH2Port, "127.0.0.1", () => {
+        bridge.write(buf);
+        socket.pipe(bridge);
+        bridge.pipe(socket);
+        socket.resume();
+      });
+      bridge.on("error", () => socket.destroy());
+      socket.on("error", () => bridge.destroy());
+      socket.on("close", () => bridge.destroy());
+      bridge.on("close", () => socket.destroy());
+    } else {
+      _muxH1++;
+      socket.unshift(buf);
+      _h1Server.emit("connection", socket); // localPort=acp口 → _reqSurfaceOf 判 local
+    }
+  });
+});
+_acpMux.on("error", (e) => {
+  log("[acp-mux] err: " + e.message);
+});
+// acp 面 h2 内部口绑定 (boundAcp+50..+58 递归避让 · 与主口 h2 同律)
+function _bindAcpH2(boundAcp) {
+  if (_acpH2Port) return;
+  function _try(p) {
+    if (p > boundAcp + 58) {
+      log(`[acp-h2] FATAL: all internal ports :${boundAcp + 50}..:${boundAcp + 58} EADDRINUSE`);
+      return;
+    }
+    const onListen = () => {
+      _acpH2Port = p;
+      _h2ServerAcp.removeListener("error", onError);
+      log(`[acp-h2] internal h2c on :${p} (acp-mux=:${boundAcp})`);
+    };
+    const onError = (e) => {
+      if (e.code === "EADDRINUSE") {
+        _h2ServerAcp.removeListener("listening", onListen);
+        log(`[acp-h2] :${p} EADDRINUSE → retry :${p + 1}`);
+        _try(p + 1);
+      } else {
+        log(`[acp-h2] internal error: ${e.message}`);
+      }
+    };
+    _h2ServerAcp.once("listening", onListen);
+    _h2ServerAcp.once("error", onError);
+    _h2ServerAcp.listen(p, "127.0.0.1");
+  }
+  _try(boundAcp + 50);
+}
+// acp 面 mux 口绑定 (wanted..wanted+8 递归避让) · 幂等
+function _bindAcpMux(wanted) {
+  if (_acpBoundPort || !wanted || wanted <= 0) return;
+  function _try(p) {
+    if (p > wanted + 8) {
+      log(`[acp-mux] FATAL: all ports :${wanted}..:${wanted + 8} EADDRINUSE → acp 不分口(主口按路径分)`);
+      return;
+    }
+    const onListen = () => {
+      _acpBoundPort = p;
+      _acpMux.removeListener("error", onError);
+      log(`[acp-mux] acp 面并听 :${p} (Devin Local 专属口 · localPort→local)`);
+      _bindAcpH2(p);
+    };
+    const onError = (e) => {
+      if (e.code === "EADDRINUSE") {
+        _acpMux.removeListener("listening", onListen);
+        log(`[acp-mux] :${p} EADDRINUSE → retry :${p + 1}`);
+        _try(p + 1);
+      } else {
+        log(`[acp-mux] error: ${e.message}`);
+      }
+    };
+    _acpMux.once("listening", onListen);
+    _acpMux.once("error", onError);
+    _acpMux.listen(p, "127.0.0.1");
+  }
+  _try(wanted);
+}
+function _closeAcpMux() {
+  try { if (_acpBoundPort) _acpMux.close(() => {}); } catch (_) {}
+  try { if (_acpH2Port) _h2ServerAcp.close(() => {}); } catch (_) {}
+  _acpBoundPort = 0;
+  _acpH2Port = 0;
+}
+
 server.on("listening", () => {
   try {
     _actualPort = (server.address() && server.address().port) || PORT;
   } catch {}
   _writeEndpointDiscovery();
+  // ★ v9.9.74 · 分口定面 · 主口就绪即并听 acp 面 (0=不分口则自动跳)
+  try {
+    _bindAcpMux(_acpPortWanted);
+  } catch (_) {}
   // 持久通道自愈: 若用户此前已绑 CF API Token, 开机即自动拉起 workers.dev 出站长连(固定地址永不轮换)。
   // ★ v9.9.67-min · 反者道之动 · 隧道轴自动连接默认关 · 名实相符
   //   病: Min 版 revproxy 轴已源码级拆除(_getRevproxy 恒 null) → 隧道之受益者已亡,
@@ -11988,6 +12125,8 @@ function start(opts) {
   opts = opts || {};
   const port = opts.port != null ? opts.port : PORT;
   const host = opts.host || "127.0.0.1";
+  // ★ v9.9.74 · 分口定面 · 库调用可指 acp 面口 (env 兜底)
+  if (opts.acpPort != null) _acpPortWanted = parseInt(opts.acpPort, 10) || 0;
   // ★ v9.9.67 · 执今之道 · 磁盘持久模式优先 · 治「重启丢模式」(与 extension.js 同修)
   //   病: ext-host activate 传 config dao.origin.defaultMode(默 invert) → 此处以之覆 SP_MODE
   //       → 用户运行时切换(道⇄官 · 已 _saveModeToDisk) 于窗口重启即被 config 默认覆没。
@@ -12034,6 +12173,9 @@ function start(opts) {
                 _h2Server.close(() => {});
                 _h2Listening = false;
               }
+            } catch {}
+            try {
+              _closeAcpMux(); // v9.9.74 · acp 面并听同闭
             } catch {}
             // ★ v9.9.67 · 长连不阻停机 (SSE 等 · 与 stop() 同律)
             try {
@@ -12128,6 +12270,9 @@ function stop() {
         _h2Server.close(() => {});
         _h2Listening = false;
       }
+    } catch {}
+    try {
+      _closeAcpMux(); // v9.9.74 · acp 面并听同闭
     } catch {}
     // ★ v9.9.67 · 长连不阻停机 · 善闭者闭众门
     //   病: server.close() 候一切连接自终 · SSE 长连(/origin/stream)永不自终
@@ -12318,5 +12463,11 @@ module.exports = {
     _originIsLocalHost,
     _setLastGoodUserStatusForTest: (v) => { _lastGoodUserStatus = v; },
     _getLastGoodUserStatusForTest: () => _lastGoodUserStatus,
+    // ★ v9.9.74 · 分口定面离线可测 (面标=口标)
+    _reqSurfaceOf,
+    _surfaceOfPath,
+    _surfaceMode,
+    _setAcpPortsForTest: (mux, h2) => { _acpBoundPort = mux || 0; _acpH2Port = h2 || 0; },
+    _getAcpPortsForTest: () => ({ mux: _acpBoundPort, h2: _acpH2Port }),
   },
 };

@@ -1,4 +1,16 @@
-// extension.js · dao-proxy-min v9.9.73 · 道法自然 · 无为而无以为
+// extension.js · dao-proxy-min v9.9.74 · 道法自然 · 无为而无以为
+//   v9.9.74 · 分口定面 —— 两面真分·口即面 (主公诏: L/C 被划成一面 根治到底):
+//     病: Devin Desktop 实证 —— Cascade(LS) 与 Devin Local(devin.exe acp)
+//         同走 api_server_pb → 路径分类尽归 local → C 行全死键,
+//         一切请求只吃 L 行模式 (实测「两个被直接划到一起」).
+//     治: ① 专属第二口 _cachedAcpPort (=主口-500·dao.origin.acpPort 可覆)
+//         —— acp 域锚面尽数归此: spawn-hook env 双键 / agentEnv 正门 /
+//            credentials.toml (devin_api_url+api_server_url);
+//         ② source.js 双 mux 并听(h1 直发+h2 桥专内口)→ socket.localPort 即面;
+//         ③ 主口 api_server_pb 归 cascade (其本即 LS/IDE 之 inference 协议);
+//         ④ 采用实况 ping.acp_port (旧代理无则回落主口·旧语义不裂);
+//         ⑤ credentials.toml Win 遗珠补径 %APPDATA%/devin (旧册未达之面复活);
+//         ⑥ 热路 log 显有效模式+面 (名实归一).
 //   v9.9.73 · 水过无痕 —— 名实终一 · 卸真无痕 (主公诏: 卸载即自己回退完消失完):
 //     ① 面板复活 —— setDots 内 var items=[ 误入 var 声明 → 全脚本语法错误,
 //        面板整瘫 (热切换/面选/dots 尽死). 此即「热切换规则全废」之真根.
@@ -199,6 +211,9 @@ const DAO_QUOTES = [
 // ═══════════════════════════ 缓存 ═══════════════════════════
 let _cachedPort = DEFAULT_PORT;
 let _cachedProxyUrl = `http://127.0.0.1:${DEFAULT_PORT}`;
+// ★ v9.9.74 · 分口定面 · Devin Local(acp) 专属口 —— acp 请求归 local 面 · 口即面无猜
+let _cachedAcpPort = 0;
+let _cachedAcpUrl = "";
 let _cachedAnchored = false;
 let _cachedMode = "invert";
 let _activateTs = 0; // v9.9.36 · ext-host 生命周期追踪 · smart deactivate
@@ -247,10 +262,33 @@ function resolvePort() {
   }
 }
 
+// ★ v9.9.74 · 分口定面 · acp 面口解析 —— 0=自动=主口-500(8389..8488) · 非0覆盖
+function resolveAcpPort() {
+  const c = vscode.workspace.getConfiguration("dao");
+  const explicit = parseInt(c.get("origin.acpPort"), 10);
+  if (Number.isFinite(explicit) && explicit >= 1 && explicit <= 65535)
+    return explicit;
+  let p = _cachedPort - 500;
+  if (!Number.isFinite(p) || p < 1024 || p > 65535) p = _cachedPort + 500;
+  return p;
+}
+// 采用远端代理实况之 acp 口 (ping.acp_port>0 → 采用; 无 → 旧代理回落主口·旧语义)
+function _adoptAcpPort(ping) {
+  const p = ping && parseInt(ping.acp_port, 10);
+  if (Number.isFinite(p) && p > 0) {
+    _cachedAcpPort = p;
+    _cachedAcpUrl = `http://127.0.0.1:${p}`;
+  } else {
+    _cachedAcpUrl = _cachedProxyUrl; // 旧代理无 acp 口 → acp 锚归主口 (9.9.73 前语义)
+  }
+}
+
 function cfg() {
   _cachedPort = resolvePort();
   _cachedProxyUrl = `http://127.0.0.1:${_cachedPort}`;
-  return { port: _cachedPort };
+  _cachedAcpPort = resolveAcpPort();
+  _cachedAcpUrl = `http://127.0.0.1:${_cachedAcpPort}`;
+  return { port: _cachedPort, acpPort: _cachedAcpPort };
 }
 
 // ═══════════════════════════ spawn hook ═══════════════════════════
@@ -330,11 +368,13 @@ function _maybeAnchorAcpEnv(cmd, args, opts) {
     //   (127.0.0.1:32809/t/<tok>) → 旧律「已设则让」致 acp 绕代理裸奔.
     //   今: 值=我锚 → 让 (无为); 值≠我锚 → 夺 (重写为锚).
     //   双键并锚 (WINDSURF_API_SERVER_URL + DEVIN_API_URL) · 与 agentEnv 正门同构.
+    // ★ v9.9.74 · 分口定面 —— acp env 锚专属口 → 其请求恒归 local 面 (口即面)
+    const acpUrl = _cachedAcpUrl || _cachedProxyUrl;
     const preA = env.WINDSURF_API_SERVER_URL;
     const preB = env.DEVIN_API_URL;
-    if (preA === _cachedProxyUrl && preB === _cachedProxyUrl) return;
-    env.WINDSURF_API_SERVER_URL = _cachedProxyUrl;
-    env.DEVIN_API_URL = _cachedProxyUrl;
+    if (preA === acpUrl && preB === acpUrl) return;
+    env.WINDSURF_API_SERVER_URL = acpUrl;
+    env.DEVIN_API_URL = acpUrl;
     const np = String(env.NO_PROXY || env.no_proxy || "")
       .split(",").map((x) => x.trim()).filter(Boolean);
     if (!np.includes("*"))
@@ -344,8 +384,8 @@ function _maybeAnchorAcpEnv(cmd, args, opts) {
     L.info(
       "spawn-hook",
       "acp env anchor -> " +
-        _cachedProxyUrl +
-        (preA && preA !== _cachedProxyUrl ? ` (夺回:${preA.slice(0, 60)})` : ""),
+        acpUrl +
+        (preA && preA !== acpUrl ? ` (夺回:${preA.slice(0, 60)})` : ""),
     );
     return opts;
   } catch {}
@@ -612,6 +652,7 @@ async function _spawnDetachedProxy(srcPath, port, mode) {
     const env = Object.assign({}, process.env, {
       ELECTRON_RUN_AS_NODE: "1", // Electron 宿主亦可作纯 node 跑
       ORIGIN_PORT: String(port),
+      ORIGIN_ACP_PORT: String(_cachedAcpPort || port - 500), // v9.9.74 · acp 面专属口
       SP_MODE: mode || "invert", // 盘值优先 · env 仅兜底 (与 start() 语义同)
       DAO_PARENT_PID: String(process.pid),
       DAO_SPAWNED: "1",
@@ -689,6 +730,7 @@ async function _spawnDetachedProxy(srcPath, port, mode) {
             "proxy",
             `spawned detached :${port} pid=${childPid} mode=${p.mode}`,
           );
+          _adoptAcpPort(p); // v9.9.74 · 实况 acp 口 (bind 避让或落 +N)
           return _createRemoteHandle(port, p.mode, {
             spawned: true,
             pid: childPid,
@@ -745,6 +787,7 @@ async function proxyStart(port, mode, _retried) {
       "proxy",
       `adopt live remote :${port} (mode=${ping0.mode} spawned=${!!ping0.spawned} pid=${ping0.pid} self=${ping0.self_file})`,
     );
+    _adoptAcpPort(ping0); // v9.9.74 · 采用实况 acp 口 (无则回落主口)
     _proxyHandle = _createRemoteHandle(port, ping0.mode, {
       spawned: !!ping0.spawned,
       pid: ping0.pid,
@@ -773,6 +816,7 @@ async function proxyStart(port, mode, _retried) {
       port,
       host: "127.0.0.1",
       mode: mode || "passthrough",
+      acpPort: _cachedAcpPort, // v9.9.74 · acp 面专属口
     });
     L.info(
       "proxy",
@@ -822,6 +866,7 @@ async function proxyStart(port, mode, _retried) {
           "proxy",
           `port :${port} live remote (mode=${ping.mode} · ver=${(ping.features || {}).mode || "?"}) → remote handle`,
         );
+        _adoptAcpPort(ping); // v9.9.74 · 采用实况 acp 口
         _proxyHandle = _createRemoteHandle(port, ping.mode, {
           spawned: !!ping.spawned,
           pid: ping.pid,
@@ -1108,7 +1153,9 @@ async function setAnchor(port) {
       }
       // v9.9.69 · 正门锚: agentEnv 声明式 env 注入 (Devin 3.11+)
       //   codeium.* 已同值亦须查 agentEnv —— 或为新版本写之缺/被再生之中继
-      const envN = _anchorAcpEnvJson(json, url);
+      // ★ v9.9.74 · 分口定面 —— agentEnv(acp域) 锚专属口 → acp 请求恒归 local 面
+      const acpUrl = _cachedAcpUrl || url;
+      const envN = _anchorAcpEnvJson(json, acpUrl);
       if (envN > 0) dirty = true;
       if (!dirty) {
         L.info("anchor", `already ${url} · skip ${sp} (无为而治)`);
@@ -1133,8 +1180,10 @@ async function setAnchor(port) {
   //   ~/.local/share/devin/credentials.toml —— devin login/换号/升级辄重写
   //   → acp chat 直连官方绕代理 (东京机实证: 友人被迫以 shell watchdog 手工纠偏)。
   //   今并入正门: setAnchor 即写 + drift watchdog 巡 · 补丁之补丁尽废。
+  // ★ v9.9.74 · 分口定面 + Win 遗珠: credentials 属 acp 域 → 锚专属口;
+  //   _CRED_PATHS 补 %APPDATA%/devin (Windows 实位 · 旧册未达曾死面).
   try {
-    _anchorCredentialsToml(url);
+    _anchorCredentialsToml(_cachedAcpUrl || url);
   } catch (e) {
     L.warn("anchor", `credentials.toml: ${e.message}`);
   }
@@ -1145,10 +1194,15 @@ async function setAnchor(port) {
 // 原子写: tmp+rename · 与 _writeSettingsJson 同律.
 const _CRED_PATHS = () => {
   const h = os.homedir();
-  return [
+  const out = [
     path.join(h, ".local", "share", "devin", "credentials.toml"),
     path.join(h, ".config", "devin", "credentials.toml"),
   ];
+  // ★ v9.9.74 · Win 遗珠 —— 实证 Windows 实位 %APPDATA%\devin\credentials.toml
+  //   (旧册唯 Unix 二径 → Win 之第四锚面曾为死面·用户 shell watchdog 代偿)
+  if (process.env.APPDATA)
+    out.push(path.join(process.env.APPDATA, "devin", "credentials.toml"));
+  return out;
 };
 function _readCredAnchor() {
   for (const p of _CRED_PATHS()) {
@@ -1214,11 +1268,11 @@ function _unanchorCredentialsToml() {
   L.info("anchor", `credentials.toml 归官方 ×${n}`);
   return true;
 }
-// drift 巡检之判: 面存在且值≠我锚 → 漂
+// drift 巡检之判: 面存在且值≠我锚 → 漂 (v9.9.74 · credentials 属 acp 域 → 比 acp 锚)
 function _isCredentialsDrifted() {
   const cur = _readCredAnchor();
   if (!cur) return false;
-  const want = _cachedProxyUrl;
+  const want = _cachedAcpUrl || _cachedProxyUrl;
   return (
     (cur.devin_api_url !== null && cur.devin_api_url !== want) ||
     (cur.api_server_url !== null && cur.api_server_url !== want)
@@ -3905,13 +3959,14 @@ function activate(ctx) {
           } else {
             // v9.9.68 · 健康路径回填 _proxyHandle — 根治「激活期单次 ping 失误判非反代 → handle 永 null → ACP env 锚死」
             if (!_proxyHandle) {
+              _adoptAcpPort(ping); // v9.9.74 · 采用实况 acp 口
               _proxyHandle = _createRemoteHandle(port, ping.mode);
               L.info("watchdog", `remote handle 回填 (mode=${ping.mode})`);
             }
             // v9.9.69 · 正门守护: Devin 3.11+ 或按会话重书 agentEnv 令牌中继锚
             //   → 每巡读 settings, URL 键离 _cachedProxyUrl 者复位 (同值不写盘)
             try {
-              _reanchorAcpEnvDrift(_cachedProxyUrl);
+              _reanchorAcpEnvDrift(_cachedAcpUrl || _cachedProxyUrl); // v9.9.74 · acp域巡 acp锚
             } catch {}
             return; // 活且版本最新 · 安心
           }

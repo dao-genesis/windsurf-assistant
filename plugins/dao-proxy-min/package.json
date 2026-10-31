@@ -2,7 +2,7 @@
   "name": "dao-proxy-min",
   "displayName": "道Agent · 反者道之动 · 弱者道之用",
   "description": "v9.9.73 · 水过无痕·名实终一(主公诏:卸载即自己回退完消失完): 面板语法错误根治(webview整瘫·热切换全废之真根)+.obsolete双钥(目录名/扩展ID·真卸载判死码复活)+8s快哨+执葬两路皆装(spawned自葬·进程内退而不杀)+settings×4还原(Devin/Windsurf User+家目录遗珠·裸回环锚为据·/t/中继不犯·NO_PROXY我植并除·空壳剪)+兄弟在册甄别(升级让位不误葬)",
-  "version": "9.9.73",
+  "version": "9.9.74",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "engines": {
@@ -10,8 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dao-genesis/windsurf-assistant.git",
-    "directory": "plugins/dao-proxy-min"
+    "url": "https://github.com/dao-genesis/windsurf-assistant.git"
   },
   "homepage": "https://github.com/dao-genesis/windsurf-assistant",
   "icon": "media/icon.png",
@@ -102,6 +101,13 @@
           "minimum": 0,
           "maximum": 65535,
           "description": "源.js 反代端口 (0=自动 per-user FNV-1a hash · 8889..8988 · 多账号自然隔离). 非0则覆盖."
+        },
+        "dao.origin.acpPort": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Devin Local(acp) 专属口 (0=自动=主口-500 · 8389..8488 · 两面分治之脊: acp 请求归 local 面 · 非0则覆盖)."
         },
         "dao.origin.defaultMode": {
           "type": "string",

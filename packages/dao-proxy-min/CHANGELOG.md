@@ -2,6 +2,17 @@
 
 > 反也者, 道之动也; 弱也者, 道之用也. —— 帛书《老子》德经
 
+## v9.9.74 · 分口定面 · 两面真分 (2026-10-31)
+
+用户诏:「两个被直接划到一起 · 完全没有处理好 · 全都要去修复到底」— 实证根治:
+
+- **分口定面(根药)**: Devin Desktop 实证 —— Cascade(LS) 与 Devin Local(devin.exe acp) 同走 `api_server_pb` → 路径分类尽归 local → C 行全死键. acp 域锚面尽归**专属第二口**(默认=主口-500·`dao.origin.acpPort` 可覆): spawn-hook env 双键 / `devin.acp.agentEnv`/`windsurf.acp.agentEnv` 正门 / `credentials.toml`(devin_api_url+api_server_url). source.js 双 mux 并听(h1 直发 + h2 桥专内口 `_h2ServerAcp`)→ **`socket.localPort` 即面** —— 口即面, 无猜无惑.
+- **主口 api_server_pb 归 cascade**: 其本即 LS/IDE 之 inference 协议(旧码误归 local → 两面划为一面之根).
+- **采用实况**: `ping.acp_port` 上报实绑口(bind 避让或落 +N)·旧代理无则 acp 锚回落主口(9.9.73 前语义不裂).
+- **credentials.toml Win 遗珠**: `_CRED_PATHS` 补 `%APPDATA%/devin/credentials.toml` —— 旧册唯 Unix 二径, Windows 之第四锚面曾为死面(用户 shell watchdog 代偿实证).
+- **名实归一**: 热路 log 显 `_effMode()`+面(旧印全局 SP_MODE·面=官而全局=道时冒充实收).
+- 验: `_surface_port_test.cjs` **14/14** · `_selftest_967` **30/30** · `_v980_strip` **6/6** · `node --check` 双过.
+
 ## v9.9.73 · 水过无痕 · 名实终一 (2026-10-31)
 
 用户诏:「新版很烂 · 切换规则一点用都没有 · 卸载就要卸干净 · 不留后门」— 四重病根全勘实证:
