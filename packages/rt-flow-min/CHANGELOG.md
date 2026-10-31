@@ -2,6 +2,169 @@
 
 > 反者道之动 · 弱者道之用 · 天下之物生于有 · 有生于无. —— 帛书《老子》德经
 
+## v3.19.3 (2026-10-30) · 时效诚实 —— 全会话库不再冻结 · devin-local 落档有生
+
+**病灶 (实证: 截图行 vs sessions.db 真值逐一对表)**
+
+- **冻结快照**: 全会话库 webview 只在打开/手点刷新时渲染一次，ago 是渲染瞬间
+  的静态串 — 实证: 面板渲染于 ~200min 前 → uttermost-crop 真48m显0m ·
+  absorbed-radish 真232m显32m · rift-perfume 真236m显36m。用户见"0m/1m"以为
+  实刷，实为老页面 (`retainContextWhenHidden` 保活·无定时器·无自动回补)
+- **新会话不入目**: devin-local 新会话 (sn89 系 glorious-beret/prism-helicona
+  等) 已在 sessions.db, 但生于渲染之后 → 库中"根本没记录" — 同一病灶
+- **零落档**: 备份链只收 cascade `.pb` → devin-local 1421/1428 会话从不进
+  `conversation_backups` (本体即档=把命押在单个 24GB sessions.db)
+- **失败失明**: helper 超时/无python → `{sessions:[],error}` → 静默空表,
+  错误只进 log 通道; 全采时限 15s 对 20GB+ 库偏紧
+- **微瑕**: `last_activity_at` 偶偏未来 → ago 显 '?'/空白
+
+**治法**
+
+- **30s 自走钟**: webview `tickAgo()` 就地重算每行 ago+活性点 — 标签永远诚实
+- **活性直通**: 60s 心跳 sig 变 → `convLive` 打点 (刷新钮亮点+底栏提示·不打断)
+- **可见回补**: host `onDidChangeViewState` + 页内 `visibilitychange` 双闸,
+  面板再可见且数据>60s → 自动重采
+- **阅读锚点**: convRead 记 {id,slug} → 刷新后按锚重定位自动回阅读位;
+  「←返回」发 convReadBack 放锚 — 刷新不再丢上下文
+- **失败显形**: 采集错误→红横幅上屏 (error + helper errors 全示)
+- **落档有生**: `_backupLocalConversations()` 档即水印增量导出 `<slug>.md`
+  进 `backup_<ts>/` 同仓 — 档状态读文件不读 sidecar (幂等自愈) · 近期优先 ·
+  每轮≤40篇/≤90s · 随每日自动备份与手动备份同队; 库内行显 📄档 (可点开定位)
+- **时限放宽**: 全采 15s→30s; ago 未来值钳0
+
+## v3.19.2 (2026-10-30) · 备而不用 · 走而能离 —— devinnet 退役净身
+
+> 机器层已根治 (sing-box 私有/回环段→direct) → 症状层补丁自然死亡 · 损之又损
+
+**病灶 (2026-10-30 全链审计定案)**
+- devinnet ACP自调谐 (v3.18.9 起) 是唯一越界模块: `cfg.update("acp.agentEnv",
+  Global)` 双写 devin./windsurf. 两节 + 改写 devin CLI `config.json` proxy 块
+- 有快照无还原: deactivate 不调 `_devinEnvRestore` → 写入比插件活得久 →
+  "卸插件不还原" 地层之一
+- 其病因 (env代理毒化 + loopback经代理→502) 已被机器层一行规则永久根治 →
+  模块本体沦为无谓之写
+
+**治法 (无为而无以为)**
+- 新配置 `wam.acpNetTune` 默认 **false** → 定时器/首检/切号后调谐全部熄火 ·
+  能力封存备而不用 (直连真死之机器可开闸自救)
+- 默认路径激活即一次性 `_devinEnvRestore()` + `_devinCfgJsonTune("heal")` →
+  历史快照还原 + 残锚指纹净扫
+- `_devinEnvRestore` 无快照分支升级为**指纹净扫**: 唯除本模块亲笔
+  (代理键="" 或 http://127.0.0.1:<port> · NO_PROXY="*") · 用户/他者之键不碰
+- `deactivate()` 首行必还原 → **走而能离**: 停用/卸载后 settings.json 与
+  devin config.json 不留本插件一字
+
+**边界自证**: 全局写面仅此一处 (agentEnv/config.json) · wam.* 为自家命名空间 ·
+vscdb token 注入为切号本体 (留之即登录态) · 无 schtasks/VBS/注册表/exe包装
+
+## v3.19.1 (2026-10-25) · 定性死才摘根 + 姊妹机并根 —— 复制号存活治本
+
+> 风暴毁根实证根治 · 复制型二次转换号 💀 之三大根因全链闭合
+
+**病灶 (141 Administrator 簿 r0t/ph/ob/iu 四号 2026-10-25 16:05 集体💀实证)**
+- **风暴毁根**: `tryFetchPlanStatus` 对超时/5xx/真401 同归 `null` → verify 快路与
+  login cached 路把 null 一律当"服务端已死" → `_evictSessionCache` 驱逐时
+  **同值摘除久簿 st/ak** → 网络瞬败被当成死证 · 持久簿"无TTL·服务端判生死"承诺被击穿
+- **复制号单叶**: 跨机复制走 accounts.md 人读行 (仅 `email----auth1`) ·
+  无 wamcred$ 魂魄行 → 副本只携 auth1 死叶 · 零 st/ak/mp 救援根
+- **auth1 叶必死**: auth1 服务端个体性死亡 (源机 179 同日 auth1Flag 实证死
+  "unauthenticated" ×4 · 号本身活 · 源机靠 st/ak 独立活根常绿)
+  三者叠加: 风暴摘根 + auth1 死叶 + 无 mailpw → 全根皆死 → 💀下牌
+  活 auth1 号同风暴同摘根 → postAuth 200 重铸自愈 (故只见死-auth1 号挂)
+
+**治法**
+- **定性死才驱逐摘根**: `tryFetchPlanStatus`/`_mintSessionByApiKey` 增 `diag`
+  输出 (全灭时 `definitive`=任一端点 401/403) · verify 快路/login cached 路
+  仅定性死才 `_evictSessionCache(email,{definitive:true})` 摘簿根 ·
+  瞬败只清热缓存·簿根保留 ("planStatus 瞬败(网络) · 保根不驱逐")
+- **💀定性收紧**: auth1 死(定性) + 会话根救援亦定性死/无根 才下牌 ·
+  救援败于网络 → 不下牌·保根下轮复审翻案 (`_rescueBySessionRoot` 增
+  `hadRoots/definitive` 诊断穿透)
+- **姊妹机并根 `_pullSiblingRoots`**: 巡检每 tick + 手动命令
+  `wam.pullSiblingRoots` · 读姊妹机 `_cred_store.json` (默认探测本舰队
+  L:/C: 四位 · `wam.siblingStores` 可配) · **只补不夺**: 本号死旗/无根且
+  姊妹根较鲜 → 并 st/ak/mp/srv + 摘双死旗 + 热缓存 · 姊妹 auth1 再铸过
+  且本号已死 → 凭据位升级 (旧叶随葬·accounts.md 归真)
+- 并根后即 `verifyAllAccounts` → 以并来的活 apiKey 铸本地新会话 (各机自铸·不共 session)
+
+## v3.19.0 (2026-10-25) · 备份根重构 + 会话库减负
+
+> 底层三缺实证根治 — 备份死链 · 路径改不动 · 千条会话库卡死整机
+
+**病灶**
+- `~/.wam/conversation_backups` junction → 已蒸发目录 (E:\DaoMigrated 亡)
+  → `existsSync=false` → 全量/增量/标题索引三线备份静默全灭 · 面板却显示"已自动备份"
+- `wam.conversationBackupDir=""` → 默认永指 C 盘; 迁移 `renameSync` 跨盘必败
+  (EXDEV 静默吞) → "改了等于没改"; 断链后旧数据迁移链找不到
+- `_collectAllConversations` 宿主线程同步 读盘+AES-256-GCM 解密 ×2/会话
+  (工作区一遍·标题一遍) → 1000+ 会话 → 扩展宿主冻结 = 整机卡死
+- webview 全量 HTML + 每行 4~5 listener → 数千闭包绑定 → 二重冻结
+- v3.18.9 热补丁只在安装目录未回写仓库 (源码漂移)
+
+**治法**
+- `_backupRoot()` 单点解析全插件共用: 显式配置 > `_local.json` 择盘缓存 >
+  智能择盘 (Win DriveType=3 固定盘·排系统盘·已含库优先·剩余≥5GB取大) > `~/.wam` 兜底
+- `_healBackupLayout()` 启动自愈: 断链 junction 摘除重指 · 老库 merge 进新根
+  (rename→EXDEV 退 copy+rm · junction 透实) · 重建 `~/.wam` 兼容链供老版本/dao_stuck
+- `selectBackupDir` 重写: withProgress + `_mergeBackupTree` 双源 merge
+  (旧根+老默认位) + 断链源透视 + 迁移可验
+- pb 元数据单次解密双取 `_pbMeta` (ws+title 同窗 `_conv_ws_cache`) ·
+  收集路径 `_pbMetaPeek` 只读缓存零 IO · 后台 `_convEnrich` 异步读盘·
+  1.5s 时间盒·setImmediate 让步 → 完成 convMeta postMessage 就地更新行
+- `_pbDirOf` 重复 stat 消 (枚举副产 pbOwner map)
+- 会话库 webview: 首屏 300 行服务端直出 · 余量前端 ≤14ms/片渐进补齐 ·
+  事件委托单 listener 接管全表 · convMeta 增量更新不重渲
+
+## v3.18.9 (2026-10-24) · 验活门 + ACP网络自调谐 *(回写入库·原仅存于部署目录)*
+
+**病灶**
+- [cached]登录道 injectToken 只验本地写入 → 服务端已 401 的死令牌伪成功
+  → TTL 命中续期令尸永生 · guardian re-login 亦走 cached → 同尸反复注入
+- devin.exe remote config 拉取预算 ~2000ms 写死 · acp 进程继承宿主慢道代理
+  → fetch 必超时 → identity_digest 无 last-good → availableModels=[] 无模型
+
+**治法**
+- 验活门: cached 命中先 tryFetchPlanStatus 服务端证实 → 死即驱逐转全登录
+- 先逐后登: guardian re-login 前 _evictSessionCache → 不再注回尸体
+- ACP网络自调谐 `_devinNetTune`: 实测择优为 devin-cli acp 择路 (直连达标剥代理·
+  发现活口注入实测活口·皆死仅告警·30min周期·网络康复自动复原)
+- 摘除 windsurf.com/_route SPA 壳死端点 (200+HTML → 假空 planStatus)
+
+## v3.18.8 (2026-10-24) · 锁绝对化 + adopt-don't-stomp
+
+> 用户实证双患: ① IDE 窗口一加载就自动切到别的账号 (留不住钦定账号)
+> ② 全部账号 🔒 仍在运行中互相切号。根因五链皆证于 wam.log:
+
+**病灶**
+- 每窗各跑独立引擎持有自家 `activeIdx` → startup/guardian 各自
+  "恢复想象" → 全局共享 secrets 被 N 窗反复覆盖 → 用户所见即自动切号
+- guardian 以 planStatus 拉空判 token 死 → 代理/网络抖动 → 强行注入乒乓
+- "硬耗尽越权"支路以"0%无消耗权"为由越锁 → 锁住的当前号被切走
+- `loginAccount` 共用原语无锁闸 → 绕过候选过滤的直连路径全破锁
+- HTML/脏 JSON 响应过解析 → proto3 omit 语义捏造 W0/D0 双耗尽假信号
+- `_readLockState` 读坏返 `{}` → read-modify-write → 全锁静默蒸发
+- `_persistAccountsToMd` 无防护 → 多窗 stale 账号表互相覆盖 → 号单蒸发
+- 日志: 多窗各自截断 wam.log (2MB) → 他窗历史反复蒸发 → announce 丢行
+
+**治法**
+- 🔒 锁绝对化: 当前号已锁 → `_tick`/`_maybeTrigger`/硬耗尽看门狗/
+  rate-limit 拦截器全熄火; 自动路径永不登入 🔒 号
+  (`loginAccount` 增 `opts.fromAuto` 闸 · 手动切号不受限)
+- adopt-don't-stomp: startup/guardian 先读 IDE 活会话真身
+  (vscdb decrypt + GetUserStatus.email) → 属池号零注入收编 ·
+  池外号尊重不动 · 读不出且活跃号🔒 → 保守不注入
+- guardian 容错: planStatus 拉空需 2 连败才 re-login · 全锁不 rotateNext
+- 跨进程切号租约 `_switch_lease.json` (60s·死PID提前过期) ·
+  验证租约 `_verify_lease.json` (30min) · 多窗风暴断流
+- `_parsePlanStatusJson`: 无额度信号字段 → null · 脏响应拒收
+- `_readLockState` 读坏返 null → 写方弃写 (锁表防抹)
+- `_persistAccountsToMd`: 缩容先备份 (滚动10份) + 空列表拒写
+- `accounts.md` 跨窗 watchFile 同步 (治"内存旧表切幽灵号")
+- `dao_stuck.js`: pbFiles 对象 `.replace` 崩溃根治 + scan 熔断 (不再刷屏)
+- `wam.log` 截断节流 `_log_trim.mark` (6h/次·跨进程)
+
+**验证**: `node --check` 双文件通过; 租约语义单测过; 两机8处副本部署实测
+
 ## v3.18.7 (2026-10-23) · 单点失明根治 — 全仓枚举
 
 > 本源缺陷: 追踪/备份/侦测三链全挂单一 `PB_DIR`/`VSCDB` —— 会话写在非主仓

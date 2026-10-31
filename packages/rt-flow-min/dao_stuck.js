@@ -207,42 +207,59 @@ const ENGINE_VER = "v13.0-wam";
 // ═══════════════════════════════════════════════════════════════════════════════
 // v9.2 修复 [E]: 引擎永不静默死亡 — 善摄生者, 陆行不遇兕虎
 // ═══════════════════════════════════════════════════════════════════════════════
-process.on("uncaughtException", (err) => {
-  const msg = `[${new Date().toISOString()}] UNCAUGHT_EXCEPTION: ${err.stack || err.message || err}`;
-  process.stderr.write(msg + "\n");
-  try {
-    const LOG_DIR_ = require("path").join(
-      require("os").homedir(),
-      ".wam",
-      "stuck-detect",
-    );
+// v13.1 · EPIPE 风暴熔断(东京 2026-10-25 实证): 宿主消亡后 stderr 成死管,
+//   write 再抛 EPIPE → 本 handler 自激递归 → 单核打满 + 107GB 日志。
+//   治: ① EPIPE/stderr.destroyed 即永久弃 stderr·只落文件 ② 10s>30 次异常=毒循环·静默自裁
+let _stderrDead = false;
+let _fatalCount = 0;
+let _fatalWindowStart = Date.now();
+function _fatalLog(kind, text, err) {
+  const msg = `[${new Date().toISOString()}] ${kind}: ${text}`;
+  if (
+    (err && err.code === "EPIPE") ||
+    (process.stderr && process.stderr.destroyed)
+  ) {
+    _stderrDead = true;
+  }
+  if (!_stderrDead) {
     try {
-      require("fs").mkdirSync(LOG_DIR_, { recursive: true });
+      process.stderr.write(msg + "\n");
+    } catch (_) {
+      _stderrDead = true;
+    }
+  }
+  try {
+    const LOG_DIR_ = path.join(os.homedir(), ".wam", "stuck-detect");
+    try {
+      fs.mkdirSync(LOG_DIR_, { recursive: true });
     } catch {}
-    require("fs").appendFileSync(
-      require("path").join(LOG_DIR_, "v9.log"),
-      msg + "\n",
-    );
+    fs.appendFileSync(path.join(LOG_DIR_, "v9.log"), msg + "\n");
   } catch {}
+  const now = Date.now();
+  if (now - _fatalWindowStart > 10000) {
+    _fatalWindowStart = now;
+    _fatalCount = 0;
+  }
+  if (++_fatalCount > 30) {
+    try {
+      fs.appendFileSync(
+        path.join(os.homedir(), ".wam", "stuck-detect", "v9.log"),
+        `[${new Date().toISOString()}] FATAL_STORM_FUSE: >30 exceptions/10s · self-terminate\n`,
+      );
+    } catch {}
+    process.exit(1);
+  }
+}
+process.on("uncaughtException", (err) => {
+  _fatalLog(
+    "UNCAUGHT_EXCEPTION",
+    (err && (err.stack || err.message)) || err,
+    err,
+  );
   // 不 exit — 让 extension.js 的心跳超时来重启, 期间引擎继续尝试
 });
 process.on("unhandledRejection", (reason) => {
-  const msg = `[${new Date().toISOString()}] UNHANDLED_REJECTION: ${reason}`;
-  process.stderr.write(msg + "\n");
-  try {
-    const LOG_DIR_ = require("path").join(
-      require("os").homedir(),
-      ".wam",
-      "stuck-detect",
-    );
-    try {
-      require("fs").mkdirSync(LOG_DIR_, { recursive: true });
-    } catch {}
-    require("fs").appendFileSync(
-      require("path").join(LOG_DIR_, "v9.log"),
-      msg + "\n",
-    );
-  } catch {}
+  _fatalLog("UNHANDLED_REJECTION", String(reason), reason);
 });
 
 // ─── 路径 ───
@@ -1889,7 +1906,11 @@ function scan() {
   // 可能原因: .pb 尚未创建(新建对话) / .pb 被清理 / 运行在不同机器
   // 道法自然: 不知则不妄断, 但必须让用户知道这些存在
   // ═══════════════════════════════════════════════════════════════════════════
-  const currentPbUuids = new Set(pbFiles.map((f) => f.replace(".pb", "")));
+  // v3.18.8 · 修 v3.18.7 回归: pbFiles 元素是 {dir,fname} 对象非字符串
+  //   旧码 f.replace 对对象必抛 TypeError → 二次扫描全灭 → 引擎每10s UNCAUGHT
+  const currentPbUuids = new Set(
+    pbFiles.map((f) => String(f.fname || f).replace(".pb", "")),
+  );
   let noPbActive = 0;
   for (const [uuid, meta] of sessionCache) {
     if (meta.status !== "active") continue;
@@ -2887,9 +2908,26 @@ function main() {
   const server = startHttpServer();
 
   let tick = 0;
+  let _scanFails = 0;
   const timer = setInterval(() => {
     tick++;
-    const r = scan();
+    // v3.18.8 · scan 崩溃熔断 — 单轮异常不再刷屏 UNCAUGHT · 连续败记计数
+    let r;
+    try {
+      r = scan();
+      _scanFails = 0;
+    } catch (e) {
+      _scanFails++;
+      if (_scanFails === 1 || _scanFails % 60 === 0) {
+        try {
+          require("fs").appendFileSync(
+            path.join(LOG_DIR, "_scan_err.log"),
+            `[${new Date().toISOString()}] scan#${tick} fail x${_scanFails}: ${e && e.message}\n`,
+          );
+        } catch {}
+      }
+      return;
+    }
     if (r) {
       writeHeartbeat({
         tick,

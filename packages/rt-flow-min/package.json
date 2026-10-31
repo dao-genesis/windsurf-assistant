@@ -2,7 +2,7 @@
   "name": "rt-flow",
   "displayName": "Runtime Flow",
   "description": "Windsurf/Devin 多账号管理与对话追踪 — 额度耗尽自动切号·对话卡死监控·会话库/阅读器·全本地运行",
-  "version": "3.18.7",
+  "version": "3.19.3",
   "publisher": "devaid",
   "repository": {
     "type": "git",
@@ -140,6 +140,11 @@
         "category": "RT Flow"
       },
       {
+        "command": "wam.pullSiblingRoots",
+        "title": "Pull Sibling Roots (姊妹机并根·复制号救援 v3.19.1)",
+        "category": "RT Flow"
+      },
+      {
         "command": "wam.toggleAutoRotate",
         "title": "Toggle Auto-Rotate",
         "category": "RT Flow"
@@ -262,6 +267,11 @@
           "type": "boolean",
           "default": true,
           "description": "v3.18.3 auth1 根探活 — 巡检会话活时对 token 凭据号顺手 postAuth 探 auth1: 死→🥀旗立+mailpw已武装则后台邮箱码再铸 (治未病·防静默烂根) · 活→摘旧旗"
+        },
+        "wam.siblingStores": {
+          "type": "string",
+          "default": "",
+          "description": "v3.19.1 姊妹机 _cred_store.json 路径列表 (分号/逗号分隔 · 空=自动探测本舰队默认位) — 巡检时只补不夺: 本号死旗/无根 → 拉姊妹较鲜 st/ak/mp/a1 落簿摘旗自愈 (复制号存活治本)"
         },
         "wam.predictiveThreshold": {
           "type": "number",
@@ -416,12 +426,17 @@
         "wam.conversationBackupDir": {
           "type": "string",
           "default": "",
-          "description": "v3.4.0 对话备份目录 — Cascade .pb 对话文件备份存储位置 (空=默认 ~/.wam/conversation_backups)"
+          "description": "v3.4.0 对话备份目录 — Cascade .pb 对话文件备份存储位置 (空=v3.19.0起智能择盘: 固定盘非系统·已含库优先·剩余≥5GB取大·不再默认堆C盘 · 设值即显式钉死)"
         },
         "wam.autoSwitchDailyMin": {
           "type": "number",
           "default": 5,
           "description": "v3.8.4 日额度最低门槛 — 低于此值 (%) 的账号不进入自动切号候选池 · 即 D<5% 不切入 (默认 5 · 0=关闭日额度守门)"
+        },
+        "wam.acpNetTune": {
+          "type": "boolean",
+          "default": false,
+          "description": "v3.19.2 ACP网络自调谐 — false (默认·道法自然) · 机器层已根治 loopback-经代理 之病后本模块备而不用: 不写 agentEnv/不改 devin config.json, deactivate 必还原, 激活时净扫自身残锚指纹 · true=恢复 v3.18.9 行为 (直连达标剥代理注入 agentEnv + devin config.json proxy 归正) 仅供直连真死的机器自救"
         },
         "wam.autoSwitchWeeklyMin": {
           "type": "number",

@@ -61,7 +61,7 @@ WAM 启动后自动：
 - 用户发 Cascade 消息后自动切到下一健康号
 - 额度归零时立即切号（硬耗尽越权保护）
 - 对话卡死/陈旧时左下角通知
-- 全量增量备份所有 Cascade 对话到 `~/.wam/conversation_backups/`
+- 全量增量备份所有 Cascade 对话（v3.19.0 起默认智能择盘·不再堆 C 盘 · `~/.wam/conversation_backups` 保兼容链）
 
 ---
 
@@ -135,7 +135,7 @@ UI 三态渲染:
 
 ### 💾 对话备份
 
-- 自动**全量**备份 `.pb` 对话文件到 `~/.wam/conversation_backups/`
+- 自动**全量**备份 `.pb` 对话文件（默认智能择盘 · 「备份配置」可换盘·旧数据自动迁移）
 - **增量**备份（防抖 3s · 合并高频小批写）
 - 多密钥池兜底解密（应对 Windsurf 版本升级换密钥）
 - 全字段 Markdown 导出：用户消息 + AI思考 + 工具调用 + 错误 + 代码上下文
@@ -191,7 +191,7 @@ UI 三态渲染:
 | `wam.notifyOnStaleStream` | true | ★ v15.1 陈旧 streaming 也通知（治 AI 中断静默） |
 | `wam.notifyOnAwaitingUser` | false | v15.1 等待用户对话也通知（极端场景） |
 | `wam.hubNotifyGlobalCdMs` | 5000 | 任意两次通知间最小间隔 |
-| `wam.conversationBackupDir` | "" | 备份目录（空=默认 `~/.wam/conversation_backups`） |
+| `wam.conversationBackupDir` | "" | 备份目录（空=智能择盘:固定盘非系统·已含库优先·剩余≥5GB取大 · `~/.wam/conversation_backups` 为兼容链） |
 | `wam.autoBackupStartDelayMs` | 8000 | 启动后备份延迟 |
 | `wam.incrementalBackupDebounceMs` | 3000 | 增量备份防抖 |
 | `wam.pythonPath` | "" | ★ v15.2 显式 Python 路径（空=自动探测·见下） |
