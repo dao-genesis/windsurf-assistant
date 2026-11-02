@@ -1,4 +1,4 @@
-# 道Agent · dao-proxy-min · **v9.9.73** · 水过无痕 · 名实终一 · 道法自然
+# 道Agent · dao-proxy-min · **v9.9.76** · 方言镜像 · 道法自然 · 道法自然
 
 > **一气化三清 · Three Pure · 道并行而不悖**
 > [I · 反代 API · `dao-core`](../dao-core/README.md) &middot; [II · 切号 WAM · `wam`](../wam/README.md) &middot; **III · 提示词反代 · 本**
@@ -9,6 +9,10 @@
 > **损之又损, 以至于无为, 无为而无不为.** —《四十八章》
 > **道法自然.** —《二十五章》
 
+
+## v9.9.76 · 方言镜像 (2026-11-02)
+
+新版 Devin 客走 Connect 协议(application/proto), 本地兜底曾恒答 gRPC 方言 → ConnectError invalid content-type → 登录崩。今以来者之方言答来者: proto/json/connect-stream/grpc 四族镜像 + 铸令类 RPC 诚实 unavailable + 服务名包族动态适配 + last-good 回放线族守卫 + 裸 502 净衣。新版旧版各得其所 · 无为而无不为。
 
 ## v9.9.73 · 水过无痕 · 名实终一 (2026-10-31)
 

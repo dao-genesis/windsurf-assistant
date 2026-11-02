@@ -1,8 +1,8 @@
 {
   "name": "dao-proxy-min",
   "displayName": "道Agent · 反者道之动 · 弱者道之用",
-  "description": "v9.9.75 · 漏网归网·子代理尽道(主公诏:新版Devin官方规则气根治): lead+Sidekick双代理架构实证(子代理SP 'You are the X of Devin'一族直通漏网)+分口定面(acp专属口→localPort即面·两面真分)+credentials.toml Win遗珠补径 + 承v9.9.73 卸载即自己回退完消失完",
-  "version": "9.9.75",
+  "description": "v9.9.76 · 方言镜像·道法自然(主公诏:141 zhou 新版Devin登录即崩根治): 新版Devin走Connect协议(application/proto)·旧代理兜底恒答application/grpc→ConnectError→登录崩;今以来者方言镜像应答+铸令类RPC诚实unavailable+last-good回放线族校验 + 承v9.9.75 子代理一族SP尽道",
+  "version": "9.9.76",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
   "engines": {

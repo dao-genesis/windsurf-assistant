@@ -2,6 +2,18 @@
 
 > 反也者, 道之动也; 弱也者, 道之用也. —— 帛书《老子》德经
 
+## v9.9.76 · 方言镜像 · 道法自然 (2026-11-02)
+
+用户诏:「141 zhou 账号新版 Devin 登录即崩·素材尽隐 —— 挖到底挖到根·插件须适配各环境」·活口实证根治:
+
+- **(141 zhou renderer.log 活捉)**: 新版 Devin(E:\Windsurf) 走 **Connect 协议**(`application/proto`), `initializeAuthSession→getUserStatus` 经 `codeium.apiServerUrl→127.0.0.1:8981` → 上游 ETIMEDOUT(网络实卡) → 代理 `_replyGrpcOk` 恒答 **`application/grpc`+5字节帧** → Connect 客严格校验 → `ConnectError [internal] invalid content-type: "application/grpc"; expecting "application/proto"` → **Failed to log in**。旧版 LS 只验 grpc-status 故 administrator 无恙——方言失配一族。
+- **方言镜像(根药)**: `_wireDialect` 按请求 content-type 识 `connect-proto/connect-json/connect-stream/grpc` → `_replyGrpcOk` 各得其所(裸空 proto 零长体 / `{}` / connect 终帧 `0x02+len+JSON` / 旧 gRPC 帧+trailers), 族内子类 ct 亦镜像(grpc-web/connect+json)。
+- **铸令不可伪**: `Login/RegisterUser/GetAuthToken/GetUserJwt/RefreshToken` 等 → 新设 `_replyDialectUnavailable` 诚实还报(Connect 503 `{code:unavailable}` / connect 终帧 error / grpc-status=14) —— 空 OK 铸不出会话, 伪答比错误更坏。
+- **线族守卫**: last-good `GetUserStatus`/`GetCliModelConfigs` 回放须录答与请求同族(connect↔connect · grpc↔grpc), 异族不回放。
+- **包族动态适配**: `API_SERVER/INFERENCE/LOCAL_AUTH` 服务名判由精确名扩为包前缀(`_pkgOfService`)——版本演进同包新 Service 自动归位, 不靠逐版静态补名。
+- **502 净衣**: 四处裸 502 补 `content-type: application/json`。
+- **验证**: `_dialect_976_test` **35/35**(L1 mock + L2 活口四族过闸) · `_selftest_967` **30/30** · `_surface_port_test` **14/14** · `_v980_strip` **6/6** · `node --check` 过。
+- **上线**: 141 zhou+administrator `~\.devin\extensions\dao-agi.dao-proxy-min-9.9.76` · 注册表换位 · 9.9.75 目录原位换新码留作回滚锚(运行中 Devin 回写注册表亦得药)。
 ## v9.9.75 · 漏网归网 · 子代理尽道 (2026-10-31)
 
 用户诏:「官方最新版 Devin 底层感觉不符合预期 · 回复更多地接受了官方的一些规则 · 隔离替换没干净 · 挖到根逆流分析到底」— 活口实证根治:

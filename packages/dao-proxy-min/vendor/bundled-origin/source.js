@@ -363,7 +363,7 @@ const ACP_PORT = parseInt(process.env.ORIGIN_ACP_PORT || "0", 10); // 0=不分�
 let _acpPortWanted = ACP_PORT; // start(opts.acpPort) 可覆 · server listening 时按此绑 acp mux
 // v9.6.1 · 反者道之动 · 远曰反 · 回归 v9.1.2 之全前端按钮 (七按钮: 道/官/实/原/编/复/卸 + dots/customBadge)
 // 以 v9.1.2 本源哲学为锚 · 守大常不动 · 五细节皆成: isAlreadyInverted · _rawTape+all_fields · 部署不 kill · 前端按钮回归
-const ORIGIN_VERSION_BASE = "v9.9.75"; // v9.9.75-min · 漏网归网·子代理尽道(主公诏:新版Devin官方规则气根治): 新版lead+Sidekick双代理架构实证(141 zhou活捉·"You are the Sidekick subagent of Devin"~11362B官方SP直通transformed:false·13/16请求漏网) —— isLikelyOfficialSP+classifySPType双闸开Devin系代理一族("You are the <X> of Devin"/"a <X> from Cognition"首句+Sidekick指纹计票) —— 前系v9.9.74-min · 分口定面·两面真分(主公诏:L/C划成一面根治): acp专属口并听→localPort即面·主口api_server_pb归cascade·acp域锚面(env/agentEnv/credentials)尽归专口·ping.acp_port实况·credentials Win遗珠补径·显有效模式+面 —— 前系v9.9.73-min · 水过无痕·名实终一(主公诏): ①执葬两路皆装(spawned自葬+进程内退而不杀·还原锚面转透传待逝) ②录死钥双式并查(目录名·扩展ID)+兄弟在册甄别(活兄在→升级让位非死不葬) ③settings×4还原(Devin/Windsurf User+~/.windsurf/~/.devin家目录遗珠·裸回环锚式为据·/t/中继不犯) ④NO_PROXY我植并除·空壳剪·dao.origin.*尽扫 ⑤进程内_/_quit录死亦还原 · 前系v9.9.72: 卸则有终·幸存者执葬 —— spawned relay 巡 .obsolete/目录亡 → 还原三面锚(settings×2+credentials.toml)+清dao-origin+逝后扫尾自退 · deactivate未逮之洞闭合 · 走而能离reqModeEff(治全局SP_MODE=custom误杀面invert·治面道全局官之原文冒充实收) ③preview停重演直呈录存真值 ④/origin/verify闭环自检+tape末条判词(sig嵌入) ⑤detached支持(DAO_SPAWNED·DAO_PARENT_PID孤儿收割·父亡+静默10min自退·_quit后自终) ⑥名实字段并录持久化(surface/mode_eff/sp_on_wire/after_source/wire_changed)·前系v9.9.69: ①切经藏log未定义修(ext·canonChanged推送断裂根) ②回调吞噬守卫(exec/execFile callback被env对象覆写) ③重启丢模式根治(磁盘持久模式优先于config默认·ext+src双侧) ④隧道自动连接默认关(DAO_BRIDGE_AUTOCONNECT=1显式开·手动端点保留·Min版revproxy已拆·隧道零收益纯攻击面) ⑤帧不落盘(DAO_FRAME_PERSIST=1复旧·Authorization+会话token不再每轮writeFileSync落盘) ⑥解锁缺省禁(名实相符·无模型解锁) ⑦selftest总判唯系道魂之路(外接径Min已拆不再拖累总判) ⑧stop()补闭H2内部服务器(CLI进程不退之根) ⑨尸骸出包(_dao_81传世本无引用·运行时态文件) · 前系 v9.9.66-min · Min 版系归位(非 Pro 9.9.3xx) · always-on 用户规则部件剔除 + 按面典源/自编 + pin 防热回滚 + 面板两面同构 · 前系: v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 多账号机 reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(多账号机): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
+const ORIGIN_VERSION_BASE = "v9.9.76"; // v9.9.76-min · 方言镜像·道法自然(主公诏:141 zhou 新版 Devin 登录即崩根治): 实案 ConnectError「invalid content-type: "application/grpc"; expecting "application/proto"」@initializeAuthSession→getUserStatus —— 新版 Devin 客走 Connect 协议(application/proto), 而 _replyGrpcOk 恒答 gRPC 帧方言 → 协议崩 —— 治: ①_wireDialect 以请求 content-type 识方言·镜像应答(connect-proto零长/json{}/connect+终帧/grpc旧帧) ②铸令类 RPC(Login/RegisterUser/GetAuthToken/GetUserJwt/RefreshToken 等) 不可伪答 → _replyDialectUnavailable 如实还报 ③last-good 回放加线族校验(connect↔connect·grpc↔grpc·异族不回放) —— 前系v9.9.75-min · 漏网归网·子代理尽道(主公诏:新版Devin官方规则气根治): 新版lead+Sidekick双代理架构实证(141 zhou活捉·"You are the Sidekick subagent of Devin"~11362B官方SP直通transformed:false·13/16请求漏网) —— isLikelyOfficialSP+classifySPType双闸开Devin系代理一族("You are the <X> of Devin"/"a <X> from Cognition"首句+Sidekick指纹计票) —— 前系v9.9.74-min · 分口定面·两面真分(主公诏:L/C划成一面根治): acp专属口并听→localPort即面·主口api_server_pb归cascade·acp域锚面(env/agentEnv/credentials)尽归专口·ping.acp_port实况·credentials Win遗珠补径·显有效模式+面 —— 前系v9.9.73-min · 水过无痕·名实终一(主公诏): ①执葬两路皆装(spawned自葬+进程内退而不杀·还原锚面转透传待逝) ②录死钥双式并查(目录名·扩展ID)+兄弟在册甄别(活兄在→升级让位非死不葬) ③settings×4还原(Devin/Windsurf User+~/.windsurf/~/.devin家目录遗珠·裸回环锚式为据·/t/中继不犯) ④NO_PROXY我植并除·空壳剪·dao.origin.*尽扫 ⑤进程内_/_quit录死亦还原 · 前系v9.9.72: 卸则有终·幸存者执葬 —— spawned relay 巡 .obsolete/目录亡 → 还原三面锚(settings×2+credentials.toml)+清dao-origin+逝后扫尾自退 · deactivate未逮之洞闭合 · 走而能离reqModeEff(治全局SP_MODE=custom误杀面invert·治面道全局官之原文冒充实收) ③preview停重演直呈录存真值 ④/origin/verify闭环自检+tape末条判词(sig嵌入) ⑤detached支持(DAO_SPAWNED·DAO_PARENT_PID孤儿收割·父亡+静默10min自退·_quit后自终) ⑥名实字段并录持久化(surface/mode_eff/sp_on_wire/after_source/wire_changed)·前系v9.9.69: ①切经藏log未定义修(ext·canonChanged推送断裂根) ②回调吞噬守卫(exec/execFile callback被env对象覆写) ③重启丢模式根治(磁盘持久模式优先于config默认·ext+src双侧) ④隧道自动连接默认关(DAO_BRIDGE_AUTOCONNECT=1显式开·手动端点保留·Min版revproxy已拆·隧道零收益纯攻击面) ⑤帧不落盘(DAO_FRAME_PERSIST=1复旧·Authorization+会话token不再每轮writeFileSync落盘) ⑥解锁缺省禁(名实相符·无模型解锁) ⑦selftest总判唯系道魂之路(外接径Min已拆不再拖累总判) ⑧stop()补闭H2内部服务器(CLI进程不退之根) ⑨尸骸出包(_dao_81传世本无引用·运行时态文件) · 前系 v9.9.66-min · Min 版系归位(非 Pro 9.9.3xx) · always-on 用户规则部件剔除 + 按面典源/自编 + pin 防热回滚 + 面板两面同构 · 前系: v9.9.373 · 损之又损·死尸出列(用户口谕): windows-agent 经藏档 + windows/freecad/kicad 工具契约轴全废(旧域代理项目尸骸·面板"官方原生工具"下拉之癌) · _winTools 注入/代理执行拆除 · _tools_*.txt/_*_agent.txt 契约文件删除 · 承 v9.9.372 · 超时预算倒挂根治(141实证): 建连预算3.5s/隧道3s(<客户端5s) · 废_daoWarming预热抛错502风暴改异步暖+成则换池 · _OriginTunnelAgent补死窗熔断90s + dao_router永久熔断改90s死窗 · 代理解析TTL60s+隧道失败即时过期(随watchdog切道) · NO_PROXY尊重 · 表面: v9.9.371 · 合流单一真源(为道者日损): 承368两面分治/端点重写/DEVIN标记/tools轴 + 归并Tokyo370独有(modifySPProto field2=SP显式截获·官方H2长连经系统代理CONNECT隧道抗RST·鉴权状态类RPC韧性兜底不登出·路由失败回退官方止血·模型目录双格式client_model_configs) · v9.9.368 · 两面分治根治(Local=chisel acp→api_server_pb / Cascade=LS→cascade 面标路由 scope + _origin_mode_surface.json 每面独立 invert/passthrough/custom) + spawn-hook 本体残缺即放行原生 acp(防扩展被清理后 Devin Local 连 spawn 都死) · v9.9.367 · 死代理熔断直连(env/系统代理 TCP 失败→_proxyDead 置旗→外接路由永久直连·治残留死代理致外呼全灭) · v9.9.366 · Devin Local 推理端点重写根治(服务端下发 GetCliModelConfigs/GetCliTeamSettings/GetUserStatus 响应体内官方 host 字段 → 127.0.0.1:_actualPort · chisel GetChatMessage 归本口 · findings/acp/07 缺口B) ·  // v9.9.357 · custom模式SP不替换根治(源级替换链 modifySPProto/preview/observe/INFER_STRIP 由「仅invert」扩为「invert+custom」·custom无自编文本则透传绝不回落经藏·副路亦隔离·终结「自编未平替、官方SP在顶+阴符经在底重复带一份」) · v9.9.356 · 自定义SP隔离替换根治(custom输出附DAO-CUSTOM-SP标记·dao_router增强路径识别即不再追加经藏·用户自编平替阴符经·增强文本亦优先自编) · v9.9.355 · v9.9.355 · 提示缓存命中率根治(对照Anthropic扩展TTL 1h+beta extended-cache-ttl·治SWE-1.6 Slow慢链路5min断档 · OpenAI prompt_cache_key稳定前缀签名钉缓存节点·跨轮尾变键不变) · v9.9.353 · 官方直通502根治收官(stale优先于配额·_classifyOfficialErr保序·precondition不误吞·实证反代真通) · v9.9.352 · 陈旧会话/版本失配自愈(_isStaleSessionErr+_invalidateStaleFrames·424 stale_session·不狂重试坏帧) · v9.9.351 · 模型反代用量记账归一(反代 /v1/* 第三方渠道调用的 tokens/缓存命中并入路由器同一张用量表·面板「用量与成本」可见·dao_router 暴露 recordUsage·runtime 透传 routerRecordUsage·revproxy 经 deps.recordUsage 记账) · v9.9.350 · 根治「runtime not loaded」·健壮解析外接api目录(非ASCII名坏亦凭内容命中)+ea/*惰性自愈 · v9.9.349 · ACP spawn hook 增识 bash 包裹型(bash.exe --login -c 'devin.exe acp ...')·实证 多账号机 reload 后 IDE 经 Git bash login shell 间接拉起 devin.exe·旧 regex 漏网致鉴权锚定失效 · // v9.9.348 · 内网穿透反脆弱三件套(移植 dao-vsix): ① 指数退避(trycloudflare 限流→5s×2^n最多5min·URL注册成功即归零) ② 宽限期45s(新隧道注册中不误判死亡) ③ 冷却期25s(防密集重启)。前端面板增退避/宽限实时状态。handoff.md 增自愈要点详解 · v9.9.347 · 内网穿透对齐二合一本源: ① 激活自动连接(去中心化默认·开机即拉起零账号快速隧道/命名隧道·治「没有自动连接好」; 手动停止落 userstop 旗真停·24h 安全自复; 优先级 固定中继>命名隧道>快速隧道) ② 模型反代专属 Agent 交接文档 GET /origin/revproxy/handoff.md(实时含公网URL/Key/三条开通路/自愈要点·面向「反代→内网穿透→公网无感直调」链路接管·④面板底部 复制/下载/预览) ③ endpoint.json 增 revproxy.handoff_url · v9.9.346 · 捆绑 ACP 代理·实证收口(多账号机): ① GetCliTeamSettings 归 PASSTHROUGH(原 LOCAL_AUTH 发 gRPC 帧·chisel 按 Connect 裸 protobuf 解 → 首字 0x00=tag0 → "invalid tag value: 0" → "Failed to fetch team settings"; 改真端成帧回真 TeamSettings·解码必过) ② dao-acp-stdio-proxy.js 永久版健康门控自注入 WINDSURF_API_SERVER_URL=本地反代(覆盖已装 v9.9.334 无需 reload·spawn 每次重读) · v9.9.345 · 捆绑 ACP 代理(devin.exe/chisel)鉴权本地锚定·根治「Connecting to server」残余(LS 侧早已反代·唯捆绑 ACP 代理仍直连官方取 GetCliTeamSettings·官方经 VPN 偶发 >3s → "Team settings refresh timed out after 3000ms" → 前端永卡; 解: spawn-hook 反代健康时注入 WINDSURF_API_SERVER_URL=本地 8937 + NO_PROXY 纳入 127.0.0.1 → 团队设置即刻本地 gRPC OK·鉴权必过·与官方可达性彻底解耦; fail-safe 仅反代健康时改写·否则原样直连; 五十二章「既得其母 以知其子」) · v9.9.344 · 座席鉴权本地兜底·根治「Connecting to server」(SeatManagement/Heartbeat 归 LOCAL_AUTH → 本地即答 gRPC OK status=0·彻底解耦官方可达性; GetUserStatus 仍走 PASSTHROUGH 真解锁·推理仍 BYOK/INFER_STRIP·不夺其真; 反者道之动·釜底抽薪) · v9.9.343 · ⑤内网穿透 第五模块归一(移植 dao-bridge workers.dev 固定中继: 一个 CF API Token 零域名自动部署中继 Worker 到用户账号·出站长连 RelayClient 派回反代 /v1/*·永不轮换持久化·开机自愈; 退出/解绑硬化-即使数据损坏也可清后重绑; 独立会话 pp- 前缀+workers-relay-proxypro.json → 与独立 dao-bridge/dao-one 三插件共存无冲突; handoff.md 反代底层API公网通道改造) · v9.9.342 · 内网穿透大修(移植 dao-bridge 核心: 代理探测7端口+注入·二进制--version验证·断点续传·CONNECT代理隧道下载·6路镜像回退·看门狗15s·resetProxy·命名空间隔离 cloudflared-proxypro.*) · v9.9.339 · 反者道之动·补全(外接api 路由流式亦撤秒数硬限·dao_router 两处 provider 请求 setTimeout(0)+keepalive·revproxy setTimeout(0)+keepalive·routed 模型长推理不再 120s 掐断·AI 自然而止) · v9.9.338 · 反者道之动(撤销一切秒数硬限·两处 H2 stream 超时归零·H1 requestTimeout=0·唯下游离场才回收·AI 自然而止·道并行而不相悖) · v9.9.337 · 流续不断(H2 stream 超时 180s→600s·H2 session keepalive ping 45s·GOAWAY 优雅排水·H1 requestTimeout 600s·对话中断根治) · v9.9.336 · 根源突破(LSP/补全PASSTHROUGH流量亦采鉴权信封·信封陈旧才缓冲探采·新鲜即纯流式直透·IDE任一活跃即保鲜·彻底脱Cascade对话依赖) · v9.9.335 · 自主保鲜闭环(envelope采得即自动合成全鉴权回放帧·rewrites从IDE活跃自然自增) · v9.9.334 · 守真突破(活鉴权信封·任一inference请求采信封) · v9.9.333 · 会话鉴权保鲜 · 五十七章「我无为也 而民自化」
 // 印 153 · 唯变所适 · 软编码归宗 · 二十五章「逝曰远 远曰反」· 七十六章「兵强则不胜」
 // 病: 多 ext-host 共端口 :8937 · 旧版 in-process proxy 持续 listen · self_file 锁死旧版目录
 //     → 即便装毕新版 vsix · /ping 仍返 v9.9.19/v9.9.20 之 self_file · canon_name 走旧映射
@@ -417,6 +417,34 @@ const API_SERVER_SERVICES = new Set([
   "exa.api_server_pb.ApiServerService",
   "exa.language_server_pb.LanguageServerService",
 ]);
+// ★ v9.9.76 · 包级前缀动态适配 · 名随实变 —— 版本演进新增同包 Service
+//   (如新版 exa.api_server_pb.XxxService) 自动归位, 不靠逐版静态补名。
+//   精确名仍优先生效; 精确不中方判包族 —— 旧径分毫不动, 新名自然归宗。
+const INFERENCE_PACKAGES = new Set([
+  "exa.language_server_pb",
+  "exa.chat_web",
+  "exa.codeium_common_pb",
+  "exa.api_server_pb",
+]);
+const API_SERVER_PACKAGES = new Set([
+  "exa.api_server_pb",
+  "exa.language_server_pb",
+]);
+function _pkgOfService(svc) {
+  // exa.api_server_pb.ApiServerService → exa.api_server_pb
+  const m = /^(.+)\.[^.]+$/.exec(svc || "");
+  return m ? m[1] : svc || "";
+}
+function _isApiServerSvc(svc) {
+  return (
+    API_SERVER_SERVICES.has(svc) || API_SERVER_PACKAGES.has(_pkgOfService(svc))
+  );
+}
+function _isInferenceSvc(svc) {
+  return (
+    INFERENCE_SERVICES.has(svc) || INFERENCE_PACKAGES.has(_pkgOfService(svc))
+  );
+}
 
 // 三种模式 · 多言数穷 · 不如守中 · v9.9.92 加入 'custom' · 与 sp_invert.js 一致
 const SP_MODE_VALID = new Set(["invert", "passthrough", "custom"]);
@@ -3913,9 +3941,10 @@ function routeUpstream(reqUrl) {
   const svc = m ? m[1] : "";
   // ★ api_server 工具服务 (非 chat 方法) → server.codeium.com 本源
   //   先于 INFERENCE_SERVICES 判定 · 工具不再误投 inference
-  if (API_SERVER_SERVICES.has(svc))
+  //   ★ v9.9.76 · 包族动态适配: 精确名不中, 同包新 Service 名归同宗
+  if (_isApiServerSvc(svc))
     return { host: UPSTREAM_API, path: rawPath + query };
-  if (INFERENCE_SERVICES.has(svc))
+  if (_isInferenceSvc(svc))
     return { host: UPSTREAM_INFER, path: rawPath + query };
   return { host: UPSTREAM_MGMT, path: rawPath + query };
 }
@@ -3941,6 +3970,8 @@ function routeUpstream(reqUrl) {
 const LOCAL_AUTH_SERVICES = new Set([
   "exa.seat_management_pb.SeatManagementService",
 ]);
+// ★ v9.9.76 · 座席鉴权包族 —— exa.seat_management_pb.* 任一新服务名同享本地兜底
+const LOCAL_AUTH_PACKAGES = new Set(["exa.seat_management_pb"]);
 // 心跳 RPC · 官方不可达时本地兜底 (LS 周期心跳; 失败→"Connecting")
 //   注: GetUserStatus 不入此集 · 其响应须经 proxyToCloud 做真解锁改写(去 Pro 锁/补 field20)
 //       故 GetUserStatus 仍走 PASSTHROUGH(reachable 时解锁; unreachable 时由 proxyToCloud 内兜底)
@@ -3979,18 +4010,22 @@ function classifyRPC(reqPath) {
   // ★ v9.9.344 · 鉴权/心跳兜底 · 既得其母 以知其子
   const svcM = cleanPath.match(/^\/([^/]+)\//);
   const svc = svcM ? svcM[1] : "";
-  if (LOCAL_AUTH_SERVICES.has(svc)) {
+  if (
+    LOCAL_AUTH_SERVICES.has(svc) ||
+    LOCAL_AUTH_PACKAGES.has(_pkgOfService(svc))
+  ) {
     // GetUserStatus 等须解锁改写的方法保留 PASSTHROUGH · 不本地短路
     if (SEATMGMT_PASSTHROUGH_METHODS.has(rpc)) return "PASSTHROUGH";
     return "LOCAL_AUTH";
   }
-  if (LOCAL_AUTH_METHODS.has(rpc) && API_SERVER_SERVICES.has(svc))
+  if (LOCAL_AUTH_METHODS.has(rpc) && _isApiServerSvc(svc))
     return "LOCAL_AUTH";
   // ★ api_server 工具服务 · 透明直透 (不剥侧信道) · 与原版 LSP 一致
   //   走 server.codeium.com · 真后端真鉴权 · 无需净化 (净化反致 proto 损坏)
-  if (API_SERVER_SERVICES.has(svc)) return "PASSTHROUGH";
-  // inference 服务 · 深度净化侧信道
-  if (INFERENCE_SERVICES.has(svc)) return "INFER_STRIP";
+  //   ★ v9.9.76 · 包族动态适配: 同包新 Service 亦归本源
+  if (_isApiServerSvc(svc)) return "PASSTHROUGH";
+  // inference 服务 · 深度净化侧信道 · 包族新名亦中
+  if (_isInferenceSvc(svc)) return "INFER_STRIP";
   return "PASSTHROUGH";
 }
 
@@ -8960,7 +8995,7 @@ _loadFullModelCatalog();
 //     (LS 仅验 grpc-status=0 即认已连接)。推理仍走 BYOK/路由器, 故 Cascade 全程可用、彻底
 //     解耦官方可达性。非鉴权类(补全等)不入此集 → 照旧 502 由客户端自然重试, 不夺其真。
 const _AUTH_RESILIENT_RE =
-  /GetUserStatus|GetCommandModelConfigs|GetCascadeModelConfigs|GetUserSettings|RegisterUser|RefreshToken|GetAuthToken|Login/i;
+  /GetUserStatus|GetCommandModelConfigs|GetCascadeModelConfigs|GetUserSettings|GetUserJwt|RegisterUser|RefreshToken|GetAuthToken|Login/i;
 function _isAuthResilientRpc(u) {
   try {
     return _AUTH_RESILIENT_RE.test(_rpcName(u));
@@ -9053,11 +9088,22 @@ function _storeCliModelsLastGood(buf, ct, ce) {
   } catch (_) {}
 }
 
-function _serveLastGoodCliModels(res, rid) {
+function _serveLastGoodCliModels(req, res, rid) {
   try {
     _loadCliModelsLastGood();
   } catch (_) {}
   if (!(_lastGoodCliModels && _lastGoodCliModels.buf)) return false;
+  // ★ v9.9.76 · 线族守卫: 录存响应方言族须与请求同族 —— 异族录答不回放(防 Connect 客吃 gRPC 帧)
+  try {
+    const _famRec = _wireFamily(_lastGoodCliModels.ct);
+    const _famReq = _wireFamily(req && req.headers && req.headers["content-type"]);
+    if (!_famRec || _famRec !== _famReq) {
+      log(
+        `#${rid} [climodels] 线族不合(rec=${_famRec}/req=${_famReq}) → 不回放,转透传`,
+      );
+      return false;
+    }
+  } catch (_) {}
   try {
     const h = {
       "content-type": _lastGoodCliModels.ct || "application/proto",
@@ -9134,20 +9180,48 @@ function _refreshCliModelsBg(req, bodyBuf, rid) {
   } catch (_) {}
 }
 
+// ★ v9.9.76 · 铸令类 RPC(登录/令牌颁发) —— 名可名非恒名 · 不可伪答:
+//   空 OK 无令牌无会话, 伪答则前端以空凭证自谓已登 → 素材尽隐 + 协议必崩。
+//   如实还报 unavailable → 客户端知"官方暂不可达"自然重试·不夺其真。
+const _AUTH_CREDENTIAL_RE =
+  /RegisterUser|RefreshToken|GetAuthToken|GetUserJwt|Login|CreateLoginToken|ExchangeToken|VerifyAuthToken|OAuthCallback/i;
+function _isCredentialRpc(u) {
+  try {
+    return _AUTH_CREDENTIAL_RE.test(_rpcName(u));
+  } catch (_) {
+    return false;
+  }
+}
 function _replyAuthResilient(req, res, rid) {
   try { req.resume(); } catch (_) {} // 排空入站体·防 socket 悬挂
   const url = req.url || "";
   const rpc = _rpcName(url);
+  // ★ v9.9.76 · 铸令不可伪 → 方言镜像的诚实 unavailable(Connect 客得 Connect 误·不再协议崩)
+  if (_isCredentialRpc(url)) {
+    _replyDialectUnavailable(
+      req,
+      res,
+      rid,
+      rpc,
+      "dao: official auth upstream unreachable, retry",
+    );
+    return true;
+  }
   // GetUserStatus: 优先回放上次真官方响应(守其母) · 30 分钟内视为可用
   //   ★ v9.9.376 · 同型校验: last-good 必须真出自 GetUserStatus —— _epHit 三 RPC
   //     共用此槽, 若无 rpc 标记 CliModelConfigs 体会被误当 UserStatus 回放
+  //   ★ v9.9.76 · 线族校验: 录存响应之方言族须与本次请求同族(connect↔connect / grpc↔grpc)
+  //     —— 旧 gRPC 录答不可喂新 Connect 客(同"invalid content-type"崩)
   if (
     /GetUserStatus/i.test(rpc) &&
     _lastGoodUserStatus &&
     _lastGoodUserStatus.buf &&
     (!_lastGoodUserStatus.rpc ||
       /GetUserStatus/i.test(_lastGoodUserStatus.rpc)) &&
-    Date.now() - (_lastGoodUserStatus.at || 0) < 30 * 60 * 1000
+    Date.now() - (_lastGoodUserStatus.at || 0) < 30 * 60 * 1000 &&
+    _wireFamily(_lastGoodUserStatus.ct) ===
+      _wireFamily(req.headers && req.headers["content-type"]) &&
+    _wireFamily(_lastGoodUserStatus.ct)
   ) {
     try {
       if (res.headersSent) return true;
@@ -9167,11 +9241,11 @@ function _replyAuthResilient(req, res, rid) {
       );
       return true;
     } catch (e) {
-      log(`#${rid} [auth-resilient] 回放失败: ${e.message} → 转空 gRPC OK`);
+      log(`#${rid} [auth-resilient] 回放失败: ${e.message} → 转方言镜像空 OK`);
     }
   }
-  // 无 last-good → 空 gRPC OK(前端仅验 grpc-status=0 即认已连接·不抛 ECONNRESET)
-  _replyGrpcOk(res, rid, rpc);
+  // 无 last-good → 方言镜像空 OK(Connect 客得 application/proto·gRPC 客得 grpc 帧·各得其所)
+  _replyGrpcOk(req, res, rid, rpc);
   return true;
 }
 
@@ -9654,7 +9728,8 @@ function proxyToCloud(req, res, overrideBody, _rid) {
       return;
     }
     log(`[h2] session create fail: ${e.message}`);
-    if (!res.headersSent) res.writeHead(502);
+    if (!res.headersSent)
+      res.writeHead(502, { "content-type": "application/json" });
     try {
       res.end(JSON.stringify({ error: "h2_session", message: e.message }));
     } catch {}
@@ -9801,8 +9876,8 @@ function proxyToCloud(req, res, overrideBody, _rid) {
               log(`#${_rid} [响应改写] 写回失败 → 502: ${e.message}`);
               try {
                 if (!res.headersSent) {
-                  res.writeHead(502);
-                  res.end();
+                  res.writeHead(502, { "content-type": "application/json" });
+                  res.end(JSON.stringify({ error: "rewrite", message: e.message }));
                 }
               } catch {}
             }
@@ -9872,7 +9947,7 @@ function proxyToCloud(req, res, overrideBody, _rid) {
       _cancelUpstream(`response-cb throw: ${e.message}`);
       try {
         if (!res.headersSent) {
-          res.writeHead(502);
+          res.writeHead(502, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "response-cb", message: e.message }));
         }
       } catch {}
@@ -9892,7 +9967,7 @@ function proxyToCloud(req, res, overrideBody, _rid) {
         return;
       }
       try {
-        res.writeHead(502);
+        res.writeHead(502, { "content-type": "application/json" });
       } catch {}
     }
     try {
@@ -10388,28 +10463,126 @@ function _harvestFromLsp(body) {
   } catch (_) {}
   return false;
 }
-// ★ v9.9.344 · 本地 gRPC OK 应答 · 天下有始 以为天下母
-//   SeatManagement/Heartbeat/GetUserStatus 官方不可达时 → 本地直返空 gRPC OK
-//   LS 仅检 grpc-status=0 即视为"已鉴权/已连接" · 无需真实 proto 载荷
+// ★ v9.9.344 · 本地 OK 应答 · 天下有始 以为天下母
+//   SeatManagement/Heartbeat/GetUserStatus 官方不可达时 → 本地直返空 OK
 //   gRPC 帧: [0x00(无压缩), 0x00,0x00,0x00,0x00(长度=0)] = 空 protobuf message
+// ★ v9.9.76 · 方言镜像 · 道法自然 —— 以来者之方言答来者:
+//   新版 Devin(E:\Windsurf) 客走 Connect 协议(content-type application/proto·unary /
+//   application/connect+* 流式 / application/json), 旧 LS 走 gRPC。
+//   向 Connect 客回 application/grpc → ConnectError「invalid content-type:
+//   "application/grpc"; expecting "application/proto"」→ initializeAuthSession→
+//   getUserStatus 崩 → "Failed to log in"(141 zhou 实案 2026-11-02)。
+//   → 随请求 content-type 镜像应答方言, 旧客新客各得其所·无为而无不为。
 const _GRPC_EMPTY_OK = Buffer.from([0, 0, 0, 0, 0]);
-function _replyGrpcOk(res, rid, rpcName) {
+// 识请求方言: connect-proto / connect-json / connect-stream / grpc(含不识兜底守旧)
+function _wireDialect(req) {
+  try {
+    const ct = String(
+      (req && req.headers && req.headers["content-type"]) || "",
+    ).toLowerCase();
+    if (ct.indexOf("application/connect+") === 0) return "connect-stream";
+    if (ct.indexOf("application/grpc") === 0) return "grpc";
+    if (ct.indexOf("application/proto") === 0) return "connect-proto";
+    if (ct.indexOf("application/json") === 0) return "connect-json";
+  } catch (_) {}
+  return "grpc"; // 不识则守旧 gRPC · 旧 LS 恒言此
+}
+// 线协议族: connect(裸/JSON/流信封) vs grpc(5字节帧+trailers) —— 跨族回放字节必裂
+function _wireFamily(ct) {
+  try {
+    const c = String(ct || "").toLowerCase();
+    if (c.indexOf("application/grpc") === 0) return "grpc";
+    if (
+      c.indexOf("application/proto") === 0 ||
+      c.indexOf("application/json") === 0 ||
+      c.indexOf("application/connect+") === 0
+    )
+      return "connect";
+  } catch (_) {}
+  return "";
+}
+// Connect 流式终帧: [0x02 end 标志][4B BE 长度][JSON 载荷 {} 清终 / {error} 误终]
+function _connectEndFrame(jsonObj) {
+  const p = Buffer.from(JSON.stringify(jsonObj || {}), "utf8");
+  const h = Buffer.alloc(5);
+  h[0] = 0x02;
+  h.writeUInt32BE(p.length, 1);
+  return Buffer.concat([h, p]);
+}
+function _replyGrpcOk(req, res, rid, rpcName) {
   try {
     if (res.headersSent) return;
-    // H2 与 H1 均用 writeHead + write + addTrailers + end
-    res.writeHead(200, {
-      "content-type": "application/grpc",
-    });
-    res.write(_GRPC_EMPTY_OK);
-    try {
-      res.addTrailers({ "grpc-status": "0", "grpc-message": "" });
-    } catch (_) {
-      // H1 无 TE:trailers 时 addTrailers 可能报错 · 忽略(grpc-status 已在 header 隐含)
+    const d = _wireDialect(req);
+    if (d === "connect-proto") {
+      // Connect unary·proto: 裸 protobuf 空消息 = 零长体
+      res.writeHead(200, { "content-type": "application/proto" });
+      res.end();
+    } else if (d === "connect-json") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+    } else if (d === "connect-stream") {
+      // 镜像请求子类型 (connect+proto / connect+json) · 名随实变
+      const _sct =
+        String((req.headers && req.headers["content-type"]) || "") ||
+        "application/connect+proto";
+      res.writeHead(200, { "content-type": _sct });
+      res.end(_connectEndFrame({}));
+    } else {
+      // grpc / grpc-web / 不识 · 守旧帧 + trailers · 族内亦镜像其子类 ct
+      const _gct = String(
+        (req.headers && req.headers["content-type"]) || "application/grpc",
+      );
+      res.writeHead(200, {
+        "content-type": _gct.indexOf("application/grpc") === 0 ? _gct : "application/grpc",
+      });
+      res.write(_GRPC_EMPTY_OK);
+      try {
+        res.addTrailers({ "grpc-status": "0", "grpc-message": "" });
+      } catch (_) {
+        // H1 无 TE:trailers 时 addTrailers 可能报错 · 忽略
+      }
+      res.end();
     }
-    res.end();
-    log(`#${rid} [local-auth] ${rpcName} → gRPC OK (本地兜底)`);
+    log(`#${rid} [local-auth] ${rpcName} → ${d} OK (本地兜底)`);
   } catch (e) {
     log(`#${rid} [local-auth] _replyGrpcOk err: ${e.message}`);
+  }
+}
+// ★ v9.9.76 · 诚实的不可用 · 不夺其真 —— 铸令类 RPC(Login/RegisterUser/令牌)不可伪答:
+//   空 OK 无令牌, 伪则前端必溃; 官方不可达时如实还报 unavailable → 客户端知悉重试。
+function _replyDialectUnavailable(req, res, rid, rpcName, msg) {
+  try {
+    if (res.headersSent) return;
+    const d = _wireDialect(req);
+    const m = String(msg || "official upstream unreachable");
+    if (d === "connect-proto" || d === "connect-json") {
+      // Connect unary 错误协议: 非2xx + application/json {code,message}
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "unavailable", message: m }));
+    } else if (d === "connect-stream") {
+      const _sct =
+        String((req.headers && req.headers["content-type"]) || "") ||
+        "application/connect+proto";
+      res.writeHead(200, { "content-type": _sct });
+      res.end(
+        _connectEndFrame({ error: { code: "unavailable", message: m } }),
+      );
+    } else {
+      // grpc: trailers-only · grpc-status=14 UNAVAILABLE · 族内镜像子类 ct
+      const _gct = String(
+        (req.headers && req.headers["content-type"]) || "application/grpc",
+      );
+      res.writeHead(200, {
+        "content-type": _gct.indexOf("application/grpc") === 0 ? _gct : "application/grpc",
+      });
+      try {
+        res.addTrailers({ "grpc-status": "14", "grpc-message": m });
+      } catch (_) {}
+      res.end();
+    }
+    log(`#${rid} [local-auth] ${rpcName} → ${d} UNAVAILABLE (${m})`);
+  } catch (e) {
+    log(`#${rid} [local-auth] _replyDialectUnavailable err: ${e.message}`);
   }
 }
 
@@ -11294,8 +11467,9 @@ const _mainHandler = async (req, res) => {
       // 先采集鉴权信封(LS 请求常携 Bearer) → 供上游模型路由复用 · 利而不害
       try { _scanAuthHeaders(req); } catch (_) {}
       // 消费 body 防 socket 泄漏, 再本地即答(零延迟·不依赖官方可达)
+      //   ★ v9.9.76 · 方言镜像: Connect 客回 application/proto 空消息·不再协议崩
       try { req.resume(); } catch (_) {}
-      _replyGrpcOk(res, rid, _authRpc);
+      _replyGrpcOk(req, res, rid, _authRpc);
       return;
     }
 
@@ -11312,7 +11486,7 @@ const _mainHandler = async (req, res) => {
         } catch (_) {}
         readBody(req)
           .then((b) => {
-            if (_serveLastGoodCliModels(res, rid)) {
+            if (_serveLastGoodCliModels(req, res, rid)) {
               try {
                 _refreshCliModelsBg(req, b, rid);
               } catch (_) {}
@@ -12472,6 +12646,13 @@ module.exports = {
     _h2TunnelConnect,
     _isAuthResilientRpc,
     _replyAuthResilient,
+    // ★ v9.9.76 · 方言镜像 (离线可测)
+    _wireDialect,
+    _wireFamily,
+    _replyGrpcOk,
+    _replyDialectUnavailable,
+    _isCredentialRpc,
+    _connectEndFrame,
     _originResolveProxyUrl,
     _originIsLocalHost,
     _setLastGoodUserStatusForTest: (v) => { _lastGoodUserStatus = v; },
