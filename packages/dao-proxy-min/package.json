@@ -1,7 +1,7 @@
 {
   "name": "dao-proxy-min",
   "displayName": "道Agent · 反者道之动 · 弱者道之用",
-  "description": "v9.9.76 · 方言镜像·道法自然(主公诏:141 zhou 新版Devin登录即崩根治): 新版Devin走Connect协议(application/proto)·旧代理兜底恒答application/grpc→ConnectError→登录崩;今以来者方言镜像应答+铸令类RPC诚实unavailable+last-good回放线族校验 + 承v9.9.75 子代理一族SP尽道",
+  "description": "v9.9.76 · 方言镜像·道法自然(主公诏:141 zhou 新版Devin登录即崩根治): 新版Devin走Connect协议(application/proto)·旧代理兜底恒答application/grpc→ConnectError→登录崩;今以来者方言镜像应答+铸令类RPC诚实unavailable+last-good回放线族校验+服务名包级前缀动态适配+裸502净衣+grpc-web/connect+json族内子类镜像 + 承v9.9.75 子代理一族SP尽道",
   "version": "9.9.76",
   "publisher": "dao-agi",
   "license": "Apache-2.0",
