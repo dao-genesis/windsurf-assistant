@@ -2501,6 +2501,10 @@ function status() {
     count: Object.keys(_routes).length,
     uids: Object.keys(_routes),
     gateway: _gatewayUrl,
+    // ★ v9.9.375 · 名实相符: status 直报活路由自身之配置路径
+    //   病: ping 之 configPath 取自 runtime 单例陈迹 (ensure 时 ready=false 则永不set)
+    //       → 惰性 init 后路由已活而报空 → 观者误判
+    configPath: (_cfg && _cfg._configPath) || "",
     stats: { ..._stats },
     providers: Object.keys(_providers),
     provHealth,

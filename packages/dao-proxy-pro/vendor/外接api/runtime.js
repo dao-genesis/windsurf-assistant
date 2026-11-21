@@ -208,11 +208,13 @@ function ensure(opts = {}) {
           }),
         configPath,
       });
+      // ★ v9.9.375 · 名实相符: 解析路径无条件实录 (无论 ready 与否)
+      //   病: 仅 ready 时才 set → 惰性 init 复活路由后单例仍报空 → ping configPath 空
+      _singleton._configPath = configPath;
       if (result.ready) {
         _singleton._router = Router;
         _singleton._gatewayUrl = result.gateway || "";
         _singleton._running = true;
-        _singleton._configPath = configPath;
       }
     } catch (e) {
       try {
