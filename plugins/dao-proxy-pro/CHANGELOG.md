@@ -2,6 +2,41 @@
 
 > 完整版本历史。详情页（README）保持精简，本文件单列于扩展的 Changelog 标签页。
 
+v9.9.374 · 名实相符·渠道热配根治 (G7/G23 双机闭环实证 2026-11-21)
+: 病(无额度账号 izpy2wrl 实机验证外接API全链时四层连环暴露):
+  ① **扁平体静默吞没**: POST /origin/ea/provider 发 `{name,apiKey,enabled}` 扁平体,
+    handler 只认 `body.cfg||body.provider` → cfg={} → 静默 no-op 仍报 `ok:true`
+    → key 丢而人以为成 (route handler 同病)。名实不符之癌。
+  ② **空壳推断覆好值**: hotAddProvider 先推断后合并 — 空 cfg 触发 completionPath
+    自动推断(/v1/chat/completions) → 覆盖既有 /chat/completions → baseUrl 已含 /v1
+    → /v1/v1 双重路径 → DeepSeek 404 渠道不可用。
+  ③ **拼接无版本段去重**: _joinCompletionUrl 对 root 已含 /vN 而 path 又以 /vN 开头
+    的历史坏配置无兜底。
+  ④ **homedir 缺失配置漂移**: systemd/守护进程无 HOME env → _resolveConfigPath
+    静默回落 VSIX 内 bundled core/配置.json → 热配写入随升级重装即失
+    (违「凭据安于 ~/.codeium 跨安装持久」本意) · status 报甲路径写乙路径。
+  治法五件:
+  ① provider/route 两 handler 扁平体兼容 (无 cfg/provider 键时整体即 cfg·剥 name;
+    route 同法剥 modelUid) — 名实相符。
+  ② hotAddProvider 改「先合并后推断」: merged = {...existing, ...cfg} ·
+    归一/推断/默认皆行于 merged 且仅缺时补 — 既有好值永不被空壳覆盖。
+  ③ _joinCompletionUrl 版本段去重闸: root 尾 /vN + path 头 /vN → 剥 path 版本段
+    — 一切历史坏配置拼接处最后一道防线。
+  ④ runtime.js _resolveConfigPath 三级解析: env → os.homedir()(退 passwd 实录) → bundled
+    — systemd 下凭据仍安于 ~/.codeium。
+  ⑤ 版本归一: plugins(374 真源) → packages(可构建) → 工作区 derive 三树同步 ·
+    README 索引 358→374 · packages 旧尸 358 出列 (P5 分叉史收口)。
+  实证(G7/G23 双 Debian13 机 · 全程命令回显在案):
+  - dao-test 全链 347/347 绿 (本地 Win + g7 + g23 + packages 四处)。
+  - E2E test-chat: origin→router→api.deepseek.com 200「知道」849ms。
+  - Devin Local 全链: devin-cli v3000.14.30821 · WINDSURF_API_SERVER_URL=8937 ·
+    无额度账号 (付费档诚实报 resource_exhausted) · `--model swe-1-6-fast` →
+    真身 gpt-6-1-sol-xhigh-priority → 路由 deepseek-v4-flash →
+    答「帛書《老子》、道藏《陰符經》」(答案唯一来源=被替换 SP) ·
+    用量表 deepseek calls=1 · 16694/16701 tokens 双机各一。
+  - SP 反转: [SP-DEVIN] field=2 24534B/18906B → 7854B (帛書經藏)。
+  - 止血回退: provider 未配时 [SKIP] → 回退官方 → 诚实配额报错 (不假死)。
+
 v9.9.373 · 损之又损·死尸出列 (为道者日损 · 用户口谕: 面板只留 Devin Local + Cascade 两线)
 : 病(用户实证): 面板与后端仍挂着旧项目尸骸 —— windows-agent 经藏档、
   windows/freecad/kicad 工具契约轴、dao-desktop 归一面板的 Windows 分身/PCB/FreeCAD

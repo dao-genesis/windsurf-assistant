@@ -46,8 +46,33 @@ const net = require("net");
 const tls = require("tls");
 
 let _proxyUrlResolved; // undefined=未解析, null=无代理, string=代理URL
+let _proxyUrlResolvedAt = 0;
+const _PROXY_RESOLVE_TTL = 60000; // v9.9.372 · 解析TTL 60s·随 watchdog 切道节奏
+function _noProxyHit(host) {
+  const np = process.env.NO_PROXY || process.env.no_proxy || "";
+  if (!np) return false;
+  const h = String(host || "").toLowerCase();
+  for (const t of np.split(",")) {
+    const tok = t.trim().toLowerCase();
+    if (!tok) continue;
+    if (tok === "*") return true;
+    if (h === tok || h.endsWith("." + tok) || (tok[0] === "." && h.endsWith(tok)))
+      return true;
+  }
+  return false;
+}
 function _resolveProxyUrl() {
-  if (_proxyUrlResolved !== undefined) return _proxyUrlResolved;
+  if (
+    _proxyUrlResolved !== undefined &&
+    Date.now() - _proxyUrlResolvedAt < _PROXY_RESOLVE_TTL
+  )
+    return _proxyUrlResolved;
+  // v9.9.372 · NO_PROXY=* → 用户明示全直连 · 尊重之
+  if (_noProxyHit("__star__")) {
+    _proxyUrlResolved = null;
+    _proxyUrlResolvedAt = Date.now();
+    return null;
+  }
   // 1) 环境变量 (优先)
   let url =
     process.env.HTTPS_PROXY ||
@@ -87,6 +112,7 @@ function _resolveProxyUrl() {
     }
   }
   _proxyUrlResolved = url || null;
+  _proxyUrlResolvedAt = Date.now();
   return _proxyUrlResolved;
 }
 
@@ -101,6 +127,19 @@ function _isLocalHostName(host) {
 }
 
 // 纯 Node 实现的 HTTP CONNECT 隧道 https Agent · 无外部依赖
+// ★ v9.9.372 · 永久熔断→90s死窗: 代理道死让路直连, 窗满自动重探(代理医好即复用)
+//   根因(141实证): 20s隧道超时×永久旗标 —— 死时代价过大且不自愈。
+//   实证(ZHOU@141): sshd 环境残留 HTTP(S)_PROXY=127.0.0.1:7890(已停用空壳)
+//   → 外接路由全灭、只能回退官方。代理是"锦上添花"不是"必须经"——死了即让路, 好了即回头。
+let _proxyDeadUntil = 0;
+function _markProxyDead(reason) {
+  _proxyDeadUntil = Date.now() + 90000;
+  _proxyUrlResolvedAt = 0; // 隧道死 → 解析即时过期 · 下次赶上 watchdog 切道
+  try {
+    _log(`[dao-router] 代理隧道死窗 90s → 直连 (${reason})`);
+  } catch (_) {}
+}
+
 class _DaoTunnelAgent extends https.Agent {
   constructor(proxyUrl, opts) {
     super(opts || {});
@@ -111,8 +150,8 @@ class _DaoTunnelAgent extends https.Agent {
   createConnection(options, cb) {
     const destHost = options.host || options.hostname;
     const destPort = parseInt(options.port || 443, 10);
-    // 本地/内网目标 → 不走代理 (直接 TLS)
-    if (_isLocalHostName(destHost)) {
+    // 本地/内网/NO_PROXY 目标 → 不走代理 (直接 TLS) · v9.9.372
+    if (_isLocalHostName(destHost) || _noProxyHit(destHost)) {
       return super.createConnection(options, cb);
     }
     const sock = net.connect(this._proxyPort, this._proxyHost);
@@ -124,10 +163,22 @@ class _DaoTunnelAgent extends https.Agent {
       try {
         sock.destroy();
       } catch (_) {}
+      // ★ v9.9.367 · 死代理熔断: 连代理本体都失败(ECONNREFUSED/超时) → 后续直连
+      //   CONNECT 拒绝(有响应但非200)说明代理活着只是不接收 → 不熔断
+      const code = e && (e.code || e.message || "");
+      if (
+        code === "ECONNREFUSED" ||
+        code === "EHOSTUNREACH" ||
+        code === "ETIMEDOUT" ||
+        /tunnel timeout/i.test(String(code))
+      ) {
+        _markProxyDead(code);
+      }
       cb(e);
     };
     sock.once("error", fail);
-    sock.setTimeout(20000, () => fail(new Error("dao proxy tunnel timeout")));
+    // v9.9.372 · 隧道建连预算 3s (<客户端5s) · 死道 fail-fast 非 fail-stall
+    sock.setTimeout(3000, () => fail(new Error("dao proxy tunnel timeout")));
     sock.on("connect", () => {
       sock.write(
         `CONNECT ${destHost}:${destPort} HTTP/1.1\r\nHost: ${destHost}:${destPort}\r\n\r\n`,
@@ -182,6 +233,7 @@ let _daoTunnelAgentUrl = null;
 function _getProxyAgent(isHttps) {
   // 仅对 https 上游启用隧道 (http/本地上游保持直连原状)
   if (!isHttps) return undefined;
+  if (Date.now() < _proxyDeadUntil) return undefined; // v9.9.372 · 死窗内直连·窗满自动重探
   const url = _resolveProxyUrl();
   if (!url) return undefined;
   if (_daoTunnelAgent && _daoTunnelAgentUrl === url) return _daoTunnelAgent;
@@ -201,6 +253,13 @@ let _spInvert = null;
 try {
   _spInvert = require(path.join(__dirname, "sp_invert"));
 } catch {}
+
+// v9.9.373 · 损之又损: windows-agent 域工具线已废(旧项目尸骸) — _winTools 注入/代理执行一并拆除
+
+// 代理侧拦截判定归一: 仅代理工具
+function _isProxyExecTool(name) {
+  return _proxyOnlyToolNames.has(name);
+}
 
 // ★ v9.9.101 · 太上下知有之 · 增强模式幂等标记 + DAO经藏文本
 //   道义: 十七章「太上 下知有之」· DAO存在但不可见 · 官方功能完整保留
@@ -262,7 +321,12 @@ function _getDaoEnhanceText() {
     const canonHeader = _spInvert.getCanonHeader
       ? _spInvert.getCanonHeader()
       : "";
-    return canonHeader + canonText;
+    // ★ 工具轴正交叠加 · 工具模式契约(windows/freecad/kicad)与经藏并行注入
+    const toolSuffix =
+      typeof _spInvert.getToolContractSuffix === "function"
+        ? _spInvert.getToolContractSuffix()
+        : "";
+    return canonHeader + canonText + toolSuffix;
   } catch {
     return null;
   }
@@ -1558,7 +1622,7 @@ function _normalizeModelUid(uid) {
 /**
  * 判断是否应路由此 modelUid
  */
-function shouldRoute(modelUid) {
+function shouldRoute(modelUid, surface) {
   if (typeof modelUid !== "string") return false;
   // ★ v9.9.98 · 无配置=全官方 · 有配置才路由 · 道法自然
   //   _ready=false: 无路由配置 → 所有模型走官方透传
@@ -1574,6 +1638,14 @@ function shouldRoute(modelUid) {
   if (r.enabled === false) return false;
   // substitute模式需要全局开关
   if (r.provider === "substitute" && !_substituteEnabled) return false;
+  // ★ v9.9.368 · 分面路由: scope=local|cascade 限定生效面 · 缺省 all 双面
+  //   Devin Local(chisel acp→api_server_pb)=local · Cascade(LS)=cascade
+  //   surface 未识别('')时只应 all 面 —— 保守不误路由
+  //   ★ v9.9.371 · surface=any|* → 面不限(test-chat 等诊断直通·验路由存在性)
+  const scope = String(r.scope || "all").toLowerCase();
+  const _sf = String(surface || "").toLowerCase();
+  if (_sf !== "any" && _sf !== "*" && scope !== "all" && scope !== surface)
+    return false;
   // ★ 通配符 * 始终可路由
   if (normalized === "*") return true;
   return true;
@@ -2187,10 +2259,12 @@ async function _tryRoute({
         );
 
         // 执行服务端工具 → 生成 tool result
-        const _toolResults = _remainingServerCalls.map((tc) => ({
-          tool_call_id: tc.id,
-          content: _executeServerTool(tc.name, tc.argumentsJson),
-        }));
+        const _toolResults = await Promise.all(
+          _remainingServerCalls.map(async (tc) => ({
+            tool_call_id: tc.id,
+            content: _executeServerTool(tc.name, tc.argumentsJson),
+          })),
+        );
 
         // ★ v9.9.86 · 追加 assistant 消息: 保留 thinking + text 内容
         //   DeepSeek 要求 assistant 消息的 reasoning_content 和 content
@@ -3357,7 +3431,7 @@ async function _unaryOaToCascade(
         //   trajectory_search 等即使 LSP 未发 → isCustomToolCall=false → LSP 正常执行
         //   道义: 十七章「太上不知有之」· LSP 不知有代理 · 工具调用自然流转
         isCustomToolCall:
-          _proxyOnlyToolNames.has(_rawName) &&
+          _isProxyExecTool(_rawName) &&
           !(lspToolNames && lspToolNames.has(_rawName)),
       };
     });
@@ -3526,6 +3600,24 @@ function _streamOaToCascade(
         _log(`[dao-router] ⚠️ 工具调用参数JSON无效: ${tc.name} → 使用空对象`);
         _validArgs = "{}";
       }
+
+      // v10.2 · run_subagent.profile 归一 — 外接模型发 profile 无 enum 值 → LSP 侧 spawn 必败
+      //   实证(2026-10-25 东京真流量): deepseek 发 "general"/"default" →
+      //   toolbox_core: Unknown subagent profile (Available: subagent_general/subagent_explore)
+      //   schema 无 enum · 模型自然乱填 → 归一到 LSP 实名 → 子代理真跑 (六十五章·善执生者无死地)
+      if (tc.name === "run_subagent") {
+        try {
+          const _a = JSON.parse(_validArgs);
+          const _p = _a.profile;
+          if (typeof _p === "string" && _p && !_p.startsWith("subagent_")) {
+            _a.profile = /explor|search|find/i.test(_p)
+              ? "subagent_explore"
+              : "subagent_general";
+            _validArgs = JSON.stringify(_a);
+            _log("[dao-router] run_subagent.profile 归一: " + _p + " → " + _a.profile);
+          }
+        } catch {}
+      }
       // 去重: name + args 组合键 (Go EXE: toolName + ':' + JSON.stringify(params))
       const _dedupKey = tc.name + ":" + _validArgs;
       if (_seen.has(_dedupKey)) {
@@ -3573,7 +3665,7 @@ function _streamOaToCascade(
     //   道义: 十七章「太上不知有之」· LSP 不知有代理 · 工具调用自然流转
     for (const tc of _dedupedCalls) {
       const isProxyOnlyTool =
-        _proxyOnlyToolNames.has(tc.name) &&
+        _isProxyExecTool(tc.name) &&
         !(lspToolNames && lspToolNames.has(tc.name));
       if (isProxyOnlyTool) {
         // 仅代理工具: LSP 无执行器 → 拦截 → 代理执行后内部重试
@@ -3589,7 +3681,7 @@ function _streamOaToCascade(
         // ★ v9.9.93 · isCustomToolCall 判定: 仅代理工具且 LSP 未发 → true
         //   trajectory_search 等即使 LSP 未发 → isCustomToolCall=false → LSP 正常执行
         const _isCustom =
-          _proxyOnlyToolNames.has(tc.name) &&
+          _isProxyExecTool(tc.name) &&
           !(lspToolNames && lspToolNames.has(tc.name));
         _lspSideCalls.push({
           ...tc,
@@ -4356,6 +4448,14 @@ function _joinCompletionUrl(base, completionPath) {
   const root = _stripCompletionSuffix(base);
   let p = completionPath || "/v1/chat/completions";
   if (!p.startsWith("/")) p = "/" + p;
+  // ★ v9.9.374 · 版本段去重: root 已含 /vN 而 p 又以 /vN 开头 → 剥 p 之版本段
+  //   道义: 二十二章「曲则全」· 旧配置多形(baseUrl=/v1 + path=/v1/chat/completions)
+  //   实证(g7 2026-11-21): /v1 + /v1/chat/completions → /v1/v1/... → DeepSeek 404
+  //   此闸兜底一切历史坏配置 · 拼接处最后一道防线
+  if (/\/v\d+$/i.test(root)) {
+    const _m = p.match(/^\/v\d+(?=\/|$)/i);
+    if (_m) p = p.slice(_m[0].length) || "/";
+  }
   return root + p;
 }
 
@@ -4755,46 +4855,52 @@ function hotAddProvider(name, cfg) {
     return { ok: false, error: "name required" };
   if (!cfg || typeof cfg !== "object")
     return { ok: false, error: "cfg required" };
+  // ★ v9.9.374 · 先合并后推断 · 道义: 三十九章「得一以宁」· 既有好值不被空壳推断覆盖
+  //   实证根因(g7 2026-11-21): 扁平体被 handler 吞成空 cfg → 推断 completionPath=/v1/chat/completions
+  //     → 覆盖既有 /chat/completions → baseUrl 已含 /v1 → /v1/v1 双重 → DeepSeek 404 渠道不可用
+  //   修法: 先 merged = {...existing, ...cfg} · 一切归一/推断/默认皆行于 merged · 仅缺时补
+  const existing = _providers[name] || {};
+  const merged = { ...existing, ...cfg };
   // ★ cc-switch 风 · baseUrl 归一: 剥去误含的补全后缀(/chat/completions 等) · 防双重路径 404
   //   实证: 小米渠道用户把完整端点贴进 baseUrl → 拼 completionPath 双重 → 完全不可用 · 此处根治
-  if (cfg.baseUrl) {
+  if (merged.baseUrl) {
     // ★ baseUrl 去内部空白 · 根治「http s://…」被切成 "http" 的渠道不可用 (URL 不含空格)
-    cfg.baseUrl = String(cfg.baseUrl).trim().replace(/\s+/g, "");
-    const _normBase = _stripCompletionSuffix(cfg.baseUrl);
-    if (_normBase && _normBase !== String(cfg.baseUrl).replace(/\/+$/, "")) {
+    merged.baseUrl = String(merged.baseUrl).trim().replace(/\s+/g, "");
+    const _normBase = _stripCompletionSuffix(merged.baseUrl);
+    if (_normBase && _normBase !== String(merged.baseUrl).replace(/\/+$/, "")) {
       _log(
-        `[dao-router] [热] provider ${name}: baseUrl 归一 ${cfg.baseUrl} → ${_normBase} (剥补全后缀·防双重路径)`,
+        `[dao-router] [热] provider ${name}: baseUrl 归一 ${merged.baseUrl} → ${_normBase} (剥补全后缀·防双重路径)`,
       );
-      cfg.baseUrl = _normBase;
+      merged.baseUrl = _normBase;
       // baseUrl 既已含补全路径 → completionPath 由下方按归一后 base 重新推断 (清旧值)
-      if (!cfg.completionPath) delete cfg.completionPath;
+      delete merged.completionPath;
     }
   }
-  // ★ 自动检测 type: 根据 baseUrl 推断
-  if (!cfg.type) {
-    const url = (cfg.baseUrl || "").toLowerCase();
+  // ★ 自动检测 type: 根据 merged.baseUrl 推断 (仅缺时)
+  if (!merged.type) {
+    const url = (merged.baseUrl || "").toLowerCase();
     if (url.includes("anthropic") || url.includes("claude"))
-      cfg.type = "anthropic";
-    else if (url.includes("openai")) cfg.type = "openai-compatible";
+      merged.type = "anthropic";
+    else if (url.includes("openai")) merged.type = "openai-compatible";
     else if (url.includes("bedrock") || url.includes("amazonaws"))
-      cfg.type = "bedrock";
-    else cfg.type = "openai-compatible"; // 默认
+      merged.type = "bedrock";
+    else merged.type = "openai-compatible"; // 默认
   }
   // ★ 自动推断 completionPath · 防 baseUrl 已含 /vN 时重复拼 /v1 → /v1/v1/chat/completions 404
   //   道义: 二十二章「曲则全」· baseUrl 多形(含/不含版本段) · 归一方得真路 (与 _modelsUrlFor 同源)
-  if (!cfg.completionPath) {
-    const _baseHasVer = /\/v\d+\/?$/i.test(String(cfg.baseUrl || ""));
-    if (cfg.type === "anthropic")
-      cfg.completionPath = _baseHasVer ? "/messages" : "/v1/messages";
+  //   ★ v9.9.374 · 推断行于 merged · 仅 merged 缺时补 · 不覆既有好值
+  if (!merged.completionPath) {
+    const _baseHasVer = /\/v\d+\/?$/i.test(String(merged.baseUrl || ""));
+    if (merged.type === "anthropic")
+      merged.completionPath = _baseHasVer ? "/messages" : "/v1/messages";
     else
-      cfg.completionPath = _baseHasVer
+      merged.completionPath = _baseHasVer
         ? "/chat/completions"
         : "/v1/chat/completions";
   }
-  // ★ 默认 streamMode
-  if (!cfg.streamMode) cfg.streamMode = "stream";
-  // ★ 默认启用
-  if (cfg.enabled === undefined) cfg.enabled = true;
+  // ★ 默认 streamMode / 默认启用 (仅缺时)
+  if (!merged.streamMode) merged.streamMode = "stream";
+  if (merged.enabled === undefined) merged.enabled = true;
 
   // ★ v9.9.92-fix · 合并而非替换 · 防止脱敏 apiKey 覆盖真实 key
   //   道义: 三十九章「得一以宁」· 得 apiKey 之全方能宁
@@ -4802,8 +4908,7 @@ function hotAddProvider(name, cfg) {
   //         POST /provider 传入脱敏 cfg → _providers[name]=cfg 覆盖真实 key
   //         → _callProvider 发脱敏 key → 401 Bad credentials
   //   修正: 合并现有 cfg → 跳过脱敏 apiKey → 保留真实 key
-  const existing = _providers[name] || {};
-  const merged = { ...existing, ...cfg };
+  //   ★ v9.9.374 · merged 已于函数首部合成 · 此处仅 apiKey 保全
   // ★ apiKey 保全 (修「编辑渠道→key 消失」根因之一)
   //   道义: 三十九章「得一以宁」· 得 apiKey 之全方能宁
   //   两类需保留原 key 的情形:
@@ -4823,7 +4928,7 @@ function hotAddProvider(name, cfg) {
   delete merged.endpoints;
   _providers[name] = merged;
   _log(
-    `[dao-router] [热] 添加provider: ${name} type=${cfg.type} url=${cfg.baseUrl || "?"}`,
+    `[dao-router] [热] 添加provider: ${name} type=${merged.type} url=${merged.baseUrl || "?"}`,
   );
 
   // ★ v9.9.262 · 首个 provider 自动默认路由 · 道法自然 · 无为而无不为

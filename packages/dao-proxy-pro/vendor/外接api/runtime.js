@@ -49,7 +49,13 @@ function _resolveConfigPath() {
   }
   const bundledCfg = path.join(CORE_DIR, "配置.json");
   const bundledTpl = path.join(CORE_DIR, "_默认配置.json");
-  const home = process.env.USERPROFILE || process.env.HOME || "";
+  // ★ v9.9.374 · homedir 三级解析: env → os.homedir() → bundled
+  //   道义: 守一不离 · systemd/守护进程常无 HOME env · os.homedir() 退 passwd 实录
+  //   实证(g7 2026-11-21): systemd 起 origin · HOME 缺 → 静默回落 bundled
+  //     → 热配写入 VSIX 内 core/配置.json → 升级重装凭据即失 (违「安于本机」本意)
+  const os = require("os");
+  const home =
+    process.env.USERPROFILE || process.env.HOME || os.homedir() || "";
   if (home) {
     const userDir = path.join(home, ".codeium", "dao-byok");
     const userCfg = path.join(userDir, "配置.json");
@@ -222,12 +228,14 @@ function ensure(opts = {}) {
 
 /**
  * 快速路由判断 (source.js 用)
+ * ★ v9.9.371 · 两面分治: surface(local|cascade|any) 透传至 router.shouldRoute
  * @param {string} modelUid
+ * @param {string} [surface] 生效面(local|cascade|any·缺省=不限面)
  * @returns {boolean}
  */
-function shouldRoute(modelUid) {
+function shouldRoute(modelUid, surface) {
   const R = _getRouterModule();
-  return R ? R.shouldRoute(modelUid) : false;
+  return R ? R.shouldRoute(modelUid, surface) : false;
 }
 
 /**

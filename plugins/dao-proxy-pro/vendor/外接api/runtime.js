@@ -49,7 +49,13 @@ function _resolveConfigPath() {
   }
   const bundledCfg = path.join(CORE_DIR, "配置.json");
   const bundledTpl = path.join(CORE_DIR, "_默认配置.json");
-  const home = process.env.USERPROFILE || process.env.HOME || "";
+  // ★ v9.9.374 · homedir 三级解析: env → os.homedir() → bundled
+  //   道义: 守一不离 · systemd/守护进程常无 HOME env · os.homedir() 退 passwd 实录
+  //   实证(g7 2026-11-21): systemd 起 origin · HOME 缺 → 静默回落 bundled
+  //     → 热配写入 VSIX 内 core/配置.json → 升级重装凭据即失 (违「安于本机」本意)
+  const os = require("os");
+  const home =
+    process.env.USERPROFILE || process.env.HOME || os.homedir() || "";
   if (home) {
     const userDir = path.join(home, ".codeium", "dao-byok");
     const userCfg = path.join(userDir, "配置.json");

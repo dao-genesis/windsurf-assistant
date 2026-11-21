@@ -71,11 +71,73 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u66F8\u8001\u5B50+\u9053\u85CF\u9670\u7B26\u7D93", // 帛書老子+道藏陰符經
   },
+  // v9.9.373 · 损之又损: windows-agent 域工具契约线已废(旧项目尸骸·契约文件亦缺失) — 出列
 };
 
 // ── 模式/经藏持久化 ────────────────────────────────────────
 const _CANON_FILE = path.join(_BUNDLED_DIR, "_origin_canon.txt");
 const _MODE_FILE = path.join(_BUNDLED_DIR, "_origin_mode.txt");
+
+// ── 工具模式轴 ── v9.9.373 · 损之又损: windows/freecad/kicad 域工具契约皆旧项目尸骸
+//   (dao-windows-agent/FreeCAD/KiCad 线早已收官) — 只余 official 一档。
+//   轴体保留以兼容持久化文件与 /origin/tools API 形状；非 official 一律拒绝。
+const _TOOLMODE_FILE = path.join(_BUNDLED_DIR, "_origin_tools.txt");
+const TOOLMODE_MAP = {
+  official: { contract: null, name: "官方原生（无附加工具契约）" },
+};
+
+function _readToolModeFile() {
+  const envMode = (process.env.DAO_TOOLS_MODE || "").trim().toLowerCase();
+  if (envMode && TOOLMODE_MAP[envMode]) return envMode;
+  try {
+    if (fs.existsSync(_TOOLMODE_FILE)) {
+      const v = fs.readFileSync(_TOOLMODE_FILE, "utf8").trim().toLowerCase();
+      if (v && TOOLMODE_MAP[v]) return v;
+    }
+  } catch {}
+  return "official";
+}
+
+let _activeToolMode = _readToolModeFile();
+let _lastToolModeCheck = 0;
+
+function getToolMode() {
+  return _activeToolMode;
+}
+
+function setToolMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  if (!TOOLMODE_MAP[m]) return false;
+  _activeToolMode = m;
+  try {
+    fs.writeFileSync(_TOOLMODE_FILE, m, "utf8");
+  } catch {}
+  return true;
+}
+
+function _maybeHotReloadToolMode() {
+  const now = Date.now();
+  if (now - _lastToolModeCheck < 500) return;
+  _lastToolModeCheck = now;
+  try {
+    _activeToolMode = _readToolModeFile();
+  } catch {}
+}
+
+// 工具契约后缀：canon=windows-agent 已自带契约文本，不重复叠加。
+function _toolContractSuffix() {
+  const entry = TOOLMODE_MAP[_activeToolMode];
+  if (!entry || !entry.contract) return "";
+  if (_activeCanon === "windows-agent" && entry.contract === "_windows_agent.txt") return "";
+  try {
+    const fp = path.join(_BUNDLED_DIR, entry.contract);
+    if (fs.existsSync(fp)) {
+      const t = fs.readFileSync(fp, "utf8").trim();
+      if (t) return "\n\n" + t;
+    }
+  } catch {}
+  return "";
+}
 
 function _readCanonFile() {
   try {
@@ -194,7 +256,7 @@ const TAO_SUB_ANCHOR = ""; // v9.9.95 损至空
 
 function _canonHeader(canon) {
   let bookRef;
-  if (canon === "laozi+yinfu") {
+  if (canon === "laozi+yinfu" || canon === "windows-agent") {
     bookRef =
       "\u5E1B\u66F8\u300A\u8001\u5B50\u300B\u9053\u85CF\u300A\u9670\u7B26\u7D93\u300B"; // 帛書《老子》道藏《陰符經》
   } else {
@@ -242,14 +304,41 @@ const OFFICIAL_SP_MARKERS = [
   "<ide_metadata>",
 ];
 
+// ── Devin Local (chisel/ACP) SP 识别 · v9.9.365 · 道并行而不相悖 ──
+// 实证(2026-10-22 本机 ACP 活捉): devin.exe acp 之 GetChatMessage system =
+//   "You are Devin, an interactive command line agent from Cognition."
+//   ~19959B · 全文无 Cascade XML 标记 → 旧识别盲区 → invert/custom 皆透传。
+//   治: 与 Cascade 同规 —— 起首强特征 + 结构标记 ≥2 命中即判官方 SP。
+//   模型注册表实得 0 组(chisel --model 恒回退默认 swe-1-6-fast),
+//   故模型替换归于 daoRoutes 路由层(与 Cascade 同一张表)· 此处只管 SP 识别。
+const DEVIN_SP_MARKERS = [
+  "interactive command line agent",
+  "from Cognition",
+  "Available MCP Servers",
+  "Available subagent profiles",
+  "subagent_explore",
+  "subagent_general",
+  "# Task Management",
+  "# Tool Tips",
+  "## Destructive Operations",
+  "mcp_list_tools",
+  "devin-cli",
+];
+
 function isLikelyOfficialSP(s) {
   if (!s) return false;
   // v9.9.95 · startsWith 优先于长度检查 · 明确的官方标识不受长度限制
   //   道义: 一章「名可名也 非恒名也」· 有名即知 · 不以大小论
   if (s.startsWith("You are Cascade")) return true;
+  // v9.9.365 · Devin Local(chisel/ACP) 起首强特征 · 与 Cascade 同格
+  if (s.startsWith("You are Devin")) return true;
   if (s.length < 500) return false;
   let hits = 0;
   for (const m of OFFICIAL_SP_MARKERS) {
+    if (s.indexOf(m) >= 0) hits++;
+    if (hits >= 2) return true;
+  }
+  for (const m of DEVIN_SP_MARKERS) {
     if (s.indexOf(m) >= 0) hits++;
     if (hits >= 2) return true;
   }
@@ -309,6 +398,13 @@ const EPHEMERAL_SP_MARKERS = [
   "main topic",
   "<planner_response>",
   "<planner_step>",
+  // v9.9.365 · Devin Local(chisel/ACP) 标题子模型 SP 指纹
+  //   实证: "You are a session title generator. ... Output ONLY the title text
+  //         — no quotes, no punctuation wrapper, no explanation." (202B)
+  "session title generator",
+  "ONLY the title",
+  "descriptive title",
+  "no punctuation wrapper",
 ];
 
 // v9.9.92 · looksLikeSPShape · 形状判 · 从 source.js 同步
@@ -335,6 +431,8 @@ function classifySPType(s) {
   if (!s || typeof s !== "string") return null;
   if (s.length < 100) return null;
   if (s.startsWith("You are Cascade")) return "chat";
+  // v9.9.365 · Devin Local(chisel/ACP) 主对话 SP · 与 Cascade 同格
+  if (s.startsWith("You are Devin")) return "chat";
   if (
     s.startsWith("You are an expert AI coding") ||
     s.startsWith("You are an AI assistant") ||
@@ -343,6 +441,7 @@ function classifySPType(s) {
     return "summary";
   const hits = { chat: 0, summary: 0, memory: 0, ephemeral: 0 };
   for (const m of OFFICIAL_SP_MARKERS) if (s.indexOf(m) >= 0) hits.chat++;
+  for (const m of DEVIN_SP_MARKERS) if (s.indexOf(m) >= 0) hits.chat++;
   for (const m of SUMMARY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.summary++;
   for (const m of MEMORY_SP_MARKERS) if (s.indexOf(m) >= 0) hits.memory++;
   for (const m of EPHEMERAL_SP_MARKERS) if (s.indexOf(m) >= 0) hits.ephemeral++;
@@ -459,6 +558,7 @@ function deOfficialName(s) {
   let out = s
     .replace(/CascadeProjects/g, "Projects")
     .replace(/\bCascade's\b/g, _DN_YOURP)
+    .replace(/\bDevin's\b/g, _DN_YOURP)
     .replace(/\bWindsurf's\b/g, _DN_ED + "'s")
     .replace(/\bCodeium's\b/g, _DN_ED + "'s")
     // 语法守: "the Cascade IDE"→"the IDE"(非"the you IDE")
@@ -466,6 +566,7 @@ function deOfficialName(s) {
     .replace(/\bthe Windsurf\b/g, "the")
     .replace(/\bthe Codeium\b/g, "the")
     .replace(/\bCascade\b/g, _DN_YOU)
+    .replace(/\bDevin\b/g, _DN_YOU)
     .replace(/\bWindsurf\b/g, _DN_ED)
     .replace(/\bCodeium\b/g, _DN_ED);
   // 主谓一致: 仅对哨兵主语 "⟨YOU⟩ <第三人称单数>" → 原形
@@ -627,7 +728,8 @@ function invertAnySP(spText) {
     //   有则保 · 无则简 · 名随实变
     // v9.9.60 · 损之又损 · 副路亦去嘱 · 经文自足 · 无末锚
     const keeps = extractKeepBlocks(s);
-    const base = _canonHeader(_activeCanon) + _activeCanonText + TAO_FOOTER;
+    _maybeHotReloadToolMode();
+    const base = _canonHeader(_activeCanon) + _activeCanonText + _toolContractSuffix() + TAO_FOOTER;
     return keeps ? base + TAO_TRAILER + keeps : base;
   } catch (e) {
     return null;
@@ -652,7 +754,8 @@ function invertSP(spText) {
     // 默认: 道法自然 · 无为而无不为
     if (!_activeCanonText) return null;
     const keeps = extractKeepBlocks(s);
-    const base = _canonHeader(_activeCanon) + _activeCanonText + TAO_FOOTER;
+    _maybeHotReloadToolMode();
+    const base = _canonHeader(_activeCanon) + _activeCanonText + _toolContractSuffix() + TAO_FOOTER;
     // v9.9.60 · 损之又损 · 去嘱留经 · 经文自足 · 无末锚
     return keeps ? base + TAO_TRAILER + keeps : base;
   } catch (e) {
@@ -783,6 +886,13 @@ module.exports = {
   // ★ v9.9.94 · 经藏热同步 · 让 source.js 能同步 sp_invert 的 _activeCanon
   setCanon,
   hotReloadCanon,
+  getToolMode,
+  setToolMode,
+  TOOLMODE_MAP,
+  getToolContractSuffix: () => {
+    _maybeHotReloadToolMode();
+    return _toolContractSuffix();
+  },
 
   // ★ v9.9.356 · 自定义SP · 标记 + 只读取数
   CUSTOM_SP_MARKER,
@@ -798,6 +908,7 @@ module.exports = {
   DAO_DE_JING_81,
   YINFU_JING,
   OFFICIAL_SP_MARKERS,
+  DEVIN_SP_MARKERS,
   SUMMARY_SP_MARKERS,
   MEMORY_SP_MARKERS,
   EPHEMERAL_SP_MARKERS,

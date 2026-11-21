@@ -80,6 +80,7 @@ const _CANON_MAP = {
     files: ["_silk_de.txt", "_silk_dao.txt", "_yinfu.txt"],
     name: "\u5E1B\u4E66\u8001\u5B50+\u9053\u85CF\u9634\u7B26\u7ECF",
   },
+  // v9.9.373 · 损之又损: windows-agent 域工具契约线已废(旧项目尸骸) — 出列
 };
 // ★ v9.9.94 · _CANON_FILE 指向 bundled-origin (与 sp_invert.js 同源)
 //   sp_core.js 在 core/ 目录 · bundled-origin 在 ../../bundled-origin
@@ -118,10 +119,58 @@ function getCanon() {
   return _activeCanon;
 }
 
+// ── 工具模式轴（与经藏轴正交·与 sp_invert.js 同源）──
+const _TOOLMODE_FILE = path.join(_BUNDLED_DIR, "_origin_tools.txt");
+const TOOLMODE_MAP = {
+  official: { contract: null, name: "官方原生（无附加工具契约）" },
+};
+
+function _readToolModeFile() {
+  const envMode = (process.env.DAO_TOOLS_MODE || "").trim().toLowerCase();
+  if (envMode && TOOLMODE_MAP[envMode]) return envMode;
+  try {
+    if (fs.existsSync(_TOOLMODE_FILE)) {
+      const v = fs.readFileSync(_TOOLMODE_FILE, "utf8").trim().toLowerCase();
+      if (v && TOOLMODE_MAP[v]) return v;
+    }
+  } catch {}
+  return "official";
+}
+
+function getToolMode() {
+  return _readToolModeFile();
+}
+
+function setToolMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  if (!TOOLMODE_MAP[m]) return false;
+  try {
+    fs.writeFileSync(_TOOLMODE_FILE, m, "utf8");
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+// 工具契约后缀：canon=windows-agent 已自带契约文本，不重复叠加。
+function _toolContractSuffix() {
+  const entry = TOOLMODE_MAP[_readToolModeFile()];
+  if (!entry || !entry.contract) return "";
+  if (_activeCanon === "windows-agent" && entry.contract === "_windows_agent.txt") return "";
+  try {
+    const fp = path.join(_BUNDLED_DIR, entry.contract);
+    if (fs.existsSync(fp)) {
+      const t = fs.readFileSync(fp, "utf8").trim();
+      if (t) return "\n\n" + t;
+    }
+  } catch {}
+  return "";
+}
+
 // ★ v9.9.94 · 动态经藏头 · 与 sp_invert.js _canonHeader 同源
 function _canonHeader(canon) {
   let bookRef;
-  if (canon === "laozi+yinfu") {
+  if (canon === "laozi+yinfu" || canon === "windows-agent") {
     bookRef =
       "\u5E1B\u4E66\u300A\u8001\u5B50\u300B\u9053\u85CF\u300A\u9634\u7B26\u7ECF\u300B";
   } else {
@@ -466,7 +515,7 @@ function buildFinalSP(params) {
   //   v9.9.95 修正: DEVIN track 之前用 _SILK.combined (SILK_DIR 不存在 → 空)
   //   现统一为 _canonText(_activeCanon) · 与 cascade track 同源
   const header = track === "devin" ? DEVIN_HEADER : _getDynamicHeader();
-  const injectText = _canonText(_activeCanon);
+  const injectText = _canonText(_activeCanon) + _toolContractSuffix();
 
   let sp = "",
     source = "bypass",
@@ -665,6 +714,9 @@ module.exports = {
   // ★ v9.9.94 · 经藏热同步
   setCanon,
   hotReloadCanon,
+  getToolMode,
+  setToolMode,
+  TOOLMODE_MAP,
   getCanon,
   _getDynamicHeader,
 

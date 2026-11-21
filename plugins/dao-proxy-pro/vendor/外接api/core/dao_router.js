@@ -4448,6 +4448,14 @@ function _joinCompletionUrl(base, completionPath) {
   const root = _stripCompletionSuffix(base);
   let p = completionPath || "/v1/chat/completions";
   if (!p.startsWith("/")) p = "/" + p;
+  // ★ v9.9.374 · 版本段去重: root 已含 /vN 而 p 又以 /vN 开头 → 剥 p 之版本段
+  //   道义: 二十二章「曲则全」· 旧配置多形(baseUrl=/v1 + path=/v1/chat/completions)
+  //   实证(g7 2026-11-21): /v1 + /v1/chat/completions → /v1/v1/... → DeepSeek 404
+  //   此闸兜底一切历史坏配置 · 拼接处最后一道防线
+  if (/\/v\d+$/i.test(root)) {
+    const _m = p.match(/^\/v\d+(?=\/|$)/i);
+    if (_m) p = p.slice(_m[0].length) || "/";
+  }
   return root + p;
 }
 
@@ -4847,46 +4855,52 @@ function hotAddProvider(name, cfg) {
     return { ok: false, error: "name required" };
   if (!cfg || typeof cfg !== "object")
     return { ok: false, error: "cfg required" };
+  // ★ v9.9.374 · 先合并后推断 · 道义: 三十九章「得一以宁」· 既有好值不被空壳推断覆盖
+  //   实证根因(g7 2026-11-21): 扁平体被 handler 吞成空 cfg → 推断 completionPath=/v1/chat/completions
+  //     → 覆盖既有 /chat/completions → baseUrl 已含 /v1 → /v1/v1 双重 → DeepSeek 404 渠道不可用
+  //   修法: 先 merged = {...existing, ...cfg} · 一切归一/推断/默认皆行于 merged · 仅缺时补
+  const existing = _providers[name] || {};
+  const merged = { ...existing, ...cfg };
   // ★ cc-switch 风 · baseUrl 归一: 剥去误含的补全后缀(/chat/completions 等) · 防双重路径 404
   //   实证: 小米渠道用户把完整端点贴进 baseUrl → 拼 completionPath 双重 → 完全不可用 · 此处根治
-  if (cfg.baseUrl) {
+  if (merged.baseUrl) {
     // ★ baseUrl 去内部空白 · 根治「http s://…」被切成 "http" 的渠道不可用 (URL 不含空格)
-    cfg.baseUrl = String(cfg.baseUrl).trim().replace(/\s+/g, "");
-    const _normBase = _stripCompletionSuffix(cfg.baseUrl);
-    if (_normBase && _normBase !== String(cfg.baseUrl).replace(/\/+$/, "")) {
+    merged.baseUrl = String(merged.baseUrl).trim().replace(/\s+/g, "");
+    const _normBase = _stripCompletionSuffix(merged.baseUrl);
+    if (_normBase && _normBase !== String(merged.baseUrl).replace(/\/+$/, "")) {
       _log(
-        `[dao-router] [热] provider ${name}: baseUrl 归一 ${cfg.baseUrl} → ${_normBase} (剥补全后缀·防双重路径)`,
+        `[dao-router] [热] provider ${name}: baseUrl 归一 ${merged.baseUrl} → ${_normBase} (剥补全后缀·防双重路径)`,
       );
-      cfg.baseUrl = _normBase;
+      merged.baseUrl = _normBase;
       // baseUrl 既已含补全路径 → completionPath 由下方按归一后 base 重新推断 (清旧值)
-      if (!cfg.completionPath) delete cfg.completionPath;
+      delete merged.completionPath;
     }
   }
-  // ★ 自动检测 type: 根据 baseUrl 推断
-  if (!cfg.type) {
-    const url = (cfg.baseUrl || "").toLowerCase();
+  // ★ 自动检测 type: 根据 merged.baseUrl 推断 (仅缺时)
+  if (!merged.type) {
+    const url = (merged.baseUrl || "").toLowerCase();
     if (url.includes("anthropic") || url.includes("claude"))
-      cfg.type = "anthropic";
-    else if (url.includes("openai")) cfg.type = "openai-compatible";
+      merged.type = "anthropic";
+    else if (url.includes("openai")) merged.type = "openai-compatible";
     else if (url.includes("bedrock") || url.includes("amazonaws"))
-      cfg.type = "bedrock";
-    else cfg.type = "openai-compatible"; // 默认
+      merged.type = "bedrock";
+    else merged.type = "openai-compatible"; // 默认
   }
   // ★ 自动推断 completionPath · 防 baseUrl 已含 /vN 时重复拼 /v1 → /v1/v1/chat/completions 404
   //   道义: 二十二章「曲则全」· baseUrl 多形(含/不含版本段) · 归一方得真路 (与 _modelsUrlFor 同源)
-  if (!cfg.completionPath) {
-    const _baseHasVer = /\/v\d+\/?$/i.test(String(cfg.baseUrl || ""));
-    if (cfg.type === "anthropic")
-      cfg.completionPath = _baseHasVer ? "/messages" : "/v1/messages";
+  //   ★ v9.9.374 · 推断行于 merged · 仅 merged 缺时补 · 不覆既有好值
+  if (!merged.completionPath) {
+    const _baseHasVer = /\/v\d+\/?$/i.test(String(merged.baseUrl || ""));
+    if (merged.type === "anthropic")
+      merged.completionPath = _baseHasVer ? "/messages" : "/v1/messages";
     else
-      cfg.completionPath = _baseHasVer
+      merged.completionPath = _baseHasVer
         ? "/chat/completions"
         : "/v1/chat/completions";
   }
-  // ★ 默认 streamMode
-  if (!cfg.streamMode) cfg.streamMode = "stream";
-  // ★ 默认启用
-  if (cfg.enabled === undefined) cfg.enabled = true;
+  // ★ 默认 streamMode / 默认启用 (仅缺时)
+  if (!merged.streamMode) merged.streamMode = "stream";
+  if (merged.enabled === undefined) merged.enabled = true;
 
   // ★ v9.9.92-fix · 合并而非替换 · 防止脱敏 apiKey 覆盖真实 key
   //   道义: 三十九章「得一以宁」· 得 apiKey 之全方能宁
@@ -4894,8 +4908,7 @@ function hotAddProvider(name, cfg) {
   //         POST /provider 传入脱敏 cfg → _providers[name]=cfg 覆盖真实 key
   //         → _callProvider 发脱敏 key → 401 Bad credentials
   //   修正: 合并现有 cfg → 跳过脱敏 apiKey → 保留真实 key
-  const existing = _providers[name] || {};
-  const merged = { ...existing, ...cfg };
+  //   ★ v9.9.374 · merged 已于函数首部合成 · 此处仅 apiKey 保全
   // ★ apiKey 保全 (修「编辑渠道→key 消失」根因之一)
   //   道义: 三十九章「得一以宁」· 得 apiKey 之全方能宁
   //   两类需保留原 key 的情形:
@@ -4915,7 +4928,7 @@ function hotAddProvider(name, cfg) {
   delete merged.endpoints;
   _providers[name] = merged;
   _log(
-    `[dao-router] [热] 添加provider: ${name} type=${cfg.type} url=${cfg.baseUrl || "?"}`,
+    `[dao-router] [热] 添加provider: ${name} type=${merged.type} url=${merged.baseUrl || "?"}`,
   );
 
   // ★ v9.9.262 · 首个 provider 自动默认路由 · 道法自然 · 无为而无不为
