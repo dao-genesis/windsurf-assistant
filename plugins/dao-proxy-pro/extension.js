@@ -4326,20 +4326,12 @@ function activate(ctx) {
 
     // 注册 webview (同样防御式: 与独立副本抢注同名视图不再 brick 后续)
     _essenceProvider = new EssenceProvider(ctx);
-    safeReg(() => vscode.window.registerWebviewViewProvider(
-      "daopp.essence",
-      _essenceProvider,
-      { webviewOptions: { retainContextWhenHidden: true } },
-    ), "view:daopp.essence");
+    /* ★ v9.9.376 · 侧栏视图摘除(集中化): daopp.essence 面板归一于编辑器Tab(状态栏唯一开门) */
 
     // ★ 归一·② Proxy Pro: 把「三模块面板」整体作为侧栏视图 dao.router 复用 ——
     //   与中央面板 cmdEaConfig 同源 getEaConfigHtml(源照/渠配/模路·拖排·1:1·实连),零前端重写。
     _eaRouterProvider = new EaRouterProvider(ctx);
-    safeReg(() => vscode.window.registerWebviewViewProvider(
-      "daopp.router",
-      _eaRouterProvider,
-      { webviewOptions: { retainContextWhenHidden: true } },
-    ), "view:daopp.router");
+    /* ★ v9.9.376 · 侧栏视图摘除(集中化): daopp.router 面板归一于编辑器Tab(状态栏唯一开门) */
 
     // ★ 状态栏入口 (右下角) · 仿 rt-flow · 点击开三模块中央面板
     // 五十二章「既得其母 以知其子」· 解「面板无处可开」之疾
@@ -5170,7 +5162,6 @@ function getEaConfigHtml(port, nonce, opts) {
     <button class="dao-tab active" data-pane="paneEssence">① 本源观照</button>
     <button class="dao-tab" data-pane="paneProvider">② 渠道配置</button>
     <button class="dao-tab" data-pane="paneRouter">③ 模型路由</button>
-    <button class="dao-tab" data-pane="paneRevproxy">④ 模型反代</button>
     <button class="dao-tab" data-pane="paneBridge">⑤ 内网穿透</button>
   </div>
 
@@ -5264,90 +5255,6 @@ function getEaConfigHtml(port, nonce, opts) {
     </div>
   </div>
 
-  <!-- ④ 模型反代 (反者道之动 · 把已接通模型反向暴露为标准本地端点 · 脱离 Devin Desktop 直调) -->
-  <div class="dao-pane" id="paneRevproxy">
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid rgba(128,128,128,0.18);flex-wrap:wrap">
-      <label class="rp-switch" title="开启后本地标准端点对外提供服务">
-        <input type="checkbox" id="rpEnabled"> <b>启用模型反代</b>
-      </label>
-      <label class="rp-switch" title="对入站 system 施『本源观照』(剥官方着相归本源) · 默认关=透传你自己的提示">
-        <input type="checkbox" id="rpInvert"> 本源观照入站提示
-      </label>
-      <label class="rp-switch" title="官方直通复用捕获帧时剥净 Cascade 系统提示词 · 反代回包即上游模型本源(Kimi 即 Kimi) · 默认开">
-        <input type="checkbox" id="rpIsolate"> 提示词隔离(回归模型本源)
-      </label>
-      <span id="rpStat" style="font-size:10px;opacity:0.65;margin-left:auto">加载中…</span>
-    </div>
-
-    <div style="font-size:11px;line-height:1.6;padding:6px 2px;opacity:0.85">
-      把「② 渠道配置 / ③ 模型路由」里已接通的模型，<b>反向</b>暴露为标准 <b>OpenAI</b> 与
-      <b>Anthropic(Claude Code)</b> 本地端点，脱离 Devin Desktop，供智能家居 / 本地脚本 /
-      其他设备以标准 SDK 直接调用。<span style="opacity:0.6">反者道之动。</span>
-    </div>
-
-    <!-- 端点信息 -->
-    <div style="border:1px solid rgba(128,128,128,0.22);border-radius:6px;padding:8px;margin:4px 2px">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-weight:600;font-size:11px">本地端点 Base URL</span>
-        <code id="rpEndpoint" style="font-size:11px;background:var(--vscode-textCodeBlock-background,rgba(0,0,0,0.18));padding:2px 6px;border-radius:3px">—</code>
-        <button class="btn" id="rpCopyEndpoint" title="复制 Base URL">复制</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px">
-        <span style="font-weight:600;font-size:11px">API Key</span>
-        <code id="rpKey" style="font-size:11px;background:var(--vscode-textCodeBlock-background,rgba(0,0,0,0.18));padding:2px 6px;border-radius:3px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</code>
-        <button class="btn" id="rpCopyKey" title="复制 API Key">复制</button>
-        <button class="btn" id="rpRegenKey" title="重新生成 API Key (旧 key 立即失效)">↻ 重置</button>
-      </div>
-      <div style="font-size:10px;opacity:0.6;margin-top:6px">
-        调用: <code>POST {Base URL}/v1/chat/completions</code> (OpenAI) ·
-        <code>POST {Base URL}/v1/messages</code> (Anthropic) ·
-        <code>GET {Base URL}/v1/models</code> · Header: <code>Authorization: Bearer {API Key}</code>
-      </div>
-    </div>
-
-    <!-- 可反代模型列表 (全量呈现·绿=可用/免费 · 红=配额耗尽 · 琥珀=付费未探测) -->
-    <div style="display:flex;align-items:center;gap:6px;padding:6px 2px 2px;flex-wrap:wrap">
-      <span style="font-weight:600;font-size:11px">可反代模型 (全量·按家族归组)</span>
-      <span id="rpModelCount" style="font-size:10px;opacity:0.6"></span>
-      <span id="rpLegend" style="font-size:10px;opacity:0.8;margin-left:6px"></span>
-      <button class="btn" id="rpRefresh" style="margin-left:auto" title="刷新可反代模型 + 状态">刷新</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:4px;padding:2px;flex-wrap:wrap">
-      <button class="btn rp-f" data-f="all" title="全部模型">全部</button>
-      <button class="btn rp-f" data-f="green" title="可反代(绿)">🟢可用</button>
-      <button class="btn rp-f" data-f="red" title="配额耗尽(红)">🔴无配额</button>
-      <button class="btn rp-f" data-f="free" title="免费档·恒可反代">免费</button>
-      <button class="btn rp-f" data-f="channel" title="经第三方渠道">渠道</button>
-      <span style="opacity:0.35">|</span>
-      <button class="btn" id="rpExposeAll" title="所有模型全部开启外接(默认态)">☑ 全选外接</button>
-      <button class="btn" id="rpExposeNone" title="所有模型全部关闭外接(端点不列不接)">☐ 全不外接</button>
-      <input id="rpFilter" placeholder="搜索模型 (uid / 名称 / 厂商)" style="flex:1;min-width:120px;font-size:11px;padding:2px 6px;border:1px solid rgba(128,128,128,0.3);border-radius:3px;background:var(--vscode-input-background,rgba(0,0,0,0.2));color:var(--vscode-input-foreground,var(--vscode-foreground))">
-    </div>
-    <div id="rpModelList" style="flex:1;overflow-y:auto;margin:2px;font-size:11px;min-height:120px"></div>
-
-    <!-- 一键测试 (GLM 等免费模型全链路自测) -->
-    <div style="border-top:1px solid rgba(128,128,128,0.2);margin-top:6px;padding-top:6px">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-weight:600;font-size:11px">一键自测</span>
-        <select id="rpTestModel" style="flex:1;min-width:120px;font-size:11px;padding:2px 4px;border:1px solid rgba(128,128,128,0.3);border-radius:3px;background:var(--vscode-dropdown-background,rgba(0,0,0,0.2));color:var(--vscode-dropdown-foreground,var(--vscode-foreground));outline:none;font-family:inherit"></select>
-        <input id="rpTestPrompt" placeholder="测试提示词 (默认: 你好)" style="flex:1.4;min-width:120px">
-        <button class="btn add" id="rpTestRun" title="经本地端点发一次标准 OpenAI 请求 · 验证全链路">▶ 测试</button>
-      </div>
-      <pre id="rpTestOut" style="display:none;max-height:200px;overflow:auto;margin:6px 0 0;padding:8px;font-size:11px;line-height:1.45;white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,rgba(0,0,0,0.18));border-radius:4px"></pre>
-    </div>
-
-    <!-- ★ v9.9.347 · 模型反代专属 Agent 交接文档 (实时生成 · 面向公网直调链路接管) -->
-    <div style="border-top:1px solid rgba(128,128,128,0.2);margin-top:6px;padding-top:6px">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-weight:600;font-size:11px">📄 Agent 交接文档 · 模型反代→公网直调</span>
-        <span style="font-size:10px;opacity:0.55">实时含公网URL/Key/自愈要点 · 交给本地或云端 Agent 即可接管「反代→内网穿透→公网无感调用」整条链路</span>
-        <button class="btn add" id="btnCopyRpHandoff" style="margin-left:auto" title="一键复制最新模型反代交接文档到剪贴板">📋 复制最新状态</button>
-        <button class="btn" id="btnDownloadRpHandoff" title="下载 dao-proxy-pro-revproxy-handoff.md">⬇ 下载 MD</button>
-        <button class="btn" id="btnPreviewRpHandoff" title="预览/刷新文档">预览</button>
-      </div>
-      <pre id="rpHandoffPreview" style="display:none;max-height:200px;overflow:auto;margin:6px 0 0;padding:8px;font-size:10px;line-height:1.45;white-space:pre-wrap;word-break:break-word;background:var(--vscode-textCodeBlock-background,rgba(0,0,0,0.18));border-radius:4px"></pre>
-    </div>
-  </div>
 
   <!-- ⑤ 内网穿透 · DAO Bridge (反者道之动 · 把反代端点直暴公网 · 零账号去中心化 · 公网直调反带模型) -->
   <div class="dao-pane" id="paneBridge">
@@ -6408,8 +6315,7 @@ function getEaConfigHtml(port, nonce, opts) {
         else { panes[j].classList.remove('active'); }
       }
       if (pane === 'paneRouter') { _scheduleWires(); }
-      if (pane === 'paneRevproxy') { _rpRefresh(); }
-      if (pane === 'paneBridge') { _brgRefresh(); }
+        if (pane === 'paneBridge') { _brgRefresh(); }
     });
   }
 
